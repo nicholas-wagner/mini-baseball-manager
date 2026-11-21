@@ -1,0 +1,30 @@
+:root {
+  --color-cardstock: #fbf4e4;
+  --color-cardstock-deep: #f1e4c8;
+  --color-ink: #181b2c;
+  --color-ink-muted: #4a5068;
+  --color-turf: #2fb356;
+  --color-turf-stripe: #279e4b;
+  --color-dirt: #d98a4e;
+  --color-sky: #4cc3ff;
+  --color-scoreboard: #1b4332;
+  --color-led-amber: #ffd166;
+  --color-coral: #ff4d6d;
+  --color-gold: #ffc300;
+  --color-cyan: #00e5ff;
+  --color-violet: #9b5de5;
+
+  --font-display: 'Bungee', 'Fredoka', system-ui, sans-serif;
+  --font-heading: 'Fredoka', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --border-comic: 3px solid var(--color-ink);
+  --border-comic-sm: 2px solid var(--color-ink);
+  --shadow-comic: 4px 4px 0 var(--color-ink);
+  --shadow-comic-sm: 2px 2px 0 var(--color-ink);
+  --shadow-comic-lg: 6px 6px 0 var(--color-ink);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

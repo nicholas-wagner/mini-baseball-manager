@@ -15,15 +15,15 @@
 
 | Milestone | Focus | Slices | Status | Target Gate |
 | :--- | :--- | :---: | :--- | :--- |
-| **M0** | Project Scaffolding, TDD Harness & Android PWA Shell | 0 / 4 | `[ ]` Planned | CI/TDD green + PWA manifest valid |
-| **M1** | **Design-First Visual Identity & Interactive Design Lab** | 0 / 6 | `[ ]` Planned | **Visual Review Checkpoint** (cards, chibi 3D, animations, camera, SFX) |
+| **M0** | Project Scaffolding, TDD Harness & Android PWA Shell | 4 / 4 | `[x]` Done | CI/TDD green + PWA manifest valid |
+| **M1** | **Design-First Visual Identity & Interactive Design Lab** | 6 / 6 | `[/]` Visual Review | **Visual Review Checkpoint** (cards, chibi 3D, animations, camera, SFX) |
 | **M2** | **Core Playable MVP** (Sim Engine + Lineups + Live 3D + Local Save) | 0 / 5 | `[ ]` Planned | **Playable MVP Release** (desktop + Android PWA) |
 | **M3** | RPG Depth: Real Skill Trees, Special Powers, Practice & Manager Tree | 0 / 3 | `[ ]` Planned | Full player & manager RPG progression live |
 | **M4** | GM Operations, 6-Tier League Pyramid, AI Clubs & Team Rivalries | 0 / 4 | `[ ]` Planned | Multi-season promotion/relegation career + rivalries |
 | **M5** | Sim-City Economy, Fanbase Engine & 3D Stadium Builder | 0 / 3 | `[ ]` Planned | Attendance, pricing, sponsors, TV & visual stadium upgrades |
 | **M6** | Surprises, Awards, Trophy Room, Unlockables & PWA Polish | 0 / 4 | `[ ]` Planned | Long-term replayability & 60 FPS mobile polish |
 
-**Overall Progress**: `0 / 29` feature slices completed
+**Overall Progress**: `10 / 29` feature slices completed *(Milestone 1 ready for visual approval)*
 
 ---
 
@@ -211,26 +211,26 @@ mini-baseball-manager/
 ## Milestone & Feature Checklist
 
 ### Milestone 0 — Project Foundation, TDD Harness & Android PWA Shell
-- [ ] **0A. Repo, Tooling & Stack Setup**: Initialize Vite + React + TypeScript + Tailwind CSS v4 + Three.js + Zustand + offline `@fontsource` fonts + lint/typecheck scripts.
-- [ ] **0B. Strict TDD & E2E Test Harness**: Configure Vitest + React Testing Library + coverage thresholds (≥90% target on `src/engine/`) + Playwright (Desktop 1280×800 & Android Mobile 390×844 viewports).
-- [ ] **0C. Android-Installable PWA Shell**: Configure `vite-plugin-pwa`, `manifest.webmanifest`, offline Workbox caching, custom retro baseball icons (`192px`, `512px`, maskable), and mobile viewport safe-area CSS.
-- [ ] **0D. Design System Spec**: Create `docs/DESIGN_SYSTEM.md` locking exact CSS custom properties, spacing, breakpoints, and 3D scale units.
-  - [ ] *TDD Gate*: Smoke tests (`npm test`, `npm run typecheck`, `npm run build`) pass green.
+- [x] **0A. Repo, Tooling & Stack Setup**: Initialize Vite + React + TypeScript + Tailwind CSS v4 + Three.js + Zustand + offline `@fontsource` fonts + lint/typecheck scripts.
+- [x] **0B. Strict TDD & E2E Test Harness**: Configure Vitest + React Testing Library + coverage thresholds (≥90% target on `src/engine/`) + Playwright (Desktop 1280×800 & Android Mobile 390×844 viewports).
+- [x] **0C. Android-Installable PWA Shell**: Configure `vite-plugin-pwa`, `manifest.webmanifest`, offline Workbox caching, custom retro baseball icons (`192px`, `512px`, maskable), and mobile viewport safe-area CSS.
+- [x] **0D. Design System Spec**: Create `docs/DESIGN_SYSTEM.md` locking exact CSS custom properties, spacing, breakpoints, and 3D scale units.
+  - [x] *TDD Gate*: Smoke tests (`npm test`, `npm run typecheck`, `npm run build`) pass green.
 
 ---
 
 ### Milestone 1 — Visual Identity & Interactive Design Lab *(Design-First!)*
-- [ ] **1A. 90s Baseball Card UI Kit** (`src/ui/design-system/`): Chunky comic buttons, cardstock panels, halftone surfaces, LED scoreboard strip, stat badges, modal dialogs, responsive mobile bottom-nav / desktop sidebar shell.
-  - [ ] *TDD Gate*: Component render, interaction, and responsive structure tests pass.
-- [ ] **1B. Procedural Retro 90s Portrait & 3D Flip Baseball Card** (`src/art/portraits/`, `FlipBaseballCard`): Deterministic SVG generator with full trait catalog, mood reactions, rarity frames (Paper / Chrome / Holo Foil), and smooth 3D card flip.
-  - [ ] *TDD Gate*: Portrait determinism, SVG validity, trait range, and flip-card interaction tests pass.
-- [ ] **1C. Toon-Shaded Chibi 3D Character Rig & Animations** (`src/scene/characters/`): Cel-shaded *Power Pros*-style 3D chibi player mesh, comic ink outline, live canvas facial expressions, and full animation state machine (idle, pitching, batting, fielding/diving/jumping, practice drills, HR celebration).
-  - [ ] *TDD Gate*: Unit tests for animation state machine transitions, spring curves, and timing durations pass.
-- [ ] **1D. Miniature 3D Ballpark, Over-the-Shoulder Camera & Comic VFX** (`src/scene/ballpark/`, `camera/`, `vfx/`): Sunlit 3D sandlot ballpark, behind-pitcher & behind-batter over-the-shoulder camera presets, smooth ball-tracking follow cam, super-power trails, dust puffs, and comic popups (`"CRACK!"`, `"WHOOSH!"`, `"BOOM!"`).
-  - [ ] *TDD Gate*: Unit tests for camera preset math, trajectory arcs, and VFX lifecycle pass.
-- [ ] **1E. Procedural 90s Web Audio Synth & Organ** (`src/audio/`): Bat crack, glove pop, super-pitch whoosh, crowd cheer, cash chime, level-up fanfare, ballpark organ riffs, and global mute/volume state.
-  - [ ] *TDD Gate*: Unit tests for audio scheduler, mute persistence, and cue triggers pass.
-- [ ] **1F. Interactive "Design Lab" Showcase Screen** (`src/ui/screens/DesignLab`): Live interactive sandbox to spin/inspect chibi characters, trigger every animation & super-power VFX, randomize 90s baseball cards, swap camera angles, and audition SFX on desktop & mobile.
+- [x] **1A. 90s Baseball Card UI Kit** (`src/ui/design-system/`): Chunky comic buttons, cardstock panels, halftone surfaces, LED scoreboard strip, stat badges, modal dialogs, responsive mobile bottom-nav / desktop sidebar shell.
+  - [x] *TDD Gate*: Component render, interaction, and responsive structure tests pass.
+- [x] **1B. Procedural Retro 90s Portrait & 3D Flip Baseball Card** (`src/art/portraits/`, `FlipBaseballCard`): Deterministic SVG generator with full trait catalog, mood reactions, rarity frames (Paper / Chrome / Holo Foil), and smooth 3D card flip.
+  - [x] *TDD Gate*: Portrait determinism, SVG validity, trait range, and flip-card interaction tests pass.
+- [x] **1C. Toon-Shaded Chibi 3D Character Rig & Animations** (`src/scene/characters/`): Cel-shaded *Power Pros*-style 3D chibi player mesh, comic ink outline, live canvas facial expressions, and full animation state machine (idle, pitching, batting, fielding/diving/jumping, practice drills, HR celebration).
+  - [x] *TDD Gate*: Unit tests for animation state machine transitions, spring curves, and timing durations pass.
+- [x] **1D. Miniature 3D Ballpark, Over-the-Shoulder Camera & Comic VFX** (`src/scene/ballpark/`, `camera/`, `vfx/`): Sunlit 3D sandlot ballpark, behind-pitcher & behind-batter over-the-shoulder camera presets, smooth ball-tracking follow cam, super-power trails, dust puffs, and comic popups (`"CRACK!"`, `"WHOOSH!"`, `"BOOM!"`).
+  - [x] *TDD Gate*: Unit tests for camera preset math, trajectory arcs, and VFX lifecycle pass.
+- [x] **1E. Procedural 90s Web Audio Synth & Organ** (`src/audio/`): Bat crack, glove pop, super-pitch whoosh, crowd cheer, cash chime, level-up fanfare, ballpark organ riffs, and global mute/volume state.
+  - [x] *TDD Gate*: Unit tests for audio scheduler, mute persistence, and cue triggers pass.
+- [x] **1F. Interactive "Design Lab" Showcase Screen** (`src/ui/screens/DesignLab`): Live interactive sandbox to spin/inspect chibi characters, trigger every animation & super-power VFX, randomize 90s baseball cards, swap camera angles, and audition SFX on desktop & mobile.
   - [ ] *Visual Gate*: User reviews Design Lab on desktop & mobile viewports and approves art direction before Milestone 2.
 
 ---

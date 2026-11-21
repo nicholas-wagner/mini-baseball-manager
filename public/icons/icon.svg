@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#7CE0FF" />
+      <stop offset="100%" stop-color="#279AF1" />
+    </radialGradient>
+  </defs>
+  <!-- Badge Background -->
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="url(#sky)" stroke="#181B2C" stroke-width="24" />
+  <!-- Turf horizon -->
+  <path d="M36 330 Q256 280 476 330 L476 404 Q476 476 404 476 L108 476 Q36 476 36 404 Z" fill="#2FB356" stroke="#181B2C" stroke-width="18" />
+  <!-- Diamond dirt arc -->
+  <path d="M128 380 Q256 324 384 380 L340 462 L172 462 Z" fill="#D98A4E" stroke="#181B2C" stroke-width="14" />
+  <!-- Sparkles -->
+  <polygon points="105,112 117,138 145,142 124,160 130,188 105,174 80,188 86,160 65,142 93,138" fill="#FFC300" stroke="#181B2C" stroke-width="10" stroke-linejoin="round" />
+  <circle cx="412" cy="128" r="18" fill="#FF4D6D" stroke="#181B2C" stroke-width="10" />
+  <!-- Cute Chibi Baseball Body -->
+  <circle cx="256" cy="272" r="118" fill="#FBF4E4" stroke="#181B2C" stroke-width="20" />
+  <!-- Baseball Seams -->
+  <path d="M180 198 Q216 272 180 346" fill="none" stroke="#E63946" stroke-width="12" stroke-linecap="round" />
+  <path d="M332 198 Q296 272 332 346" fill="none" stroke="#E63946" stroke-width="12" stroke-linecap="round" />
+  <!-- Mini Baseball Cap -->
+  <path d="M148 212 C156 128 356 128 364 212 Z" fill="#E63946" stroke="#181B2C" stroke-width="18" stroke-linejoin="round" />
+  <ellipse cx="290" cy="210" rx="108" ry="26" fill="#C1121F" stroke="#181B2C" stroke-width="16" />
+  <circle cx="256" cy="144" r="14" fill="#FFC300" stroke="#181B2C" stroke-width="10" />
+  <!-- Cute 90s Cartoon Eyes & Grin -->
+  <ellipse cx="220" cy="274" rx="14" ry="20" fill="#181B2C" />
+  <circle cx="225" cy="266" r="5" fill="#FFFFFF" />
+  <ellipse cx="292" cy="274" rx="14" ry="20" fill="#181B2C" />
+  <circle cx="297" cy="266" r="5" fill="#FFFFFF" />
+  <!-- Cheek blush -->
+  <ellipse cx="192" cy="296" rx="14" ry="8" fill="#FF8FA3" opacity="0.85" />
+  <ellipse cx="320" cy="296" rx="14" ry="8" fill="#FF8FA3" opacity="0.85" />
+  <!-- Big confident smile -->
+  <path d="M222 308 Q256 344 290 308 Z" fill="#181B2C" stroke="#181B2C" stroke-width="8" stroke-linejoin="round" />
+  <path d="M232 314 Q256 322 280 314" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" />
+</svg>
