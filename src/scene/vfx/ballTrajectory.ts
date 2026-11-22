@@ -1,13 +1,7 @@
+import type { BallVfxStyle } from '../../engine/vfx/types';
 import type { Vec3 } from '../camera/cameraRig';
 
-export type BallVfxStyle =
-  | 'fastball'
-  | 'blazing_comet'
-  | 'ghost_knuckle'
-  | 'tornado_slider'
-  | 'moonshot_hr'
-  | 'ninja_bunt'
-  | 'line_drive';
+export type { BallVfxStyle };
 
 export interface BallTrajectorySpec {
   style: BallVfxStyle;

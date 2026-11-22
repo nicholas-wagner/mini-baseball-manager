@@ -62,17 +62,32 @@ describe('Lefty / Righty / Switch Handedness & Platoon System', () => {
   it('resolves switch hitters to the opposite box and awards correct platoon edges', () => {
     expect(resolveEffectiveBatSide('S', 'R')).toBe('L');
     expect(resolveEffectiveBatSide('S', 'L')).toBe('R');
+    expect(resolveEffectiveBatSide('L', 'R')).toBe('L');
+    expect(resolveEffectiveBatSide('R', 'L')).toBe('R');
 
     const switchVsRight = evaluatePlatoonMatchup('S', 'R');
     expect(switchVsRight.advantage).toBe('batter');
     expect(switchVsRight.isSwitchHitterEdge).toBe(true);
     expect(switchVsRight.batterContactDelta).toBeGreaterThan(0);
     expect(switchVsRight.firstBaseStepBonus).toBeGreaterThan(0);
+    expect(switchVsRight.label).toBe('Switch-Hitter Platoon Edge');
+
+    const rightVsLeft = evaluatePlatoonMatchup('R', 'L');
+    expect(rightVsLeft.advantage).toBe('batter');
+    expect(rightVsLeft.isSwitchHitterEdge).toBe(false);
+    expect(rightVsLeft.firstBaseStepBonus).toBe(0);
+    expect(rightVsLeft.label).toBe('Batter Platoon Edge');
 
     const leftOnLeft = evaluatePlatoonMatchup('L', 'L');
     expect(leftOnLeft.advantage).toBe('pitcher');
     expect(leftOnLeft.pitcherBreakDelta).toBeGreaterThan(0);
     expect(leftOnLeft.batterContactDelta).toBeLessThan(0);
+    expect(leftOnLeft.label).toBe('Lefty-on-Lefty Pitcher Edge');
+
+    const rightOnRight = evaluatePlatoonMatchup('R', 'R');
+    expect(rightOnRight.advantage).toBe('pitcher');
+    expect(rightOnRight.firstBaseStepBonus).toBe(0);
+    expect(rightOnRight.label).toBe('Righty-on-Righty Pitcher Edge');
   });
 
   it('grants LHP runner-hold bonus and Lefty 1B scoop bonus', () => {

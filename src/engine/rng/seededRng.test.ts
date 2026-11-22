@@ -18,13 +18,17 @@ describe('createSeededRng', () => {
     expect(a.next()).not.toBe(b.next());
   });
 
-  it('bounds int() inclusively within [min, max]', () => {
+  it('bounds int() and float() deterministically within [min, max]', () => {
     const rng = createSeededRng(42);
     for (let i = 0; i < 100; i += 1) {
       const value = rng.int(3, 7);
       expect(value).toBeGreaterThanOrEqual(3);
       expect(value).toBeLessThanOrEqual(7);
       expect(Number.isInteger(value)).toBe(true);
+
+      const sample = rng.float(-1.5, 2.5);
+      expect(sample).toBeGreaterThanOrEqual(-1.5);
+      expect(sample).toBeLessThan(2.5);
     }
   });
 

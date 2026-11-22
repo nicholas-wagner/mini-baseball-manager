@@ -1,4 +1,4 @@
-import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
+import type { BallVfxStyle } from '../vfx/types';
 
 export type NationalityId =
   | 'USA'

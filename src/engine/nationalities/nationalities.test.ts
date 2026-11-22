@@ -68,6 +68,22 @@ describe('Global Nationalities & Cultural Heritage System', () => {
     expect(a.nationality.id).toBe('IRL');
     expect(a.nationality.heritageAbility.name).toMatch(/leprechaun/i);
     expect(a.nationality.hometowns).toContain(a.hometown);
+
+    const unforcedA = generatePlayerIdentity(createSeededRng(909));
+    const unforcedB = generatePlayerIdentity(createSeededRng(909));
+    expect(unforcedA).toEqual(unforcedB);
+    expect(NATIONALITIES_CATALOG.map((n) => n.id)).toContain(unforcedA.nationality.id);
+  });
+
+  it('guards against empty catalogs and floating-point upper-bound rolls', () => {
+    expect(() => rollNationality(createSeededRng(1), [])).toThrow(/cannot be empty/i);
+
+    const maxBoundaryRng = {
+      ...createSeededRng(1),
+      next: () => 1,
+    };
+    const picked = rollNationality(maxBoundaryRng);
+    expect(picked.id).toBe(NATIONALITIES_CATALOG[NATIONALITIES_CATALOG.length - 1].id);
   });
 
   it('assigns unique Cultural Heritage ability IDs to every nationality', () => {

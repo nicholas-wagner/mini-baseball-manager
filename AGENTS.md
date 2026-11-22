@@ -13,20 +13,24 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
 4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-052`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
+6. **Project Workflow Skills (`.agents/skills/`)** — Portable engineering skills (auto-discovered by Antigravity and readable by any AI editor):
+   - [`.agents/skills/ub-tdd-craft/SKILL.md`](./.agents/skills/ub-tdd-craft/SKILL.md) — Strict TDD, behavior-focused tests, Clean Code refactoring, and CRAP-lite complexity discipline (*inspired by `unclebob/ub-mode`*).
+   - [`.agents/skills/pstack-correct/SKILL.md`](./.agents/skills/pstack-correct/SKILL.md) — Architectural sketching, root-cause fixes, and the `/correct` mistake-elimination ladder (*inspired by `cursor/plugins/pstack`*).
 
 ---
 
-## 2. Hard Architectural Rules (Never Violate!)
+## 2. Hard Architectural Rules (Mechanically Enforced!)
 
-1. **Hexagonal Layer Purity**:
-   - `src/engine/**` MUST be **100% pure TypeScript**. **ZERO imports** from `react`, `react-dom`, `three`, `zustand`, `window`, `document`, `localStorage`, or `indexedDB`.
+1. **Hexagonal Layer Purity** *(enforced by `eslint.config.js`)*:
+   - `src/engine/**` MUST be **100% pure TypeScript**. **ZERO imports** from `react`, `react-dom`, `three`, `zustand`, `ui`, `scene`, `store`, `art`, `audio`, or browser globals (`window`, `document`, `localStorage`, `indexedDB`, `navigator`, `fetch`).
+   - Production `src/engine/**/*.ts` enforces cyclomatic `complexity <= 10` and `max-depth <= 3`.
    - `src/scene/**` (Three.js 3D engine) is imperative and decoupled from React reconciliation; pure math modules (`cameraRig.ts`, `animationState.ts`, `ballTrajectory.ts`) must remain runnable in Node/jsdom without WebGL.
    - `src/ui/**` reads projections and dispatches actions via `src/store/**` and renders the 3D scene through thin host wrappers (e.g., `BallparkCanvas.tsx`).
-2. **Seeded Determinism (`SeededRng`)**:
+2. **Seeded Determinism (`SeededRng`)** *(enforced by `eslint.config.js`)*:
    - NEVER use `Math.random()` inside `src/engine/**` or `src/art/**`. Always thread `SeededRng` from `src/engine/rng/seededRng.ts` so every game, draft class, portrait, nationality roll, and surprise event is 100% reproducible in tests.
-3. **Strict TDD (Red → Green → Refactor)**:
+3. **Strict TDD (Red → Green → Refactor)** *(enforced by `vitest.config.ts`)*:
    - Write failing Vitest tests BEFORE writing implementation code for every engine rule, RPG modifier, economy formula, AI decision, persistence migration, and interactive UI component.
-   - Maintain **≥90% coverage** across `src/engine/**`.
+   - Maintain **≥90% statements, branches, functions, and lines coverage** across `src/engine/**/*.ts` (checked automatically on `vitest run --coverage`).
 4. **Local-Only Persistence**:
    - Zero centralized backend DB. All state lives on-device (IndexedDB primary + localStorage metadata + schema version migrations + portable JSON/Base64 export/import).
 5. **Visual & Mobile Craft**:
@@ -100,9 +104,9 @@ Before marking a task `DONE` in `docs/TASKS.md`:
 1. Set task status to `IN_PROGRESS` before coding.
 2. Write failing Vitest tests first (**RED**), implement clean TypeScript (**GREEN**), refactor cleanly (**REFACTOR**).
 3. Run the full verification pipeline and confirm **zero errors**:
-   - `./node_modules/.bin/vitest run`
+   - `./node_modules/.bin/vitest run --coverage` *(enforces `>= 90%` coverage on `src/engine/**/*.ts`)*
    - `./node_modules/.bin/tsc -b --noEmit`
-   - `./node_modules/.bin/eslint .`
+   - `./node_modules/.bin/eslint .` *(enforces hexagonal purity, `SeededRng`, and engine complexity caps)*
    - `./node_modules/.bin/vite build`
 4. If touching UI, SVG art, or 3D scenes: run Playwright E2E and visually inspect real screenshots across Desktop (`1280×800`) and Android Mobile (`390×844`) viewports.
 5. **Keep `README.md` & Visual Previews Up to Date**: Whenever shipping a new milestone, major feature, or noticeable UI/3D/art improvement, update `README.md` (status/progress count, feature highlights, commands) and refresh or add up-to-date screenshots in `docs/screenshots/`.

@@ -175,6 +175,7 @@
 | 2026-11-21 | Gameplay & Visuals | Added **Lefty / Righty / Switch Handedness & Platoon Matchups** (exact position-specific throw & bat distributions, platoon edges, mirrored 2.5D/3D graphics) | Deepens bullpen/lineup chess and adds unmistakable visual variety on mound & plate |
 | 2026-11-21 | 10X Expansion & Agentic Workflow | Expanded roadmap to **10 Milestones / 52 Slices** (All-Star HR Derby, Global Chibi Cup, Chemistry, Coaches, 90s Relics, Weather, District Grid, Trade Machine, Farm Academy, Sandlot Gazette, HOF/Retired Wall Numbers, Shareable PNG Cards & Club Codes) and added `AGENTS.md`, `docs/ARCHITECTURE.md`, and `docs/TASKS.md` | Makes the game a genuine 10X cult-classic baseball RPG AND enables any AI agent to drop in and contribute autonomously with zero ambiguity |
 | 2026-11-21 | Open Source & Docs Hygiene | Published under MIT License on GitHub and added mandatory **`README.md` + `docs/screenshots/` visual preview refresh** to the milestone/PR Definition of Done | Ensures the public GitHub showcase always reflects the latest visuals, features, and progress |
+| 2026-11-21 | Engineering Craft & Quality Gates | Added portable `.agents/skills/` (`ub-tdd-craft` & `pstack-correct` inspired by `ub-mode` and `pstack`) plus mechanical ESLint (hexagonal purity, `SeededRng`, `complexity <= 10`, `max-depth <= 3`) and Vitest (`>= 90%` engine coverage thresholds) gates | Enforces clean TDD, root-cause discipline, and architectural purity mechanically across every AI editor and human contributor |
 
 ---
 
