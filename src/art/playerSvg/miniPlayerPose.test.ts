@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CLIP_DURATIONS, type CharacterAnimClip } from '../../scene/characters/animationState';
 import { evaluateMiniPlayerPose } from './miniPlayerPose';
 
-describe('Articulated Mini-Player SVG Pose Rig', () => {
+describe('Articulated 2.5D Chibi Mini-Player Pose Rig', () => {
   const clips = Object.keys(CLIP_DURATIONS) as CharacterAnimClip[];
 
   it('evaluates finite joint transforms across all 14 animation clips', () => {
@@ -11,8 +11,9 @@ describe('Articulated Mini-Player SVG Pose Rig', () => {
       for (const frac of [0, 0.25, 0.5, 0.8]) {
         const pose = evaluateMiniPlayerPose(clip, dur * frac, 'pitcher');
         expect(Number.isFinite(pose.root.ty)).toBe(true);
-        expect(Number.isFinite(pose.leftArm.rotDeg)).toBe(true);
-        expect(Number.isFinite(pose.rightArm.rotDeg)).toBe(true);
+        expect(Number.isFinite(pose.backArm.rotDeg)).toBe(true);
+        expect(Number.isFinite(pose.frontArm.rotDeg)).toBe(true);
+        expect(Number.isFinite(pose.hopWorldY)).toBe(true);
         expect(pose.shadowScale).toBeGreaterThan(0.2);
       }
     }
