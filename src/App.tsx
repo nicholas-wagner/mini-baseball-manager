@@ -4,6 +4,7 @@ import { soundEngine } from './audio/soundEngine';
 import { useGameStore } from './store/gameStore';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
 import { ComicCard } from './ui/design-system/ComicCard';
+import { PwaInstallBanner } from './ui/components/PwaInstallBanner';
 import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
 import { ClubHubScreen } from './ui/screens/ClubHubScreen';
 import { DesignLabScreen } from './ui/screens/DesignLabScreen';
@@ -113,6 +114,7 @@ export function App() {
       muted={muted}
       onToggleMute={handleToggleMute}
     >
+      <PwaInstallBanner />
       {renderMainContent()}
     </AppShell>
   );

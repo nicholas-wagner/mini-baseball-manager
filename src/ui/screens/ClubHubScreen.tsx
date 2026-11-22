@@ -1,10 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Award, Building2, Dumbbell, Sparkles, Users } from 'lucide-react';
+import { Award, Building2, Dumbbell, Share2, Sparkles, Trophy, Users } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
 import {
   BALLPARK_CATALOG,
   getBallparkPreset,
 } from '../../engine/ballparks/stadiumCatalog';
+import {
+  getStadiumTierProfile,
+  STADIUM_UPGRADE_CATALOG,
+} from '../../engine/ballparks/stadiumProgression';
+import { evaluateUnlockablesProgress } from '../../engine/events/unlockables';
+import { runHomeRunDerby, type HomeRunDerbyResult } from '../../engine/league/homeRunDerby';
+import { encodeClubExportCode } from '../../store/clubCode';
 import {
   computeClubStaffPayroll,
   evaluateClubStaffBonuses,
@@ -34,16 +41,18 @@ import {
   runHumanStaffClinic,
   unequipHumanPlayerRelic,
   unlockHumanManagerNode,
+  upgradeHumanStadium,
 } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
 import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
-type HubSubTab = 'stadiums' | 'staff' | 'practice' | 'manager' | 'relics';
+type HubSubTab = 'stadiums' | 'staff' | 'practice' | 'manager' | 'relics' | 'spectacles';
 
 export function ClubHubScreen() {
   const club = useGameStore((s) => s.getHumanClub());
+  const leagues = useGameStore((s) => s.leagues);
   const manager = useGameStore((s) => s.manager);
   const worldSeed = useGameStore((s) => s.worldSeed);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
@@ -52,6 +61,8 @@ export function ClubHubScreen() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
   const [activeClip, setActiveClip] = useState<'idle' | 'practice_cage' | 'practice_bullpen' | 'field_dive' | 'field_run' | 'celebrate_hr'>('idle');
   const [notice, setNotice] = useState<string | null>(null);
+  const [derbyResult, setDerbyResult] = useState<HomeRunDerbyResult | null>(null);
+  const [exportCode, setExportCode] = useState<string>('');
 
   const staffMarket = useMemo(() => {
     if (!club) return [];
@@ -72,6 +83,7 @@ export function ClubHubScreen() {
   if (!club) return null;
 
   const activePark = getBallparkPreset(club.stadium.ballparkId);
+  const tierProfile = getStadiumTierProfile(club.leagueTier);
   const activeStaff = club.coaches.activeStaff ?? [];
   const staffBonuses = evaluateClubStaffBonuses(activeStaff);
   const chemistry = evaluateClubhouseChemistry(club.roster);
@@ -148,6 +160,15 @@ export function ClubHubScreen() {
             >
               Relics & Chemistry
             </ComicButton>
+            <ComicButton
+              size="sm"
+              variant={subTab === 'spectacles' ? 'gold' : 'cream'}
+              active={subTab === 'spectacles'}
+              icon={<Trophy className="w-3.5 h-3.5" />}
+              onClick={() => setSubTab('spectacles')}
+            >
+              Derby & Sharing
+            </ComicButton>
           </div>
         }
       >
@@ -159,23 +180,44 @@ export function ClubHubScreen() {
 
         {subTab === 'stadiums' ? (
           <div className="space-y-3">
-            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="font-display text-sm text-[#181B2C]">
-                  Current Home Venue: {activePark.name}
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="font-display text-sm text-[#181B2C]">
+                    Current Home Venue: {activePark.name} ({tierProfile.label})
+                  </div>
+                  <div className="text-xs font-bold text-[#4A5068]">
+                    {activePark.tagline} • Capacity {club.stadium.capacity.toLocaleString()} /{' '}
+                    {tierProfile.maxCapacity.toLocaleString()} fans (Seating Deck Lv.{club.stadium.seatingTier})
+                  </div>
                 </div>
-                <div className="text-xs font-bold text-[#4A5068]">{activePark.tagline}</div>
+                <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
+                  <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C]">
+                    LF {activePark.factors.leftWallFt} / CF {activePark.factors.centerWallFt} / RF {activePark.factors.rightWallFt} ft
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C]">
+                    HR {activePark.factors.hrFactor.toFixed(2)}x (L {activePark.factors.leftyHrFactor.toFixed(2)}x / R {activePark.factors.rightyHrFactor.toFixed(2)}x)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C]">
+                    {activePark.factors.isDome ? 'Indoor Dome' : 'Open Air'} • {activePark.factors.surface === 'fast_turf' ? 'Fast Turf' : 'Natural Grass'}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
-                <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C]">
-                  LF {activePark.factors.leftWallFt} / CF {activePark.factors.centerWallFt} / RF {activePark.factors.rightWallFt} ft
-                </span>
-                <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C]">
-                  HR {activePark.factors.hrFactor.toFixed(2)}x (L {activePark.factors.leftyHrFactor.toFixed(2)}x / R {activePark.factors.rightyHrFactor.toFixed(2)}x)
-                </span>
-                <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C]">
-                  {activePark.factors.isDome ? 'Indoor Dome' : 'Open Air'} • {activePark.factors.surface === 'fast_turf' ? 'Fast Turf' : 'Natural Grass'}
-                </span>
+              <div className="flex flex-wrap gap-1.5 pt-1 border-t border-dashed border-[#181B2C]/20">
+                {STADIUM_UPGRADE_CATALOG.map((upg) => (
+                  <ComicButton
+                    key={upg.id}
+                    size="sm"
+                    variant="gold"
+                    onClick={() => {
+                      const res = upgradeHumanStadium(upg.id);
+                      setNotice(res.upgraded ? `Upgraded stadium: ${upg.label}!` : (res.reason ?? 'Unavailable.'));
+                      soundEngine.play(res.upgraded ? 'cash_chime' : 'ui_pop');
+                    }}
+                  >
+                    + {upg.label} (${upg.cost.toLocaleString()})
+                  </ComicButton>
+                ))}
               </div>
             </div>
 
@@ -547,6 +589,116 @@ export function ClubHubScreen() {
                 })}
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {subTab === 'spectacles' ? (
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="font-display text-sm text-[#181B2C]">
+                    All-Star Home Run Derby &amp; Unlockables Gallery
+                  </div>
+                  <div className="text-xs font-bold text-[#4A5068]">
+                    Run an 8-slugger bracketed Derby across {club.leagueTier.toUpperCase()} or share your dynasty offline!
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <ComicButton
+                    size="sm"
+                    variant="gold"
+                    icon={<Trophy className="w-3.5 h-3.5" />}
+                    onClick={() => {
+                      const tierClubs = leagues[club.leagueTier] ?? [club];
+                      const res = runHomeRunDerby(
+                        createSeededRng(worldSeed + seasonNumber * 997),
+                        tierClubs,
+                        club.stadium.ballparkId ?? 'high_altitude_mesa',
+                      );
+                      setDerbyResult(res);
+                      setNotice(
+                        `HR Derby Champion: ${res.championName}! Longest bomb: ${res.longestHomeRunFt} ft!`,
+                      );
+                      soundEngine.play('trophy_fanfare');
+                    }}
+                  >
+                    Run Home Run Derby
+                  </ComicButton>
+                  <ComicButton
+                    size="sm"
+                    variant="sky"
+                    icon={<Share2 className="w-3.5 h-3.5" />}
+                    onClick={() => {
+                      const code = encodeClubExportCode(club);
+                      setExportCode(code);
+                      setNotice('Generated serverless MBM1 Club Export Code — copy and share offline!');
+                      soundEngine.play('ui_pop');
+                    }}
+                  >
+                    Generate Club Export Code
+                  </ComicButton>
+                </div>
+              </div>
+              {derbyResult ? (
+                <div className="p-2.5 rounded-xl border border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]">
+                  🏆 Derby Champ: {derbyResult.championName} • Longest HR: {derbyResult.longestHomeRunFt} ft •
+                  Prize: ${derbyResult.cashPrize.toLocaleString()}
+                </div>
+              ) : null}
+              {exportCode ? (
+                <div className="space-y-1">
+                  <label htmlFor="club-export-code" className="text-[10px] font-extrabold uppercase text-[#4A5068]">
+                    Serverless Club Export Code (Share Offline)
+                  </label>
+                  <input
+                    id="club-export-code"
+                    readOnly
+                    value={exportCode}
+                    className="w-full px-2.5 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] font-mono-tabular text-[11px]"
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            {(() => {
+              const unlockStatus = evaluateUnlockablesProgress({
+                leagueTier: club.leagueTier,
+                careerWins: club.wins,
+                championshipsWon: club.stadium.championshipPennants.length,
+                retiredNumbersCount: club.stadium.retiredNumbers.length,
+                wonHomeRunDerby: Boolean(derbyResult),
+                wonGlobalCup: false,
+              });
+              return (
+                <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2">
+                  <div className="font-display text-xs text-[#181B2C]">
+                    Cosmetics &amp; Throwbacks Gallery ({unlockStatus.unlocked.length}/{unlockStatus.unlocked.length + unlockStatus.locked.length} Unlocked • {unlockStatus.completionPct}%)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {[...unlockStatus.unlocked, ...unlockStatus.locked].slice(0, 6).map((item) => {
+                      const earned = unlockStatus.unlocked.some((u) => u.id === item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-2 rounded-xl border-2 border-[#181B2C] text-xs ${
+                            earned ? 'bg-[#D8F3DC]' : 'bg-white opacity-80'
+                          }`}
+                        >
+                          <div className="font-display text-[#181B2C]">
+                            {earned ? '★ ' : '🔒 '}
+                            {item.name}
+                          </div>
+                          <div className="text-[10px] font-bold text-[#4A5068]">
+                            {item.requirementText}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         ) : null}
       </ComicCard>
