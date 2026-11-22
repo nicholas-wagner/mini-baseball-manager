@@ -3,6 +3,10 @@ import { Dices, Play } from 'lucide-react';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
 import { soundEngine } from '../../audio/soundEngine';
+import {
+  STARTING_ROSTER_PRESETS,
+  type StartingRosterPreset,
+} from '../../engine/gm/rosterPresets';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import { useGameStore } from '../../store/gameStore';
 import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
@@ -24,6 +28,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const [mascot, setMascot] = useState('Rocket Dog');
   const [monogram, setMonogram] = useState('SC');
   const [managerName, setManagerName] = useState('Coach Skip');
+  const [startingPreset, setStartingPreset] = useState<StartingRosterPreset>('balanced');
   const [paletteIndex, setPaletteIndex] = useState(0);
   const [seedNonce, setSeedNonce] = useState(1994);
 
@@ -58,6 +63,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
       secondaryColor: palette.secondary,
       accentColor: palette.accent,
       managerName,
+      startingPreset,
       seed: seedNonce,
     });
     soundEngine.play('organ_charge');
@@ -178,6 +184,45 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                     {item.name}
                   </ComicButton>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+                  Starting Roster Build (Fair Rookie Sandlot Parity)
+                </span>
+                <span className="text-[10px] font-extrabold text-[#1B4332]">
+                  Climb Rookie → Mini Majors World Champs!
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {STARTING_ROSTER_PRESETS.map((preset) => {
+                  const active = startingPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setStartingPreset(preset.id);
+                        soundEngine.play('ui_pop');
+                      }}
+                      className={`p-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[68px] transition cursor-pointer ${
+                        active
+                          ? 'bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C]'
+                          : 'bg-[#FFFDF7]'
+                      }`}
+                    >
+                      <div className="font-display text-xs text-[#181B2C]">{preset.label}</div>
+                      <div className="text-[10px] font-extrabold text-[#1B4332] mt-0.5">
+                        + {preset.pros}
+                      </div>
+                      <div className="text-[10px] font-bold text-[#9D0208]">
+                        − {preset.cons}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

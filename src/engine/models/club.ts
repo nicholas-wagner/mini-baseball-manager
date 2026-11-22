@@ -13,6 +13,16 @@ export const LEAGUE_TIER_ORDER: readonly LeagueTierId[] = [
   'majors',
 ] as const;
 
+/** Tier-scaled annual club payroll Salary Caps (scales cleanly from Rookie Sandlot to Mini Major League). */
+export const TIER_SALARY_CAPS: Readonly<Record<LeagueTierId, number>> = {
+  rookie: 15_000,
+  low_a: 24_000,
+  high_a: 38_000,
+  aa: 66_000,
+  aaa: 120_000,
+  majors: 240_000,
+};
+
 export type AiArchetype =
   | 'mashers'
   | 'speed_demons'

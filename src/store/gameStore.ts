@@ -5,9 +5,19 @@ import {
   validateRosterRelease,
 } from '../engine/gm/marketTiers';
 import {
+  beginOffseasonCycle,
+  completeOffseasonCycle,
+  draftOffseasonProspect,
+  resolveExpiringContractDecision,
+  signOffseasonFreeAgent,
+  validateSalaryCapRoom,
+  type OffseasonState,
+} from '../engine/gm/offseasonEngine';
+import {
   buildOptimalLineup,
   validateLineup,
 } from '../engine/gm/rosterFactory';
+import type { StartingRosterPreset } from '../engine/gm/rosterPresets';
 import type { FieldPosition } from '../engine/handedness/types';
 import {
   advanceOffseasonWorld,
@@ -71,6 +81,7 @@ export interface StartNewCareerInput {
   secondaryColor: string;
   accentColor: string;
   managerName: string;
+  startingPreset?: StartingRosterPreset;
   seed?: number;
 }
 
@@ -98,6 +109,7 @@ export interface GameStoreState {
   lastPostGameSummary: PostGameSummary | null;
   lastPlayoffResult: TierPlayoffResult | null;
   lastOffseasonTransitions: readonly TierPromotionTransition[];
+  activeOffseason: OffseasonState | null;
   getHumanClub: () => Club | null;
   startNewCareer: (input: StartNewCareerInput) => void;
   simNextSeriesRound: (
@@ -110,6 +122,15 @@ export interface GameStoreState {
     transitions: readonly TierPromotionTransition[];
     nextSeasonNumber: number;
   } | null;
+  beginInteractiveOffseason: (regulationInnings?: GameLengthInnings) => OffseasonState | null;
+  decideOffseasonExpiring: (
+    playerId: string,
+    decision: 'resign' | 'release',
+    offeredYears?: number,
+  ) => { applied: boolean; reason?: string };
+  draftOffseasonRookie: (prospectId: string) => { drafted: boolean; reason?: string };
+  signOffseasonAgent: (playerId: string) => { signed: boolean; reason?: string };
+  finishInteractiveOffseason: () => number | null;
   swapLineupSlots: (slotIndexA: number, slotIndexB: number) => void;
   assignLineupPlayer: (slotIndex: number, playerId: string) => void;
   autoOptimizeHumanLineup: () => void;
@@ -188,6 +209,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     lastPostGameSummary: null,
     lastPlayoffResult: null,
     lastOffseasonTransitions: [],
+    activeOffseason: null,
 
     getHumanClub: () => findClubAcrossLeagues(get().leagues, get().humanClubId),
 
@@ -211,6 +233,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         lastPostGameSummary: null,
         lastPlayoffResult: null,
         lastOffseasonTransitions: [],
+        activeOffseason: null,
       });
     },
 
@@ -292,6 +315,77 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         transitions: offseason.transitions,
         nextSeasonNumber,
       };
+    },
+
+    beginInteractiveOffseason: (regulationInnings = 5) => {
+      const state = get();
+      const humanClub = get().getHumanClub();
+      if (!humanClub) return null;
+
+      const championsByTier: Partial<Record<LeagueTierId, string>> = {};
+      let humanPlayoffs: TierPlayoffResult | null = null;
+      LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
+        if (state.leagues[tier].length < 4) return;
+        const playoffSeed = state.worldSeed + state.seasonNumber * 20000 + tierIdx * 131;
+        const res = simulateBestOfThreePlayoffs(state.leagues[tier], playoffSeed, regulationInnings);
+        championsByTier[tier] = res.championClubId;
+        if (tier === humanClub.leagueTier) humanPlayoffs = res;
+      });
+
+      const offseason = beginOffseasonCycle(
+        state.leagues,
+        humanClub.id,
+        state.worldSeed,
+        state.seasonNumber,
+        championsByTier,
+      );
+      set({
+        activeOffseason: offseason,
+        lastPlayoffResult: humanPlayoffs,
+        lastOffseasonTransitions: offseason.transitions,
+      });
+      return offseason;
+    },
+
+    decideOffseasonExpiring: (playerId, decision, offeredYears = 2) => {
+      const current = get().activeOffseason;
+      if (!current) return { applied: false, reason: 'No active offseason.' };
+      const res = resolveExpiringContractDecision(current, playerId, decision, offeredYears);
+      if (!res.applied) return { applied: false, reason: res.reason };
+      set({ activeOffseason: res.state });
+      return { applied: true };
+    },
+
+    draftOffseasonRookie: (prospectId) => {
+      const current = get().activeOffseason;
+      if (!current) return { drafted: false, reason: 'No active offseason.' };
+      const res = draftOffseasonProspect(current, prospectId);
+      if (!res.drafted) return { drafted: false, reason: res.reason };
+      set({ activeOffseason: res.state });
+      return { drafted: true };
+    },
+
+    signOffseasonAgent: (playerId) => {
+      const current = get().activeOffseason;
+      if (!current) return { signed: false, reason: 'No active offseason.' };
+      const res = signOffseasonFreeAgent(current, playerId);
+      if (!res.signed) return { signed: false, reason: res.reason };
+      set({ activeOffseason: res.state });
+      return { signed: true };
+    },
+
+    finishInteractiveOffseason: () => {
+      const current = get().activeOffseason;
+      if (!current) return null;
+      const done = completeOffseasonCycle(current);
+      set({
+        seasonNumber: done.nextSeasonNumber,
+        currentSeriesIndex: 0,
+        leagues: done.leagues,
+        freeAgents: done.freeAgents,
+        activeOffseason: null,
+      });
+      return done.nextSeasonNumber;
     },
 
     swapLineupSlots: (slotIndexA, slotIndexB) => {
@@ -521,6 +615,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const capCheck = validateRosterAddition(club.roster, incoming.id);
       if (!capCheck.allowed) {
         return { signed: false, reason: capCheck.reason };
+      }
+      const salaryCheck = validateSalaryCapRoom(club, incoming.contract.salaryPerSeason);
+      if (!salaryCheck.allowed) {
+        return { signed: false, reason: salaryCheck.reason };
       }
       if (club.economy.cash < incoming.contract.signingBonus) {
         return {

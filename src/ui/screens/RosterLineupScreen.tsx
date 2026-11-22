@@ -3,6 +3,11 @@ import { ArrowLeftRight, Flame, Gamepad2, Save, Snowflake, Sparkles, UserPlus } 
 import { FlagBadge } from '../../art/flags/FlagBadge';
 import { soundEngine } from '../../audio/soundEngine';
 import type { FieldPosition } from '../../engine/handedness/types';
+import {
+  computeClubPayroll,
+  TIER_SALARY_CAPS,
+  validateSalaryCapRoom,
+} from '../../engine/gm/offseasonEngine';
 import { MAX_ACTIVE_ROSTER_SIZE } from '../../engine/models/club';
 import {
   BATTED_BALL_TENDENCY_LABELS,
@@ -192,12 +197,14 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const crossTrainTargets = isPitcherPosition(inspectedPlayer.position)
     ? PITCHER_CROSS_TRAIN_POSITIONS
     : HITTER_CROSS_TRAIN_POSITIONS;
+  const clubPayroll = computeClubPayroll(humanClub.roster);
+  const salaryCap = TIER_SALARY_CAPS[humanClub.leagueTier];
 
   return (
     <div className="space-y-4">
       <ComicCard
         title={`${humanClub.city} ${humanClub.name} Clubhouse`}
-        subtitle={`Record ${humanClub.wins}-${humanClub.losses} • Roster ${humanClub.roster.length}/${MAX_ACTIVE_ROSTER_SIZE} • Cash $${humanClub.economy.cash.toLocaleString()} • Hype ${humanClub.economy.teamHype}/100`}
+        subtitle={`Record ${humanClub.wins}-${humanClub.losses} • Roster ${humanClub.roster.length}/${MAX_ACTIVE_ROSTER_SIZE} • Payroll $${clubPayroll.toLocaleString()}/$${salaryCap.toLocaleString()} • Cash $${humanClub.economy.cash.toLocaleString()} • Hype ${humanClub.economy.teamHype}/100`}
         headerBg={humanClub.colors.secondary}
         badge={
           <div className="flex flex-wrap gap-2">
@@ -418,6 +425,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                 {freeAgents.slice(0, 6).map((fa) => {
                   const full = humanClub.roster.length >= MAX_ACTIVE_ROSTER_SIZE;
                   const canAfford = humanClub.economy.cash >= fa.contract.signingBonus;
+                  const fitsCap = validateSalaryCapRoom(humanClub, fa.contract.salaryPerSeason).allowed;
                   return (
                     <div
                       key={fa.id}
@@ -434,13 +442,13 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                         </div>
                         <div className="text-[11px] font-bold text-[#4A5068]">
                           OVR {computePlayerOverall(fa)} • {SPECIALIST_LABELS[fa.specialistArchetype]} •
-                          Bonus ${fa.contract.signingBonus.toLocaleString()}
+                          ${fa.contract.salaryPerSeason.toLocaleString()}/yr • Bonus ${fa.contract.signingBonus.toLocaleString()}
                         </div>
                       </div>
                       <ComicButton
                         size="sm"
                         variant="turf"
-                        disabled={full || !canAfford}
+                        disabled={full || !canAfford || !fitsCap}
                         onClick={() => handleSignAgent(fa.id, fa.name)}
                       >
                         Sign

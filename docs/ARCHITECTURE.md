@@ -349,6 +349,16 @@ export interface Player {
     3. **Expiring Contracts & Re-Signing Window** (`yearsRemaining - 1`; players at `0` enter expiring queue where human & AI clubs offer extensions under Salary Cap or let them hit Free Agency).
     4. **3-Round Amateur Draft** (reverse-standings draft order replenishing youth talent on cheap rookie deals).
     5. **Offseason Free-Agent Signing Window** (open market populated by league expiring players + fresh FA pool; AI & human fill rosters under the `20`-man cap and Tier Salary Cap before Opening Day).
+- **Asymmetric Co-Ed Attribute Tilts, Complementary Special Traits & Roster-Mix Synergies (`TASK-066`)**:
+  - Built directly on each player's `traits.presentation` (`'male' | 'female'`) with **zero average OVR advantage** for either sex—instead delivering playful, classic 90s arcade-baseball complementary strengths, weaknesses, and special traits so every roster composition is strategically meaningful:
+    - **Male Athlete Tilt & Signature Traits**: Stronger raw **Power (`+6`)**, **Velocity (`+6`)**, and **Arm (`+4`)**, balanced by looser **Eye (`-4`)**, **Contact (`-4`)**, **Control (`-4`)**, and **Fielding/Range (`-3`)**. Unlocks male-signature traits: **`thunder_bravado`** (HR/K triggers `+10` Hype adrenaline surge & rattles opposing control, with `+4%` chase risk behind in counts), **`cleanup_enforcer`** (protects the preceding batter with `+4 Eye` and adds `+3 Power` with RISP), and **`iron_shoulder`** (`-10%` fastball endurance drain).
+    - **Female Athlete Tilt & Signature Traits**: Stronger **Contact (`+6`)**, **Eye (`+6`)**, **Movement (`+5`)**, **Control (`+5`)**, **Fielding/Range (`+5`)**, and **Speed (`+4`)**, balanced by lighter raw **Power (`-5`)**, **Velocity (`-5`)**, and **Arm (`-3`)**. Unlocks female-signature traits: **`tactical_poise`** (cuts team cold-slump drag by `30%`, reduces team errors by `15%`, and adds `+3 Eye/+3 Control` at `LI >= 1.55`), **`precision_spark`** (grants the next batter/teammate `+4 Contact/+3 Power` table-setter boost), and **`crafty_spin_wizard`** (`+5 Movement` on breaking/offspeed pitches and `-25%` fatigue break drop).
+    - **Clubhouse Roster-Mix Synergies (`evaluateCoEdClubhouseSynergy`)**:
+      - **Balanced Co-Ed (`>= 30%` each)**: *Total Baseball Harmony* — pairs table-setter OBP/defense/poise with cleanup HR/velo thunder.
+      - **Mostly Male + Key Female Splash (`1–3` female players)**: *Calm in the Storm* — injects command, poise & slump stabilization into a volatile slugger core.
+      - **Mostly Female + Key Male Splash (`1–3` male players)**: *Thunder Anchor* — injects middle-of-the-order HR threat & triple-digit gas into a precision small-ball machine.
+      - **All-Male (`100%` male)**: *Bash-Bro Chaos* — extreme HR/velo & hype bursts (`+3 Power/+3 Velocity` identity), intentionally missing composure/discipline/glove consistency (`-3 Eye/-3 Control`).
+      - **All-Female (`100%` female)**: *Precision Swarm* — relentless contact, spin, speed & iron defense (`+3 Contact/+3 Movement/+3 Fielding` identity), intentionally missing easy HR/100-mph thunder (`-3 Power/-3 Velocity`).
 
 ### 2.2 Club, Lineup & Stadium District (`src/engine/models/club.ts`)
 

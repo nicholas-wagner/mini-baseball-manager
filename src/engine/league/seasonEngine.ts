@@ -1,5 +1,9 @@
 import { createClub } from '../gm/rosterFactory';
 import {
+  createClubWithStartingPreset,
+  type StartingRosterPreset,
+} from '../gm/rosterPresets';
+import {
   LEAGUE_TIER_ORDER,
   type Club,
   type LeagueTierId,
@@ -26,6 +30,7 @@ export interface HumanClubSeedInput {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
+  startingPreset?: StartingRosterPreset;
 }
 
 export interface SeriesMatchup {
@@ -99,7 +104,7 @@ export function generateSixTierWorld(
   worldSeed: number,
   humanInput: HumanClubSeedInput,
 ): { humanClubId: string; leagues: Record<LeagueTierId, Club[]> } {
-  const humanClub = createClub(createSeededRng(worldSeed), {
+  const humanOpts = {
     id: `club-human-${worldSeed}`,
     city: humanInput.city.trim() || 'Sandlot',
     name: humanInput.clubName.trim() || 'Comets',
@@ -110,9 +115,12 @@ export function generateSixTierWorld(
       accent: humanInput.accentColor,
       monogram: humanInput.monogram.trim().toUpperCase().slice(0, 2) || 'SC',
     },
-    leagueTier: 'rookie',
+    leagueTier: 'rookie' as const,
     isHuman: true,
-  });
+  };
+  const humanClub = humanInput.startingPreset
+    ? createClubWithStartingPreset(createSeededRng(worldSeed), humanOpts, humanInput.startingPreset)
+    : createClub(createSeededRng(worldSeed), humanOpts);
 
   const leagues = {} as Record<LeagueTierId, Club[]>;
   LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {

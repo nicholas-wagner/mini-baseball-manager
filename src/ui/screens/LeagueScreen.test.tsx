@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useGameStore } from '../../store/gameStore';
 import { LeagueScreen } from './LeagueScreen';
 
-describe('LeagueScreen — 6-Tier Pyramid & 21-Game Season Flow (TASK-024)', () => {
+describe('LeagueScreen — 6-Tier Pyramid & Full Offseason HQ (TASK-024, TASK-065)', () => {
   beforeEach(() => {
     useGameStore.getState().startNewCareer({
       city: 'Sandlot',
@@ -20,7 +20,7 @@ describe('LeagueScreen — 6-Tier Pyramid & 21-Game Season Flow (TASK-024)', () 
   });
 
   it(
-    'displays all 6 tiers, simulates 3-game series, switches tier standings, and executes Playoffs & Offseason',
+    'displays all 6 tiers, simulates series, opens Offseason HQ (Retirements, Expiring, Draft, FA, Salary Cap), and launches Season 2',
     async () => {
       const user = userEvent.setup();
       render(<LeagueScreen />);
@@ -43,7 +43,19 @@ describe('LeagueScreen — 6-Tier Pyramid & 21-Game Season Flow (TASK-024)', () 
         }
       });
 
+      // Open Interactive Offseason HQ
       await user.click(screen.getByRole('button', { name: /playoffs & offseason/i }));
+      expect(screen.getByTestId('offseason-hq')).toBeInTheDocument();
+      expect(screen.getAllByText(/salary cap/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/amateur draft \(3 rounds left\)/i)).toBeInTheDocument();
+
+      // Draft a prospect in Round 1
+      const draftButtons = screen.getAllByRole('button', { name: /^draft$/i });
+      await user.click(draftButtons[0]);
+      expect(screen.getByText(/amateur draft \(2 rounds left\)/i)).toBeInTheDocument();
+
+      // Launch Season 2 cleanly
+      await user.click(screen.getByRole('button', { name: /launch season 2/i }));
       expect(screen.getByTestId('league-notice').textContent).toMatch(/season 2 underway/i);
       expect(useGameStore.getState().seasonNumber).toBe(2);
     },
