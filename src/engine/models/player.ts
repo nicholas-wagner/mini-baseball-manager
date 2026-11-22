@@ -36,8 +36,11 @@ export type AccessoryStyle =
 
 export type BackdropStyle = 'starburst' | 'stripes' | 'halftone' | 'lightning' | 'stadium';
 
+export type PlayerLook = 'male' | 'female';
+
 export interface PlayerPortraitTraits {
   seed: number;
+  playerLook?: PlayerLook;
   headShape: HeadShape;
   skinTone: string;
   skinShadow: string;
@@ -271,6 +274,23 @@ export type CareerExperienceTier =
   | 'seasoned'
   | 'cagey_veteran';
 
+export type CoEdSpecialTraitId =
+  | 'thunder_bravado'
+  | 'cleanup_enforcer'
+  | 'iron_shoulder'
+  | 'tactical_poise'
+  | 'precision_spark'
+  | 'crafty_spin_wizard';
+
+export const COED_TRAIT_LABELS: Readonly<Record<CoEdSpecialTraitId, string>> = {
+  thunder_bravado: 'Thunder Bravado',
+  cleanup_enforcer: 'Cleanup Enforcer',
+  iron_shoulder: 'Iron Shoulder',
+  tactical_poise: 'Tactical Poise',
+  precision_spark: 'Precision Spark',
+  crafty_spin_wizard: 'Spin Wizard',
+};
+
 export const EXPERIENCE_TIER_LABELS: Readonly<Record<CareerExperienceTier, string>> = {
   rookie_green: 'Green Rookie',
   developing: 'Developing',
@@ -390,6 +410,7 @@ export interface Player {
   mentalTraits: MentalTraitId[];
   pressureProfile: PressureResponseProfile;
   careerService: CareerServiceProfile;
+  coEdTrait: CoEdSpecialTraitId;
   ratings: PlayerRatings;
   statCaps: PlayerRatings;
   totalRatingBudget: number;
@@ -478,9 +499,11 @@ const BACKDROPS: readonly BackdropStyle[] = ['starburst', 'stripes', 'halftone',
 export function rollPlayerPortraitTraits(rng: SeededRng, seed: number): PlayerPortraitTraits {
   const skin = rng.pick(SKIN_TONES);
   const hair = rng.pick(HAIR_PALETTES);
+  const playerLook: PlayerLook = rng.chance(0.5) ? 'female' : 'male';
 
   return {
     seed,
+    playerLook,
     headShape: rng.pick(HEAD_SHAPES),
     skinTone: skin.base,
     skinShadow: skin.shadow,

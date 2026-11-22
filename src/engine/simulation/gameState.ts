@@ -13,6 +13,10 @@ import {
   type AbilityCooldownState,
 } from '../rpg/abilityCooldowns';
 import {
+  evaluateCoEdClubhouseSynergy,
+  type CoEdClubhouseSynergy,
+} from '../rpg/coEdArchetypes';
+import {
   computeSituationLeverage,
   evaluateClubhouseMentalAura,
   type SituationLeverageResult,
@@ -91,6 +95,7 @@ export interface TeamGameSide {
   errors: number;
   hypeGauge: number;
   clubhouseHypeMultiplier: number;
+  coEdSynergy: CoEdClubhouseSynergy;
 }
 
 export interface GameSessionState {
@@ -179,6 +184,8 @@ export function createTeamGameSide(club: Club): TeamGameSide {
     club.rotationIds[club.rotationCursor % Math.max(1, club.rotationIds.length)] ??
     club.roster[club.roster.length - 1].id;
 
+  const coEdSynergy = evaluateCoEdClubhouseSynergy(club.roster);
+
   return {
     clubId: club.id,
     isHuman: club.isHuman,
@@ -197,7 +204,10 @@ export function createTeamGameSide(club: Club): TeamGameSide {
     hits: 0,
     errors: 0,
     hypeGauge: 25,
-    clubhouseHypeMultiplier: evaluateClubhouseMentalAura(club.roster).hypeGainMultiplier,
+    clubhouseHypeMultiplier:
+      evaluateClubhouseMentalAura(club.roster).hypeGainMultiplier +
+      coEdSynergy.hypeMultiplierBonus,
+    coEdSynergy,
   };
 }
 

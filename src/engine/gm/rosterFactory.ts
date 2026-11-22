@@ -24,6 +24,10 @@ import { generatePlayerIdentity } from '../nationalities/pickNationality';
 import type { NationalityId } from '../nationalities/types';
 import type { SeededRng } from '../rng/seededRng';
 import { rollInitialCareerService } from '../rpg/careerExperience';
+import {
+  applyCoEdAttributeTilt,
+  rollCoEdSpecialTrait,
+} from '../rpg/coEdArchetypes';
 import { rollMentalAndPressureProfile } from '../rpg/mentalAndLeverage';
 import {
   computeTotalRatingBudget,
@@ -259,7 +263,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   const shiftedMax = clampStat(band.max + marketSpec.ovrOffset);
   const baseRatings = rollRatingsForRole(rng, options.position, shiftedMin, shiftedMax);
   const specialistRatings = applySpecialistRatingShape(baseRatings, specialistArchetype, options.position);
-  const { ratings, pitcherRole, pitchArsenal } = buildPitcherOnlyProfile(
+  const { ratings: roleRatings, pitcherRole, pitchArsenal } = buildPitcherOnlyProfile(
     rng,
     options.position,
     throws,
@@ -267,7 +271,11 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     specialistRatings,
     marketTier,
   );
+  const preCaps = rollStatCapsForMarketTier(rng, roleRatings, marketTier, options.position);
+  const presentation = traits.playerLook === 'female' ? 'female' : 'male';
+  const ratings = applyCoEdAttributeTilt(roleRatings, preCaps, presentation, options.position);
   const statCaps = rollStatCapsForMarketTier(rng, ratings, marketTier, options.position);
+  const coEdTrait = rollCoEdSpecialTrait(rng, presentation, options.position);
   const batterPitchProfile = rollBatterPitchProfile(rng, specialistArchetype, ratings, marketTier);
   const battedBallProfile = rollBattedBallProfile(
     rng,
@@ -317,6 +325,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     mentalTraits: mental.mentalTraits,
     pressureProfile: mental.pressureProfile,
     careerService,
+    coEdTrait,
     ratings,
     statCaps,
     totalRatingBudget,

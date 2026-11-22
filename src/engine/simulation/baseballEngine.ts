@@ -771,6 +771,8 @@ export function stepPitch(
     tacticalCall,
     atBatPitchHistory: next.atBatPitchHistory,
     requestedPitchType: options?.requestedPitchType,
+    battingCoEdSynergy: batting.coEdSynergy,
+    fieldingCoEdSynergy: fielding.coEdSynergy,
   });
 
   events.push(dispatchPitchResolution(next, resolution, batter.id, pitcher.id));

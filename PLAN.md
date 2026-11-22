@@ -19,7 +19,7 @@
 | **M0** | Project Foundation, TDD Harness & Android PWA Shell | 4 / 4 | `[x]` Done | Vitest + Playwright + TS + PWA manifest green |
 | **M1** | **Design-First Visual Identity & Interactive Design Lab** | 8 / 8 | `[x]` Done | 90s Cards, 2.5D Chibi Rigs, 11 Nations, Handedness, 3D Park, Web Audio |
 | **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 6 / 6 | `[x]` Done | **MVP Gate**: Complete playable game installable on Android |
-| **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals, Compromise Training, Cooldowns, Mental/Leverage, Roles, Sabermetrics, Endurance, Pacing, Co-Ed Traits & Role Cards | 12 / 16 | `[/]` In Progress | Deep 2–60 min player, tactical & RPG simulation core |
+| **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals, Compromise Training, Cooldowns, Mental/Leverage, Roles, Sabermetrics, Endurance, Pacing, Co-Ed Traits & Role Cards | 13 / 16 | `[/]` In Progress | Deep 2–60 min player, tactical & RPG simulation core |
 | **M4** | **Living League World**: 6-Tier Pyramid, Fair Start Presets, Market Tiers, Salary Caps, Offseason (Retirements/Expiring/Draft/FA) & Rivalries | 4 / 8 | `[/]` In Progress | Multi-season climb from Rookie Ball to World Champions |
 | **M5** | **Sim-City Ballpark District**: Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 0 / 5 | `[ ]` Planned | Interactive stadium & neighborhood builder visible in 3D |
 | **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches, 90s Gear Relics, Weather & Night Games | 0 / 5 | `[ ]` Planned | Synergy combos, coaching staff, loot relics & live weather |
@@ -27,7 +27,7 @@
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `34 / 66` feature slices completed
+**Overall 10X Progress**: `35 / 66` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -38,7 +38,7 @@
 **Mini Baseball Manager** is an offline-first, cross-platform web & Android PWA where you are **General Manager, Field Manager, and Ballpark Architect** of a charming baseball dynasty — blending:
 
 1. **Iconic Retro-90s Cartoon & Volumetric 2.5D Chibi Art (Design-First)**:
-   - Collectible **90s Baseball Cards** (3D-flippable *1994 Rookie*, *All-Star Chrome*, and *MVP Holo Foil*) with procedural cel-shaded SVG portraits, crisp vector country flags, `B/T` handedness pills, and Cultural Heritage Myth/Animal badges.
+   - Collectible **90s Baseball Cards** (3D-flippable *1994 Rookie*, *All-Star Chrome*, and *MVP Holo Foil*) feature original manga portraits in neutral uniforms. The frame carries club colors and jersey numbers alongside country flags, `B/T` handedness and Cultural Heritage badges. Players awaiting a catalog illustration use seeded SVG art.
    - **True ~1.8-Head Volumetric 2.5D Chibi Mini Players** with animated articulated SVG limbs, mirrored southpaw/righty gloves, palm-gripped baseballs, two-handed bat swings, and 2.5D standee depth + 3D hop physics inside a sunlit **Over-the-Shoulder 3D Ballpark** featuring all 9 live defenders, baserunners, instanced cheering fans, sponsor billboards, retired-number wall plaques, and dynamic weather/night lights.
    - **Procedural 90s Web Audio Synth & Ballpark Organ**: Multi-formant stadium crowd roars + hand-claps, bat cracks, super-pitch whooshes, spring boings, cash chimes, RPG level-ups, and classic ballpark organ riffs — 100% offline.
 
@@ -51,7 +51,7 @@
    - **Slow-Earned Career Experience & Veteran Savvy**: Real baseball mileage (**seasons played, career games, at-bats/innings, playoff games**) takes multiple full seasons to earn, granting **Cagey Veterans** a subtle, authentic discipline/command/composure edge over green **Rookies** (while rookies grow skills faster over time).
    - **Human Manager RPG Tree**: Active in-game powers (*Pep Talk*, *Mound Whisper*, *Clutch Focus*, *Rally Cap Magic*, *Bullpen Freeze*) + permanent Coach & Mogul passives.
    - **Hot Streaks & Cold Slumps**: Dynamic momentum curves reflected on cards, portraits, and headlines — busted actively via animated Practice Drills or Manager Pep Talks.
-   - **Asymmetric Co-Ed Archetypes & Roster-Mix Synergies**: Male athletes lean into classic raw **Power / Velocity / Arm** + *Bravado / Cleanup Enforcer / Workhorse* traits (at the cost of discipline & glove/command volatility), while female athletes lean into classic **Contact / Eye / Spin Movement / Control / Speed / Fielding** + *Tactical Poise / Table-Setter Spark / Spin Wizard* traits (at the cost of raw wall-clearing power & pure mph) — keeping equal OVR while rewarding mixed co-ed rosters, targeted splash additions, OR intriguing all-male *Bash-Bro Chaos* / all-female *Precision Swarm* builds!
+   - **Asymmetric Co-Ed Archetypes & Roster-Mix Synergies**: Male athletes lean into classic raw **Power / Velocity / Arm** + *Bravado / Cleanup Enforcer / Workhorse* traits (at the cost of discipline & glove/command volatility), while female athletes lean into classic **Contact / Eye / Spin Movement / Control / Speed / Fielding** + a modest **`+6` Popularity** fan-draw bonus + *Tactical Poise / Table-Setter Spark / Spin Wizard* traits (at the cost of raw wall-clearing power & pure mph) — keeping equal OVR while rewarding mixed co-ed rosters, targeted splash additions, OR intriguing all-male *Bash-Bro Chaos* / all-female *Precision Swarm* builds!
    - **Clubhouse Chemistry & Synergy Bonds**: Personality archetypes (*Prankster*, *Clutch Captain*, *Quiet Assassin*, *Showboat*, *Gym Rat*, *Rival Hunter*) form live combos (*Bash Brothers*, *Battery Telepathy*, *Turn-Two Wizards*).
    - **90s Gear & Relics + Coaching Staff**: Equip quirky loot (*Lucky Neon Stirrups*, *Golden Ash Bat*, *90s Wrap Shades*, *Titanium Rosin Bag*) and hire SVG-portraited Pitching/Hitting/Scouting Coaches.
 
@@ -109,7 +109,7 @@
 
 ---
 
-### Milestone 3 — RPG Core: Skill Trees, Specialists, Pitch Arsenals, Mental/Leverage, Roles, Sabermetrics, Endurance, Pacing, Co-Ed Traits & Role Cards (`12 / 16`)
+### Milestone 3 — RPG Core: Skill Trees, Specialists, Pitch Arsenals, Mental/Leverage, Roles, Sabermetrics, Endurance, Pacing, Co-Ed Traits & Role Cards (`13 / 16`)
 - [x] **3A. Player Branching Skill Trees & Capstone Special Powers** (`TASK-019`): Pure graph engine + pan/zoom interactive Skill Tree UI for Pitcher, Batter, and Fielder paths respecting `statCaps` & `totalRatingBudget`, with charge/cooldown/fatigue-gated capstone Special Powers & evolving `specialistArchetype`.
 - [x] **3B. 3-Tier Cultural Heritage Myth/Animal Skill Branches** (`TASK-020`): Expand each nationality's Heritage Ability into a 3-node unlockable progression with bespoke 3D VFX, `65–100` Hype-gauge consumption, strict charge/cooldown caps, and sim effects.
 - [x] **3C. Dynamic Hot Streaks & Cold Slumps Engine** (`TASK-021`): Rolling multi-game form tracker driving 🔥 *On Fire!* & 🧊 *Cold Spell* stat curves, reactive 90s card frames/moods, and slump-busting triggers.
@@ -125,7 +125,7 @@
 - [x] **3M. Pitcher Endurance & Pitch-Specific Effectiveness Degradation** (`TASK-061`): Live mound endurance gauge (`100% → 0%`) degrading fastball velocity (`-1..-7 mph`), flattening sinker/splitter drop & `GB%`, and hanging tired breaking balls + bullpen warnings & series recovery.
 - [x] **3N. Multi-Burst Game Pacing (`5 / 7 / 9`-Inning Formats, Half-Inning Sim & Ghost-Runner Extras)** (`TASK-062`): Short-burst and long-session pacing via selectable 5/7/9-inning formats, 1-tap `Sim Half-Inning`, smarter `Clutch Burst`, and 1st-extra-inning 2B Ghost Runner.
 - [/] **3O. Role-Specific Baseball Card Stats (Pitchers vs. Batters/Fielders)** (`TASK-063`): Pitcher cards show Velocity/Movement/Control/Stamina/Clutch + `ERA/WHIP/K9/Strike%`, while Batter/Fielder cards show Contact/Power/Speed/Fielding/Arm + `AVG/OBP/OPS/FPCT`.
-- [ ] **3P. Asymmetric Co-Ed Athlete Attributes, Complementary Special Traits & Roster-Mix Synergies** (`TASK-066`): Equal-OVR classic male vs. female attribute tilts (Power/Velo/Arm vs. Contact/Eye/Movement/Control/Speed/Fielding) paired with complementary special traits (*Thunder Bravado*, *Cleanup Enforcer*, *Iron Shoulder* vs. *Tactical Poise*, *Precision Spark*, *Crafty Spin Wizard*) and dynamic clubhouse mix synergies (Balanced Co-Ed, Calm-in-the-Storm / Thunder-Anchor splash builds, and extreme All-Male / All-Female strategies).
+- [x] **3P. Asymmetric Co-Ed Athlete Attributes, Complementary Special Traits & Roster-Mix Synergies** (`TASK-066`): Equal-OVR classic male vs. female attribute tilts (Power/Velo/Arm vs. Contact/Eye/Movement/Control/Speed/Fielding + modest `+6` Popularity fan-draw bonus) paired with complementary special traits (*Thunder Bravado*, *Cleanup Enforcer*, *Iron Shoulder* vs. *Tactical Poise*, *Precision Spark*, *Crafty Spin Wizard*) and dynamic clubhouse mix synergies (Balanced Co-Ed, Calm-in-the-Storm / Thunder-Anchor splash builds, and extreme All-Male / All-Female strategies).
 
 ---
 
@@ -138,6 +138,14 @@
 - [x] **4F. Active Roster Limit (`20` Max) & 6 Player Market Tiers** (`TASK-054`): `rookie` (cheap / `1.35x` XP / variable `statCaps`), `all_star` (rare & expensive), `veteran` (affordable steady quality / `0.30x` minimal growth), `above_average`, `average`, and `below_average` bargain specialists + `20`-man roster limit enforcement.
 - [x] **4G. Fair Rookie-Ball Starting Roster Presets** (`TASK-064`): Choose `All Rookies`, `Balanced`, `Veterans`, `Good Defense`, `Good Hitting`, or `Good Pitching` when founding your Rookie Sandlot club — each shaping strengths/weaknesses inside a strict Rookie-tier parity OVR band so climbing to Mini Major League World Champions is earned!
 - [x] **4H. Full End-of-Season & Offseason Engine (Retirements, Expiring Contracts, Salary Caps, Draft & FA Window)** (`TASK-065`): Structured multi-step offseason processing player retirements, contract expirations & re-sign choices, tier-scaled payroll Salary Caps (`rookie` → `majors`), annual Amateur Draft, and open Free-Agent signing window before the next Opening Day!
+
+#### Fixed illustrated player pool
+
+Grow the permanent catalog to **3,000 distinct players across all six tiers**, with **2,250 men (75%) and 750 women (25%)**. Each athlete has a stable ID, a team-neutral card portrait and matching field appearance. Keep physique, handedness, signature delivery, uniform cut and accessories with that identity through trades and across careers.
+
+- **Art production.** Start with the eight illustrated players in the Design Lab. Add small batches over time, prioritizing gaps in position, handedness and skill tier. Continue using procedural art while the collection grows.
+- **Planned career assignment.** On a new career, draw without replacement from the same catalog using the world seed. Fill 48 legal, tier-balanced rosters of 18 players and select 12 distinct free agents. These **876 opening-day places** leave **2,124 identities** available for different starting lineups across saves and for later draft classes or signings.
+- **Save continuity.** Persist the assigned player IDs and catalog version so loading a save or adding another art batch preserves its rosters. A fresh seed produces a different allocation, while replaying the same seed and catalog version reproduces it.
 
 ---
 

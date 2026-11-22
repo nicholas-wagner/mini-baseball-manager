@@ -3,6 +3,7 @@ import type { ManagerProfile } from '../engine/models/manager';
 import { createEmptySeasonStats, isPitcherPosition, type Player, type PlayerSeasonStats } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
 import { rollInitialCareerService } from '../engine/rpg/careerExperience';
+import { rollCoEdSpecialTrait } from '../engine/rpg/coEdArchetypes';
 import { rollMentalAndPressureProfile } from '../engine/rpg/mentalAndLeverage';
 import {
   computeTotalRatingBudget,
@@ -58,6 +59,13 @@ function hydratePlayerDefaults(player: Player): Player {
   const careerService =
     player.careerService ??
     rollInitialCareerService(seedRng, marketTier, player.age ?? 24, player.position);
+  const coEdTrait =
+    player.coEdTrait ??
+    rollCoEdSpecialTrait(
+      seedRng,
+      player.traits?.playerLook === 'female' ? 'female' : 'male',
+      player.position,
+    );
   const ratings =
     typeof player.ratings.luck === 'number' &&
     typeof player.ratings.gapPower === 'number' &&
@@ -96,6 +104,7 @@ function hydratePlayerDefaults(player: Player): Player {
     mentalTraits: mental.mentalTraits,
     pressureProfile: mental.pressureProfile,
     careerService,
+    coEdTrait,
     ratings,
     statCaps,
     totalRatingBudget:

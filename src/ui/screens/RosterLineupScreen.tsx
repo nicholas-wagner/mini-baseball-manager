@@ -11,6 +11,7 @@ import {
 import { MAX_ACTIVE_ROSTER_SIZE } from '../../engine/models/club';
 import {
   BATTED_BALL_TENDENCY_LABELS,
+  COED_TRAIT_LABELS,
   computePlayerOverall,
   EXPERIENCE_TIER_LABELS,
   isPitcherPosition,
@@ -22,6 +23,7 @@ import {
   SPECIALIST_LABELS,
   type FormState,
 } from '../../engine/models/player';
+import { evaluateCoEdClubhouseSynergy } from '../../engine/rpg/coEdArchetypes';
 import {
   computeBattingSabermetrics,
   computeFieldingSabermetrics,
@@ -199,6 +201,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
     : HITTER_CROSS_TRAIN_POSITIONS;
   const clubPayroll = computeClubPayroll(humanClub.roster);
   const salaryCap = TIER_SALARY_CAPS[humanClub.leagueTier];
+  const coEdSynergy = evaluateCoEdClubhouseSynergy(humanClub.roster);
 
   return (
     <div className="space-y-4">
@@ -246,6 +249,16 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
             {rosterMessage}
           </div>
         ) : null}
+
+        <div
+          data-testid="coed-synergy-banner"
+          className="mb-3 px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-[#1D3557]"
+        >
+          <span className="font-display">
+            Clubhouse Synergy: {coEdSynergy.label} ({coEdSynergy.maleCount}M / {coEdSynergy.femaleCount}F)
+          </span>
+          <span>{coEdSynergy.summary}</span>
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">
           <div className="space-y-4">
@@ -521,6 +534,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
               <div className="flex flex-wrap gap-1 pt-1 border-t border-[#181B2C]/15 text-[10px] font-extrabold">
                 <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]">
                   {PRESSURE_PROFILE_LABELS[inspectedPlayer.pressureProfile]}
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-[#F6EEFF] border border-[#181B2C] text-[#4A148C]">
+                  {COED_TRAIT_LABELS[inspectedPlayer.coEdTrait]}
                 </span>
                 <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
                   {EXPERIENCE_TIER_LABELS[inspectedPlayer.careerService.experienceTier]} •{' '}

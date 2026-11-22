@@ -18,6 +18,10 @@ import {
 import { getNationalityById } from '../nationalities/pickNationality';
 import type { SeededRng } from '../rng/seededRng';
 import { evaluateVeteranSavvyEdge } from '../rpg/careerExperience';
+import {
+  evaluateCoEdPlayerTraitEffect,
+  type CoEdClubhouseSynergy,
+} from '../rpg/coEdArchetypes';
 import { getFormStatModifiers } from '../rpg/formTracker';
 import { evaluateHeritageCombatBonuses } from '../rpg/heritageTrees';
 import { evaluatePressureAndLuckModifiers } from '../rpg/mentalAndLeverage';
@@ -434,6 +438,8 @@ export interface PitchResolverContext {
   tacticalCall: TacticalCall;
   atBatPitchHistory: readonly PitchType[];
   requestedPitchType?: PitchType;
+  battingCoEdSynergy?: CoEdClubhouseSynergy;
+  fieldingCoEdSynergy?: CoEdClubhouseSynergy;
 }
 
 const BATTED_BALL_BABIP_SHIFT: Readonly<Record<BattedBallType, number>> = {
@@ -605,6 +611,39 @@ function attachPitchTelemetry(
   };
 }
 
+const ZERO_SYNERGY_DELTAS = {
+  contactDelta: 0,
+  powerDelta: 0,
+  eyeDelta: 0,
+  velocityDelta: 0,
+  movementDelta: 0,
+  controlDelta: 0,
+};
+
+function computeCoEdPitchDeltas(ctx: PitchResolverContext, pitchType: PitchType) {
+  const hasRisp = Boolean(ctx.bases[1] || ctx.bases[2]);
+  const batterFx = evaluateCoEdPlayerTraitEffect(ctx.batter, {
+    leverageIndex: ctx.leverageIndex,
+    hasRisp,
+  });
+  const pitcherFx = evaluateCoEdPlayerTraitEffect(ctx.pitcher, {
+    leverageIndex: ctx.leverageIndex,
+    hasRisp,
+    pitchType,
+  });
+  const batSyn = ctx.battingCoEdSynergy ?? ZERO_SYNERGY_DELTAS;
+  const fldSyn = ctx.fieldingCoEdSynergy ?? ZERO_SYNERGY_DELTAS;
+  return {
+    contactDelta: batterFx.contactDelta + batSyn.contactDelta,
+    powerDelta: batterFx.powerDelta + batSyn.powerDelta,
+    eyeDelta: batterFx.eyeDelta + batSyn.eyeDelta,
+    stuffDelta: pitcherFx.movementDelta + (fldSyn.velocityDelta + fldSyn.movementDelta) * 0.5,
+    controlDelta: pitcherFx.controlDelta + fldSyn.controlDelta,
+    chaseRateDelta: batterFx.chaseRateDelta,
+    breakingHangScale: pitcherFx.breakingHangScale,
+  };
+}
+
 /** Resolves a single baseball pitch or tactical action cleanly from seeded state. */
 export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   if (ctx.tacticalCall === 'intentional_walk') {
@@ -658,6 +697,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const pitcherSkills = computeSkillTreeCombatBonuses(ctx.pitcher);
   const batterHeritage = evaluateHeritageCombatBonuses(ctx.batter, ctx.leverageIndex);
   const pitcherHeritage = evaluateHeritageCombatBonuses(ctx.pitcher, ctx.leverageIndex);
+  const coEd = computeCoEdPitchDeltas(ctx, pitchType);
   const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
   const pitcherRoleEval = evaluatePitcherRoleSituation(ctx.pitcher, {
     inning: ctx.inning,
@@ -677,7 +717,8 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     batterSavvy.composureDelta +
     batterSkills.battingContactDelta +
     batterHeritage.passiveBonus +
-    batterHeritage.clutchBonus;
+    batterHeritage.clutchBonus +
+    coEd.contactDelta;
   const effPower =
     ctx.batter.ratings.power +
     platoon.batterPowerDelta +
@@ -686,8 +727,9 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitchMatchup.batterPowerDelta +
     batterMental.pressureRatingDelta +
     batterSkills.battingPowerDelta +
-    batterHeritage.clutchBonus;
-  const effEye = ctx.batter.ratings.eye + batterSavvy.eyeDelta;
+    batterHeritage.clutchBonus +
+    coEd.powerDelta;
+  const effEye = ctx.batter.ratings.eye + batterSavvy.eyeDelta + coEd.eyeDelta;
   const effStuff =
     (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 +
     platoon.pitcherBreakDelta +
@@ -699,7 +741,8 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitcherSkills.pitchingStuffDelta +
     pitcherHeritage.passiveBonus +
     pitcherHeritage.clutchBonus +
-    enduranceFx.breakDrop +
+    coEd.stuffDelta +
+    Math.round(enduranceFx.breakDrop * coEd.breakingHangScale) +
     enduranceFx.mphDrop;
   const effControl =
     ctx.pitcher.ratings.control +
@@ -710,6 +753,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitcherSavvy.controlDelta +
     pitcherRoleEval.controlDelta +
     pitcherSkills.pitchingControlDelta +
+    coEd.controlDelta +
     enduranceFx.controlDrop;
 
   const luckZoneShift = pitcherMental.luckZoneProbDelta - batterMental.luckZoneProbDelta * 0.5;
@@ -723,7 +767,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const swingProb = inZone
     ? clampProb(0.67 + mod.swingMod, 0.52, 0.85)
     : clampProb(
-        0.26 - (effEye - 65) * 0.002 + mod.chaseMod + pitchMatchup.chaseRateDelta,
+        0.26 - (effEye - 65) * 0.002 + mod.chaseMod + pitchMatchup.chaseRateDelta + coEd.chaseRateDelta,
         0.10,
         0.48,
       );

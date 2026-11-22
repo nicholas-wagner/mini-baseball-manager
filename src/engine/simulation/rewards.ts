@@ -5,6 +5,7 @@ import {
   updateCareerServiceAfterGame,
   xpRequiredForNextLevel,
 } from '../rpg/careerExperience';
+import { computeRosterPopularityAttendanceMultiplier } from '../rpg/coEdArchetypes';
 import { updatePlayerFormAfterGame } from '../rpg/formTracker';
 import { evaluateClubhouseMentalAura } from '../rpg/mentalAndLeverage';
 import { computePostGamePitcherRecovery } from '../rpg/pitcherEndurance';
@@ -158,9 +159,13 @@ export function calculatePostGameRewards(
   won: boolean,
 ): PostGameRewards {
   const hypeFactor = 0.55 + club.economy.teamHype / 100;
+  const popMultiplier = computeRosterPopularityAttendanceMultiplier(club.roster);
   const attendance = Math.min(
     club.stadium.capacity,
-    Math.max(120, Math.round(club.economy.fanBase * hypeFactor * (isHomeGame ? 1.0 : 0.65))),
+    Math.max(
+      120,
+      Math.round(club.economy.fanBase * hypeFactor * popMultiplier * (isHomeGame ? 1.0 : 0.65)),
+    ),
   );
   const gateShare = isHomeGame ? 0.65 : 0.25;
   const gateRevenue = Math.round(attendance * club.economy.ticketPrice * gateShare);
