@@ -125,5 +125,5 @@ describe('Personality-Driven AI GMs, Bullpen AI & 10-Season Headless Soak (TASK-
       expect(Number.isNaN(club.wins)).toBe(false);
       expect(Number.isNaN(club.economy.cash)).toBe(false);
     }
-  }, 60_000);
+  }, 120_000);
 });

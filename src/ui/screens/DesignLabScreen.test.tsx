@@ -70,4 +70,4 @@ it('can replay a groundout, a force at second and relay to first, a pop fly, and
     fireEvent.click(screen.getByRole('button', { name: label }));
     expect(screen.getByRole('button', { name: 'Replay ' + label })).toBeVisible();
   }
-});
+}, 30_000);

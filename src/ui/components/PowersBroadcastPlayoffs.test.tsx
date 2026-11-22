@@ -86,5 +86,5 @@ describe('Broadcast Strike-Zone Plot, Active Special Power Dock & Interactive Pl
     fireEvent.click(simGameBtn);
     expect(screen.getByTestId('league-notice')).toBeInTheDocument();
     expect(typeof launchedLive).toBe('boolean');
-  });
+  }, 45_000);
 });

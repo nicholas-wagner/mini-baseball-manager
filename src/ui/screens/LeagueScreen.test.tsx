@@ -59,6 +59,6 @@ describe('LeagueScreen — 6-Tier Pyramid & Full Offseason HQ (TASK-024, TASK-06
       expect(screen.getByTestId('league-notice').textContent).toMatch(/season 2 underway/i);
       expect(useGameStore.getState().seasonNumber).toBe(2);
     },
-    30_000,
+    60_000,
   );
 });

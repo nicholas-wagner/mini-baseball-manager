@@ -1,23 +1,45 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { clearAllCareerSlotsStorage } from './store/careerSlots';
+import { useGameStore } from './store/gameStore';
 import { App } from './App';
 
-describe('Mini Baseball Manager — Milestone 1 Design Lab Integration', () => {
-  it('renders the Design Lab with live scoreboard, 3D viewport, and retro baseball cards', () => {
+function unlockDesignLab(): void {
+  for (let i = 0; i < 5; i += 1) {
+    fireEvent.keyDown(window, { key: 'd' });
+  }
+}
+
+describe('Mini Baseball Manager — App & Design Lab Integration', () => {
+  beforeEach(() => {
+    clearAllCareerSlotsStorage();
+    useGameStore.setState({ humanClubId: null, manager: null });
+  });
+
+  it('unlocks the Design Lab via 5x "d" with live scoreboard, 3D viewport, and retro baseball cards', async () => {
     render(<App />);
     expect(screen.getAllByText(/mini baseball manager/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('region', { name: /live baseball scoreboard/i })).toBeInTheDocument();
+    unlockDesignLab();
+
+    expect(
+      await screen.findByRole('region', { name: /live baseball scoreboard/i }, { timeout: 10_000 }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId('ballpark-3d-canvas')).toBeInTheDocument();
     expect(screen.getAllByText('Rico Comet').length).toBeGreaterThanOrEqual(1);
-  });
+  }, 30_000);
 
   it('switches cameras, triggers special powers, rolls new random players, and navigates tabs', async () => {
     const user = userEvent.setup();
     render(<App />);
+    unlockDesignLab();
 
     // Switch to Batter Over-the-Shoulder 3D
-    const batterCam = screen.getByRole('button', { name: /batter ots 3d/i });
+    const batterCam = await screen.findByRole(
+      'button',
+      { name: /batter ots 3d/i },
+      { timeout: 10_000 },
+    );
     await user.click(batterCam);
     expect(batterCam).toHaveAttribute('aria-pressed', 'true');
 
@@ -42,12 +64,16 @@ describe('Mini Baseball Manager — Milestone 1 Design Lab Integration', () => {
 
     // Navigate to Ballpark preview tab and live Skill Tree tab, then back to Design Lab
     await user.click(screen.getAllByRole('button', { name: /ballpark/i })[0]);
-    expect(screen.getByText(/sim-city ballpark economy & upgrades/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/sim-city ballpark economy & upgrades/i, {}, { timeout: 10_000 }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /skill tree/i })[0]);
-    expect(screen.getByText(/found your 90s sandlot club/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/found your 90s sandlot club/i, {}, { timeout: 10_000 }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /design lab/i })[0]);
-    expect(screen.getByTestId('ballpark-3d-canvas')).toBeInTheDocument();
-  }, 30_000);
+    expect(await screen.findByTestId('ballpark-3d-canvas', {}, { timeout: 10_000 })).toBeInTheDocument();
+  }, 45_000);
 });

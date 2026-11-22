@@ -11,7 +11,6 @@ import {
   Dices,
   Flame,
   Globe2,
-  Music,
   Palette,
   Play,
   RotateCcw,
@@ -37,6 +36,7 @@ import { CAMERA_PRESET_LABELS, type CameraPresetId } from '../../scene/camera/ca
 import type { CharacterAnimClip } from '../../scene/characters/animationState';
 import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
 import { BallparkCanvas, type ShowcaseTrigger } from '../components/BallparkCanvas';
+import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
 import { FlipBaseballCard, type BaseballCardPlayer } from '../components/FlipBaseballCard';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -196,19 +196,6 @@ const MOOD_OPTIONS: readonly { id: PortraitMood; label: string }[] = [
   { id: 'sweating', label: 'Practice Sweat' },
   { id: 'shocked', label: 'Shocked' },
   { id: 'rival_glare', label: 'Rival Glare' },
-];
-
-const SOUNDBOARD_CUES: readonly { cue: SoundCue; label: string }[] = [
-  { cue: 'organ_charge', label: 'Organ: Charge!' },
-  { cue: 'organ_homerun', label: 'Organ: Home Run!' },
-  { cue: 'bat_crack', label: 'Bat Crack' },
-  { cue: 'bomb_crack', label: 'Bomb Blast' },
-  { cue: 'comet_pitch', label: 'Comet Pitch' },
-  { cue: 'knuckle_warble', label: 'Ghost Knuckle' },
-  { cue: 'spring_boing', label: 'High-Jump Boing' },
-  { cue: 'crowd_cheer', label: 'Crowd Roar' },
-  { cue: 'level_up', label: 'RPG Level Up' },
-  { cue: 'cash_chime', label: 'Sim-City Cash' },
 ];
 
 const SHELF_SIZE = INITIAL_SHOWCASE_ROSTER.length;
@@ -633,26 +620,8 @@ export function DesignLabScreen() {
         </div>
       </ComicCard>
 
-      {/* Built-in Procedural 90s Synth & Ballpark Organ Soundboard */}
-      <ComicCard
-        title="Ballpark Soundboard"
-        headerBg="#7209B7"
-        badge={<Sparkles className="w-5 h-5 text-[#FFC300]" />}
-      >
-        <div className="flex flex-wrap gap-2">
-          {SOUNDBOARD_CUES.map((item) => (
-            <ComicButton
-              key={item.cue}
-              size="sm"
-              variant={item.cue.startsWith('organ_') ? 'gold' : 'cream'}
-              icon={<Music className="w-3.5 h-3.5" />}
-              onClick={() => soundEngine.play(item.cue)}
-            >
-              {item.label}
-            </ComicButton>
-          ))}
-        </div>
-      </ComicCard>
+      {/* Built-in Procedural 90s Synth & Ballpark Organ Soundboard (all 28 cues) */}
+      <BallparkSoundboardCard />
     </div>
   );
 }
