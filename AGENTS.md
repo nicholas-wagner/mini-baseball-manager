@@ -1,0 +1,109 @@
+# AGENTS.md — AI Agent Onboarding & Contribution Protocol
+
+Welcome to **Mini Baseball Manager** — a retro 90s Saturday-morning cartoon & 2.5D chibi baseball GM/Manager RPG built as an offline-first, Android-installable PWA.
+
+Any AI agent (fresh session, subagent, or parallel worker) should read this file first (~60 seconds), then check `docs/TASKS.md` for the next `READY` ticket.
+
+---
+
+## 1. Read Order for New Agents
+
+1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
+2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
+3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-050`). Pick the highest-priority `READY` task!
+5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
+
+---
+
+## 2. Hard Architectural Rules (Never Violate!)
+
+1. **Hexagonal Layer Purity**:
+   - `src/engine/**` MUST be **100% pure TypeScript**. **ZERO imports** from `react`, `react-dom`, `three`, `zustand`, `window`, `document`, `localStorage`, or `indexedDB`.
+   - `src/scene/**` (Three.js 3D engine) is imperative and decoupled from React reconciliation; pure math modules (`cameraRig.ts`, `animationState.ts`, `ballTrajectory.ts`) must remain runnable in Node/jsdom without WebGL.
+   - `src/ui/**` reads projections and dispatches actions via `src/store/**` and renders the 3D scene through thin host wrappers (e.g., `BallparkCanvas.tsx`).
+2. **Seeded Determinism (`SeededRng`)**:
+   - NEVER use `Math.random()` inside `src/engine/**` or `src/art/**`. Always thread `SeededRng` from `src/engine/rng/seededRng.ts` so every game, draft class, portrait, nationality roll, and surprise event is 100% reproducible in tests.
+3. **Strict TDD (Red → Green → Refactor)**:
+   - Write failing Vitest tests BEFORE writing implementation code for every engine rule, RPG modifier, economy formula, AI decision, persistence migration, and interactive UI component.
+   - Maintain **≥90% coverage** across `src/engine/**`.
+4. **Local-Only Persistence**:
+   - Zero centralized backend DB. All state lives on-device (IndexedDB primary + localStorage metadata + schema version migrations + portable JSON/Base64 export/import).
+5. **Visual & Mobile Craft**:
+   - Android-installable PWA, **portrait-first** on mobile (`390×844`, `>=44px` tap targets, respects `safe-area-inset-*`), automatic wide landscape layout during 3D games, WebGL DPR capped at `<= 2`.
+
+---
+
+## 3. Exact Domain Invariants Already Locked In
+
+| System | Invariant | Source of Truth |
+| :--- | :--- | :--- |
+| **Nationalities** | Exact weights summing to `100`: `50% USA` + `5%` each (`CAN`, `JPN`, `KOR`, `MEX`, `DOM`, `PRI`, `BRA`, `ARG`, `AUS`, `IRL`), each with authentic names/hometowns, vector SVG flag, and a Myth/Animal Cultural Heritage Ability | `src/engine/nationalities/nationalitiesCatalog.ts` |
+| **Batting Handedness** | Exact distribution: `50% R`, `40% L`, `10% Switch (S)` | `src/engine/handedness/handedness.ts` |
+| **Throwing Handedness** | `SP`: `35% L`; `RP`: `50% L`; `LF/CF/RF`: `50% L`; `1B`: `80% L`; `C`: `20% L`; `2B/3B/SS`: `0% L (100% R)` | `src/engine/handedness/handedness.ts` |
+| **Player Art** | Cards use cel-shaded 90s SVG portraits (`generatePortrait.ts`); field & rig characters use ~1.8-head volumetric 2.5D chibi SVG rigs (`renderMiniPlayerSvg.ts`) rendered both in DOM (`MiniPlayerSvg.tsx`) and as camera-aware 2.5D standees in Three.js (`chibiBuilder.ts`) | `src/art/portraits/`, `src/art/playerSvg/` |
+| **League Pyramid** | 6 tiers × 8 teams (48 clubs): Rookie → Low-A → High-A → AA → AAA → Mini Major League; 21-game regular season (3× round-robin) + 4-team Best-of-3 playoffs | `PLAN.md` |
+| **Audio** | 100% procedural Web Audio API (`soundEngine.ts`); zero external audio downloads; global mute toggle | `src/audio/soundEngine.ts` |
+
+---
+
+## 4. Local Commands & Verification Toolchain
+
+Run binaries directly via `./node_modules/.bin/*` (works cleanly inside restricted sandboxes where `npm` shims may not be on `PATH`):
+
+```bash
+# Unit & Component TDD Suite
+./node_modules/.bin/vitest run
+
+# Watch mode during TDD iteration
+./node_modules/.bin/vitest
+
+# Coverage check
+./node_modules/.bin/vitest run --coverage
+
+# Strict TypeScript check
+./node_modules/.bin/tsc -b --noEmit
+
+# ESLint check
+./node_modules/.bin/eslint .
+
+# Production & Android PWA Service Worker build
+./node_modules/.bin/vite build
+
+# Playwright Browser E2E (Desktop 1280x800 + Android Pixel 7 390x844)
+mkdir -p /tmp/pw-chrome-cfg /tmp/pw-chrome-cache && ./node_modules/.bin/playwright test
+```
+
+*(Note: `npm run dev` launches the Vite dev server for live interactive review.)*
+
+---
+
+## 5. Pitfalls Already Solved (Do Not Regress!)
+
+1. **Inline SVG `<defs>` ID Collisions**: Multiple `<MiniPlayerSvg />` or portrait SVGs render on the same DOM page. ALWAYS namespace `<radialGradient>` / `<linearGradient>` / `<pattern>` IDs with a unique suffix (`seed + role + facing + throws + batSide`) so gradients never bleed across characters.
+2. **Front ↔ Back Handedness Consistency**:
+   - Mitt side: `const mittOnViewerLeft = (facing === 'back') === (throwsHand === 'R')`.
+   - Bat side: `const batOnViewerLeft = (facing === 'front') === (batSide === 'R')`.
+   - Back-view pitcher baseball MUST render **underneath** the back-of-hand circle (peeking from palm side), NEVER glued on top of the knuckles.
+   - Helmet ear-flap sits on the batter's front ear facing the pitcher (opposite the bat shoulder).
+3. **2.5D Standee Rim in Three.js**: Keep `rimBackingMesh` tight (`z = -0.025`, `scale = 1`) and pass `includeGroundShadow: false` into Three.js sprites so shadows aren't doubled over the real 3D ground disc.
+4. **Crowd Audio Realism**: NEVER synthesize crowd cheers from plain white noise (sounds like TV static). Keep `playCrowdLayer()` using Paul Kellet pink noise + sweeping vocal-tract formants + staggered hand claps + subtle distant cheer glide.
+5. **Playwright & `tsc -b`**: Do not import Node-only built-ins like `node:fs` inside `playwright.config.ts` (keeps `tsconfig.node.json` clean without extra `@types/node` friction). Keep `XDG_CONFIG_HOME` / `XDG_CACHE_HOME` pointed to `/tmp/pw-chrome-*` so Chromium crashpad works inside sandboxes.
+6. **Three.js + jsdom**: `tests/setup.ts` stubs `HTMLCanvasElement.prototype.getContext` to return `null` so `<BallparkCanvas />` activates its graceful non-WebGL fallback cleanly in unit tests.
+
+---
+
+## 6. Definition of Done (Every Task / PR / Commit)
+
+Before marking a task `DONE` in `docs/TASKS.md`:
+
+1. Set task status to `IN_PROGRESS` before coding.
+2. Write failing Vitest tests first (**RED**), implement clean TypeScript (**GREEN**), refactor cleanly (**REFACTOR**).
+3. Run the full verification pipeline and confirm **zero errors**:
+   - `./node_modules/.bin/vitest run`
+   - `./node_modules/.bin/tsc -b --noEmit`
+   - `./node_modules/.bin/eslint .`
+   - `./node_modules/.bin/vite build`
+4. If touching UI, SVG art, or 3D scenes: run Playwright E2E and visually inspect real screenshots across Desktop (`1280×800`) and Android Mobile (`390×844`) viewports.
+5. Update `docs/TASKS.md` (`DONE` + any unlocked downstream `READY` tickets) AND update `PLAN.md` (Progress Dashboard counts, checkboxes, and Decision Log if any scope/design changed).
+6. Make a clean, focused Git commit referencing the Task ID (e.g., `Implement seeded pitch-by-pitch simulation engine (TASK-013)`).
