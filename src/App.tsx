@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { bgmEngine } from './audio/bgmEngine';
 import { soundEngine } from './audio/soundEngine';
+import { buildManagerActionInbox } from './engine/gm/managerActionInbox';
 import { getNextAvailableStoryChapter } from './engine/story/storyEngine';
 import { useCareerStoryStore } from './store/careerSlots';
 import { useFoilPackStore } from './store/foilPackStore';
@@ -97,6 +98,8 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [packsOpen, setPacksOpen] = useState(false);
   const humanClub = useGameStore((s) => s.getHumanClub());
+  const manager = useGameStore((s) => s.manager);
+  const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const unopenedPackCount = useFoilPackStore((s) => s.unopenedPacks.length);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
   const storyState = useCareerStoryStore((s) => s.storyState);
@@ -292,9 +295,25 @@ export function App() {
     }
   };
 
-  const visibleNavItems = designLabVisible
+  const inboxBadges = humanClub
+    ? buildManagerActionInbox({
+        club: humanClub,
+        manager,
+        currentSeriesIndex,
+        unopenedPackCount,
+      }).tabBadges
+    : {};
+
+  const visibleNavItems = (designLabVisible
     ? NAV_ITEMS
-    : NAV_ITEMS.filter((item) => item.id !== 'lab');
+    : NAV_ITEMS.filter((item) => item.id !== 'lab')
+  ).map((item) => {
+    if (item.id === 'roster' && inboxBadges.roster) return { ...item, badge: inboxBadges.roster };
+    if (item.id === 'skills' && inboxBadges.skills) return { ...item, badge: inboxBadges.skills };
+    if (item.id === 'league' && inboxBadges.league) return { ...item, badge: inboxBadges.league };
+    if (item.id === 'economy' && inboxBadges.economy) return { ...item, badge: inboxBadges.economy };
+    return item;
+  });
 
   const renderMainContent = () => {
     if (activeTab === 'lab' && designLabVisible) {
@@ -302,7 +321,7 @@ export function App() {
     }
     if (activeTab === 'gameday' || activeTab === 'lab') {
       return humanClub ? (
-        <GameDayScreen />
+        <GameDayScreen onJumpToTab={(tab) => setActiveTab(tab)} />
       ) : (
         <ClubCreatorScreen onCreated={() => setActiveTab('gameday')} />
       );

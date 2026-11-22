@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import {
+  applySeriesAutoProgression,
+  diffClubLevelUps,
+  runQuickTeamPractice,
+  type PlayerLevelUpEvent,
+  type QuickTeamPracticeResult,
+} from '../engine/gm/managerActionInbox';
+import {
   generateMarketPool,
   validateRosterAddition,
   validateRosterRelease,
@@ -96,6 +103,7 @@ export interface PostGameSummary {
   mvp: GameMvpSelection;
   rewards: PostGameRewards;
   result: GameSessionResult;
+  levelUps?: readonly PlayerLevelUpEvent[];
 }
 
 export interface GameStoreState {
@@ -116,7 +124,15 @@ export interface GameStoreState {
   startNewCareer: (input: StartNewCareerInput) => void;
   simNextSeriesRound: (
     regulationInnings?: GameLengthInnings,
-  ) => { seriesCompleted: number; seasonComplete: boolean };
+  ) => {
+    seriesCompleted: number;
+    seasonComplete: boolean;
+    winsGained?: number;
+    lossesGained?: number;
+    cashEarned?: number;
+    levelUps?: readonly PlayerLevelUpEvent[];
+  };
+  runQuickTeamPracticeAction: () => QuickTeamPracticeResult | null;
   runPlayoffsAndAdvanceSeason: (
     regulationInnings?: GameLengthInnings,
   ) => {
@@ -255,6 +271,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         return { seriesCompleted: state.currentSeriesIndex, seasonComplete: true };
       }
 
+      const prevHumanClub = findClubAcrossLeagues(state.leagues, state.humanClubId);
       const nextLeagues = { ...state.leagues };
       LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
         if (nextLeagues[tier].length < 2) return;
@@ -272,11 +289,55 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       });
 
       const nextIndex = state.currentSeriesIndex + 1;
+      const postHumanClub = findClubAcrossLeagues(nextLeagues, state.humanClubId);
+      let nextManager = state.manager;
+      let winsGained = 0;
+      let lossesGained = 0;
+      let cashEarned = 0;
+      let levelUps: PlayerLevelUpEvent[] = [];
+
+      if (prevHumanClub && postHumanClub && state.manager) {
+        winsGained = Math.max(0, postHumanClub.wins - prevHumanClub.wins);
+        lossesGained = Math.max(0, postHumanClub.losses - prevHumanClub.losses);
+        const autoProg = applySeriesAutoProgression(
+          postHumanClub,
+          state.manager,
+          winsGained,
+          lossesGained,
+        );
+        nextLeagues[autoProg.club.leagueTier] = nextLeagues[autoProg.club.leagueTier].map((c) =>
+          c.id === autoProg.club.id ? autoProg.club : c,
+        );
+        nextManager = autoProg.manager;
+        cashEarned = autoProg.cashEarned;
+        levelUps = autoProg.levelUps;
+      }
+
       set({
         leagues: nextLeagues,
+        manager: nextManager,
         currentSeriesIndex: nextIndex,
       });
-      return { seriesCompleted: nextIndex, seasonComplete: nextIndex >= 7 };
+      return {
+        seriesCompleted: nextIndex,
+        seasonComplete: nextIndex >= 7,
+        winsGained,
+        lossesGained,
+        cashEarned,
+        levelUps,
+      };
+    },
+
+    runQuickTeamPracticeAction: () => {
+      const state = get();
+      const humanClub = get().getHumanClub();
+      if (!humanClub || !state.manager) return null;
+      const res = runQuickTeamPractice(humanClub, state.manager);
+      set({
+        leagues: updateHumanClubInLeagues(state.leagues, res.club),
+        manager: res.manager,
+      });
+      return res;
     },
 
     runPlayoffsAndAdvanceSeason: (regulationInnings = 5) => {
@@ -711,6 +772,8 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         won,
       );
 
+      const levelUps = diffClubLevelUps(humanClub.roster, progressed.club.roster);
+
       const summary: PostGameSummary = {
         opponentClubId: opponentClub.id,
         opponentName: `${opponentClub.city} ${opponentClub.name}`,
@@ -720,6 +783,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         mvp,
         rewards,
         result,
+        levelUps,
       };
 
       set({

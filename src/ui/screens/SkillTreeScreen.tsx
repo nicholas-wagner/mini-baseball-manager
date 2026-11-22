@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { Check, Lock, RotateCcw, Sparkles, Star } from 'lucide-react';
+import { Award, Check, Lock, RotateCcw, Sparkles, Star } from 'lucide-react';
 import { FlagBadge } from '../../art/flags/FlagBadge';
 import { soundEngine } from '../../audio/soundEngine';
+import {
+  MANAGER_SKILL_NODES,
+  unlockManagerSkillNode,
+} from '../../engine/manager/managerTree';
 import {
   computePlayerOverall,
   SPECIALIST_LABELS,
@@ -18,6 +22,7 @@ import {
   SKILL_RESPEC_CASH_FEE,
   type SkillBranchId,
 } from '../../engine/rpg/skillTrees';
+import { unlockHumanManagerNode } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -30,20 +35,27 @@ const BRANCH_LABELS: Record<SkillBranchId, string> = {
 
 export function SkillTreeScreen() {
   const humanClub = useGameStore((s) => s.getHumanClub());
+  const manager = useGameStore((s) => s.manager);
   const unlockPlayerSkill = useGameStore((s) => s.unlockPlayerSkill);
   const unlockPlayerHeritageTier = useGameStore((s) => s.unlockPlayerHeritageTier);
   const togglePlayerSpecialPower = useGameStore((s) => s.togglePlayerSpecialPower);
   const respecPlayerSkillTree = useGameStore((s) => s.respecPlayerSkillTree);
 
+  const [treeMode, setTreeMode] = useState<'players' | 'manager'>('players');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
   const [activeBranch, setActiveBranch] = useState<SkillBranchId | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   if (!humanClub) return null;
 
+  const totalPlayerSp = humanClub.roster.reduce((sum, p) => sum + p.skillPoints, 0);
+  const managerSp = manager?.skillPoints ?? 0;
+
+  const defaultPlayerWithSp =
+    humanClub.roster.find((p) => p.skillPoints > 0) ?? humanClub.roster[0];
   const player =
     humanClub.roster.find((p) => p.id === selectedPlayerId) ??
-    humanClub.roster[0];
+    defaultPlayerWithSp;
 
   const availableBranches = getAvailableSkillBranches(player);
   const currentBranch: SkillBranchId =
@@ -100,6 +112,91 @@ export function SkillTreeScreen() {
 
   return (
     <div className="space-y-4">
+      <div className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-wrap items-center justify-between gap-2 shadow-[3px_3px_0_#181B2C]">
+        <div className="text-xs font-extrabold text-[#181B2C]">
+          ⬆️ Regular stats level up automatically after games &amp; practice — spend{' '}
+          <span className="underline">Skill Points (SP)</span> here for Special Skill Trees!
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ComicButton
+            size="sm"
+            variant={treeMode === 'players' ? 'gold' : 'cream'}
+            active={treeMode === 'players'}
+            icon={<Sparkles className="w-3.5 h-3.5" />}
+            onClick={() => setTreeMode('players')}
+          >
+            Player Skill Trees{totalPlayerSp > 0 ? ` (${totalPlayerSp} SP)` : ''}
+          </ComicButton>
+          <ComicButton
+            size="sm"
+            variant={treeMode === 'manager' ? 'violet' : 'cream'}
+            active={treeMode === 'manager'}
+            icon={<Award className="w-3.5 h-3.5" />}
+            onClick={() => setTreeMode('manager')}
+          >
+            Manager Skill Tree{managerSp > 0 ? ` (${managerSp} SP)` : ''}
+          </ComicButton>
+        </div>
+      </div>
+
+      {treeMode === 'manager' && manager ? (
+        <ComicCard
+          title={`MANAGER SKILL TREE — ${manager.name.toUpperCase()} (LV.${manager.level})`}
+          subtitle={`${manager.skillPoints} Manager SP Ready • Unlock Skipper Powers, Coaching Boosts & Mogul Bonuses`}
+          headerBg="#7209B7"
+        >
+          <div data-testid="manager-skill-tree-panel" className="space-y-3">
+            {feedback ? (
+              <div
+                data-testid="skill-tree-feedback"
+                className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]"
+              >
+                {feedback}
+              </div>
+            ) : null}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {MANAGER_SKILL_NODES.map((node) => {
+                const owned = manager.unlockedNodeIds.includes(node.id);
+                const check = unlockManagerSkillNode(manager, node.id);
+                return (
+                  <div
+                    key={node.id}
+                    className={`p-3 rounded-xl border-2 border-[#181B2C] flex flex-col justify-between gap-2 ${
+                      owned ? 'bg-[#D8F3DC]' : check.unlocked ? 'bg-[#FFF3BF]' : 'bg-[#FFFDF7]'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 text-xs font-display text-[#181B2C]">
+                        <span>{node.name}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] text-[10px] uppercase">
+                          {node.branch}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-bold text-[#4A5068] mt-1">{node.description}</p>
+                    </div>
+                    <ComicButton
+                      size="sm"
+                      variant={owned ? 'turf' : check.unlocked ? 'gold' : 'cream'}
+                      disabled={owned || !check.unlocked}
+                      onClick={() => {
+                        const res = unlockHumanManagerNode(node.id);
+                        if (res.unlocked) {
+                          soundEngine.play('level_up');
+                          setFeedback(`Unlocked Manager Skill: ${node.name}!`);
+                        } else {
+                          setFeedback(res.reason ?? 'Unable to unlock Manager node.');
+                        }
+                      }}
+                    >
+                      {owned ? 'Unlocked ✓' : `Unlock (${node.spCost} SP)`}
+                    </ComicButton>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </ComicCard>
+      ) : (
       <ComicCard
         title="PLAYER SKILL TREES & HERITAGE MASTERY"
         subtitle={`${humanClub.city} ${humanClub.name} • Cash $${humanClub.economy.cash.toLocaleString()} • Spend SP to evolve specialists & unlock scarce finishers`}
@@ -122,7 +219,9 @@ export function SkillTreeScreen() {
                   className={`shrink-0 px-3 py-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[44px] transition ${
                     selected
                       ? 'bg-[#FFC300] shadow-[3px_3px_0_#181B2C]'
-                      : 'bg-[#FFFDF7]'
+                      : p.skillPoints > 0
+                        ? 'bg-[#FFF3BF]'
+                        : 'bg-[#FFFDF7]'
                   }`}
                 >
                   <div className="flex items-center gap-1.5 font-display text-xs text-[#181B2C]">
@@ -130,6 +229,11 @@ export function SkillTreeScreen() {
                     <span>
                       {p.position} {p.name}
                     </span>
+                    {p.skillPoints > 0 ? (
+                      <span className="px-1.5 py-0.5 rounded bg-[#E63946] text-white text-[9px] font-display">
+                        ⚡ {p.skillPoints} SP
+                      </span>
+                    ) : null}
                   </div>
                   <div className="text-[10px] font-extrabold text-[#4A5068]">
                     LV.{p.level} • {p.skillPoints} SP • OVR {computePlayerOverall(p)}
@@ -313,6 +417,7 @@ export function SkillTreeScreen() {
           </div>
         </div>
       </ComicCard>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ interface PostGameSummaryModalProps {
   managerLevel: number;
   onClose: () => void;
   onPlayAgain?: () => void;
+  onSpendSkillPoints?: () => void;
 }
 
 export function PostGameSummaryModal({
@@ -26,6 +27,7 @@ export function PostGameSummaryModal({
   managerLevel,
   onClose,
   onPlayAgain,
+  onSpendSkillPoints,
 }: PostGameSummaryModalProps) {
   if (!summary) return null;
 
@@ -33,15 +35,17 @@ export function PostGameSummaryModal({
     humanClub.roster.find((p) => p.id === summary.mvp.playerId) ?? humanClub.roster[0];
   const mvpCardPlayer = toBaseballCardPlayer(mvpDomainPlayer, 'mvp');
   const humanWon = summary.won;
+  const levelUps = summary.levelUps ?? [];
+  const totalUnspentSp = humanClub.roster.reduce((sum, p) => sum + p.skillPoints, 0);
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#181B2C]/80 p-3 sm:p-6 flex items-center justify-center overflow-y-auto"
+      className="fixed inset-0 z-50 bg-[#181B2C]/80 p-3 sm:p-6 flex items-start sm:items-center justify-center overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Post-Game Box Score & MVP"
     >
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-3xl my-2 sm:my-auto">
         <ComicCard
           title={humanWon ? 'VICTORY! SANDLOT FINAL' : 'TOUGH LOSS — CLUBHOUSE RECAP'}
           subtitle={`${humanClub.city} ${humanClub.name} vs ${summary.opponentName} • ${summary.awayScore}-${summary.homeScore}`}
@@ -170,7 +174,36 @@ export function PostGameSummaryModal({
                 </div>
               </div>
 
+              {levelUps.length > 0 ? (
+                <div
+                  data-testid="postgame-levelups-card"
+                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] space-y-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-wider text-[#181B2C]">
+                    <span>⬆️ Automatic Level-Ups! (+Core Stats &amp; Skill Tree SP)</span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166]">
+                      {levelUps.length} UP
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {levelUps.slice(0, 6).map((lv) => (
+                      <span
+                        key={lv.playerId}
+                        className="px-2 py-0.5 rounded-lg border border-[#181B2C] bg-[#FFFDF7] text-[11px] font-extrabold text-[#181B2C]"
+                      >
+                        {lv.playerName} → LV.{lv.newLevel} (+{lv.spEarned} SP)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap gap-2.5 pt-1">
+                {onSpendSkillPoints && totalUnspentSp > 0 ? (
+                  <ComicButton variant="violet" onClick={onSpendSkillPoints}>
+                    ⚡ Spend Skill Points ({totalUnspentSp} SP)
+                  </ComicButton>
+                ) : null}
                 {onPlayAgain ? (
                   <ComicButton variant="gold" onClick={onPlayAgain}>
                     Play Next Game

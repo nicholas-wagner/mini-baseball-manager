@@ -15,6 +15,10 @@ import {
 import { bgmEngine } from '../../audio/bgmEngine';
 import { soundEngine } from '../../audio/soundEngine';
 import { getBallparkPreset } from '../../engine/ballparks/stadiumCatalog';
+import {
+  buildManagerActionInbox,
+  type ManagerJumpTarget,
+} from '../../engine/gm/managerActionInbox';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
 import {
   buildRivalryShowdownPreview,
@@ -105,6 +109,7 @@ import { FoilPackModal } from '../components/FoilPackModal';
 import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { LiveGameCanvas } from '../components/LiveGameCanvas';
+import { ManagerClipboardBanner } from '../components/ManagerClipboardBanner';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -161,12 +166,30 @@ function buildComicCallout(
   return null;
 }
 
-export function GameDayScreen() {
+function safeScrollTop(): void {
+  try {
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  } catch {
+    // Ignore non-scrolling jsdom environments
+  }
+}
+
+interface GameDayScreenProps {
+  onJumpToTab?: (tab: 'roster' | 'skills' | 'league' | 'economy') => void;
+}
+
+export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
   const manager = useGameStore((s) => s.manager);
   const worldSeed = useGameStore((s) => s.worldSeed);
+  const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const commitCompletedGame = useGameStore((s) => s.commitCompletedGame);
+  const simNextSeriesRound = useGameStore((s) => s.simNextSeriesRound);
+  const runQuickTeamPracticeAction = useGameStore((s) => s.runQuickTeamPracticeAction);
+  const [gmQuickFeedback, setGmQuickFeedback] = useState<string | null>(null);
 
   const opponents = humanClub
     ? leagues[humanClub.leagueTier].filter((c) => c.id !== humanClub.id)
@@ -224,9 +247,7 @@ export function GameDayScreen() {
 
   const hasLiveSession = liveSession !== null;
   useEffect(() => {
-    if (hasLiveSession && typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
-      window.scrollTo({ top: 0, behavior: 'auto' });
-    }
+    safeScrollTop();
   }, [hasLiveSession]);
 
   // Keep Android screen awake during active live 3D games when Wake Lock preference is ON
@@ -505,8 +526,59 @@ export function GameDayScreen() {
   if (!humanClub) return null;
 
   if (!liveSession || !activeOpponent) {
+    const inbox = buildManagerActionInbox({
+      club: humanClub,
+      manager,
+      currentSeriesIndex,
+      unopenedPackCount: unopenedPacks.length,
+    });
+
+    const handleManagerJump = (target: ManagerJumpTarget) => {
+      soundEngine.play('ui_pop');
+      if (target === 'foil_packs') {
+        setFoilModalOpen(true);
+        return;
+      }
+      onJumpToTab?.(target);
+    };
+
+    const handleFastSimSeries = () => {
+      const res = simNextSeriesRound(gameLength);
+      soundEngine.play(res.winsGained && res.winsGained >= 2 ? 'level_up' : 'ui_pop');
+      if (res.winsGained && res.winsGained >= 2) {
+        awardFoilPack('sandlot_foil', `Series ${res.seriesCompleted} Victory!`);
+      }
+      const lvText =
+        res.levelUps && res.levelUps.length > 0
+          ? ` • ⬆️ ${res.levelUps.length} auto level-up${res.levelUps.length === 1 ? '' : 's'} (+SP ready!)`
+          : '';
+      const cashText = res.cashEarned ? ` • +$${res.cashEarned.toLocaleString()} cash` : '';
+      setGmQuickFeedback(
+        `Series ${res.seriesCompleted}/7 complete (${res.winsGained ?? 0}-${res.lossesGained ?? 0})${cashText}${lvText}`,
+      );
+    };
+
+    const handleQuickPractice = () => {
+      const res = runQuickTeamPracticeAction();
+      if (!res) return;
+      soundEngine.play(res.levelUps.length > 0 ? 'level_up' : 'ui_pop');
+      setGmQuickFeedback(res.summary);
+    };
+
     return (
       <div className="space-y-4">
+        <ManagerClipboardBanner
+          clubName={`${humanClub.city} ${humanClub.name}`}
+          recordLabel={`${humanClub.wins}-${humanClub.losses}`}
+          cash={humanClub.economy.cash}
+          seriesIndex={currentSeriesIndex}
+          inbox={inbox}
+          quickFeedback={gmQuickFeedback}
+          onSimNextSeries={handleFastSimSeries}
+          onQuickPractice={handleQuickPractice}
+          onActionClick={handleManagerJump}
+        />
+
         <ComicCard
           title={
             pendingLivePlayoff
@@ -653,7 +725,18 @@ export function GameDayScreen() {
           summary={modalSummary}
           humanClub={humanClub}
           managerLevel={manager?.level ?? 1}
-          onClose={() => setModalSummary(null)}
+          onClose={() => {
+            setModalSummary(null);
+            safeScrollTop();
+          }}
+          onSpendSkillPoints={
+            onJumpToTab
+              ? () => {
+                  setModalSummary(null);
+                  onJumpToTab('skills');
+                }
+              : undefined
+          }
         />
       </div>
     );
@@ -730,19 +813,24 @@ export function GameDayScreen() {
 
   return (
     <div className="space-y-3">
-      <ScoreboardStrip
-        awayAbbr={activeOpponent.colors.monogram}
-        awayScore={liveSession.away.score}
-        awayColor={activeOpponent.colors.primary}
-        homeAbbr={humanClub.colors.monogram}
-        homeScore={liveSession.home.score}
-        homeColor={humanClub.colors.primary}
-        inning={liveSession.inning}
-        half={liveSession.half}
-        balls={liveSession.balls}
-        strikes={liveSession.strikes}
-        outs={liveSession.outs}
-      />
+      <div
+        data-testid="sticky-live-scoreboard"
+        className="sticky top-[62px] md:top-2 z-20"
+      >
+        <ScoreboardStrip
+          awayAbbr={activeOpponent.colors.monogram}
+          awayScore={liveSession.away.score}
+          awayColor={activeOpponent.colors.primary}
+          homeAbbr={humanClub.colors.monogram}
+          homeScore={liveSession.home.score}
+          homeColor={humanClub.colors.primary}
+          inning={liveSession.inning}
+          half={liveSession.half}
+          balls={liveSession.balls}
+          strikes={liveSession.strikes}
+          outs={liveSession.outs}
+        />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
         <div className="space-y-3">
@@ -1502,8 +1590,18 @@ export function GameDayScreen() {
         onClose={() => {
           setModalSummary(null);
           setLiveSession(null);
+          safeScrollTop();
         }}
         onPlayAgain={() => handleStartLiveGame(false)}
+        onSpendSkillPoints={
+          onJumpToTab
+            ? () => {
+                setModalSummary(null);
+                setLiveSession(null);
+                onJumpToTab('skills');
+              }
+            : undefined
+        }
       />
     </div>
   );

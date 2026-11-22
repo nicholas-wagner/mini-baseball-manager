@@ -56,7 +56,7 @@ export function StoryChapterModal({ open, onClose }: StoryChapterModalProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Dynasty Story and Backstories"
-      className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-3 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/65 flex items-start sm:items-center justify-center p-3 overflow-y-auto"
     >
       <div className="w-full max-w-4xl my-auto">
         <ComicCard

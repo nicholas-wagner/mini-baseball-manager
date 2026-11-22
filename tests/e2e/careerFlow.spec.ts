@@ -14,15 +14,19 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
 
   // Soundboard lives exclusively in Design Lab (NOT cluttering Game Day)
   await expect(page.getByTestId('ballpark-soundboard')).toHaveCount(0);
+  await expect(page.getByTestId('manager-action-inbox')).toBeVisible();
   await page.getByRole('button', { name: /start live 3d game/i }).click();
 
-  // Verify 3D Ballpark Canvas + Live Action Bar + Next Pitch button are ALL visible on-screen together WITHOUT scrolling!
+  // Verify Sticky Scoreboard + 3D Ballpark Canvas + Next Pitch button are ALL visible on-screen together WITHOUT scrolling!
+  const scoreBox = await page.getByTestId('sticky-live-scoreboard').boundingBox();
   const canvasBox = await page.getByTestId('live-game-3d-canvas').boundingBox();
   const nextPitchBtn = page.getByRole('button', { name: /next pitch/i });
   const nextPitchBox = await nextPitchBtn.boundingBox();
   const viewport = page.viewportSize()!;
+  expect(scoreBox).not.toBeNull();
   expect(canvasBox).not.toBeNull();
   expect(nextPitchBox).not.toBeNull();
+  expect(scoreBox!.y).toBeGreaterThanOrEqual(0);
   expect(canvasBox!.y).toBeGreaterThanOrEqual(0);
   expect(nextPitchBox!.y + nextPitchBox!.height).toBeLessThanOrEqual(viewport.height);
 
@@ -46,6 +50,18 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByTestId('control-mode-toggle').click();
   await expect(page.getByTestId('active-powers-dock')).toBeVisible();
   await expect(page.getByTestId('mind-games-bar')).toBeVisible();
+
+  // Finish the game -> verify Post-Game Summary top is NOT clipped off mobile screen, and closing scrolls cleanly to top!
+  await page.getByRole('button', { name: /sim to end/i }).click();
+  const postGameDialog = page.getByRole('dialog', { name: /post-game box score & mvp/i });
+  await expect(postGameDialog).toBeVisible();
+  const postGameHeaderBox = await postGameDialog.locator('h2').first().boundingBox();
+  expect(postGameHeaderBox).not.toBeNull();
+  expect(postGameHeaderBox!.y).toBeGreaterThanOrEqual(0);
+  await page.getByRole('button', { name: /back to clubhouse/i }).click();
+  const inboxBox = await page.getByTestId('manager-action-inbox').boundingBox();
+  expect(inboxBox).not.toBeNull();
+  expect(inboxBox!.y).toBeGreaterThanOrEqual(0);
 
   // Visit Roster -> verify Trainer's Table, Deep Scouting Dossier & 1-tap PNG Baseball Card export
   await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();

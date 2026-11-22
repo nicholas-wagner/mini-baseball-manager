@@ -32,8 +32,12 @@ export function AppShell({
   children,
 }: AppShellProps) {
   useEffect(() => {
-    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
-      window.scrollTo({ top: 0, behavior: 'auto' });
+    try {
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+    } catch {
+      // Ignore jsdom scrollTo stub
     }
   }, [activeTab]);
 
@@ -68,7 +72,10 @@ export function AppShell({
                   <span>{item.label}</span>
                 </span>
                 {item.badge ? (
-                  <span className="text-[10px] font-display px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white border border-[#181B2C]">
+                  <span
+                    aria-hidden="true"
+                    className="text-[10px] font-display px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white border border-[#181B2C]"
+                  >
                     {item.badge}
                   </span>
                 ) : null}
@@ -137,12 +144,20 @@ export function AppShell({
               type="button"
               onClick={() => onSelectTab(item.id)}
               className={[
-                'flex-1 min-h-[48px] rounded-xl flex flex-col items-center justify-center gap-0.5 text-[10px] font-heading font-bold transition-colors',
+                'relative flex-1 min-h-[48px] rounded-xl flex flex-col items-center justify-center gap-0.5 text-[10px] font-heading font-bold transition-colors',
                 isActive
                   ? 'bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C]'
                   : 'text-[#E3F2EA]',
               ].join(' ')}
             >
+              {item.badge ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-1.5 right-0.5 text-[8px] leading-none font-display px-1 py-0.5 rounded-full bg-[#FF4D6D] text-white border border-[#181B2C]"
+                >
+                  {item.badge}
+                </span>
+              ) : null}
               {item.icon}
               <span className="truncate">{item.label}</span>
             </button>

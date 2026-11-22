@@ -189,6 +189,12 @@ Every player carries **both** their **National Cultural Heritage Power** (22+ na
     - *Wet Drizzle*: penalizes pitcher grip control (**`-3` Control**) and increases wet-grass error probability (**`1.12×`**).
 - **In-Game Pitch Math & d100 Dice-Roll Inspector**:
   - Every resolved pitch attaches a structured `PlayMathBreakdown` (`effContact`, `effPower`, `effStuff`, `effControl`, `zonePct`, `hitPct`, `hrPct`, `diceRoll` `1..100`, and active modifier badges) — toggleable live on the Game Day Play-by-Play Ticker via **Show Math / Dice Rolls**.
+- **Pitcher/Batter Mind Games & Persistent Nemesis Grudges (`pitchMindGames.ts`, `nemesisTracker.ts`)**:
+  - **Pitch Target Intent (Pitching)**: `Attack Zone` (`+9%` zone strike prob), `Paint Corners` (`+5` control / `+4%` whiff), `High Heat` (`+2 mph` / `+7%` whiff on fastballs with slightly higher HR carry), and `Bury Chase` (`+11%` chase rate / `+8%` whiff on offspeed pitches at the cost of fewer zone strikes).
+  - **Guess Pitch (Batting)**: `Sit Fastball` or `Sit Offspeed` — guessing the pitch family correctly triggers **🎯 LOCKED IN** (`+14 CON / +12 PWR / +6% Hit`), while guessing wrong triggers **😵 FOOLED** (`-8 CON` & `+8%` whiff penalty).
+  - **Persistent Nemesis Grudges**: Tracks career batter-vs-pitcher plate appearances across games & seasons — **`🔥 OWNS HIM`** grants `+4 CON / +4 PWR` (`-1 STU / -1 CTL`), **`❄️ REVENGE SPOT`** grants `+4 STU / +3 CTL` (`-1 CON`), and **`⚔️ HEATED GRUDGE`** (4+ career battles) amps both sides (`+2 CON / +1 PWR` vs `+2 STU / +1 CTL`).
+- **Automatic Player & Manager Progression (`rewards.ts`, `managerActionInbox.ts`)**:
+  - Both single played/simmed games (`commitCompletedGame`) and fast-simmed 3-game series (`simNextSeriesRound`, plus 1-tap `Quick Team Practice`) automatically award XP, auto-level players (`level * 200` XP curve), auto-bump core role ratings within `statCaps` & `totalRatingBudget`, and grant **Skill Points (`+1 SP`)** specifically for Player & Manager **Special Skill Trees**.
 
 ---
 

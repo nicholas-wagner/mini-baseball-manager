@@ -52,7 +52,7 @@ export function CareerSlotsModal({ open, onClose, onStartNewInSlot }: CareerSlot
       role="dialog"
       aria-modal="true"
       aria-label="4 Career Auto-Save Slots"
-      className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-3 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/65 flex items-start sm:items-center justify-center p-3 overflow-y-auto"
     >
       <div className="w-full max-w-3xl my-auto">
         <ComicCard

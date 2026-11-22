@@ -124,7 +124,7 @@ export function SaveSlotsModal({ open, onClose, repository }: SaveSlotsModalProp
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#181B2C]/75 p-3 sm:p-6 flex items-center justify-center overflow-y-auto"
+      className="fixed inset-0 z-50 bg-[#181B2C]/75 p-3 sm:p-6 flex items-start sm:items-center justify-center overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Save & Backup Slots"

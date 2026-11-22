@@ -32,7 +32,7 @@ export function DugoutGuideModal({ open, onClose, onJumpToTab }: DugoutGuideModa
       role="dialog"
       aria-modal="true"
       aria-label="Coach Pops Dugout Handbook"
-      className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-3 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/65 flex items-start sm:items-center justify-center p-3 overflow-y-auto"
     >
       <div className="w-full max-w-3xl my-auto">
         <ComicCard

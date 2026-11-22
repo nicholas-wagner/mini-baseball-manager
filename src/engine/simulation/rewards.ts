@@ -206,7 +206,7 @@ function nudgeRatingsWithinCaps(player: Player): Player['ratings'] {
   return enforceRatingBudget(bumped, player.position, player.totalRatingBudget);
 }
 
-function applyPlayerXpAndLevelUps(player: Player, gainedXp: number): Player {
+export function applyPlayerXpAndLevelUps(player: Player, gainedXp: number): Player {
   let level = player.level;
   let xp = player.xp + gainedXp;
   let skillPoints = player.skillPoints;
@@ -233,7 +233,7 @@ function applyPlayerXpAndLevelUps(player: Player, gainedXp: number): Player {
   };
 }
 
-function applyManagerXpAndLevelUp(
+export function applyManagerXpAndLevelUp(
   manager: ManagerProfile,
   gainedXp: number,
   won: boolean,
