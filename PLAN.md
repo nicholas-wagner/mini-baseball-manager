@@ -23,11 +23,11 @@
 | **M4** | **Living League World**: 6-Tier Pyramid, Fair Start Presets, Market Tiers, Salary Caps, Offseason (Retirements/Expiring/Draft/FA) & Rivalries | 4 / 8 | `[/]` In Progress | Multi-season climb from Rookie Ball to World Champions |
 | **M5** | **Sim-City Ballpark District**: Multiple Stadiums & Park Factors, Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 0 / 6 | `[ ]` Planned | Multiple distinct 3D ballparks & interactive district builder |
 | **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches & Equipment Manager, Team Doctors & Trainers, Toggleable Injuries/Illnesses, Relics & Weather | 0 / 7 | `[ ]` Planned | Synergy combos, full coaching/equipment/medical staff, low-frequency health drama & loot relics |
-| **M7** | **10X Front Office**: Trade Machine, Deadline Drama, Prospect Academy & "The Sandlot Gazette" | 0 / 4 | `[ ]` Planned | Full GM trade negotiation, farm call-ups & 90s newspaper |
+| **M7** | **10X Front Office**: Trade Machine, Deadline Drama, Prospect Academy & "The Sandlot Gazette" | 1 / 4 | `[/]` In Progress | Full GM trade negotiation, farm call-ups & 90s newspaper |
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `36 / 69` feature slices completed
+**Overall 10X Progress**: `37 / 69` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -171,10 +171,10 @@ Grow the permanent catalog to **3,000 distinct players across all six tiers**, w
 
 ---
 
-### Milestone 7 — 10X Front Office: Trade Machine, Prospect Academy & "The Sandlot Gazette" (`0 / 4`)
+### Milestone 7 — 10X Front Office: Trade Machine, Prospect Academy & "The Sandlot Gazette" (`1 / 4`)
 - [ ] **7A. Multi-Player Trade Machine & Trade Deadline Drama** (`TASK-039`): Fair-value AI Trade Evaluator weighing `marketTier`, `specialistArchetype`, `favoritePosition`, `statCaps`, age & `20`-man roster fit; multi-player & draft-pick swaps; incoming AI Deadline Trade Offers.
 - [ ] **7B. Prospect Academy (Farm / Taxi Squad) & Rookie Call-Ups** (`TASK-040`): 6-slot youth academy to stash & train drafted prospects without clogging active roster, plus celebratory **Rookie Debut** games with hype/XP bonuses.
-- [ ] **7C. Full Player Career Arc, Aging Curves, Mentorship & Coach Transitions** (`TASK-041`): Real multi-season career arcs — rookies (`18–24`) improve stats toward `statCaps`, peak through Prime (`25–30`), hold steady with veteran savvy (`31–34`), and gradually see physical tools (`Speed`, `Velocity`, `Range`, `Stamina`, `Power`) diminish at `35+` until Retirement — plus veteran-to-rookie XP mentorship aura and retiring club legends joining your hireable Coach pool!
+- [x] **7C. Full Player Career Arc, Aging Curves, Mentorship & Coach Transitions** (`TASK-041`): Real multi-season career arcs — rookies (`18–24`) improve stats toward `statCaps`, peak through Prime (`25–30`), hold steady with veteran savvy (`31–34`), and gradually see physical tools (`Speed`, `Velocity`, `Range`, `Stamina`, `Power`) diminish at `35+` until Retirement — plus veteran-to-rookie XP mentorship aura and retiring club legends joining your hireable Coach pool!
 - [ ] **7D. "The Sandlot Gazette" Auto-Generated 90s Newspaper** (`TASK-042`): Rich retro tabloid front page after every series featuring procedurally written headlines for walk-offs, hot streaks, rivalries, trades, league leaders, and clickable player cards.
 
 ---

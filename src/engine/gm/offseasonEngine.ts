@@ -14,6 +14,10 @@ import {
 import { isPitcherPosition, type Player } from '../models/player';
 import { createSeededRng, type SeededRng } from '../rng/seededRng';
 import {
+  evaluateRetirementAndCoachTransition,
+  type RetiredLegendCoachCandidate,
+} from '../rpg/lifecycle';
+import {
   generateMarketPool,
   validateRosterAddition,
 } from './marketTiers';
@@ -49,6 +53,7 @@ export interface OffseasonState {
   humanWonWorldChampionship: boolean;
   transitions: readonly TierPromotionTransition[];
   retirements: readonly RetiredPlayerNotice[];
+  retiredCoachCandidates: readonly RetiredLegendCoachCandidate[];
   leagues: Record<LeagueTierId, Club[]>;
   pendingExpiringPlayers: Player[];
   draftPool: Player[];
@@ -102,15 +107,6 @@ export function validateSalaryCapRoom(
     cap,
     remainingSpace,
   };
-}
-
-function getRetirementChance(age: number): number {
-  if (age >= 40) return 1.0;
-  if (age === 39) return 0.8;
-  if (age === 38) return 0.55;
-  if (age === 37) return 0.35;
-  if (age === 36) return 0.18;
-  return 0;
 }
 
 function findClub(
@@ -167,25 +163,32 @@ function processSingleClubRetirementsAndExpirations(
 ): {
   club: Club;
   retired: RetiredPlayerNotice[];
+  coachCandidates: RetiredLegendCoachCandidate[];
   humanExpiring: Player[];
   releasedToFa: Player[];
 } {
   const retired: RetiredPlayerNotice[] = [];
+  const coachCandidates: RetiredLegendCoachCandidate[] = [];
   const humanExpiring: Player[] = [];
   const releasedToFa: Player[] = [];
   const retained: Player[] = [];
+  const clubLabel = `${club.city} ${club.name}`;
 
   for (const player of club.roster) {
-    if (rng.chance(getRetirementChance(player.age))) {
+    const retirement = evaluateRetirementAndCoachTransition(rng, player, clubLabel);
+    if (retirement.retires) {
       retired.push({
         playerId: player.id,
         playerName: player.name,
         clubId: club.id,
-        clubName: `${club.city} ${club.name}`,
+        clubName: clubLabel,
         position: player.position,
         age: player.age,
         seasonsPlayed: player.careerService.seasonsPlayed,
       });
+      if (retirement.coachCandidate) {
+        coachCandidates.push(retirement.coachCandidate);
+      }
       continue;
     }
 
@@ -225,6 +228,7 @@ function processSingleClubRetirementsAndExpirations(
   return {
     club: syncClubDepthIds(club, retained),
     retired,
+    coachCandidates,
     humanExpiring,
     releasedToFa,
   };
@@ -266,6 +270,7 @@ export function beginOffseasonCycle(
     championsByTier?.majors ?? offseasonWorld.leagues.majors[0].id;
 
   const retirements: RetiredPlayerNotice[] = [];
+  const retiredCoachCandidates: RetiredLegendCoachCandidate[] = [];
   let pendingExpiringPlayers: Player[] = [];
   const releasedToFa: Player[] = [];
   const processedLeagues = {} as Record<LeagueTierId, Club[]>;
@@ -274,6 +279,7 @@ export function beginOffseasonCycle(
     processedLeagues[tier] = offseasonWorld.leagues[tier].map((club) => {
       const res = processSingleClubRetirementsAndExpirations(rng, club, club.id === humanClubId);
       retirements.push(...res.retired);
+      retiredCoachCandidates.push(...res.coachCandidates);
       if (club.id === humanClubId) {
         pendingExpiringPlayers = res.humanExpiring;
       }
@@ -300,6 +306,7 @@ export function beginOffseasonCycle(
     humanWonWorldChampionship: worldChampionClubId === humanClubId,
     transitions: offseasonWorld.transitions,
     retirements,
+    retiredCoachCandidates,
     leagues: processedLeagues,
     pendingExpiringPlayers,
     draftPool,

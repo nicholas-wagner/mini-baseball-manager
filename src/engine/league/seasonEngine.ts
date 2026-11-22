@@ -15,6 +15,10 @@ import {
 } from '../models/player';
 import { createSeededRng } from '../rng/seededRng';
 import { advanceCareerServiceForSeason } from '../rpg/careerExperience';
+import {
+  applyOffseasonCareerArc,
+  evaluateClubMentorshipAura,
+} from '../rpg/lifecycle';
 import { applyGameStatDeltasToClub, simFullGame } from '../simulation/baseballEngine';
 import {
   computeBattingSabermetrics,
@@ -390,7 +394,9 @@ export function simulateBestOfThreePlayoffs(
   };
 }
 
-function resetClubForNewSeason(club: Club, targetTier: LeagueTierId): Club {
+function resetClubForNewSeason(club: Club, targetTier: LeagueTierId, seed: number): Club {
+  const rng = createSeededRng(seed);
+  const mentorship = evaluateClubMentorshipAura(club.roster);
   return {
     ...club,
     leagueTier: targetTier,
@@ -398,13 +404,18 @@ function resetClubForNewSeason(club: Club, targetTier: LeagueTierId): Club {
     losses: 0,
     streak: 0,
     rotationCursor: 0,
-    roster: club.roster.map((player) => ({
-      ...player,
-      age: player.age + 1,
-      fatigue: 0,
-      careerService: advanceCareerServiceForSeason(player.careerService, player.careerStats),
-      seasonStats: createEmptySeasonStats(),
-    })),
+    roster: club.roster.map((player) => {
+      const aged = {
+        ...player,
+        age: player.age + 1,
+        fatigue: 0,
+        careerService: advanceCareerServiceForSeason(player.careerService, player.careerStats),
+        seasonStats: createEmptySeasonStats(),
+      };
+      return applyOffseasonCareerArc(rng, aged, {
+        mentorshipGrowthBonus: mentorship.offseasonGrowthBonus,
+      }).player;
+    }),
   };
 }
 
@@ -469,8 +480,10 @@ export function advanceOffseasonWorld(
   }
 
   const nextLeagues = {} as Record<LeagueTierId, Club[]>;
-  for (const tier of LEAGUE_TIER_ORDER) {
-    nextLeagues[tier] = buckets[tier].map((club) => resetClubForNewSeason(club, tier));
-  }
+  LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
+    nextLeagues[tier] = buckets[tier].map((club, clubIdx) =>
+      resetClubForNewSeason(club, tier, seed + tierIdx * 709 + clubIdx * 37),
+    );
+  });
   return { leagues: nextLeagues, transitions };
 }
