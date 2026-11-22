@@ -23,6 +23,7 @@ import {
 import { generatePlayerIdentity } from '../nationalities/pickNationality';
 import type { NationalityId } from '../nationalities/types';
 import type { SeededRng } from '../rng/seededRng';
+import { rollInitialCareerService } from '../rpg/careerExperience';
 import { rollMentalAndPressureProfile } from '../rpg/mentalAndLeverage';
 import {
   computeTotalRatingBudget,
@@ -275,6 +276,8 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     pitchArsenal?.favoritePitch,
   );
   const totalRatingBudget = computeTotalRatingBudget(marketTier, options.position);
+  const age = rng.int(marketSpec.ageRange[0], marketSpec.ageRange[1]);
+  const careerService = rollInitialCareerService(rng, marketTier, age, options.position);
   const overall = computePlayerOverall({ position: options.position, ratings });
   const token = rng.int(100000, 999999);
   const prefix = options.idPrefix ?? 'plyr';
@@ -283,7 +286,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     id: `${prefix}-${options.position.toLowerCase()}-${token}`,
     name: identity.fullName,
     nickname: rng.pick(NICKNAMES),
-    age: rng.int(marketSpec.ageRange[0], marketSpec.ageRange[1]),
+    age,
     position: options.position,
     secondaryPositions: eligibility.secondaryPositions,
     bats,
@@ -313,6 +316,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     battedBallProfile,
     mentalTraits: mental.mentalTraits,
     pressureProfile: mental.pressureProfile,
+    careerService,
     ratings,
     statCaps,
     totalRatingBudget,

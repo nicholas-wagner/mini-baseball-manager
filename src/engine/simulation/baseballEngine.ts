@@ -1,9 +1,9 @@
-import { evaluatePlatoonMatchup } from '../handedness/handedness';
 import type { Club } from '../models/club';
 import type { PlayEvent, TacticalCall } from '../models/playEvent';
 import {
   createEmptySeasonStats,
   PITCHER_ROLE_SHORT_LABELS,
+  type GameLengthInnings,
   type GamePressureLevel,
   type PitchType,
   type PlayerSeasonStats,
@@ -18,10 +18,8 @@ import {
   tickAbilityCooldownsOnPlateAppearance,
   type TeamSideKey,
 } from '../rpg/abilityCooldowns';
-import {
-  evaluatePitcherRoleSituation,
-  selectBestBullpenReliever,
-} from '../rpg/pitcherRoles';
+import { computePitchEnduranceDrain } from '../rpg/pitcherEndurance';
+import { selectBestBullpenReliever } from '../rpg/pitcherRoles';
 import {
   advanceHitRunners,
   advanceWalkRunners,
@@ -54,6 +52,7 @@ export function createGameSession(
   homeClub: Club,
   seed: number,
   gamePressureLevel: GamePressureLevel = 'regular',
+  regulationInnings: GameLengthInnings = 9,
 ): GameSessionState {
   const away = createTeamGameSide(awayClub);
   const home = createTeamGameSide(homeClub);
@@ -61,6 +60,7 @@ export function createGameSession(
     rngSeed: seed >>> 0,
     stepCounter: 0,
     status: 'in_progress',
+    regulationInnings,
     gamePressureLevel,
     inning: 1,
     half: 'TOP',
@@ -591,11 +591,15 @@ function rotateToNextHalfInning(state: GameSessionState): void {
 
   const batting = getBattingSide(state);
   const prevIdx = (batting.lineupIndex + batting.lineup.length - 1) % batting.lineup.length;
-  state.bases = state.inning >= 11 ? [null, batting.lineup[prevIdx].playerId, null] : [null, null, null];
+  // Immediate 2B Ghost Runner starting in the 1st extra inning so games stay snappy!
+  state.bases =
+    state.inning > state.regulationInnings
+      ? [null, batting.lineup[prevIdx].playerId, null]
+      : [null, null, null];
 }
 
 function getThreeOutFinishReason(state: GameSessionState): string | null {
-  if (state.inning < 9) return null;
+  if (state.inning < state.regulationInnings) return null;
   if (state.half === 'TOP' && state.home.score > state.away.score) {
     return `${state.home.city} closes it out!`;
   }
@@ -606,7 +610,11 @@ function getThreeOutFinishReason(state: GameSessionState): string | null {
 }
 
 function advanceHalfOrFinish(state: GameSessionState, events: PlayEvent[]): void {
-  if (state.half === 'BOT' && state.inning >= 9 && state.home.score > state.away.score) {
+  if (
+    state.half === 'BOT' &&
+    state.inning >= state.regulationInnings &&
+    state.home.score > state.away.score
+  ) {
     completeGame(state, events, 'Walk-off victory!');
     return;
   }
@@ -732,18 +740,9 @@ export function stepPitch(
   const leverage = getCurrentLeverage(next).leverageIndex;
   const pitchingLead = fielding.score - batting.score;
   if (tacticalCall !== 'steal' && tacticalCall !== 'intentional_walk') {
-    const roleEval = evaluatePitcherRoleSituation(pitcher, {
-      inning: next.inning,
-      lead: pitchingLead,
-      hasRunnersOn: next.bases.some((b) => b !== null),
-      leverageIndex: leverage,
-      batterEffectiveSide: evaluatePlatoonMatchup(batter.bats, pitcher.throws).effectiveBatSide,
-    });
+    const drain = computePitchEnduranceDrain(pitcher, leverage, next.regulationInnings);
     getPitcherLines(next)[pitcher.id].pitchesThrown += 1;
-    fielding.pitcherFatigue = Math.min(
-      100,
-      fielding.pitcherFatigue + 1.45 * roleEval.fatiguePerPitchMultiplier,
-    );
+    fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + drain);
     next.abilityCooldowns = tickAbilityCooldownsOnPitch(next.abilityCooldowns, pitcher.id);
   }
 
@@ -815,6 +814,28 @@ export function stepAtBat(
     if (paResolved) break;
   }
 
+  return { nextSession: current, events };
+}
+
+/** Advances the simulation until the active half-inning ends or the game finishes (ideal for short bursts!). */
+export function stepHalfInning(
+  session: GameSessionState,
+  tacticalCall: TacticalCall = 'normal',
+): { nextSession: GameSessionState; events: PlayEvent[] } {
+  if (session.status === 'completed') {
+    return { nextSession: session, events: [] };
+  }
+  const startHalf = session.half;
+  const startInning = session.inning;
+  const events: PlayEvent[] = [];
+  let current = session;
+
+  for (let i = 0; i < 60 && current.status === 'in_progress'; i += 1) {
+    const step = stepAtBat(current, tacticalCall);
+    current = step.nextSession;
+    events.push(...step.events);
+    if (current.half !== startHalf || current.inning !== startInning) break;
+  }
   return { nextSession: current, events };
 }
 
@@ -898,13 +919,14 @@ export function buildPlayerStatDeltas(box: GameBoxScore): Record<string, PlayerS
   return deltas;
 }
 
-/** Simulates a complete 9+ inning baseball game deterministically from seed. */
+/** Simulates a complete baseball game (5, 7, or 9 regulation innings + extras) deterministically from seed. */
 export function simFullGame(
   awayClub: Club,
   homeClub: Club,
   seed: number,
+  regulationInnings: GameLengthInnings = 9,
 ): GameSessionResult {
-  let state = createGameSession(awayClub, homeClub, seed);
+  let state = createGameSession(awayClub, homeClub, seed, 'regular', regulationInnings);
   const events: PlayEvent[] = [];
 
   for (let i = 0; i < 1200 && state.status === 'in_progress'; i += 1) {

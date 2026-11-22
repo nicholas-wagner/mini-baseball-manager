@@ -6,6 +6,7 @@ import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import {
   PITCHER_ROLE_SHORT_LABELS,
   PITCH_TYPE_SHORT_LABELS,
+  type GameLengthInnings,
   type PitchType,
 } from '../../engine/models/player';
 import {
@@ -13,12 +14,17 @@ import {
   SPECIAL_ABILITY_HYPE_COST,
 } from '../../engine/rpg/abilityCooldowns';
 import {
+  evaluatePitcherEnduranceEffect,
+  fatigueToEndurance,
+} from '../../engine/rpg/pitcherEndurance';
+import {
   buildPlayerStatDeltas,
   createGameSession,
   manualSwapPitcher,
   simFullGame,
   simUntilClutchOrEnd,
   stepAtBat,
+  stepHalfInning,
   stepPitch,
 } from '../../engine/simulation/baseballEngine';
 import {
@@ -45,6 +51,12 @@ const TACTICAL_OPTIONS: readonly { id: TacticalCall; label: string }[] = [
   { id: 'intentional_walk', label: 'IBB' },
 ];
 
+const GAME_LENGTH_OPTIONS: readonly { innings: GameLengthInnings; label: string }[] = [
+  { innings: 5, label: '5 Inn (Blitz)' },
+  { innings: 7, label: '7 Inn (Quick)' },
+  { innings: 9, label: '9 Inn (Classic)' },
+];
+
 export function GameDayScreen() {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
@@ -57,6 +69,7 @@ export function GameDayScreen() {
     : [];
 
   const [selectedOpponentId, setSelectedOpponentId] = useState<string>(opponents[0]?.id ?? '');
+  const [gameLength, setGameLength] = useState<GameLengthInnings>(9);
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const [recentEvents, setRecentEvents] = useState<PlayEvent[]>([]);
@@ -95,7 +108,7 @@ export function GameDayScreen() {
     const opp = opponents.find((c) => c.id === selectedOpponentId) ?? opponents[0];
     if (!opp) return;
     const seed = worldSeed + humanClub.wins + humanClub.losses + 1;
-    const session = createGameSession(opp, humanClub, seed);
+    const session = createGameSession(opp, humanClub, seed, 'regular', gameLength);
     setActiveOpponentId(opp.id);
     setLiveSession(session);
     setRecentEvents([]);
@@ -158,6 +171,12 @@ export function GameDayScreen() {
     applyStepResult(nextSession, events, activeOpponentId);
   };
 
+  const handleSimHalfInning = () => {
+    if (!liveSession || liveSession.status === 'completed') return;
+    const { nextSession, events } = stepHalfInning(liveSession, tacticalCall);
+    applyStepResult(nextSession, events, activeOpponentId);
+  };
+
   const handleClutchSim = () => {
     if (!liveSession || liveSession.status === 'completed') return;
     const { nextSession, events } = simUntilClutchOrEnd(liveSession);
@@ -167,7 +186,8 @@ export function GameDayScreen() {
   const handleSimToEnd = () => {
     if (!humanClub || !activeOpponent) return;
     const seed = liveSession?.rngSeed ?? worldSeed + humanClub.wins + humanClub.losses + 1;
-    const full = simFullGame(activeOpponent, humanClub, seed);
+    const innings = liveSession?.regulationInnings ?? gameLength;
+    const full = simFullGame(activeOpponent, humanClub, seed, innings);
     setLiveSession(full.finalState);
     setRecentEvents(full.events.slice(-8).reverse());
     const summary = commitCompletedGame(activeOpponent.id, full, true);
@@ -181,7 +201,7 @@ export function GameDayScreen() {
     const opp = opponents.find((c) => c.id === selectedOpponentId) ?? opponents[0];
     if (!opp) return;
     const seed = worldSeed + humanClub.wins + humanClub.losses + 1;
-    const full = simFullGame(opp, humanClub, seed);
+    const full = simFullGame(opp, humanClub, seed, gameLength);
     const summary = commitCompletedGame(opp.id, full, true);
     if (summary) setModalSummary(summary);
     soundEngine.play('crowd_cheer');
@@ -249,6 +269,23 @@ export function GameDayScreen() {
               })}
             </div>
 
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-extrabold uppercase text-[#181B2C]">
+                Game Length:
+              </span>
+              {GAME_LENGTH_OPTIONS.map((opt) => (
+                <ComicButton
+                  key={opt.innings}
+                  size="sm"
+                  variant={gameLength === opt.innings ? 'gold' : 'cream'}
+                  active={gameLength === opt.innings}
+                  onClick={() => setGameLength(opt.innings)}
+                >
+                  {opt.label}
+                </ComicButton>
+              ))}
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <ComicButton
                 variant="turf"
@@ -288,6 +325,11 @@ export function GameDayScreen() {
   const fieldingSideKey = liveSession.half === 'TOP' ? 'home' : 'away';
   const battingHype = liveSession[battingSideKey].hypeGauge;
   const fieldingHype = liveSession[fieldingSideKey].hypeGauge;
+  const pitcherEndurance = fatigueToEndurance(liveSession[fieldingSideKey].pitcherFatigue);
+  const enduranceFx = evaluatePitcherEnduranceEffect(
+    pitcherEndurance,
+    currentPitcher.pitchArsenal?.favoritePitch ?? 'four_seam',
+  );
   const batterSpecial = canTriggerSpecialAbility(
     liveSession.abilityCooldowns,
     battingSideKey,
@@ -378,6 +420,24 @@ export function GameDayScreen() {
                 >
                   LI {currentLeverage.leverageIndex.toFixed(2)} • {currentLeverage.label}
                 </span>
+                <span
+                  data-testid="endurance-hud"
+                  className={`px-2 py-0.5 rounded border border-[#181B2C] ${
+                    enduranceFx.tier === 'gassed' || enduranceFx.tier === 'fatigued'
+                      ? 'bg-[#FF4D6D] text-white'
+                      : enduranceFx.tier === 'tiring'
+                        ? 'bg-[#FFC300] text-[#181B2C]'
+                        : 'bg-[#D8F3DC] text-[#1B4332]'
+                  }`}
+                >
+                  Endurance {pitcherEndurance}% ({enduranceFx.tier}
+                  {enduranceFx.mphDrop < 0 ? `, ${enduranceFx.mphDrop} mph` : ''})
+                </span>
+                {enduranceFx.scoutWarning ? (
+                  <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
+                    ⚠️ {enduranceFx.scoutWarning}
+                  </span>
+                ) : null}
                 <span
                   data-testid="special-ability-hud"
                   className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]"
@@ -470,6 +530,14 @@ export function GameDayScreen() {
                   onClick={handleSimAtBat}
                 >
                   Sim At-Bat
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant="cream"
+                  icon={<FastForward className="w-4 h-4" />}
+                  onClick={handleSimHalfInning}
+                >
+                  Sim Half-Inn
                 </ComicButton>
                 <ComicButton
                   size="sm"

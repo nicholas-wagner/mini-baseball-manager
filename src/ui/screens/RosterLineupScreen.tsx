@@ -7,6 +7,7 @@ import { MAX_ACTIVE_ROSTER_SIZE } from '../../engine/models/club';
 import {
   BATTED_BALL_TENDENCY_LABELS,
   computePlayerOverall,
+  EXPERIENCE_TIER_LABELS,
   isPitcherPosition,
   MARKET_TIER_LABELS,
   MENTAL_TRAIT_LABELS,
@@ -512,6 +513,10 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
               <div className="flex flex-wrap gap-1 pt-1 border-t border-[#181B2C]/15 text-[10px] font-extrabold">
                 <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]">
                   {PRESSURE_PROFILE_LABELS[inspectedPlayer.pressureProfile]}
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
+                  {EXPERIENCE_TIER_LABELS[inspectedPlayer.careerService.experienceTier]} •{' '}
+                  {inspectedPlayer.careerService.seasonsPlayed} Yr
                 </span>
                 <span className="px-1.5 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[#181B2C]">
                   Luck {inspectedPlayer.ratings.luck}

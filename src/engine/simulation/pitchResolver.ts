@@ -17,6 +17,7 @@ import {
 } from '../models/player';
 import { getNationalityById } from '../nationalities/pickNationality';
 import type { SeededRng } from '../rng/seededRng';
+import { evaluateVeteranSavvyEdge } from '../rpg/careerExperience';
 import { getFormStatModifiers } from '../rpg/formTracker';
 import { evaluatePressureAndLuckModifiers } from '../rpg/mentalAndLeverage';
 import {
@@ -24,6 +25,10 @@ import {
   selectPitchForCount,
   type PitchMatchupEvaluation,
 } from '../rpg/pitchArsenals';
+import {
+  evaluatePitcherEnduranceEffect,
+  fatigueToEndurance,
+} from '../rpg/pitcherEndurance';
 import { evaluatePitcherRoleSituation } from '../rpg/pitcherRoles';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
@@ -445,11 +450,16 @@ function resolveContactResult(
   luckHitShift: number,
   defenderLuckErrMult: number,
   pitchType: PitchType,
+  gbRateShift: number,
 ): PitchResolution {
+  const fatiguedPitcherProfile = {
+    ...ctx.pitcher.battedBallProfile,
+    gbRateBias: Math.max(-16, ctx.pitcher.battedBallProfile.gbRateBias + gbRateShift),
+  };
   const battedBallType = sampleBattedBallType(
     ctx.rng,
     ctx.batter.battedBallProfile,
-    ctx.pitcher.battedBallProfile,
+    fatiguedPitcherProfile,
     pitchType,
   );
   const rangeSuppress = (ctx.defender.ratings.range - 62) * 0.0018;
@@ -525,6 +535,7 @@ function evaluateSwingResult(
   luckHitShift: number,
   defenderLuckErrMult: number,
   pitchType: PitchType,
+  gbRateShift: number,
 ): PitchResolution {
   const contactProb = inZone
     ? clampProb(0.76 + (effContact - effStuff) * 0.0048, 0.48, 0.94)
@@ -558,6 +569,7 @@ function evaluateSwingResult(
     luckHitShift,
     defenderLuckErrMult,
     pitchType,
+    gbRateShift,
   );
 }
 
@@ -623,6 +635,14 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   );
   const repeatCount = countTrailingPitchRepeats(ctx.atBatPitchHistory, pitchType);
   const pitchMatchup = evaluatePitchMatchup(ctx.pitcher, ctx.batter, pitchType, repeatCount);
+  const enduranceFx = evaluatePitcherEnduranceEffect(
+    fatigueToEndurance(ctx.pitcherFatigue),
+    pitchType,
+  );
+  const adjustedMatchup: PitchMatchupEvaluation = {
+    ...pitchMatchup,
+    mph: Math.max(58, pitchMatchup.mph + enduranceFx.mphDrop),
+  };
 
   const mod = TACTICAL_CONFIG[ctx.tacticalCall];
   const batterForm = getFormStatModifiers(ctx.batter.formState);
@@ -630,6 +650,8 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const batterMental = evaluatePressureAndLuckModifiers(ctx.batter, ctx.leverageIndex);
   const pitcherMental = evaluatePressureAndLuckModifiers(ctx.pitcher, ctx.leverageIndex);
   const defenderMental = evaluatePressureAndLuckModifiers(ctx.defender, ctx.leverageIndex);
+  const batterSavvy = evaluateVeteranSavvyEdge(ctx.batter.careerService.experienceTier, ctx.leverageIndex);
+  const pitcherSavvy = evaluateVeteranSavvyEdge(ctx.pitcher.careerService.experienceTier, ctx.leverageIndex);
   const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
   const pitcherRoleEval = evaluatePitcherRoleSituation(ctx.pitcher, {
     inning: ctx.inning,
@@ -638,14 +660,15 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     leverageIndex: ctx.leverageIndex,
     batterEffectiveSide: platoon.effectiveBatSide,
   });
-  const fatigueDrop = Math.max(0, ctx.pitcherFatigue - 45) * 0.28;
+
   const effContact =
     ctx.batter.ratings.contact +
     platoon.batterContactDelta +
     mod.contactMod +
     batterForm.contactDelta +
     pitchMatchup.batterContactDelta +
-    batterMental.pressureRatingDelta;
+    batterMental.pressureRatingDelta +
+    batterSavvy.composureDelta;
   const effPower =
     ctx.batter.ratings.power +
     platoon.batterPowerDelta +
@@ -653,26 +676,31 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     batterForm.powerDelta +
     pitchMatchup.batterPowerDelta +
     batterMental.pressureRatingDelta;
+  const effEye = ctx.batter.ratings.eye + batterSavvy.eyeDelta;
   const effStuff =
     (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 +
     platoon.pitcherBreakDelta +
     pitcherForm.stuffDelta +
     pitchMatchup.pitcherStuffDelta +
     pitcherMental.pressureRatingDelta +
-    pitcherRoleEval.stuffDelta -
-    fatigueDrop;
+    pitcherSavvy.composureDelta +
+    pitcherRoleEval.stuffDelta +
+    enduranceFx.breakDrop +
+    enduranceFx.mphDrop;
   const effControl =
     ctx.pitcher.ratings.control +
     pitcherForm.controlDelta +
     pitcherPosEval.controlDelta +
     pitchMatchup.pitcherControlDelta +
     pitcherMental.pressureRatingDelta +
-    pitcherRoleEval.controlDelta;
+    pitcherSavvy.controlDelta +
+    pitcherRoleEval.controlDelta +
+    enduranceFx.controlDrop;
 
   const luckZoneShift = pitcherMental.luckZoneProbDelta - batterMental.luckZoneProbDelta * 0.5;
   const luckHitShift = batterMental.luckHitProbDelta - pitcherMental.luckHitProbDelta * 0.5;
   const zoneProb = clampProb(
-    0.55 + (effControl - ctx.batter.ratings.eye) * 0.0025 + luckZoneShift,
+    0.55 + (effControl - effEye) * 0.0025 + luckZoneShift,
     0.40,
     0.72,
   );
@@ -680,7 +708,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const swingProb = inZone
     ? clampProb(0.67 + mod.swingMod, 0.52, 0.85)
     : clampProb(
-        0.26 - (ctx.batter.ratings.eye - 65) * 0.002 + mod.chaseMod + pitchMatchup.chaseRateDelta,
+        0.26 - (effEye - 65) * 0.002 + mod.chaseMod + pitchMatchup.chaseRateDelta,
         0.10,
         0.48,
       );
@@ -699,7 +727,8 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
         luckHitShift,
         defenderMental.luckErrorMultiplier,
         pitchType,
+        enduranceFx.gbRateShift,
       );
 
-  return attachPitchTelemetry(rawResult, pitchMatchup);
+  return attachPitchTelemetry(rawResult, adjustedMatchup);
 }

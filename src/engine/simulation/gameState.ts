@@ -2,6 +2,7 @@ import type { FieldPosition } from '../handedness/types';
 import type { Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
 import type {
+  GameLengthInnings,
   GamePressureLevel,
   Player,
   PitchType,
@@ -96,6 +97,7 @@ export interface GameSessionState {
   rngSeed: number;
   stepCounter: number;
   status: 'in_progress' | 'completed';
+  regulationInnings: GameLengthInnings;
   gamePressureLevel: GamePressureLevel;
   inning: number;
   half: HalfInning;
@@ -256,15 +258,18 @@ export function getCurrentLeverage(state: GameSessionState): SituationLeverageRe
   });
 }
 
-/** Detects RISP, high Leverage Index, close late-inning pressure, or Special Ability Hype readiness. */
+/** Detects RISP, high Leverage Index, tired mound warning, close late-inning pressure, or Hype readiness. */
 export function isClutchSituation(state: GameSessionState): boolean {
   const hasRisp = state.bases[1] !== null || state.bases[2] !== null;
-  const closeLate = state.inning >= 7 && Math.abs(state.away.score - state.home.score) <= 2;
+  const lateThreshold = Math.max(4, state.regulationInnings - 2);
+  const closeLate =
+    state.inning >= lateThreshold && Math.abs(state.away.score - state.home.score) <= 2;
   const powerReady =
     state.away.hypeGauge >= SPECIAL_ABILITY_HYPE_COST ||
     state.home.hypeGauge >= SPECIAL_ABILITY_HYPE_COST;
   const highLeverage = getCurrentLeverage(state).leverageIndex >= 1.6;
-  return hasRisp || closeLate || powerReady || highLeverage;
+  const pitcherGassed = getFieldingSide(state).pitcherFatigue >= 72;
+  return hasRisp || closeLate || powerReady || highLeverage || pitcherGassed;
 }
 
 /** Advances runners only when forced on a walk/intentional walk. */

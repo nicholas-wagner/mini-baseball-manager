@@ -26,14 +26,19 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       render(<GameDayScreen />);
 
       expect(screen.getByText(/choose today's matchup/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /5 inn \(blitz\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /7 inn \(quick\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /9 inn \(classic\)/i })).toBeInTheDocument();
 
+      await user.click(screen.getByRole('button', { name: /5 inn \(blitz\)/i }));
       await user.click(screen.getByRole('button', { name: /start live 3d game/i }));
 
       expect(screen.getByRole('region', { name: /live baseball scoreboard/i })).toBeInTheDocument();
       expect(screen.getByTestId('live-game-3d-canvas')).toBeInTheDocument();
 
-      // Home SP pitches in TOP 1 with 4-5 selectable pitches + Auto Pitch + Leverage & Special Ability HUD
+      // Home SP pitches in TOP 1 with 4-5 selectable pitches + Endurance, Leverage & Special Ability HUD
       expect(screen.getByTestId('leverage-hud').textContent).toMatch(/LI /i);
+      expect(screen.getByTestId('endurance-hud').textContent).toMatch(/endurance 100%/i);
       expect(screen.getByTestId('special-ability-hud').textContent).toMatch(/pitcher 2\/2/i);
       const spPitchButtons = screen.getAllByRole('button', { name: /^pitch /i });
       expect(spPitchButtons.length).toBeGreaterThanOrEqual(4);
@@ -54,6 +59,10 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       const rpPitchButtons = screen.getAllByRole('button', { name: /^pitch /i });
       expect(rpPitchButtons.length).toBeGreaterThanOrEqual(2);
       expect(rpPitchButtons.length).toBeLessThanOrEqual(3);
+
+      // Sim Half-Inn jumps smoothly out of TOP 1
+      await user.click(screen.getByRole('button', { name: /sim half-inn/i }));
+      expect(screen.queryByTestId('pitch-selector-bar')).not.toBeInTheDocument();
 
       // Sim to End completes game cleanly and opens PostGameSummaryModal
       await user.click(screen.getByRole('button', { name: /sim to end/i }));

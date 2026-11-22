@@ -265,6 +265,28 @@ export interface BattedBallProfile {
   popUpRateBias: number;
 }
 
+export type CareerExperienceTier =
+  | 'rookie_green'
+  | 'developing'
+  | 'seasoned'
+  | 'cagey_veteran';
+
+export const EXPERIENCE_TIER_LABELS: Readonly<Record<CareerExperienceTier, string>> = {
+  rookie_green: 'Green Rookie',
+  developing: 'Developing',
+  seasoned: 'Seasoned Pro',
+  cagey_veteran: 'Cagey Veteran',
+};
+
+export interface CareerServiceProfile {
+  seasonsPlayed: number;
+  careerPlayoffGames: number;
+  experienceScore: number; // 0..100 slow-earned
+  experienceTier: CareerExperienceTier;
+}
+
+export type GameLengthInnings = 5 | 7 | 9;
+
 export interface PlayerRatings {
   // Batting (1-99)
   contact: number;
@@ -367,6 +389,7 @@ export interface Player {
   battedBallProfile: BattedBallProfile;
   mentalTraits: MentalTraitId[];
   pressureProfile: PressureResponseProfile;
+  careerService: CareerServiceProfile;
   ratings: PlayerRatings;
   statCaps: PlayerRatings;
   totalRatingBudget: number;

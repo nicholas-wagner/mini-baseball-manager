@@ -12,6 +12,7 @@ import {
   simFullGame,
   simUntilClutchOrEnd,
   stepAtBat,
+  stepHalfInning,
   stepPitch,
 } from './baseballEngine';
 import {
@@ -489,5 +490,53 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
     };
 
     expect(runPressureHits('ice_veins')).toBeGreaterThan(runPressureHits('pressure_wilt'));
+  });
+
+  it('supports 5-inning Blitz games, 1st-extra-inning 2B Ghost Runner, stepHalfInning, and pitcher velocity drop when fatigued (TASK-061, TASK-062)', () => {
+    const away = createClub(createSeededRng(980), AWAY_OPTS);
+    const home = createClub(createSeededRng(981), HOME_OPTS);
+
+    // 1. 5-inning Blitz finishes at inning >= 5 and stays shorter than a 9-inning game
+    const blitz = simFullGame(away, home, 2026, 5);
+    expect(blitz.finalState.status).toBe('completed');
+    expect(blitz.finalState.regulationInnings).toBe(5);
+    expect(blitz.finalState.inning).toBeGreaterThanOrEqual(5);
+    expect(blitz.awayScore).not.toBe(blitz.homeScore);
+
+    // 2. Tied after BOT 5 places an automatic 2B Ghost Runner in TOP 6 immediately
+    const baseBlitz = createGameSession(away, home, 2027, 'regular', 5);
+    const tiedBot5TwoOuts: GameSessionState = {
+      ...baseBlitz,
+      inning: 5,
+      half: 'BOT',
+      outs: 2,
+      away: { ...baseBlitz.away, score: 2 },
+      home: { ...baseBlitz.home, score: 2 },
+    };
+    let extrasCheck = tiedBot5TwoOuts;
+    for (let i = 0; i < 30 && extrasCheck.inning === 5 && extrasCheck.status === 'in_progress'; i += 1) {
+      extrasCheck = stepAtBat(extrasCheck, 'normal').nextSession;
+    }
+    if (extrasCheck.inning === 6 && extrasCheck.half === 'TOP' && extrasCheck.outs === 0) {
+      expect(extrasCheck.bases[1]).not.toBeNull();
+    }
+
+    // 3. stepHalfInning jumps cleanly from TOP 1 to BOT 1 in one call
+    const halfStep = stepHalfInning(baseBlitz);
+    expect(halfStep.nextSession.half).toBe('BOT');
+    expect(halfStep.nextSession.inning).toBe(1);
+    expect(halfStep.events.length).toBeGreaterThan(0);
+
+    // 4. Fatigued pitcher throws slower radar-gun fastball mph than fresh pitcher (TASK-061)
+    const freshStart = createGameSession(away, home, 4040, 'regular', 9);
+    const tiredStart: GameSessionState = {
+      ...freshStart,
+      home: { ...freshStart.home, pitcherFatigue: 88 },
+    };
+    const freshStep = stepPitch(freshStart, 'normal', { requestedPitchType: 'four_seam' });
+    const tiredStep = stepPitch(tiredStart, 'normal', { requestedPitchType: 'four_seam' });
+    const freshMph = freshStep.events.find((e) => e.pitchThrown)?.pitchThrown?.mph ?? 0;
+    const tiredMph = tiredStep.events.find((e) => e.pitchThrown)?.pitchThrown?.mph ?? 0;
+    expect(freshMph).toBeGreaterThan(tiredMph);
   });
 });

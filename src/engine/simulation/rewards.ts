@@ -1,8 +1,13 @@
 import type { Club } from '../models/club';
 import type { ManagerProfile } from '../models/manager';
 import { isPitcherPosition, type Player, type PlayerSeasonStats } from '../models/player';
+import {
+  updateCareerServiceAfterGame,
+  xpRequiredForNextLevel,
+} from '../rpg/careerExperience';
 import { updatePlayerFormAfterGame } from '../rpg/formTracker';
 import { evaluateClubhouseMentalAura } from '../rpg/mentalAndLeverage';
+import { computePostGamePitcherRecovery } from '../rpg/pitcherEndurance';
 import { evolveSpecialistArchetype } from '../rpg/specialistsAndPositions';
 import { enforceRatingBudget } from '../rpg/trainingCompromises';
 import { applyGameStatDeltasToClub } from './baseballEngine';
@@ -202,8 +207,8 @@ function applyPlayerXpAndLevelUps(player: Player, gainedXp: number): Player {
   let skillPoints = player.skillPoints;
   let nextRatings = player.ratings;
 
-  while (xp >= level * 100) {
-    xp -= level * 100;
+  while (xp >= xpRequiredForNextLevel(level)) {
+    xp -= xpRequiredForNextLevel(level);
     level += 1;
     skillPoints += 1;
     nextRatings = nudgeRatingsWithinCaps({ ...player, ratings: nextRatings });
@@ -260,10 +265,20 @@ export function applyPostGameProgression(
   const aura = evaluateClubhouseMentalAura(clubWithStats.roster);
   const moraleShift = (won ? 4 : -4) + aura.moraleRecoveryBonus;
   const updatedRoster = clubWithStats.roster.map((player) => {
+    const delta = statDeltas[player.id];
     const withXp = applyPlayerXpAndLevelUps(player, rewards.playerXpById[player.id] ?? 0);
-    const withForm = updatePlayerFormAfterGame(withXp, statDeltas[player.id]);
+    const withForm = updatePlayerFormAfterGame(withXp, delta);
+    const pitched = Boolean(delta && (delta.pitchesThrown > 0 || delta.inningsPitchedOuts > 0));
+    const nextFatigue = isPitcherPosition(player.position)
+      ? computePostGamePitcherRecovery(
+          pitched ? Math.min(100, withForm.fatigue + Math.round((delta?.pitchesThrown ?? 25) * 0.9)) : withForm.fatigue,
+          pitched,
+        )
+      : Math.max(0, withForm.fatigue - 25);
     return {
       ...withForm,
+      careerService: updateCareerServiceAfterGame(withForm.careerService, withForm.careerStats, false),
+      fatigue: nextFatigue,
       morale: Math.max(20, Math.min(100, withForm.morale + moraleShift)),
     };
   });

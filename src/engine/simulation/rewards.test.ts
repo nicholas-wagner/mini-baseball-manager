@@ -71,7 +71,7 @@ describe('Post-Game MVP & Rewards Engine', () => {
     const preLeveledHome = {
       ...home,
       roster: home.roster.map((player, index) =>
-        index === 0 ? { ...player, xp: 95, level: 1, skillPoints: 1 } : player,
+        index === 0 ? { ...player, xp: 185, level: 1, skillPoints: 1 } : player,
       ),
     };
     const manager = { ...createManagerProfile({ name: 'Skip', avatarSeed: 9 }), xp: 115 };
@@ -105,7 +105,7 @@ describe('Post-Game MVP & Rewards Engine', () => {
     const rookie = {
       ...home.roster[0],
       xpGrowthMultiplier: 1.35,
-      xp: 90,
+      xp: 190,
       level: 1,
       statCaps: { ...home.roster[0].statCaps, contact: home.roster[0].ratings.contact },
     };
@@ -148,5 +148,64 @@ describe('Post-Game MVP & Rewards Engine', () => {
     const r = afterTight.club.roster[0].ratings;
     const afterSum = r.contact + r.power + r.eye + r.bunt + r.speed + r.fielding + r.arm;
     expect(afterSum).toBeLessThanOrEqual(tightBudgetRookie.totalRatingBudget);
+  });
+
+  it('enforces slow-earned RPG XP & career service pacing and partial post-game pitcher recovery (TASK-060, TASK-061)', () => {
+    const away = createClub(createSeededRng(901), AWAY_OPTS);
+    const home = createClub(createSeededRng(902), HOME_OPTS);
+
+    const starterIndex = home.roster.findIndex((p) => p.id === home.rotationIds[0]);
+    const greenRookie = {
+      ...home.roster[0],
+      level: 1,
+      xp: 0,
+      careerService: {
+        seasonsPlayed: 0,
+        careerPlayoffGames: 0,
+        experienceScore: 1,
+        experienceTier: 'rookie_green' as const,
+      },
+    };
+    const modHome = {
+      ...home,
+      roster: home.roster.map((p, idx) =>
+        idx === 0 ? greenRookie : idx === starterIndex ? { ...p, fatigue: 10 } : p,
+      ),
+    };
+
+    const result = simFullGame(away, modHome, 903);
+    result.playerStatDeltas[greenRookie.id] = {
+      ...greenRookie.seasonStats,
+      games: 1,
+      plateAppearances: 4,
+      atBats: 4,
+      hits: 1,
+    };
+    const starterId = home.rotationIds[0];
+    result.playerStatDeltas[starterId] = {
+      ...modHome.roster[starterIndex].seasonStats,
+      games: 1,
+      pitchesThrown: 90,
+      inningsPitchedOuts: 18,
+    };
+
+    const rewards = calculatePostGameRewards(modHome, result, true, true);
+    const after = applyPostGameProgression(
+      modHome,
+      createManagerProfile({ name: 'Skip', avatarSeed: 2 }),
+      rewards,
+      result.playerStatDeltas,
+      true,
+    );
+
+    // Slow-burn level curve (200 XP for Lv 1 -> 2): 1 normal game must NOT insta-level a fresh player
+    const rookieAfter = after.club.roster[0];
+    expect(rookieAfter.level).toBe(1);
+    expect(rookieAfter.careerService.experienceTier).toBe('rookie_green');
+
+    // Heavy-workload starter recovers partially after the game rather than resetting to 0 immediately
+    const starterAfter = after.club.roster[starterIndex];
+    expect(starterAfter.fatigue).toBeGreaterThan(20);
+    expect(starterAfter.fatigue).toBeLessThan(95);
   });
 });

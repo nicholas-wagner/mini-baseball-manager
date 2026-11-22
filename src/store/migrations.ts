@@ -2,6 +2,7 @@ import type { Club, LeagueTierId } from '../engine/models/club';
 import type { ManagerProfile } from '../engine/models/manager';
 import { createEmptySeasonStats, isPitcherPosition, type Player, type PlayerSeasonStats } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
+import { rollInitialCareerService } from '../engine/rpg/careerExperience';
 import { rollMentalAndPressureProfile } from '../engine/rpg/mentalAndLeverage';
 import {
   computeTotalRatingBudget,
@@ -54,6 +55,9 @@ function hydratePlayerDefaults(player: Player): Player {
     player.mentalTraits && player.pressureProfile
       ? { mentalTraits: player.mentalTraits, pressureProfile: player.pressureProfile }
       : rollMentalAndPressureProfile(seedRng, player.personality ?? 'clutch_captain', marketTier);
+  const careerService =
+    player.careerService ??
+    rollInitialCareerService(seedRng, marketTier, player.age ?? 24, player.position);
   const ratings =
     typeof player.ratings.luck === 'number' &&
     typeof player.ratings.gapPower === 'number' &&
@@ -91,6 +95,7 @@ function hydratePlayerDefaults(player: Player): Player {
     battedBallProfile,
     mentalTraits: mental.mentalTraits,
     pressureProfile: mental.pressureProfile,
+    careerService,
     ratings,
     statCaps,
     totalRatingBudget:
