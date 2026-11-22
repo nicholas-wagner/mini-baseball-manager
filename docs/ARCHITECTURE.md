@@ -408,7 +408,34 @@ export interface DistrictTile {
   tier: 1 | 2 | 3;
 }
 
+export type BallparkPresetId =
+  | 'sandlot_commons'
+  | 'brickyard_classic'
+  | 'bayfront_cove'
+  | 'high_altitude_mesa'
+  | 'neon_metro_dome'
+  | 'cornfield_twilight'
+  | 'harbor_shipyard'
+  | 'sakura_garden'
+  | 'sunbelt_cactus'
+  | 'grand_cathedral';
+
+export interface ParkFactors {
+  leftWallFt: number;
+  centerWallFt: number;
+  rightWallFt: number;
+  leftWallHeightFt: number; // e.g., tall Emerald Wall in Brickyard Classic
+  surface: 'natural_grass' | 'fast_turf';
+  isDome: boolean;
+  hrFactor: number; // 0.85..1.20
+  leftyHrFactor: number; // e.g., Harbor Shipyard short RF porch boosts LHB HRs
+  rightyHrFactor: number;
+  doublesTriplesFactor: number; // 0.90..1.18
+  groundballSpeedFactor: number; // fast_turf boosts grounders & speed
+}
+
 export interface StadiumState {
+  ballparkId: BallparkPresetId;
   name: string;
   seatingTier: 1 | 2 | 3 | 4; // Bleachers -> Grandstand -> Double-Deck -> Mega Dome
   capacity: number;
@@ -419,6 +446,46 @@ export interface StadiumState {
   retiredNumbers: { jerseyNumber: number; playerName: string }[];
   championshipPennants: { season: number; leagueTier: LeagueTierId }[];
   districtTiles: DistrictTile[];
+}
+
+export type StaffRole =
+  | 'pitching_coach'
+  | 'hitting_coach'
+  | 'bench_coach'
+  | 'fielding_coach'
+  | 'bullpen_coach'     // Helps BOTH catchers (framing, pop-time, calling) & pitchers (warmup, endurance, reliever poise)
+  | 'equipment_manager' // Boosts 90s Gear/Relics, bat/glove/cleat tuning, blister prevention, morale & vintage gear finds
+  | 'team_doctor'
+  | 'athletic_trainer';
+
+export const STAFF_SLOT_LIMITS_BY_TIER: Record<LeagueTierId, number> = {
+  rookie: 2,
+  low_a: 3,
+  high_a: 4,
+  aa: 5,
+  aaa: 6,
+  majors: 7,
+};
+
+export interface StaffMember {
+  id: string;
+  role: StaffRole;
+  firstName: string;
+  lastName: string;
+  portraitSeed: number;
+  tier: 1 | 2 | 3 | 4 | 5;     // Hiring quality tier (drives salary & cap ceiling)
+  level: 1 | 2 | 3 | 4 | 5;    // Developed over seasons via Staff XP & Offseason Clinics
+  xp: number;
+  salaryPerSeason: number;
+  yearsRemaining: number;
+  specialtyId: string;          // e.g., 'gas_lab', 'launch_guru', 'battery_whisperer', 'relic_tuner', 'orthopedic_arm'
+  tradeOffSummary: string;      // Explicit compromise cost (no free-lunch all-99 coach!)
+  formerPlayerId?: string;      // Populated when a retiring club legend transitions to coach!
+}
+
+export interface CoachStaffState {
+  activeStaff: StaffMember[];   // Capped at STAFF_SLOT_LIMITS_BY_TIER[club.leagueTier] & club budget
+  clinicSessionsUsedThisOffseason: number;
 }
 
 export interface ClubEconomy {
@@ -460,6 +527,24 @@ export interface Club {
   streak: number; // +N win streak, -N losing streak
 }
 ```
+
+#### Coaching Staff, Equipment Manager & Multiple Stadiums Rules (`TASK-035`, `TASK-069`)
+
+- **Full Dugout & Clubhouse Staff Roles (`TASK-035`)**:
+  - **Pitching Coach**: Boosts pitcher training drills (`velocity`/`movement`/`control`), Pitch Lab mastery, and limits mound meltdowns. Philosophy trade-offs split archetypes (*Gas Lab* `+Velo/+K` vs higher endurance drain; *Groundball Professor* `+Sinker/+GB%/+Control` vs softer velo; *Command Tactician* `+Control/-BB` vs fewer strikeouts).
+  - **Hitting Coach**: Boosts batting drills (`contact`/`power`/`eye`), Pitch Recognition, and slump busting. Trade-offs split archetypes (*Launch-Angle Guru* `+Power/+HR` vs slightly higher K-rate; *Small-Ball Craftsman* `+Contact/+Eye/+Bunt` vs capped power gains; *Clutch Mentor* `+LI hitting` vs slower raw tool growth).
+  - **Bench Coach**: Tactical right-hand skipper boosting in-game tactical call accuracy, pinch-hit/pinch-run & platoon matchup IQ, defensive shift effectiveness, Manager Power efficiency, and clubhouse morale cohesion (*Hard-Nosed Tactician* vs *Players' Skipper* trade-offs).
+  - **Fielding Coach**: Sharpens `fielding`, `range`, `arm`, double-play turns, error reduction, and accelerates **Positional Cross-Training** while cutting positional rust penalties (*Range Specialist* vs *Sure-Handed Fundamentalist*).
+  - **Bullpen Coach (Catchers + Pitchers)**: Bridges the battery — speeds reliever warmup readiness, slows reliever fatigue buildup, boosts catcher pitch-framing (extra borderline strikes), catcher pitch-calling synergy (`Battery Telepathy`), pop-time/throwing out base-stealers, and passed-ball/wild-pitch suppression!
+  - **Equipment Manager**: Charming clubhouse specialist who amplifies **90s Gear & Relics** (`+15%..+35%` relic bonuses or extra relic slot tuning), provides subtle bat/glove/cleat upkeep perks (fresh pine tar/rosin in wet weather, traction & barrel feel), cuts blister/equipment-irritation risk, lifts team morale, and has a small per-series chance to uncover quirky vintage 90s gear/relics or discount merch!
+  - **Strategic Limits & Staff Development**:
+    - **Hard Tier-Scaled Staff Slot Cap (`STAFF_SLOT_LIMITS_BY_TIER`)**: Starts at just **`2` active staff slots** in Rookie Ball (`Low-A: 3`, `High-A: 4`, `AA: 5`, `AAA: 6`, `Majors: 7`) shared across Coaches, Equipment Manager, Team Doctor, and Athletic Trainer — making every hire a genuine GM trade-off (*e.g., Hitting + Bullpen Coach vs. Pitching Coach + Team Doctor vs. Fielding Coach + Equipment Manager*).
+    - **Staff Budget & Philosophy Trade-Offs**: Higher-tier (`1–5`) staff cost substantially more club cash per season, and every specialty comes with a real baseball philosophy compromise.
+    - **Ways to Develop Staff**: Active staff earn **Staff XP** from games, series wins, playoffs, and player breakouts to climb `Lv 1 → Lv 5`; clubs can also spend cash on **Offseason Coaching Clinics / Seminars** (capped per offseason) or hire/develop **Retiring Club Legends (`TASK-041`)** — though leveled-up coaches demand fair raises at contract renewal or risk being poached by higher-tier clubs!
+- **Multiple Distinct Stadiums & Park Factors (`TASK-069`)**:
+  - `10` handcrafted 90s-inspired ballparks (`sandlot_commons`, `brickyard_classic`, `bayfront_cove`, `high_altitude_mesa`, `neon_metro_dome`, `cornfield_twilight`, `harbor_shipyard`, `sakura_garden`, `sunbelt_cactus`, `grand_cathedral`) are assigned across the 48 clubs in the 6-tier pyramid so road trips feel genuinely different in both **simulation math** and **3D visuals**.
+  - **Live Simulation Park Factors**: `pitchResolver.ts` and `ballTrajectory.ts` apply the host venue's `ParkFactors` (short RF porches favoring lefty pull HRs, tall left-field walls turning HRs into doubles, thin mountain air carrying fly balls, indoor domes eliminating rain/wind while fast turf speeds up groundballs).
+  - **Home Venue Upgrades & Relocation**: Clubs start in *Sandlot Commons* in Rookie Ball and can either evolve their current park (`TASK-033`) OR spend franchise funds at higher tiers to **commission/relocate to a new Stadium Archetype** whose dimensions and park factors complement their roster build!
 
 ### 2.3 Simulation Event Stream Contract (`src/engine/models/playEvent.ts`)
 

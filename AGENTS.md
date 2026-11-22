@@ -11,7 +11,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
 2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
-4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-062`). Pick the highest-priority `READY` task!
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-069`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
 6. **Project Workflow Skills (`.agents/skills/`)** — Portable engineering skills (auto-discovered by Antigravity and readable by any AI editor):
    - [`.agents/skills/ub-tdd-craft/SKILL.md`](./.agents/skills/ub-tdd-craft/SKILL.md) — Strict TDD, behavior-focused tests, Clean Code refactoring, and CRAP-lite complexity discipline (*inspired by `unclebob/ub-mode`*).
@@ -61,6 +61,8 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 | **Offseason & Tier Salary Caps** | End-of-season & offseason flow runs Retirements, Expiring Contracts (`yearsRemaining -> 0`) + Re-Sign decisions, Tier-Scaled Payroll **Salary Caps** (`rookie` → `majors`), 3-Round Amateur Draft, and Free-Agent Signing Window alongside `MAX_ACTIVE_ROSTER_SIZE = 20` | `docs/ARCHITECTURE.md` |
 | **Co-Ed Attribute Tilts & Synergies** | Equal-OVR male vs. female baseball archetypes & complementary special traits (Male: raw Power/Velocity/Arm + Bravado/Enforcer/Workhorse traits vs. chase/discipline risk; Female: Contact/Eye/Movement/Control/Speed/Fielding + modest `+6` Popularity fan-draw bonus + Tactical Poise/Table-Setter/Spin Wizard traits vs. raw HR/velo) creating distinct mixed-roster, mostly-one-sex splash, and all-male/all-female strategies | `docs/ARCHITECTURE.md` |
 | **Career Arc, Health & Medical Staff** | Real multi-season aging curve (Rookie growth `18–24` → Prime `25–30` → Veteran savvy `31–34` → Physical decline `35+` → Retirement); low-frequency, new-game-toggleable **Injuries** & **Illnesses** (`common`/`uncommon`/`rare`/`ultra_rare`, extensible catalog, zero fatalities, zero STDs, sex-specific conditions supported, play-through with stat penalties vs. mandatory IL / season / rare aged-vet career-ending) mitigated by hireable specialty **Team Doctors** & **Athletic Trainers** | `docs/ARCHITECTURE.md` |
+| **Coaching Staff & Equipment Manager** | Hireable & developable **Pitching**, **Hitting**, **Bench**, **Fielding**, **Bullpen** (catchers + pitchers), and **Equipment Manager** (90s gear/relic tuning, blisters/morale) roles bounded by tier-scaled **Staff Slot Limits** (`rookie: 2` → `majors: 7`), staff salary budgets, and **philosophy trade-offs** — growing via Season XP, Offseason Clinics & retiring club legends | `docs/ARCHITECTURE.md` |
+| **Multiple Stadiums & Park Factors** | Catalog of `10` distinct 90s ballparks (*Sandlot Commons*, *Brickyard Classic*, *Bayfront Cove*, *High-Altitude Mesa*, *Neon Metro Dome*, *Harbor Shipyard*, *Sakura Garden*, *Sunbelt Cactus*, *Cornfield Twilight*, *Grand Cathedral*) across the 48-club pyramid & unlockable/commissionable home venues — each with real dimensions, grass/turf surface, simulation **Park Factors**, and distinct 3D ballpark scenery | `docs/ARCHITECTURE.md` |
 
 ---
 
