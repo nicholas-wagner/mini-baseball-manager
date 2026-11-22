@@ -11,7 +11,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
 2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
-4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-056`). Pick the highest-priority `READY` task!
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-059`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
 6. **Project Workflow Skills (`.agents/skills/`)** — Portable engineering skills (auto-discovered by Antigravity and readable by any AI editor):
    - [`.agents/skills/ub-tdd-craft/SKILL.md`](./.agents/skills/ub-tdd-craft/SKILL.md) — Strict TDD, behavior-focused tests, Clean Code refactoring, and CRAP-lite complexity discipline (*inspired by `unclebob/ub-mode`*).
@@ -52,6 +52,8 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 | **Roster Cap & Market Tiers** | `MAX_ACTIVE_ROSTER_SIZE = 20`; 6 `PlayerMarketTier` profiles (`rookie` cheap/high-variable-ceiling, `all_star` rare/expensive, `veteran` affordable/steady/minimal-growth, `above_average`, `average`, `below_average` bargain specialist) | `docs/ARCHITECTURE.md` |
 | **Pitch Arsenals & Matchups** | `RP` strictly `2–3` pitches, `SP` strictly `4–5` pitches from 8-pitch `PitchType` catalog; both pitchers & batters have a `favoritePitch` bonus and `weakestPitch`/`weakPitch` vulnerability, trainable via Pitch Lab / Recognition drills | `docs/ARCHITECTURE.md` |
 | **Compromise Training & Ability Cooldowns** | Every training drill carries a concrete trade-off/rust cost inside `statCaps` & `totalRatingBudget` (only rare `all_star`s carry elite multi-tool budgets); super-power swings/pitches/abilities consume Hype + Fatigue and obey strict per-game charge & multi-PA/batter cooldown caps | `docs/ARCHITECTURE.md` |
+| **Luck, Mental Traits & Leverage (`LI`)** | Universal subtle `luck` (`1..99`), clubhouse/mental traits (`clubhouse_glue`, `high_energy`, `ice_veins`, `pressure_riser`, `pressure_wilt`), and dynamic Leverage Index (`LI`) × Game Stakes driving clutch surges vs pressure wilting | `docs/ARCHITECTURE.md` |
+| **Pitcher Roles & Sabermetrics** | 7 `PitcherRole` profiles (`starter`, `long_reliever`, `short_reliever`, `loogy`, `setup_man`, `closer`, `fireman`), explicit ball/strike command, `GB%/LD%/FB%/PopUp%` batted-ball profiles, defender `range`/`arm`/`fielding`, and derived `AVG/OBP/SLG/OPS/WHIP/ERA/K9/BB9/Strike%/FPCT` | `docs/ARCHITECTURE.md` |
 
 ---
 

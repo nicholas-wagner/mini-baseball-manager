@@ -101,22 +101,70 @@ export interface BatterPitchProfile {
   pitchRecognition: Partial<Record<PitchType, number>>; // -20..+20 per-pitch Contact/Power/Eye & chase modifier
 }
 
+export type MentalTraitId =
+  | 'clubhouse_glue'    // Good clubhouse guy: lifts team morale recovery & chemistry, cushions losing streaks
+  | 'high_energy'       // Sparkplug: accelerates Team Hype gain (+20%) and energizes rallies
+  | 'ice_veins'         // Ice in their veins: sharp bonus in critical / high-Leverage Index moments
+  | 'pressure_riser'    // Big-game performer: scales up Contact/Power/Control under playoff/rivalry stakes
+  | 'pressure_wilt'     // Tightens up: loses Contact/Eye/Control/Stuff when Leverage Index is high
+  | 'steady_hand'       // Even keel: resistant to slump spirals and pressure swings
+  | 'fiery_competitor'; // Bulldog: extra edge in rivalry games & jams, higher fatigue burn
+
+export type PressureResponseProfile =
+  | 'ice_veins'
+  | 'clutch_riser'
+  | 'steady'
+  | 'pressure_wilt';
+
+export type PitcherRole =
+  | 'starter'         // SP (4–5 pitches): high stamina, built for 5–7+ innings
+  | 'long_reliever'   // RP (3 pitches): high-stamina bridge / mop-up / extra-inning reliever
+  | 'short_reliever'  // RP (2–3 pitches): 1-inning middle-relief burst
+  | 'loogy'           // RP (2–3 pitches, throws 'L'): Lefty One-Out Guy with amplified L-vs-L platoon break
+  | 'setup_man'       // RP (2–3 pitches): 7th–8th inning high-leverage bridge
+  | 'closer'          // RP (2–3 pitches): 9th+ inning save specialist (+Stuff/+CTL in save spots)
+  | 'fireman';        // RP (2–3 pitches): multi-inning high-LI jam stopper deployed with runners on base!
+
+export type GamePressureLevel =
+  | 'regular'
+  | 'series_rubber'
+  | 'rivalry_showdown'
+  | 'playoff_game'
+  | 'elimination_championship';
+
+export type BattedBallTendency =
+  | 'groundball'
+  | 'line_drive'
+  | 'flyball'
+  | 'balanced';
+
+export interface BattedBallProfile {
+  tendency: BattedBallTendency;
+  gbRateBias: number;    // -12..+12 percentage-point shift on Ground Ball Rate (GB%)
+  ldRateBias: number;    // -8..+8 percentage-point shift on Line Drive Rate (LD%)
+  fbRateBias: number;    // -12..+12 percentage-point shift on Fly Ball Rate (FB%)
+  popUpRateBias: number; // -8..+8 percentage-point shift on Pop-Up Rate (PopUp%)
+}
+
 export interface PlayerRatings {
-  // Batting (1–99)
+  // Batting (1–99) — drives AVG, OBP, SLG, OPS, BB%, K%
   contact: number;
   power: number;
-  eye: number;
+  gapPower: number; // Extra-base 2B/3B drive power (SLG / OPS)
+  eye: number;      // Plate discipline & Walk Rate (BB% / OBP)
   bunt: number;
-  // Pitching (1–99)
+  // Pitching (1–99) — drives Strike%, BB/9, K/9, WHIP, ERA
   velocity: number;
   movement: number;
-  control: number;
+  control: number;  // Strike-zone command (Strike% & Walk Rate)
   stamina: number;
-  // Athleticism & Intangibles (1–99)
+  // Athleticism, Defense & Intangibles (1–99)
   speed: number;
-  fielding: number;
-  arm: number;
-  clutch: number;
+  fielding: number; // Glove & hands -> Fielding Percentage (FPCT)
+  range: number;    // Footwork & reaction -> converting line drives & grounders into outs
+  arm: number;      // Arm strength -> gunning down runners & limiting extra bases
+  clutch: number;   // High-leverage performance multiplier
+  luck: number;     // Subtle universal edge (BABIP bloops, borderline calls, error bounces)
   popularity: number;
   potential: number;
 }
@@ -130,6 +178,7 @@ export interface PlayerContract {
 
 export interface PlayerSeasonStats {
   games: number;
+  plateAppearances?: number;
   atBats: number;
   hits: number;
   doubles: number;
@@ -138,14 +187,30 @@ export interface PlayerSeasonStats {
   rbis: number;
   walks: number;
   strikeouts: number;
+  sacFlies?: number;
   stolenBases: number;
+  // Batted-ball counts (for AVG/OBP/SLG/OPS/BABIP + GB%/LD%/FB%/PopUp%)
+  groundBalls?: number;
+  lineDrives?: number;
+  flyBalls?: number;
+  popUps?: number;
+  // Pitching counts (for ERA, WHIP, K/9, BB/9, Strike%, GB%/LD%/PopUp%)
   inningsPitchedOuts: number; // stored in outs (e.g. 21 outs = 7.0 IP) to avoid float error
+  hitsAllowed?: number;
+  homeRunsAllowed?: number;
   earnedRuns: number;
   pitchingStrikeouts: number;
   pitchingWalks: number;
+  pitchesThrown?: number;
+  strikesThrown?: number;
+  ballsThrown?: number;
   wins: number;
   losses: number;
   saves: number;
+  holds?: number;
+  // Fielding counts (for FPCT & Range Factor)
+  putouts?: number;
+  assists?: number;
   errors: number;
 }
 
@@ -178,11 +243,15 @@ export interface Player {
   // Live Status & Form
   marketTier: PlayerMarketTier;
   specialistArchetype: PlayerSpecialistArchetype;
+  pitcherRole?: PitcherRole; // starter | long_reliever | short_reliever | loogy | setup_man | closer | fireman
   flexibilityProfile: PositionalFlexibilityProfile;
   favoritePosition: FieldPosition; // Playing favorite position awards +5 Fielding/+4 Control, +3 Clutch, +5 Morale
   positionProficiency: Partial<Record<FieldPosition, number>>; // 0..100; < 50 triggers Out-of-Position penalty
   pitchArsenal?: PitcherArsenalProfile; // Populated for SP (4–5 pitches) & RP (2–3 pitches)
   batterPitchProfile: BatterPitchProfile; // Favorite pitch to crush, pitch weakness & trainable recognition map
+  battedBallProfile?: BattedBallProfile; // Drives GB% / LD% / FB% / PopUp% tendencies for batters & pitchers
+  mentalTraits?: MentalTraitId[]; // Good clubhouse guy, high energy, ice veins, pressure riser/wilter, etc.
+  pressureProfile?: PressureResponseProfile; // ice_veins | clutch_riser | steady | pressure_wilt
   ratings: PlayerRatings;
   statCaps: PlayerRatings; // Per-tool max rating ceilings (1..99), widest variance on rookies
   totalRatingBudget: number; // Archetype + marketTier tool envelope preventing generic 99-all-stat overpowered clones (rare 'all_star' carries elite budget)
@@ -227,6 +296,11 @@ export interface Player {
   - *Batter Special Swings / Heritage Swings*: Max **`1` use per batter per game** (`2` only for Legend capstone), **`>= 2` PA team super-swing cooldown**, drains **`65–100` Team Hype**, and adds **`+8` Fatigue**.
   - *Pitcher Special Pitches / Heritage Pitches*: Max **`1` use per `RP` outing** and **`2` uses per `SP` outing**, **`>= 3` batters (`12` pitches) cooldown** between super-pitches, drains **`65–100` Team Hype**, and adds **`+8` arm Fatigue**.
   - *Manager Active Skipper Powers*: Max **`1` charge per power per game**.
+- **Luck, Mental Traits, Pressure Risers vs. Wilters & Leverage Index (`LI`)**:
+  - **`luck` (`1..99`)**: Subtle universal variance nudge (`±2.5%` BABIP bloop/hole hits, `±2%` borderline balls/strikes, error bounces, rare surprise events) — never overpowers real skill, just injects believable baseball fortune.
+  - **Clubhouse & Mental Traits + Pressure Response**: Good Clubhouse Guys (`clubhouse_glue`) stabilize morale & chemistry; Sparkplugs (`high_energy`) accelerate Hype; **Ice-in-Veins / Pressure Risers** surge (`+4..+7`) when dynamic **Leverage Index (`LI`, `0.4` blowout → `1.6+` High Leverage → `2.4+` Critical Moment)** or game stakes (`rivalry_showdown`, `playoff_game`, `elimination_championship`) spike; **Pressure Wilters (`pressure_wilt`)** tighten up (`-4..-8`) in crunch time!
+- **Specialized Pitching Staff Roles (`PitcherRole`)**: `starter`, `long_reliever`, `short_reliever`, `loogy` (southpaw platoon assassin), `setup_man` (7th–8th bridge), `closer` (9th+ save specialist), and `fireman` (high-LI multi-inning jam stopper with inherited runners).
+- **Balls & Strikes, Batted-Ball Profiles & Sabermetrics**: Explicit ball/strike counts & zone strike rate (`Strike%`, `BB%`, `K%`), batted-ball profiles (`GB%`, `LD%`, `FB%`, `PopUp%`, `pop_out`), defender `fielding` (`FPCT`), `range` (converting hits to outs), and `arm` (runner throws), plus full derived stat lines (`AVG`, `OBP`, `SLG`, `OPS`, `ISO`, `BABIP`, `ERA`, `WHIP`, `K/9`, `BB/9`, `FPCT`).
 
 ### 2.2 Club, Lineup & Stadium District (`src/engine/models/club.ts`)
 
