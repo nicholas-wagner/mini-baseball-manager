@@ -2,6 +2,11 @@
   "name": "mini-baseball-manager",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicholas-wagner/mini-baseball-manager.git"
+  },
   "type": "module",
   "description": "Retro 90s cartoon & chibi 3D baseball GM and manager RPG PWA",
   "scripts": {
