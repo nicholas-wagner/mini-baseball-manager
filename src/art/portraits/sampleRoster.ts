@@ -1,3 +1,5 @@
+import { rollBatsHand, rollThrowsHand } from '../../engine/handedness/handedness';
+import type { FieldPosition } from '../../engine/handedness/types';
 import { generatePlayerIdentity } from '../../engine/nationalities/pickNationality';
 import type { NationalityId } from '../../engine/nationalities/types';
 import { createSeededRng } from '../../engine/rng/seededRng';
@@ -18,7 +20,18 @@ const NICKNAMES = [
   '90s Lightning',
 ] as const;
 
-const POSITIONS = ['SP', 'RP', 'C', '1B', '2B', 'SS', '3B', 'LF', 'CF', 'RF'] as const;
+const POSITIONS: readonly FieldPosition[] = [
+  'SP',
+  'RP',
+  'C',
+  '1B',
+  '2B',
+  'SS',
+  '3B',
+  'LF',
+  'CF',
+  'RF',
+] as const;
 
 const POWERS = [
   'Blazing Comet',
@@ -47,6 +60,8 @@ export const INITIAL_SHOWCASE_ROSTER: readonly BaseballCardPlayer[] = [
     name: 'Rico Comet',
     nickname: 'The Rocket Kid',
     position: 'SP',
+    bats: 'R',
+    throws: 'R',
     jerseyNumber: 24,
     nationalityId: 'USA',
     hometown: 'Sandlot, OH',
@@ -64,6 +79,8 @@ export const INITIAL_SHOWCASE_ROSTER: readonly BaseballCardPlayer[] = [
     name: 'Kiko Tanaka',
     nickname: 'Ghost Ball',
     position: 'RP',
+    bats: 'L',
+    throws: 'L',
     jerseyNumber: 51,
     nationalityId: 'JPN',
     hometown: 'Osaka',
@@ -74,13 +91,15 @@ export const INITIAL_SHOWCASE_ROSTER: readonly BaseballCardPlayer[] = [
     traits: createPortraitTraits(5519),
     specialPowers: ['Ghost Knuckle', 'Tornado Slider'],
     stats: { contact: 58, power: 52, speed: 76, pitching: 93, fielding: 86 },
-    bio: 'Her floating knuckleball dances like a kitsune illusion across the strike zone.',
+    bio: 'Her southpaw knuckleball dances like a kitsune illusion across the strike zone.',
   },
   {
     id: 'showcase-manny',
     name: 'Manny Guerrero',
     nickname: 'Storm Bat',
     position: 'CF',
+    bats: 'S',
+    throws: 'R',
     jerseyNumber: 27,
     nationalityId: 'DOM',
     hometown: 'San Pedro de Macorís',
@@ -91,13 +110,15 @@ export const INITIAL_SHOWCASE_ROSTER: readonly BaseballCardPlayer[] = [
     traits: createPortraitTraits(2042),
     specialPowers: ['Bomb-Swing', 'Sky-High Leap'],
     stats: { contact: 86, power: 95, speed: 88, pitching: 42, fielding: 90 },
-    bio: 'Launches tropical-storm moonshots with an iconic celebratory bat flip.',
+    bio: 'Switch-hitting phenom who launches moonshots from either batter’s box.',
   },
   {
     id: 'showcase-finn',
     name: 'Finn O’Malley',
     nickname: 'Lucky Clover',
     position: 'SS',
+    bats: 'L',
+    throws: 'R',
     jerseyNumber: 7,
     nationalityId: 'IRL',
     hometown: 'Dublin',
@@ -108,7 +129,7 @@ export const INITIAL_SHOWCASE_ROSTER: readonly BaseballCardPlayer[] = [
     traits: createPortraitTraits(8133),
     specialPowers: ['Ninja Bunt', 'Cannon Arm'],
     stats: { contact: 84, power: 62, speed: 94, pitching: 48, fielding: 88 },
-    bio: 'Drops impossible fair-line bunts that seem guided by pure shamrock luck.',
+    bio: 'Lefty-hitting shortstop who drops fair-line bunts guided by pure shamrock luck.',
   },
 ];
 
@@ -119,6 +140,8 @@ export function generateRandomCardPlayer(
   const rng = createSeededRng(seed);
   const identity = generatePlayerIdentity(rng, forcedNationalityId);
   const position = rng.pick(POSITIONS);
+  const bats = rollBatsHand(rng);
+  const throws = rollThrowsHand(rng, position);
   const isPitcher = position === 'SP' || position === 'RP';
 
   const contact = rng.int(45, 95);
@@ -143,6 +166,8 @@ export function generateRandomCardPlayer(
     name: identity.fullName,
     nickname: rng.pick(NICKNAMES),
     position,
+    bats,
+    throws,
     jerseyNumber: rng.int(1, 99),
     nationalityId: identity.nationality.id,
     hometown: identity.hometown,

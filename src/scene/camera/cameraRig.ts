@@ -1,3 +1,5 @@
+import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
+
 export type CameraPresetId =
   | 'over_shoulder_pitcher'
   | 'over_shoulder_batter'
@@ -29,29 +31,37 @@ export function getCameraPresetPose(
   preset: CameraPresetId,
   elapsedSec = 0,
   turntableAngle = 0,
+  pitcherThrows: ThrowsHand = 'R',
+  batterSide: EffectiveBatSide = 'R',
 ): CameraPose {
   switch (preset) {
-    case 'over_shoulder_pitcher':
+    case 'over_shoulder_pitcher': {
+      // Right-hander throwing shoulder sits on -X (from behind facing +Z); Left-hander sits on +X!
+      const shoulderSide = pitcherThrows === 'R' ? -1.75 : 1.75;
       return {
         position: {
-          x: -1.75 + Math.sin(elapsedSec * 0.7) * 0.08,
+          x: shoulderSide + Math.sin(elapsedSec * 0.7) * 0.08,
           y: 2.55 + Math.cos(elapsedSec * 0.9) * 0.04,
           z: -14.1,
         },
-        lookAt: { x: 0.1, y: 1.05, z: 1.1 },
+        lookAt: { x: pitcherThrows === 'R' ? 0.1 : -0.1, y: 1.05, z: 1.1 },
         fov: 44,
       };
+    }
 
-    case 'over_shoulder_batter':
+    case 'over_shoulder_batter': {
+      // RHB stands in 3rd-base box (-X); LHB stands in 1st-base box (+X)!
+      const boxSide = batterSide === 'R' ? -1.85 : 1.85;
       return {
         position: {
-          x: -1.85 + Math.sin(elapsedSec * 0.65) * 0.07,
+          x: boxSide + Math.sin(elapsedSec * 0.65) * 0.07,
           y: 2.65 + Math.cos(elapsedSec * 0.85) * 0.04,
           z: 4.85,
         },
-        lookAt: { x: 0.25, y: 1.3, z: -11.4 },
+        lookAt: { x: batterSide === 'R' ? 0.25 : -0.25, y: 1.3, z: -11.4 },
         fov: 45,
       };
+    }
 
     case 'broadcast_diamond':
       return {

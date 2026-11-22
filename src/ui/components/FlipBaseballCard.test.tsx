@@ -10,6 +10,8 @@ const samplePlayer: BaseballCardPlayer = {
   name: 'Rico Comet',
   nickname: 'The Rocket Kid',
   position: 'SP',
+  bats: 'R',
+  throws: 'R',
   jerseyNumber: 24,
   nationalityId: 'USA',
   hometown: 'Sandlot, OH',

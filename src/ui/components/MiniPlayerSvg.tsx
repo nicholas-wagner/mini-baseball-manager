@@ -6,6 +6,7 @@ import {
   type MiniPlayerRole,
 } from '../../art/playerSvg/miniPlayerPose';
 import { renderMiniPlayerSvgString } from '../../art/playerSvg/renderMiniPlayerSvg';
+import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import type { CharacterAnimClip } from '../../scene/characters/animationState';
 
 interface MiniPlayerSvgProps {
@@ -14,6 +15,8 @@ interface MiniPlayerSvgProps {
   jerseyNumber: number;
   role: MiniPlayerRole;
   facing?: MiniPlayerFacing;
+  throwsHand?: ThrowsHand;
+  batSide?: EffectiveBatSide;
   clip?: CharacterAnimClip;
   moodOverride?: PortraitMood;
   animate?: boolean;
@@ -26,6 +29,8 @@ export function MiniPlayerSvg({
   jerseyNumber,
   role,
   facing = 'front',
+  throwsHand = 'R',
+  batSide = 'R',
   clip = 'idle',
   moodOverride,
   animate = true,
@@ -50,10 +55,10 @@ export function MiniPlayerSvg({
   const svgMarkup = useMemo(() => {
     const pose = evaluateMiniPlayerPose(clip, timeSec, role);
     return renderMiniPlayerSvgString(
-      { traits, team, jerseyNumber, role, facing, moodOverride },
+      { traits, team, jerseyNumber, role, facing, throwsHand, batSide, moodOverride },
       pose,
     );
-  }, [traits, team, jerseyNumber, role, facing, clip, moodOverride, timeSec]);
+  }, [traits, team, jerseyNumber, role, facing, throwsHand, batSide, clip, moodOverride, timeSec]);
 
   return (
     <div

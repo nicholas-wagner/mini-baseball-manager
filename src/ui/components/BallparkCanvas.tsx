@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../../art/portraits/types';
+import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import type { CameraPresetId } from '../../scene/camera/cameraRig';
 import type { CharacterAnimClip } from '../../scene/characters/animationState';
 import { DesignLabSceneController } from '../../scene/DesignLabSceneController';
@@ -15,6 +16,8 @@ interface BallparkCanvasProps {
   heroTraits: PortraitTraits;
   heroTeam: PortraitTeamColors;
   heroJersey: number;
+  heroThrows?: ThrowsHand;
+  batterSide?: EffectiveBatSide;
   cameraPreset: CameraPresetId;
   pitcherClip: CharacterAnimClip;
   batterClip: CharacterAnimClip;
@@ -28,6 +31,8 @@ export function BallparkCanvas({
   heroTraits,
   heroTeam,
   heroJersey,
+  heroThrows = 'R',
+  batterSide = 'R',
   cameraPreset,
   pitcherClip,
   batterClip,
@@ -68,8 +73,14 @@ export function BallparkCanvas({
   }, []);
 
   useEffect(() => {
-    controllerRef.current?.setHeroAppearance(heroTraits, heroTeam, heroJersey);
-  }, [heroTraits, heroTeam, heroJersey]);
+    controllerRef.current?.setHeroAppearance(
+      heroTraits,
+      heroTeam,
+      heroJersey,
+      heroThrows,
+      batterSide,
+    );
+  }, [heroTraits, heroTeam, heroJersey, heroThrows, batterSide]);
 
   useEffect(() => {
     controllerRef.current?.setAnimationClips({

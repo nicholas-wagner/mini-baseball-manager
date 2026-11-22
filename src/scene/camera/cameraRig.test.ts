@@ -52,4 +52,16 @@ describe('Over-the-Shoulder 3D Camera Rig', () => {
       expect(pose.fov).toBeLessThanOrEqual(60);
     }
   });
+
+  it('shifts over-shoulder cameras to match lefty vs righty throwing shoulder and batter box', () => {
+    const rhpCam = getCameraPresetPose('over_shoulder_pitcher', 0, 0, 'R', 'R');
+    const lhpCam = getCameraPresetPose('over_shoulder_pitcher', 0, 0, 'L', 'R');
+    expect(rhpCam.position.x).toBeLessThan(0);
+    expect(lhpCam.position.x).toBeGreaterThan(0);
+
+    const rhbCam = getCameraPresetPose('over_shoulder_batter', 0, 0, 'R', 'R');
+    const lhbCam = getCameraPresetPose('over_shoulder_batter', 0, 0, 'R', 'L');
+    expect(rhbCam.position.x).toBeLessThan(0);
+    expect(lhbCam.position.x).toBeGreaterThan(0);
+  });
 });

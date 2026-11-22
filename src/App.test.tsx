@@ -35,6 +35,10 @@ describe('Mini Baseball Manager — Milestone 1 Design Lab Integration', () => {
     await user.click(screen.getByRole('button', { name: /aus.*5%/i }));
     expect(screen.getAllByText(/kangaroo bounce/i).length).toBeGreaterThanOrEqual(1);
 
+    // Switch opposing batter to Switch Hitter and verify platoon matchup indicator updates
+    await user.click(screen.getByRole('button', { name: /switch \(s\)/i }));
+    expect(screen.getAllByText(/switch-hitter platoon edge/i).length).toBeGreaterThanOrEqual(1);
+
     // Navigate to Skill Tree preview tab and back to Design Lab
     await user.click(screen.getAllByRole('button', { name: /skill tree/i })[0]);
     expect(screen.getByText(/branching player & manager skill trees/i)).toBeInTheDocument();

@@ -8,6 +8,7 @@ import type {
   PortraitTeamColors,
   PortraitTraits,
 } from '../../art/portraits/types';
+import type { BatsHand, FieldPosition, ThrowsHand } from '../../engine/handedness/types';
 import { getNationalityById } from '../../engine/nationalities/pickNationality';
 import type { NationalityId } from '../../engine/nationalities/types';
 import { getStatGrade } from '../design-system/statGrade';
@@ -17,7 +18,9 @@ export interface BaseballCardPlayer {
   id: string;
   name: string;
   nickname: string;
-  position: string;
+  position: FieldPosition;
+  bats: BatsHand;
+  throws: ThrowsHand;
   jerseyNumber: number;
   nationalityId: NationalityId;
   hometown: string;
@@ -108,6 +111,12 @@ export function FlipBaseballCard({
                 {RARITY_LABELS[player.rarity]}
               </span>
               <div className="flex items-center gap-1 shrink-0">
+                <span
+                  title={`Bats ${player.bats} / Throws ${player.throws}`}
+                  className="px-1.5 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] border border-[#181B2C] font-mono-tabular text-[10px] font-extrabold"
+                >
+                  {player.bats}/{player.throws}
+                </span>
                 <span className="px-1.5 py-0.5 rounded-md bg-[#FBF4E4] text-[#181B2C] border border-[#181B2C] font-mono-tabular text-[11px] font-extrabold">
                   #{player.jerseyNumber}
                 </span>

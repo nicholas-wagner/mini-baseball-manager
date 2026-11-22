@@ -19,6 +19,8 @@ import {
 import type { PortraitMood } from '../../art/portraits/types';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
 import { soundEngine, type SoundCue } from '../../audio/soundEngine';
+import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
+import type { BatsHand } from '../../engine/handedness/types';
 import { NATIONALITIES_CATALOG } from '../../engine/nationalities/nationalitiesCatalog';
 import { getNationalityById } from '../../engine/nationalities/pickNationality';
 import type { NationalityId } from '../../engine/nationalities/types';
@@ -203,11 +205,14 @@ export function DesignLabScreen() {
   const [trigger, setTrigger] = useState<ShowcaseTrigger | null>(null);
   const [turntableNudge, setTurntableNudge] = useState(0);
   const [rollSeed, setRollSeed] = useState(9601);
+  const [opposingBatterBats, setOpposingBatterBats] = useState<BatsHand>('R');
 
   const activeTeam = SAMPLE_TEAM_PALETTES[teamIdx];
   const heroPlayer = roster.find((p) => p.id === selectedHeroId) ?? roster[0];
   const heroNation = getNationalityById(heroPlayer.nationalityId);
   const heroHeritage = heroNation.heritageAbility;
+  const platoon = evaluatePlatoonMatchup(opposingBatterBats, heroPlayer.throws);
+  const heroInspectorBatSide = heroPlayer.bats === 'S' ? 'L' : heroPlayer.bats;
 
   const handleTriggerHeritagePower = () => {
     setActiveActionId('heritage_power');
@@ -285,11 +290,11 @@ export function DesignLabScreen() {
       {/* Top Hero Section: Over-the-Shoulder 3D Mini Ballpark */}
       <ComicCard
         title="Over-the-Shoulder 3D Ballpark & Chibi Lab"
-        subtitle={`On the Mound: ${heroPlayer.name} (#${heroPlayer.jerseyNumber}) • Toon-Shaded 3D + Live Expressions`}
+        subtitle={`On the Mound: ${heroPlayer.name} (#${heroPlayer.jerseyNumber} • ${heroPlayer.throws}HP) vs ${opposingBatterBats === 'S' ? `Switch (${platoon.effectiveBatSide}HB)` : `${opposingBatterBats}HB`} • ${platoon.label}`}
         headerBg={activeTeam.secondary}
         badge={
           <span className="px-2.5 py-1 rounded-full bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C] font-display text-[11px]">
-            MILESTONE 1 LAB
+            {heroPlayer.throws}HP VS {platoon.effectiveBatSide}HB
           </span>
         }
       >
@@ -298,6 +303,8 @@ export function DesignLabScreen() {
             heroTraits={heroPlayer.traits}
             heroTeam={activeTeam}
             heroJersey={heroPlayer.jerseyNumber}
+            heroThrows={heroPlayer.throws}
+            batterSide={platoon.effectiveBatSide}
             cameraPreset={cameraPreset}
             pitcherClip={pitcherClip}
             batterClip={batterClip}
@@ -306,6 +313,39 @@ export function DesignLabScreen() {
             trigger={trigger}
             turntableNudge={turntableNudge}
           />
+
+          {/* Live Platoon Matchup & Batter Handedness Switcher */}
+          <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-heading font-bold text-xs uppercase tracking-wider text-[#181B2C]">
+                Opposing Batter:
+              </span>
+              {(['R', 'L', 'S'] as const).map((hand) => (
+                <ComicButton
+                  key={hand}
+                  size="sm"
+                  variant={opposingBatterBats === hand ? 'sky' : 'cream'}
+                  active={opposingBatterBats === hand}
+                  onClick={() => {
+                    soundEngine.play('ui_pop');
+                    setOpposingBatterBats(hand);
+                  }}
+                >
+                  {hand === 'R' ? 'Righty (R)' : hand === 'L' ? 'Lefty (L)' : 'Switch (S)'}
+                </ComicButton>
+              ))}
+            </div>
+            <span
+              className={[
+                'px-2.5 py-1 rounded-lg border-2 border-[#181B2C] font-heading font-bold text-xs',
+                platoon.advantage === 'pitcher'
+                  ? 'bg-[#2FB356] text-white'
+                  : 'bg-[#FF4D6D] text-white',
+              ].join(' ')}
+            >
+              ⚡ {platoon.label}
+            </span>
+          </div>
 
           {/* Camera Angle Switcher */}
           <div className="space-y-2">
@@ -400,7 +440,7 @@ export function DesignLabScreen() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
             <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              PITCHER • FRONT
+              PITCHER ({heroPlayer.throws}HP) • FRONT
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -408,6 +448,7 @@ export function DesignLabScreen() {
               jerseyNumber={heroPlayer.jerseyNumber}
               role="pitcher"
               facing="front"
+              throwsHand={heroPlayer.throws}
               clip={pitcherClip}
               moodOverride={mood === 'happy' ? undefined : mood}
               className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
@@ -416,7 +457,7 @@ export function DesignLabScreen() {
 
           <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
             <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              PITCHER • BACK (#{heroPlayer.jerseyNumber})
+              PITCHER ({heroPlayer.throws}HP) • BACK (#{heroPlayer.jerseyNumber})
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -424,6 +465,7 @@ export function DesignLabScreen() {
               jerseyNumber={heroPlayer.jerseyNumber}
               role="pitcher"
               facing="back"
+              throwsHand={heroPlayer.throws}
               clip={pitcherClip}
               moodOverride={mood === 'happy' ? undefined : mood}
               className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
@@ -432,7 +474,7 @@ export function DesignLabScreen() {
 
           <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
             <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              BATTER • HELMET &amp; BAT
+              BATTER ({heroPlayer.bats === 'S' ? 'SWITCH' : `${heroPlayer.bats}HB`}) • HELMET &amp; BAT
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -440,6 +482,7 @@ export function DesignLabScreen() {
               jerseyNumber={heroPlayer.jerseyNumber}
               role="batter"
               facing="front"
+              batSide={heroInspectorBatSide}
               clip={batterClip}
               moodOverride={mood === 'happy' ? undefined : mood}
               className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
@@ -448,7 +491,7 @@ export function DesignLabScreen() {
 
           <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
             <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              FIELDER • LEAP / DIVE
+              FIELDER ({heroPlayer.throws}H) • LEAP / DIVE
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -456,6 +499,7 @@ export function DesignLabScreen() {
               jerseyNumber={heroPlayer.jerseyNumber}
               role="fielder"
               facing="front"
+              throwsHand={heroPlayer.throws}
               clip={fielderClip}
               moodOverride={mood === 'happy' ? undefined : mood}
               className="w-36 h-44 sm:w-44 sm:h-52 mt-1"

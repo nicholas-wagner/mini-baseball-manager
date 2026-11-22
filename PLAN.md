@@ -186,6 +186,10 @@ mini-baseball-manager/
 - **Hot Streaks & Cold Slumps (Dynamic Player Form)**:
   - Rolling performance momentum across recent games puts players into **Hot Streaks** (*🔥 On Fire!* — temporary contact/power/velocity surge, fiery card backdrop, glowing chibi sparks, bonus fan hype & faster Special Power charge) or **Cold Slumps** (*🧊 Cold Spell* — temporary batting/control dip, sweaty/nervous portrait mood).
   - Managers can actively bust slumps via targeted **Practice Drills**, **Active Manager Pep Talks**, dropping them in the lineup for low-pressure at-bats, or narrative **Surprise Events**.
+- **Lefty / Righty / Switch Handedness & Platoon Strategy**:
+  - Realistic generation distributions: **Batting** (`50% R`, `40% L`, `10% Switch`), **Throwing** (`SP`: 35% L / 65% R; `RP`: 50% L / 50% R; `LF/CF/RF`: 50% L / 50% R; `1B`: 80% L / 20% R; `C`: 20% L / 80% R; `2B/3B/SS`: 100% R).
+  - **Platoon Matchups**: Same-hand matchups (`LHP vs LHB`, `RHP vs RHB`) grant the pitcher extra breaking-ball deception & K rate; opposite-hand matchups grant the batter cleaner sightlines & Contact/Power boosts; **Switch Hitters (`S`)** always bat from the opposite box to claim the platoon edge.
+  - **Handedness Traits**: Lefty batters get a subtle first-base step bonus on grounders/bunts; Lefty pitchers get a hold-runners/pickoff bonus; Lefty `1B` get a stretch/scoop defensive edge. Reflected visually on all cards (`B/T`), 2.5D chibi gloves/bats/helmet ear-flaps, and 3D batter's box placement!
 
 ### 2. Human Manager RPG Powers
 - **Skipper Path (Active In-Game Powers, 1–3 uses/game)**: *Fired-Up Pep Talk*, *Mound Whisper*, *Clutch Focus*, *Rally Cap Magic*.
@@ -242,8 +246,8 @@ mini-baseball-manager/
 ---
 
 ### Milestone 2 — Core Playable MVP *(Real Playable Game!)*
-- [ ] **2A. Core Domain Models & Seeded Baseball Simulation Engine** (`src/engine/simulation/`): Deterministic pitch-by-pitch / at-bat baseball rules (balls, strikes, walks, Ks, 1B/2B/3B/HR, sac flies, errors, double plays, base-running, stamina, extra innings) emitting rich `PlayEvent` streams with 3D trajectories.
-  - [ ] *TDD Gate*: ≥90% coverage across simulation rules, edge cases, and seeded determinism.
+- [ ] **2A. Core Domain Models & Seeded Baseball Simulation Engine** (`src/engine/simulation/`): Deterministic pitch-by-pitch / at-bat baseball rules (balls, strikes, walks, Ks, 1B/2B/3B/HR, sac flies, errors, double plays, base-running, stamina, extra innings, and **Lefty/Righty/Switch platoon & handedness modifiers**) emitting rich `PlayEvent` streams with 3D trajectories.
+  - [ ] *TDD Gate*: ≥90% coverage across simulation rules, platoon matchups, edge cases, and seeded determinism.
 - [ ] **2B. New Club Creator, Roster & Lineup/Rotation Manager**: Quick Team Creator (name, city, mascot, 2 colors + 1-tap Randomize) + mobile-friendly batting order, defensive positions, starting rotation, bullpen, and auto-optimize helper.
   - [ ] *TDD Gate*: Lineup validation (unique positions, valid pitcher, DH/bench rules) & UI tests pass.
 - [ ] **2C. Live 3D Game Day & Pacing Controls** (`src/scene/playback/`, `GameDay`): Wire `PlayEvent` stream to Three.js ballpark choreography, 1x/2x/4x speeds, **Clutch Moments** mode, Instant Sim, live scoreboard HUD, and tactical manager calls (Swing, Contact, Power, Bunt, Steal, IBB, Pitching Change).
@@ -325,6 +329,7 @@ Track every plan tweak, new feature idea, or architectural pivot here so the evo
 | 2026-11-21 | Player Visuals (M1) | Upgraded players to **True 1.8-Head Volumetric 2.5D Chibi SVG Rigs** (plump 3/4 mochi cheeks, giant low-set luminous gradient eyes, tiny bean torso, stepped stubby limbs/cleats, spherical/cylindrical SVG gradients, cast head/visor shadows, and 2.5D standee rim + 3D hop physics in the ballpark) | Delivers authentic chibi proportions and tactile 2.5D depth while keeping the approved 90s card portraits intact |
 | 2026-11-21 | Global Roster & RPG | Added **11 Nationalities** (`50% USA` + `5%` each CAN/JPN/KOR/MEX/DOM/PRI/BRA/ARG/AUS/IRL, extensible) with crisp SVG flags, authentic names/hometowns, and **Cultural Heritage Myth & Animal Special Abilities** | Celebrates international baseball culture and adds memorable identity & RPG flavor to every drafted player |
 | 2026-11-21 | RPG & Simulation (M3) | Added **Hot Streaks & Cold Slumps** (dynamic player form & slump-busting via practice/manager powers) to Milestone 3 | Makes day-to-day lineup decisions, manager pep talks, and practice assignments feel alive across a 21-game season |
+| 2026-11-21 | Gameplay & Visuals | Added **Lefty / Righty / Switch Handedness & Platoon Matchups** (exact position-specific throw & bat distributions, platoon advantages/disadvantages, LHP/LHB/1B-L traits, mirrored 2.5D chibi gloves/bats/helmets & 3D batter's boxes) | Deepens bullpen/lineup chess and adds unmistakable visual variety on the mound and at home plate |
 
 ---
 

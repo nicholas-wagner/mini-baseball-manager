@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../art/portraits/types';
 import { createPortraitTraits } from '../art/portraits/generatePortrait';
 import { SAMPLE_TEAM_PALETTES } from '../art/themes/teamPalettes';
+import type { EffectiveBatSide, ThrowsHand } from '../engine/handedness/types';
 import { createMiniBallpark } from './ballpark/ballparkBuilder';
 import {
   computeShakeOffset,
@@ -49,6 +50,9 @@ export class DesignLabSceneController {
   private batterClip: CharacterAnimClip = 'bat_stance';
   private fielderClip: CharacterAnimClip = 'field_ready';
   private moodOverride: PortraitMood | undefined = undefined;
+  private pitcherThrows: ThrowsHand = 'R';
+  private batterSide: EffectiveBatSide = 'R';
+  private rivalBatterTraits = createPortraitTraits(4412);
 
   constructor(
     container: HTMLElement,
@@ -172,19 +176,40 @@ export class DesignLabSceneController {
     traits: PortraitTraits,
     team: PortraitTeamColors,
     jerseyNumber: number,
+    pitcherThrows: ThrowsHand = 'R',
+    batterSide: EffectiveBatSide = 'R',
   ): void {
-    this.pitcher.updateAppearance({ traits, team, jerseyNumber, role: 'pitcher' });
+    this.pitcherThrows = pitcherThrows;
+    this.batterSide = batterSide;
+    this.pitcher.updateAppearance({
+      traits,
+      team,
+      jerseyNumber,
+      role: 'pitcher',
+      throwsHand: pitcherThrows,
+    });
+    // Position opposing batter in 3rd-base box (-X) for RHB or 1st-base box (+X) for LHB!
+    this.batter.root.position.set(batterSide === 'R' ? -0.95 : 0.95, 0.04, 0.15);
+    this.batter.updateAppearance({
+      traits: this.rivalBatterTraits,
+      team: SAMPLE_TEAM_PALETTES[1],
+      jerseyNumber: 7,
+      role: 'batter',
+      batSide: batterSide,
+    });
     this.catcher.updateAppearance({
       traits: createPortraitTraits(3105),
       team,
       jerseyNumber: 2,
       role: 'catcher',
+      throwsHand: 'R',
     });
     this.fielder.updateAppearance({
       traits: createPortraitTraits(7721),
       team,
       jerseyNumber: 19,
       role: 'fielder',
+      throwsHand: pitcherThrows,
     });
   }
 
@@ -236,6 +261,8 @@ export class DesignLabSceneController {
       this.cameraPreset,
       this.elapsedSec,
       this.turntableOffset,
+      this.pitcherThrows,
+      this.batterSide,
     );
     this.cameraPose = dampCameraPose(this.cameraPose, targetPose, dt, 6.2);
     const shake = computeShakeOffset(this.trauma, this.elapsedSec);

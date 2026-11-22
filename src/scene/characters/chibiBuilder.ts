@@ -6,6 +6,7 @@ import {
 } from '../../art/playerSvg/miniPlayerPose';
 import { renderMiniPlayerSvgString } from '../../art/playerSvg/renderMiniPlayerSvg';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../../art/portraits/types';
+import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import { CLIP_DURATIONS, type CharacterAnimClip } from './animationState';
 
 export type ChibiRole = MiniPlayerRole;
@@ -15,6 +16,8 @@ export interface ChibiRigOptions {
   team: PortraitTeamColors;
   jerseyNumber: number;
   role: ChibiRole;
+  throwsHand?: ThrowsHand;
+  batSide?: EffectiveBatSide;
 }
 
 export interface ChibiPlayerRig {
@@ -129,8 +132,10 @@ export function createChibiPlayerRig(
   let appearanceNonce = 0;
 
   const prewarmIdle = (opts: ChibiRigOptions, nonce: number) => {
+    const th = opts.throwsHand ?? 'R';
+    const bs = opts.batSide ?? 'R';
     for (const facing of ['front', 'back'] as const) {
-      const key = `v3:${nonce}:${opts.traits.seed}:${opts.team.primary}:${opts.jerseyNumber}:${opts.role}:${facing}:idle:default:0`;
+      const key = `v4:${nonce}:${opts.traits.seed}:${opts.team.primary}:${opts.jerseyNumber}:${opts.role}:${th}:${bs}:${facing}:idle:default:0`;
       const pose = evaluateMiniPlayerPose('idle', 0, opts.role);
       getOrDecodeSvgFrame(key, () =>
         renderMiniPlayerSvgString(
@@ -140,6 +145,8 @@ export function createChibiPlayerRig(
             jerseyNumber: opts.jerseyNumber,
             role: opts.role,
             facing,
+            throwsHand: th,
+            batSide: bs,
             includeGroundShadow: false,
           },
           pose,
@@ -197,7 +204,9 @@ export function createChibiPlayerRig(
       }
 
       const moodKey = moodOverride ?? 'default';
-      const key = `v3:${appearanceNonce}:${currentOptions.traits.seed}:${currentOptions.team.primary}:${currentOptions.jerseyNumber}:${currentOptions.role}:${facing}:${clip}:${moodKey}:${frameIdx}`;
+      const th = currentOptions.throwsHand ?? 'R';
+      const bs = currentOptions.batSide ?? 'R';
+      const key = `v4:${appearanceNonce}:${currentOptions.traits.seed}:${currentOptions.team.primary}:${currentOptions.jerseyNumber}:${currentOptions.role}:${th}:${bs}:${facing}:${clip}:${moodKey}:${frameIdx}`;
 
       if (key === lastDrawnKey) return;
 
@@ -209,6 +218,8 @@ export function createChibiPlayerRig(
             jerseyNumber: currentOptions.jerseyNumber,
             role: currentOptions.role,
             facing,
+            throwsHand: th,
+            batSide: bs,
             moodOverride,
             includeGroundShadow: false,
           },
@@ -222,7 +233,7 @@ export function createChibiPlayerRig(
         spriteTex.needsUpdate = true;
         lastDrawnKey = key;
       } else if (!lastDrawnKey && ctx) {
-        const fallbackKey = `v3:${appearanceNonce}:${currentOptions.traits.seed}:${currentOptions.team.primary}:${currentOptions.jerseyNumber}:${currentOptions.role}:${facing}:idle:default:0`;
+        const fallbackKey = `v4:${appearanceNonce}:${currentOptions.traits.seed}:${currentOptions.team.primary}:${currentOptions.jerseyNumber}:${currentOptions.role}:${th}:${bs}:${facing}:idle:default:0`;
         const fallbackImg = svgFrameCache.get(fallbackKey);
         if (fallbackImg && fallbackImg.complete && fallbackImg.naturalWidth > 0) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
