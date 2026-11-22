@@ -56,6 +56,7 @@ function makeMatchupClubs(
     ratings: {
       contact: 72,
       power: 72,
+      gapPower: 72,
       eye: 70,
       bunt: 75,
       velocity: 72,
@@ -64,6 +65,7 @@ function makeMatchupClubs(
       stamina: 80,
       speed: 75,
       fielding: 74,
+      range: 74,
       arm: 74,
       clutch: 72,
       luck: 50,

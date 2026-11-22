@@ -5,6 +5,7 @@ import { soundEngine } from '../../audio/soundEngine';
 import type { FieldPosition } from '../../engine/handedness/types';
 import { MAX_ACTIVE_ROSTER_SIZE } from '../../engine/models/club';
 import {
+  BATTED_BALL_TENDENCY_LABELS,
   computePlayerOverall,
   isPitcherPosition,
   MARKET_TIER_LABELS,
@@ -15,6 +16,12 @@ import {
   SPECIALIST_LABELS,
   type FormState,
 } from '../../engine/models/player';
+import {
+  computeBattingSabermetrics,
+  computeFieldingSabermetrics,
+  computePitchingSabermetrics,
+  formatRate3,
+} from '../../engine/simulation/sabermetrics';
 import {
   evaluatePositionAssignment,
   getEligiblePositions,
@@ -517,6 +524,17 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                     {MENTAL_TRAIT_LABELS[trait]}
                   </span>
                 ))}
+              </div>
+              <div className="pt-1 border-t border-[#181B2C]/15 text-[10px] font-bold text-[#4A5068]">
+                {(() => {
+                  if (isPitcherPosition(inspectedPlayer.position)) {
+                    const p = computePitchingSabermetrics(inspectedPlayer.seasonStats);
+                    return `ERA ${p.era.toFixed(2)} • WHIP ${p.whip.toFixed(2)} • K/9 ${p.kPer9.toFixed(1)} • Strk ${Math.round(p.strikeRate * 100)}% • ${BATTED_BALL_TENDENCY_LABELS[inspectedPlayer.battedBallProfile.tendency]}`;
+                  }
+                  const b = computeBattingSabermetrics(inspectedPlayer.seasonStats);
+                  const f = computeFieldingSabermetrics(inspectedPlayer.seasonStats);
+                  return `AVG ${formatRate3(b.avg)} / OBP ${formatRate3(b.obp)} / OPS ${formatRate3(b.ops)} • RNG ${inspectedPlayer.ratings.range} • FPCT ${formatRate3(f.fpct)} • ${BATTED_BALL_TENDENCY_LABELS[inspectedPlayer.battedBallProfile.tendency]}`;
+                })()}
               </div>
             </div>
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">

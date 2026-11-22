@@ -1,5 +1,11 @@
 import { Coins, Sparkles, Trophy, Users } from 'lucide-react';
 import type { Club } from '../../engine/models/club';
+import { isPitcherPosition } from '../../engine/models/player';
+import {
+  computeBattingSabermetrics,
+  computePitchingSabermetrics,
+  formatRate3,
+} from '../../engine/simulation/sabermetrics';
 import type { PostGameSummary } from '../../store/gameStore';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -72,6 +78,17 @@ export function PostGameSummaryModal({
                   {summary.mvp.playerName}
                 </div>
                 <div className="text-xs font-bold text-[#1B4332] mt-0.5">{summary.mvp.summary}</div>
+                <div className="text-[11px] font-bold text-[#4A5068] mt-1">
+                  {isPitcherPosition(mvpDomainPlayer.position)
+                    ? (() => {
+                        const p = computePitchingSabermetrics(mvpDomainPlayer.seasonStats);
+                        return `Season: ${p.era.toFixed(2)} ERA • ${p.whip.toFixed(2)} WHIP • ${Math.round(p.strikeRate * 100)}% Strk`;
+                      })()
+                    : (() => {
+                        const b = computeBattingSabermetrics(mvpDomainPlayer.seasonStats);
+                        return `Season: ${formatRate3(b.avg)}/${formatRate3(b.obp)}/${formatRate3(b.slg)} (${formatRate3(b.ops)} OPS)`;
+                      })()}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">

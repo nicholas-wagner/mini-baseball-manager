@@ -20,6 +20,7 @@ describe('Pitcher Arsenals & Batter Pitch-Matchup Profiles (TASK-055)', () => {
     const baseRatings = {
       contact: 30,
       power: 30,
+      gapPower: 30,
       eye: 30,
       bunt: 40,
       velocity: 74,
@@ -28,6 +29,7 @@ describe('Pitcher Arsenals & Batter Pitch-Matchup Profiles (TASK-055)', () => {
       stamina: 68,
       speed: 55,
       fielding: 60,
+      range: 60,
       arm: 75,
       clutch: 68,
       luck: 55,

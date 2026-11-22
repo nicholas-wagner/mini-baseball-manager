@@ -36,6 +36,7 @@ import {
   rollPositionalEligibility,
   rollSpecialistArchetype,
 } from '../rpg/specialistsAndPositions';
+import { rollBattedBallProfile } from '../simulation/sabermetrics';
 import {
   computeMarketContract,
   MARKET_TIER_SPECS,
@@ -197,6 +198,7 @@ function rollRatingsForRole(
   return {
     contact: isPitcher ? rollOff() : roll(bias.contact),
     power: isPitcher ? rollOff() : roll(bias.power),
+    gapPower: isPitcher ? rollOff() : roll(Math.round((bias.power + bias.contact) * 0.5)),
     eye: isPitcher ? rollOff() : roll(bias.eye),
     bunt: clampStat(rng.int(Math.max(30, min - 10), max)),
     velocity: isPitcher ? roll(bias.velocity) : rollOff(),
@@ -205,12 +207,34 @@ function rollRatingsForRole(
     stamina: isPitcher ? roll(bias.stamina) : rollOff(),
     speed: clampStat(rng.int(min, max) + bias.speed),
     fielding: clampStat(rng.int(min, max) + bias.fielding),
+    range: clampStat(rng.int(min, max) + Math.round((bias.fielding + bias.speed) * 0.5)),
     arm: clampStat(rng.int(min, max) + bias.arm),
     clutch: clampStat(rng.int(min, max)),
     luck: clampStat(rng.int(25, 85)),
     popularity: clampStat(rng.int(min, Math.min(99, max + 6))),
     potential: clampStat(rng.int(min + 4, Math.min(99, max + 10))),
   };
+}
+
+function buildPitcherOnlyProfile(
+  rng: SeededRng,
+  position: FieldPosition,
+  throws: 'L' | 'R',
+  specialistArchetype: PlayerSpecialistArchetype,
+  specialistRatings: PlayerRatings,
+  marketTier: PlayerMarketTier,
+): {
+  ratings: PlayerRatings;
+  pitcherRole?: ReturnType<typeof rollPitcherRole>;
+  pitchArsenal?: ReturnType<typeof rollPitcherArsenal>;
+} {
+  if (!isPitcherPosition(position)) {
+    return { ratings: specialistRatings };
+  }
+  const pitcherRole = rollPitcherRole(rng, position, throws, specialistArchetype);
+  const ratings = applyPitcherRoleShape(specialistRatings, pitcherRole);
+  const pitchArsenal = rollPitcherArsenal(rng, position, specialistArchetype, ratings, marketTier);
+  return { ratings, pitcherRole, pitchArsenal };
 }
 
 /** Generates a single deterministic player calibrated to position, league tier, market tier, and specialist role. */
@@ -234,17 +258,22 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   const shiftedMax = clampStat(band.max + marketSpec.ovrOffset);
   const baseRatings = rollRatingsForRole(rng, options.position, shiftedMin, shiftedMax);
   const specialistRatings = applySpecialistRatingShape(baseRatings, specialistArchetype, options.position);
-  const pitcherRole = isPitcherPosition(options.position)
-    ? rollPitcherRole(rng, options.position, throws, specialistArchetype)
-    : undefined;
-  const ratings = pitcherRole
-    ? applyPitcherRoleShape(specialistRatings, pitcherRole)
-    : specialistRatings;
+  const { ratings, pitcherRole, pitchArsenal } = buildPitcherOnlyProfile(
+    rng,
+    options.position,
+    throws,
+    specialistArchetype,
+    specialistRatings,
+    marketTier,
+  );
   const statCaps = rollStatCapsForMarketTier(rng, ratings, marketTier, options.position);
   const batterPitchProfile = rollBatterPitchProfile(rng, specialistArchetype, ratings, marketTier);
-  const pitchArsenal = isPitcherPosition(options.position)
-    ? rollPitcherArsenal(rng, options.position, specialistArchetype, ratings, marketTier)
-    : undefined;
+  const battedBallProfile = rollBattedBallProfile(
+    rng,
+    options.position,
+    specialistArchetype,
+    pitchArsenal?.favoritePitch,
+  );
   const totalRatingBudget = computeTotalRatingBudget(marketTier, options.position);
   const overall = computePlayerOverall({ position: options.position, ratings });
   const token = rng.int(100000, 999999);
@@ -281,6 +310,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     positionProficiency: eligibility.positionProficiency,
     ...(pitchArsenal ? { pitchArsenal } : {}),
     batterPitchProfile,
+    battedBallProfile,
     mentalTraits: mental.mentalTraits,
     pressureProfile: mental.pressureProfile,
     ratings,

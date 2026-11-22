@@ -16,6 +16,7 @@ describe('TASK-053 — Player Specialists, Positional Eligibility & Cross-Traini
     const baseRatings = {
       contact: 65,
       power: 65,
+      gapPower: 65,
       eye: 65,
       bunt: 60,
       velocity: 65,
@@ -24,6 +25,7 @@ describe('TASK-053 — Player Specialists, Positional Eligibility & Cross-Traini
       stamina: 65,
       speed: 65,
       fielding: 65,
+      range: 65,
       arm: 65,
       clutch: 65,
       luck: 55,

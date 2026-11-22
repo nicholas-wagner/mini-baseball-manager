@@ -76,6 +76,7 @@ export function applySpecialistRatingShape(
   return {
     contact: isPitcher ? ratings.contact : bump('contact', ratings.contact),
     power: isPitcher ? ratings.power : bump('power', ratings.power),
+    gapPower: isPitcher ? ratings.gapPower : bump('power', ratings.gapPower),
     eye: isPitcher ? ratings.eye : bump('eye', ratings.eye),
     bunt: bump('bunt', ratings.bunt),
     velocity: isPitcher ? bump('velocity', ratings.velocity) : ratings.velocity,
@@ -84,6 +85,7 @@ export function applySpecialistRatingShape(
     stamina: isPitcher ? bump('stamina', ratings.stamina) : ratings.stamina,
     speed: bump('speed', ratings.speed),
     fielding: bump('fielding', ratings.fielding),
+    range: bump('fielding', ratings.range),
     arm: bump('arm', ratings.arm),
     clutch: bump('clutch', ratings.clutch),
     luck: ratings.luck,

@@ -246,10 +246,30 @@ export const PITCHER_ROLE_SHORT_LABELS: Readonly<Record<PitcherRole, string>> = 
   fireman: 'Fireman',
 };
 
+export type BattedBallTendency = 'groundball' | 'line_drive' | 'flyball' | 'balanced';
+
+export type BattedBallType = 'ground_ball' | 'line_drive' | 'fly_ball' | 'pop_up';
+
+export const BATTED_BALL_TENDENCY_LABELS: Readonly<Record<BattedBallTendency, string>> = {
+  groundball: 'Groundball',
+  line_drive: 'Line-Drive',
+  flyball: 'Flyball',
+  balanced: 'Balanced',
+};
+
+export interface BattedBallProfile {
+  tendency: BattedBallTendency;
+  gbRateBias: number;
+  ldRateBias: number;
+  fbRateBias: number;
+  popUpRateBias: number;
+}
+
 export interface PlayerRatings {
   // Batting (1-99)
   contact: number;
   power: number;
+  gapPower: number;
   eye: number;
   bunt: number;
   // Pitching (1-99)
@@ -260,6 +280,7 @@ export interface PlayerRatings {
   // Athleticism & Intangibles (1-99)
   speed: number;
   fielding: number;
+  range: number;
   arm: number;
   clutch: number;
   luck: number;
@@ -276,6 +297,7 @@ export interface PlayerContract {
 
 export interface PlayerSeasonStats {
   games: number;
+  plateAppearances: number;
   atBats: number;
   hits: number;
   doubles: number;
@@ -284,14 +306,26 @@ export interface PlayerSeasonStats {
   rbis: number;
   walks: number;
   strikeouts: number;
+  sacFlies: number;
   stolenBases: number;
+  groundBalls: number;
+  lineDrives: number;
+  flyBalls: number;
+  popUps: number;
   inningsPitchedOuts: number;
+  hitsAllowed: number;
+  homeRunsAllowed: number;
   earnedRuns: number;
   pitchingStrikeouts: number;
   pitchingWalks: number;
+  pitchesThrown: number;
+  strikesThrown: number;
+  ballsThrown: number;
   wins: number;
   losses: number;
   saves: number;
+  putouts: number;
+  assists: number;
   errors: number;
 }
 
@@ -330,6 +364,7 @@ export interface Player {
   positionProficiency: Partial<Record<FieldPosition, number>>;
   pitchArsenal?: PitcherArsenalProfile;
   batterPitchProfile: BatterPitchProfile;
+  battedBallProfile: BattedBallProfile;
   mentalTraits: MentalTraitId[];
   pressureProfile: PressureResponseProfile;
   ratings: PlayerRatings;
@@ -443,6 +478,7 @@ export function rollPlayerPortraitTraits(rng: SeededRng, seed: number): PlayerPo
 export function createEmptySeasonStats(): PlayerSeasonStats {
   return {
     games: 0,
+    plateAppearances: 0,
     atBats: 0,
     hits: 0,
     doubles: 0,
@@ -451,14 +487,26 @@ export function createEmptySeasonStats(): PlayerSeasonStats {
     rbis: 0,
     walks: 0,
     strikeouts: 0,
+    sacFlies: 0,
     stolenBases: 0,
+    groundBalls: 0,
+    lineDrives: 0,
+    flyBalls: 0,
+    popUps: 0,
     inningsPitchedOuts: 0,
+    hitsAllowed: 0,
+    homeRunsAllowed: 0,
     earnedRuns: 0,
     pitchingStrikeouts: 0,
     pitchingWalks: 0,
+    pitchesThrown: 0,
+    strikesThrown: 0,
+    ballsThrown: 0,
     wins: 0,
     losses: 0,
     saves: 0,
+    putouts: 0,
+    assists: 0,
     errors: 0,
   };
 }

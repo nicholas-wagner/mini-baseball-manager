@@ -136,6 +136,7 @@ export function rollStatCapsForMarketTier(
   return {
     contact: capTool(ratings.contact, !isPitcher),
     power: capTool(ratings.power, !isPitcher),
+    gapPower: capTool(ratings.gapPower, !isPitcher),
     eye: capTool(ratings.eye, !isPitcher),
     bunt: capTool(ratings.bunt, true),
     velocity: capTool(ratings.velocity, isPitcher),
@@ -144,6 +145,7 @@ export function rollStatCapsForMarketTier(
     stamina: capTool(ratings.stamina, isPitcher),
     speed: capTool(ratings.speed, true),
     fielding: capTool(ratings.fielding, true),
+    range: capTool(ratings.range, true),
     arm: capTool(ratings.arm, true),
     clutch: capTool(ratings.clutch, true),
     luck: capTool(ratings.luck, true),

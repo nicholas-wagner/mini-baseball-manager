@@ -1,6 +1,6 @@
 import type { Club, LeagueTierId } from '../engine/models/club';
 import type { ManagerProfile } from '../engine/models/manager';
-import { isPitcherPosition, type Player } from '../engine/models/player';
+import { createEmptySeasonStats, isPitcherPosition, type Player, type PlayerSeasonStats } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
 import { rollMentalAndPressureProfile } from '../engine/rpg/mentalAndLeverage';
 import {
@@ -9,6 +9,7 @@ import {
   rollPitcherArsenal,
 } from '../engine/rpg/pitchArsenals';
 import { rollPitcherRole } from '../engine/rpg/pitcherRoles';
+import { rollBattedBallProfile } from '../engine/simulation/sabermetrics';
 import {
   CURRENT_SAVE_SCHEMA_VERSION,
   DEFAULT_SAVE_SETTINGS,
@@ -21,6 +22,10 @@ interface RawLegacyV0Payload {
   worldSeed: number;
   humanClub: Club;
   manager: ManagerProfile;
+}
+
+function hydrateStatsDefaults(stats: PlayerSeasonStats | undefined): PlayerSeasonStats {
+  return { ...createEmptySeasonStats(), ...(stats ?? {}) };
 }
 
 function hydratePlayerDefaults(player: Player): Player {
@@ -42,16 +47,35 @@ function hydratePlayerDefaults(player: Player): Player {
   const batterPitchProfile =
     player.batterPitchProfile ??
     rollBatterPitchProfile(seedRng, specialistArchetype, player.ratings, marketTier);
+  const battedBallProfile =
+    player.battedBallProfile ??
+    rollBattedBallProfile(seedRng, player.position, specialistArchetype, pitchArsenal?.favoritePitch);
   const mental =
     player.mentalTraits && player.pressureProfile
       ? { mentalTraits: player.mentalTraits, pressureProfile: player.pressureProfile }
       : rollMentalAndPressureProfile(seedRng, player.personality ?? 'clutch_captain', marketTier);
   const ratings =
-    typeof player.ratings.luck === 'number' ? player.ratings : { ...player.ratings, luck: 50 };
+    typeof player.ratings.luck === 'number' &&
+    typeof player.ratings.gapPower === 'number' &&
+    typeof player.ratings.range === 'number'
+      ? player.ratings
+      : {
+          ...player.ratings,
+          gapPower: player.ratings.gapPower ?? player.ratings.power,
+          range: player.ratings.range ?? player.ratings.fielding,
+          luck: player.ratings.luck ?? 50,
+        };
   const statCaps = player.statCaps
-    ? typeof player.statCaps.luck === 'number'
+    ? typeof player.statCaps.luck === 'number' &&
+      typeof player.statCaps.gapPower === 'number' &&
+      typeof player.statCaps.range === 'number'
       ? player.statCaps
-      : { ...player.statCaps, luck: Math.min(99, ratings.luck + 10) }
+      : {
+          ...player.statCaps,
+          gapPower: player.statCaps.gapPower ?? Math.min(99, ratings.gapPower + 10),
+          range: player.statCaps.range ?? Math.min(99, ratings.range + 10),
+          luck: player.statCaps.luck ?? Math.min(99, ratings.luck + 10),
+        }
     : { ...ratings, potential: 99 };
 
   return {
@@ -64,6 +88,7 @@ function hydratePlayerDefaults(player: Player): Player {
     positionProficiency: player.positionProficiency ?? { [favoritePosition]: 90 },
     ...(pitchArsenal ? { pitchArsenal } : {}),
     batterPitchProfile,
+    battedBallProfile,
     mentalTraits: mental.mentalTraits,
     pressureProfile: mental.pressureProfile,
     ratings,
@@ -71,6 +96,8 @@ function hydratePlayerDefaults(player: Player): Player {
     totalRatingBudget:
       player.totalRatingBudget ?? computeTotalRatingBudget(marketTier, player.position),
     xpGrowthMultiplier: player.xpGrowthMultiplier ?? 0.85,
+    seasonStats: hydrateStatsDefaults(player.seasonStats),
+    careerStats: hydrateStatsDefaults(player.careerStats),
   };
 }
 

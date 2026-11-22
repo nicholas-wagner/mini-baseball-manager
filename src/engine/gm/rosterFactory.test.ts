@@ -267,6 +267,7 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
       ratings: {
         contact: 20,
         power: 20,
+        gapPower: 20,
         eye: 20,
         bunt: 20,
         velocity: 99,
@@ -275,6 +276,7 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
         stamina: 99,
         speed: 50,
         fielding: 80,
+        range: 80,
         arm: 80,
         clutch: 95,
         luck: 55,
@@ -287,6 +289,7 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
       ratings: {
         contact: 20,
         power: 20,
+        gapPower: 20,
         eye: 20,
         bunt: 20,
         velocity: 98,
@@ -295,6 +298,7 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
         stamina: 35,
         speed: 50,
         fielding: 75,
+        range: 75,
         arm: 85,
         clutch: 98,
         luck: 55,
@@ -307,6 +311,7 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
       ratings: {
         contact: -10,
         power: 0,
+        gapPower: 0,
         eye: 0,
         bunt: 0,
         velocity: 0,
@@ -315,6 +320,7 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
         stamina: 0,
         speed: 0,
         fielding: 0,
+        range: 0,
         arm: 0,
         clutch: 0,
         luck: 0,

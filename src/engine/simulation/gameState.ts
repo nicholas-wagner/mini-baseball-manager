@@ -23,6 +23,7 @@ export type BaseState = [string | null, string | null, string | null];
 
 export interface BatterBoxLine {
   playerId: string;
+  plateAppearances: number;
   atBats: number;
   hits: number;
   runs: number;
@@ -32,7 +33,14 @@ export interface BatterBoxLine {
   rbis: number;
   walks: number;
   strikeouts: number;
+  sacFlies: number;
   stolenBases: number;
+  groundBalls: number;
+  lineDrives: number;
+  flyBalls: number;
+  popUps: number;
+  putouts: number;
+  assists: number;
   errors: number;
 }
 
@@ -46,6 +54,12 @@ export interface PitcherBoxLine {
   strikeouts: number;
   homeRunsAllowed: number;
   pitchesThrown: number;
+  strikesThrown: number;
+  ballsThrown: number;
+  groundBalls: number;
+  lineDrives: number;
+  flyBalls: number;
+  popUps: number;
   decision: 'W' | 'L' | 'SV' | null;
 }
 
@@ -111,6 +125,7 @@ export interface GameSessionResult {
 function createEmptyBatterLine(playerId: string): BatterBoxLine {
   return {
     playerId,
+    plateAppearances: 0,
     atBats: 0,
     hits: 0,
     runs: 0,
@@ -120,7 +135,14 @@ function createEmptyBatterLine(playerId: string): BatterBoxLine {
     rbis: 0,
     walks: 0,
     strikeouts: 0,
+    sacFlies: 0,
     stolenBases: 0,
+    groundBalls: 0,
+    lineDrives: 0,
+    flyBalls: 0,
+    popUps: 0,
+    putouts: 0,
+    assists: 0,
     errors: 0,
   };
 }
@@ -136,6 +158,12 @@ export function createEmptyPitcherLine(playerId: string): PitcherBoxLine {
     strikeouts: 0,
     homeRunsAllowed: 0,
     pitchesThrown: 0,
+    strikesThrown: 0,
+    ballsThrown: 0,
+    groundBalls: 0,
+    lineDrives: 0,
+    flyBalls: 0,
+    popUps: 0,
     decision: null,
   };
 }

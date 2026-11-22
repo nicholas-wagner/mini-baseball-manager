@@ -106,6 +106,7 @@ function makeEvent(
     ballFlight: partial.ballFlight,
     fieldingHighlight: partial.fieldingHighlight,
     pitchThrown: partial.pitchThrown,
+    battedBallType: partial.battedBallType,
     commentary: partial.commentary,
     soundCue: partial.soundCue,
     type: partial.type,
@@ -171,12 +172,16 @@ function applyCountPitch(
   pitcherId: string,
 ): PlayEvent {
   const outsBefore = state.outs;
+  const pitcherLine = getPitcherLines(state)[pitcherId];
   if (res.outcome === 'ball') {
     state.balls += 1;
+    pitcherLine.ballsThrown += 1;
   } else if (res.outcome === 'called_strike' || res.outcome === 'swinging_strike') {
     state.strikes += 1;
-  } else if (res.outcome === 'foul' && state.strikes < 2) {
-    state.strikes += 1;
+    pitcherLine.strikesThrown += 1;
+  } else if (res.outcome === 'foul') {
+    pitcherLine.strikesThrown += 1;
+    if (state.strikes < 2) state.strikes += 1;
   }
 
   const batting = getBattingSide(state);
@@ -245,7 +250,41 @@ function updateHitStats(
   }
 }
 
-function applyRunnerMovementForPlateOutcome(
+const BATTED_BALL_COUNT_KEY: Readonly<
+  Record<NonNullable<PitchResolution['battedBallType']>, 'groundBalls' | 'lineDrives' | 'flyBalls' | 'popUps'>
+> = {
+  ground_ball: 'groundBalls',
+  line_drive: 'lineDrives',
+  fly_ball: 'flyBalls',
+  pop_up: 'popUps',
+};
+
+function recordBattedBallAndFielding(
+  state: GameSessionState,
+  res: PitchResolution,
+  batterLine: BatterBoxLine,
+  pitcherLine: PitcherBoxLine,
+): void {
+  if (res.battedBallType) {
+    const key = BATTED_BALL_COUNT_KEY[res.battedBallType];
+    batterLine[key] += 1;
+    pitcherLine[key] += 1;
+  }
+
+  const fielderId = res.fieldingHighlight?.fielderId;
+  if (!fielderId || res.outsAdded <= 0) return;
+  const fieldingLines =
+    state.half === 'TOP' ? state.boxScore.homeBatters : state.boxScore.awayBatters;
+  const fLine = fieldingLines[fielderId];
+  if (!fLine) return;
+  if (res.outcome === 'ground_out' || res.outcome === 'double_play') {
+    fLine.assists += 1;
+  } else {
+    fLine.putouts += 1;
+  }
+}
+
+function applyFieldingErrorOutcome(
   state: GameSessionState,
   res: PitchResolution,
   batterId: string,
@@ -254,8 +293,32 @@ function applyRunnerMovementForPlateOutcome(
 ): void {
   const batting = getBattingSide(state);
   const fielding = getFieldingSide(state);
+  fielding.errors += 1;
+  const errFielderId = res.fieldingHighlight?.fielderId;
+  const fieldingLines =
+    state.half === 'TOP' ? state.boxScore.homeBatters : state.boxScore.awayBatters;
+  if (errFielderId && fieldingLines[errFielderId]) {
+    fieldingLines[errFielderId].errors += 1;
+  } else {
+    batterLine.errors += 1;
+  }
+  const errAdvance = advanceWalkRunners(state.bases, batterId);
+  state.bases = errAdvance.basesAfter;
+  recordRunsScored(state, batting, pitcherLine, batterLine, errAdvance.runsScoredIds, false);
+}
+
+function applyRunnerMovementForPlateOutcome(
+  state: GameSessionState,
+  res: PitchResolution,
+  batterId: string,
+  batterLine: BatterBoxLine,
+  pitcherLine: PitcherBoxLine,
+): void {
+  const batting = getBattingSide(state);
+  batterLine.plateAppearances += 1;
 
   if (res.outcome === 'walk') {
+    pitcherLine.ballsThrown += 1;
     const walked = advanceWalkRunners(state.bases, batterId);
     state.bases = walked.basesAfter;
     batterLine.walks += 1;
@@ -264,13 +327,12 @@ function applyRunnerMovementForPlateOutcome(
     return;
   }
 
+  pitcherLine.strikesThrown += 1;
+  recordBattedBallAndFielding(state, res, batterLine, pitcherLine);
+
   batterLine.atBats += 1;
   if (res.outcome === 'fielding_error') {
-    fielding.errors += 1;
-    batterLine.errors += 1;
-    const errAdvance = advanceWalkRunners(state.bases, batterId);
-    state.bases = errAdvance.basesAfter;
-    recordRunsScored(state, batting, pitcherLine, batterLine, errAdvance.runsScoredIds, false);
+    applyFieldingErrorOutcome(state, res, batterId, batterLine, pitcherLine);
     return;
   }
 
@@ -293,6 +355,7 @@ function applyRunnerMovementForPlateOutcome(
     const scoringId = state.bases[2];
     state.bases = [state.bases[0], state.bases[1], null];
     batterLine.atBats -= 1;
+    batterLine.sacFlies += 1;
     recordRunsScored(state, batting, pitcherLine, batterLine, [scoringId], true);
   }
 }
@@ -385,6 +448,7 @@ function applyPlateComplete(
     ballFlight: res.ballFlight,
     fieldingHighlight: res.fieldingHighlight,
     pitchThrown: res.pitchThrown,
+    battedBallType: res.battedBallType,
     commentary: res.commentary,
     soundCue: res.soundCue,
   });
@@ -771,8 +835,9 @@ export function simUntilClutchOrEnd(
 
 function mergeBatterLineToDelta(line: BatterBoxLine): PlayerSeasonStats {
   const stat = createEmptySeasonStats();
-  const participated = line.atBats > 0 || line.walks > 0 || line.stolenBases > 0;
+  const participated = line.plateAppearances > 0 || line.atBats > 0 || line.walks > 0 || line.stolenBases > 0;
   stat.games = participated ? 1 : 0;
+  stat.plateAppearances = line.plateAppearances;
   stat.atBats = line.atBats;
   stat.hits = line.hits;
   stat.doubles = line.doubles;
@@ -781,7 +846,14 @@ function mergeBatterLineToDelta(line: BatterBoxLine): PlayerSeasonStats {
   stat.rbis = line.rbis;
   stat.walks = line.walks;
   stat.strikeouts = line.strikeouts;
+  stat.sacFlies = line.sacFlies;
   stat.stolenBases = line.stolenBases;
+  stat.groundBalls = line.groundBalls;
+  stat.lineDrives = line.lineDrives;
+  stat.flyBalls = line.flyBalls;
+  stat.popUps = line.popUps;
+  stat.putouts = line.putouts;
+  stat.assists = line.assists;
   stat.errors = line.errors;
   return stat;
 }
@@ -793,9 +865,18 @@ function mergePitcherLineToDelta(
   const stat = existing ?? createEmptySeasonStats();
   if (line.pitchesThrown > 0 || line.outsRecorded > 0) stat.games = 1;
   stat.inningsPitchedOuts += line.outsRecorded;
+  stat.hitsAllowed += line.hitsAllowed;
+  stat.homeRunsAllowed += line.homeRunsAllowed;
   stat.earnedRuns += line.earnedRuns;
   stat.pitchingStrikeouts += line.strikeouts;
   stat.pitchingWalks += line.walks;
+  stat.pitchesThrown += line.pitchesThrown;
+  stat.strikesThrown += line.strikesThrown;
+  stat.ballsThrown += line.ballsThrown;
+  stat.groundBalls += line.groundBalls;
+  stat.lineDrives += line.lineDrives;
+  stat.flyBalls += line.flyBalls;
+  stat.popUps += line.popUps;
   if (line.decision === 'W') stat.wins += 1;
   if (line.decision === 'L') stat.losses += 1;
   if (line.decision === 'SV') stat.saves += 1;
@@ -846,6 +927,7 @@ export function simFullGame(
 function addStats(base: PlayerSeasonStats, delta: PlayerSeasonStats): PlayerSeasonStats {
   return {
     games: base.games + delta.games,
+    plateAppearances: base.plateAppearances + delta.plateAppearances,
     atBats: base.atBats + delta.atBats,
     hits: base.hits + delta.hits,
     doubles: base.doubles + delta.doubles,
@@ -854,14 +936,26 @@ function addStats(base: PlayerSeasonStats, delta: PlayerSeasonStats): PlayerSeas
     rbis: base.rbis + delta.rbis,
     walks: base.walks + delta.walks,
     strikeouts: base.strikeouts + delta.strikeouts,
+    sacFlies: base.sacFlies + delta.sacFlies,
     stolenBases: base.stolenBases + delta.stolenBases,
+    groundBalls: base.groundBalls + delta.groundBalls,
+    lineDrives: base.lineDrives + delta.lineDrives,
+    flyBalls: base.flyBalls + delta.flyBalls,
+    popUps: base.popUps + delta.popUps,
     inningsPitchedOuts: base.inningsPitchedOuts + delta.inningsPitchedOuts,
+    hitsAllowed: base.hitsAllowed + delta.hitsAllowed,
+    homeRunsAllowed: base.homeRunsAllowed + delta.homeRunsAllowed,
     earnedRuns: base.earnedRuns + delta.earnedRuns,
     pitchingStrikeouts: base.pitchingStrikeouts + delta.pitchingStrikeouts,
     pitchingWalks: base.pitchingWalks + delta.pitchingWalks,
+    pitchesThrown: base.pitchesThrown + delta.pitchesThrown,
+    strikesThrown: base.strikesThrown + delta.strikesThrown,
+    ballsThrown: base.ballsThrown + delta.ballsThrown,
     wins: base.wins + delta.wins,
     losses: base.losses + delta.losses,
     saves: base.saves + delta.saves,
+    putouts: base.putouts + delta.putouts,
+    assists: base.assists + delta.assists,
     errors: base.errors + delta.errors,
   };
 }

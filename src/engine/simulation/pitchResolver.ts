@@ -11,6 +11,7 @@ import type {
 } from '../models/playEvent';
 import {
   PITCH_TYPE_SHORT_LABELS,
+  type BattedBallType,
   type PitchType,
   type Player,
 } from '../models/player';
@@ -26,6 +27,7 @@ import {
 import { evaluatePitcherRoleSituation } from '../rpg/pitcherRoles';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
+import { sampleBattedBallType } from './sabermetrics';
 
 export interface PitchResolution {
   kind: 'pitch_event' | 'plate_complete' | 'steal_attempt';
@@ -41,6 +43,7 @@ export interface PitchResolution {
   fieldingHighlight?: PlayEvent['fieldingHighlight'];
   specialPowerTriggered?: PlayEvent['specialPowerTriggered'];
   pitchThrown?: PlayEvent['pitchThrown'];
+  battedBallType?: BattedBallType;
 }
 
 interface TacticalModifiers {
@@ -164,10 +167,17 @@ function resolveHitType(
   batter: Player,
   effPower: number,
   defender: Player,
+  battedBallType: BattedBallType,
 ): PitchResolution {
-  const hrChance = clampProb(0.11 + (effPower - 60) * 0.0038, 0.04, 0.34);
-  const tripleChance = clampProb(0.05 + (batter.ratings.speed - 65) * 0.002, 0.02, 0.11);
-  const doubleChance = clampProb(0.22 + (effPower - 60) * 0.0022, 0.14, 0.32);
+  const hrMult = battedBallType === 'fly_ball' ? 1.55 : battedBallType === 'line_drive' ? 0.9 : 0.08;
+  const gapBonus = (batter.ratings.gapPower - 60) * 0.0024;
+  const hrChance = clampProb((0.11 + (effPower - 60) * 0.0038) * hrMult, 0.01, 0.42);
+  const tripleChance = clampProb(0.045 + (batter.ratings.speed - 65) * 0.002 + gapBonus * 0.4, 0.015, 0.12);
+  const doubleChance = clampProb(
+    0.22 + (effPower - 60) * 0.0018 + gapBonus + (battedBallType === 'line_drive' ? 0.08 : 0),
+    0.12,
+    0.38,
+  );
   const roll = rng.next();
   const ofSpot = rng.pick(OUTFIELD_SPOTS);
 
@@ -177,6 +187,7 @@ function resolveHitType(
       outcome: 'home_run',
       totalBases: 4,
       outsAdded: 0,
+      battedBallType: 'fly_ball',
       commentary: `MOONSHOT! ${batter.name} blasts one out to deep ${ofSpot.pos}!`,
       soundCue: 'bomb_crack',
       ballFlight: {
@@ -200,6 +211,7 @@ function resolveHitType(
       outcome: 'triple',
       totalBases: 3,
       outsAdded: 0,
+      battedBallType,
       commentary: `Off the wall! ${batter.name} motors all the way to third!`,
       soundCue: 'bat_crack',
       ballFlight: {
@@ -218,6 +230,7 @@ function resolveHitType(
       outcome: 'double',
       totalBases: 2,
       outsAdded: 0,
+      battedBallType,
       commentary: `${batter.name} laces a gap double!`,
       soundCue: 'bat_crack',
       ballFlight: {
@@ -235,6 +248,7 @@ function resolveHitType(
     outcome: 'single',
     totalBases: 1,
     outsAdded: 0,
+    battedBallType,
     commentary: `${batter.name} pokes a clean base hit into the outfield!`,
     soundCue: 'bat_crack',
     ballFlight: {
@@ -247,37 +261,77 @@ function resolveHitType(
   };
 }
 
+interface SimpleOutPreset {
+  outcome: AtBatOutcome;
+  suffix: string;
+  outfield: boolean;
+  apexY: number;
+  durationSec: number;
+  anim: 'field_run' | 'field_dive';
+}
+
+const SIMPLE_OUT_PRESETS: Readonly<Record<BattedBallType, SimpleOutPreset>> = {
+  pop_up: {
+    outcome: 'fly_out',
+    suffix: 'skies a shallow pop-up in the infield.',
+    outfield: false,
+    apexY: 14,
+    durationSec: 1.25,
+    anim: 'field_run',
+  },
+  fly_ball: {
+    outcome: 'fly_out',
+    suffix: 'lifts a routine fly ball for an out.',
+    outfield: true,
+    apexY: 10,
+    durationSec: 1.25,
+    anim: 'field_run',
+  },
+  line_drive: {
+    outcome: 'line_out',
+    suffix: 'rockets a line drive right into a glove!',
+    outfield: false,
+    apexY: 2.3,
+    durationSec: 0.78,
+    anim: 'field_dive',
+  },
+  ground_ball: {
+    outcome: 'ground_out',
+    suffix: 'grounds out cleanly.',
+    outfield: false,
+    apexY: 2.3,
+    durationSec: 0.78,
+    anim: 'field_run',
+  },
+};
+
 function buildSimpleOut(
   rng: SeededRng,
   batter: Player,
   defender: Player,
+  battedBallType: BattedBallType,
 ): PitchResolution {
-  const outTypes: readonly { outcome: AtBatOutcome; text: string; anim: 'field_run' | 'field_dive' }[] = [
-    { outcome: 'ground_out', text: `${batter.name} grounds out cleanly.`, anim: 'field_run' },
-    { outcome: 'fly_out', text: `${batter.name} lifts a routine fly ball for an out.`, anim: 'field_run' },
-    { outcome: 'line_out', text: `${batter.name} rockets a line drive right into a glove!`, anim: 'field_dive' },
-  ];
-  const chosen = rng.pick(outTypes);
-  const isFly = chosen.outcome === 'fly_out';
-  const spot = isFly ? rng.pick(OUTFIELD_SPOTS) : rng.pick(INFIELD_SPOTS);
+  const preset = SIMPLE_OUT_PRESETS[battedBallType];
+  const spot = preset.outfield ? rng.pick(OUTFIELD_SPOTS) : rng.pick(INFIELD_SPOTS);
   return {
     kind: 'plate_complete',
-    outcome: chosen.outcome,
+    outcome: preset.outcome,
     outsAdded: 1,
     advanceOnOut: 'none',
-    commentary: chosen.text,
+    battedBallType,
+    commentary: `${batter.name} ${preset.suffix}`,
     soundCue: 'glove_pop',
     ballFlight: {
       style: 'line_drive',
       landingX: spot.x,
       landingZ: spot.z,
-      apexY: isFly ? 10 : 2.3,
-      durationSec: isFly ? 1.25 : 0.78,
+      apexY: preset.apexY,
+      durationSec: preset.durationSec,
     },
     fieldingHighlight: {
       fielderId: defender.id,
       fielderPos: spot.pos,
-      anim: chosen.anim,
+      anim: preset.anim,
     },
   };
 }
@@ -290,6 +344,7 @@ function resolveOutOrError(
   defender: Player,
   defenderPos: Exclude<FieldPosition, 'SP' | 'RP'>,
   luckErrorMultiplier: number,
+  battedBallType: BattedBallType,
 ): PitchResolution {
   const posEval = evaluatePositionAssignment(defender, defenderPos);
   const effectiveFielding = defender.ratings.fielding + posEval.fieldingDelta;
@@ -305,6 +360,7 @@ function resolveOutOrError(
       outcome: 'fielding_error',
       totalBases: 1,
       outsAdded: 0,
+      battedBallType,
       commentary: `Booted it! ${batter.name} reaches on an infield error.`,
       soundCue: 'spring_boing',
       ballFlight: { style: 'line_drive', landingX: inf.x, landingZ: inf.z, apexY: 2.0, durationSec: 0.8 },
@@ -312,13 +368,15 @@ function resolveOutOrError(
     };
   }
 
-  if (outs < 2 && bases[0] !== null && rng.chance(0.24)) {
+  const dpChance = battedBallType === 'ground_ball' ? 0.36 : 0.1;
+  if (outs < 2 && bases[0] !== null && rng.chance(dpChance)) {
     const dpSpot = rng.pick(INFIELD_SPOTS);
     return {
       kind: 'plate_complete',
       outcome: 'double_play',
       outsAdded: 2,
       advanceOnOut: 'double_play',
+      battedBallType: 'ground_ball',
       commentary: `Around the horn! ${batter.name} grounds into a 6-4-3 double play.`,
       soundCue: 'glove_pop',
       ballFlight: { style: 'line_drive', landingX: dpSpot.x, landingZ: dpSpot.z, apexY: 1.8, durationSec: 0.78 },
@@ -326,13 +384,16 @@ function resolveOutOrError(
     };
   }
 
-  if (outs < 2 && bases[2] !== null && rng.chance(0.24)) {
+  const armSuppress = (defender.ratings.arm - 65) * 0.0025;
+  const sacChance = battedBallType === 'fly_ball' ? clampProb(0.34 - armSuppress, 0.14, 0.48) : 0.08;
+  if (outs < 2 && bases[2] !== null && rng.chance(sacChance)) {
     const ofSpot = rng.pick(OUTFIELD_SPOTS);
     return {
       kind: 'plate_complete',
       outcome: 'sac_fly',
       outsAdded: 1,
       advanceOnOut: 'sac_fly',
+      battedBallType: 'fly_ball',
       commentary: `Deep fly ball — caught, and the runner tags from third on a sac fly!`,
       soundCue: 'glove_pop',
       ballFlight: { style: 'line_drive', landingX: ofSpot.x, landingZ: ofSpot.z, apexY: 11.5, durationSec: 1.4 },
@@ -340,7 +401,7 @@ function resolveOutOrError(
     };
   }
 
-  return buildSimpleOut(rng, batter, defender);
+  return buildSimpleOut(rng, batter, defender, battedBallType);
 }
 
 export interface PitchResolverContext {
@@ -368,6 +429,13 @@ export interface PitchResolverContext {
   requestedPitchType?: PitchType;
 }
 
+const BATTED_BALL_BABIP_SHIFT: Readonly<Record<BattedBallType, number>> = {
+  line_drive: 0.16,
+  ground_ball: -0.02,
+  fly_ball: -0.03,
+  pop_up: -0.22,
+};
+
 function resolveContactResult(
   ctx: PitchResolverContext,
   effContact: number,
@@ -376,14 +444,27 @@ function resolveContactResult(
   firstBaseStepBonus: number,
   luckHitShift: number,
   defenderLuckErrMult: number,
+  pitchType: PitchType,
 ): PitchResolution {
+  const battedBallType = sampleBattedBallType(
+    ctx.rng,
+    ctx.batter.battedBallProfile,
+    ctx.pitcher.battedBallProfile,
+    pitchType,
+  );
+  const rangeSuppress = (ctx.defender.ratings.range - 62) * 0.0018;
   const hitProb = clampProb(
-    0.295 + (effContact - effStuff) * 0.0044 + firstBaseStepBonus * 0.008 + luckHitShift,
-    0.16,
-    0.50,
+    0.295 +
+      (effContact - effStuff) * 0.0044 +
+      firstBaseStepBonus * 0.008 +
+      luckHitShift +
+      BATTED_BALL_BABIP_SHIFT[battedBallType] -
+      rangeSuppress,
+    0.04,
+    0.66,
   );
   if (ctx.rng.chance(hitProb)) {
-    const hit = resolveHitType(ctx.rng, ctx.batter, effPower, ctx.defender);
+    const hit = resolveHitType(ctx.rng, ctx.batter, effPower, ctx.defender, battedBallType);
     if (ctx.canBatterTriggerSpecial) {
       hit.specialPowerTriggered = buildHeritagePowerTrigger(ctx.batter, 'batter');
     }
@@ -397,6 +478,7 @@ function resolveContactResult(
     ctx.defender,
     ctx.defenderPos,
     defenderLuckErrMult,
+    battedBallType,
   );
 }
 
@@ -442,6 +524,7 @@ function evaluateSwingResult(
   firstBaseStepBonus: number,
   luckHitShift: number,
   defenderLuckErrMult: number,
+  pitchType: PitchType,
 ): PitchResolution {
   const contactProb = inZone
     ? clampProb(0.76 + (effContact - effStuff) * 0.0048, 0.48, 0.94)
@@ -474,6 +557,7 @@ function evaluateSwingResult(
     firstBaseStepBonus,
     luckHitShift,
     defenderLuckErrMult,
+    pitchType,
   );
 }
 
@@ -614,6 +698,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
         platoon.firstBaseStepBonus,
         luckHitShift,
         defenderMental.luckErrorMultiplier,
+        pitchType,
       );
 
   return attachPitchTelemetry(rawResult, pitchMatchup);
