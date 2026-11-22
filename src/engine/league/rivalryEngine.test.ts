@@ -57,5 +57,17 @@ describe('Dynamic Team Rivalries Engine & Showdowns (TASK-028)', () => {
 
     const afterWin = updateTravelingRivalryCup(records, home.id, rival.id, home.id);
     expect(afterWin[0].cupHolderClubId).toBe(home.id);
+    expect(buildRivalryShowdownPreview(home, rival, afterWin[0]).cupHolderName).toContain('Sandlot');
+    const afterLoss = updateTravelingRivalryCup(afterWin, home.id, rival.id, rival.id);
+    expect(buildRivalryShowdownPreview(home, rival, afterLoss[0]).cupHolderName).toContain('Bayou');
+
+    // All heat tiers + brand-new rivalry creation without a starter record
+    expect(evaluateRivalryShowdownModifiers(5).tier).toBe('neutral');
+    expect(evaluateRivalryShowdownModifiers(20).tier).toBe('simmering');
+    expect(evaluateRivalryShowdownModifiers(35).tier).toBe('heated');
+    expect(evaluateRivalryShowdownModifiers(65).tier).toBe('fierce');
+    const brandNew = recordRivalrySpark([], 'club-z', 'club-a', 'mascot_prank', 'Mascot heist!');
+    expect(brandNew).toHaveLength(1);
+    expect(buildRivalryShowdownPreview(home, rival, { ...brandNew[0], heat: 60 }).vsBannerTitle).toMatch(/FIERCE/i);
   });
 });

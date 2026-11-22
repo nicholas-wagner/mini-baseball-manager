@@ -126,5 +126,31 @@ describe('Practice & Training Complex (TASK-022) & Manager RPG Tree (TASK-023)',
     );
     expect(secondUse.used).toBe(false);
     expect(secondUse.reason).toMatch(/already used/i);
+
+    // Exercise additional Manager Skipper powers & guardrails
+    const allPowersMgr = {
+      ...mgr,
+      skillPoints: 0,
+      activePowerIds: [
+        'pep_talk',
+        'mound_whisper',
+        'clutch_focus',
+        'rally_cap',
+        'bullpen_freeze',
+      ] as typeof mgr.activePowerIds,
+    };
+    expect(unlockManagerSkillNode(allPowersMgr, 'unknown_node').unlocked).toBe(false);
+    expect(unlockManagerSkillNode(allPowersMgr, 'skipper_pep_talk').unlocked).toBe(false);
+    expect(unlockManagerSkillNode(allPowersMgr, 'coach_film_room').unlocked).toBe(false);
+
+    const pep = triggerInGameManagerPower(createInGameManagerPowerTracker(), allPowersMgr, 'pep_talk', session, 'home');
+    expect(pep.used).toBe(true);
+    const focus = triggerInGameManagerPower(pep.tracker, allPowersMgr, 'clutch_focus', pep.session, 'home');
+    expect(focus.used).toBe(true);
+    const rally = triggerInGameManagerPower(focus.tracker, allPowersMgr, 'rally_cap', focus.session, 'home');
+    expect(rally.used).toBe(true);
+    const freeze = triggerInGameManagerPower(rally.tracker, allPowersMgr, 'bullpen_freeze', rally.session, 'home');
+    expect(freeze.used).toBe(true);
+    expect(freeze.session.away.hypeGauge).toBeLessThan(session.away.hypeGauge);
   });
 });

@@ -13,6 +13,7 @@ import {
   PROMO_NIGHT_CATALOG,
 } from './ledger';
 import {
+  getAvailableSponsors,
   getAvailableTvContracts,
   PARODY_SPONSORS_CATALOG,
   signParodySponsor,
@@ -53,6 +54,8 @@ describe('Milestone 5 — Sim-City Ballpark Economy, Sponsors/TV & District Grid
   it('computes Sim-City fan pricing mood faces, Promo Night boosts & Series P&L Ledger (TASK-030)', () => {
     expect(PROMO_NIGHT_CATALOG.length).toBeGreaterThanOrEqual(4);
     expect(evaluateFanPricingMood(8, 'rookie').mood).toBe('ecstatic');
+    expect(evaluateFanPricingMood(10, 'rookie').mood).toBe('happy');
+    expect(evaluateFanPricingMood(12, 'rookie').mood).toBe('grumpy');
     expect(evaluateFanPricingMood(36, 'rookie').mood).toBe('furious');
 
     const club = createClub(createSeededRng(3001), {
@@ -104,9 +107,14 @@ describe('Milestone 5 — Sim-City Ballpark Economy, Sponsors/TV & District Grid
     expect(blockedTv.signed).toBe(false);
 
     const sponsor = PARODY_SPONSORS_CATALOG[0];
+    expect(getAvailableSponsors('rookie').length).toBeGreaterThanOrEqual(2);
     const signedSpon = signParodySponsor(signedTv.club, sponsor.id);
     expect(signedSpon.signed).toBe(true);
     expect(signedSpon.club.economy.activeSponsorIds).toContain(sponsor.id);
+    expect(signParodySponsor(signedSpon.club, sponsor.id).signed).toBe(false);
+    expect(signParodySponsor(signedSpon.club, 'mega_chrome_cards').signed).toBe(false);
+    expect(signParodySponsor(signedSpon.club, 'unknown_id').signed).toBe(false);
+    expect(signTvContract(signedSpon.club, 'unknown_tv').signed).toBe(false);
   });
 
   it('builds Sim-City Ballpark District buildings with adjacency synergies and upkeep (TASK-032)', () => {
@@ -123,7 +131,14 @@ describe('Milestone 5 — Sim-City Ballpark Economy, Sponsors/TV & District Grid
 
     const b1 = buildDistrictBuilding(baseClub, 'north-1', 'nacho_cantina');
     expect(b1.built).toBe(true);
-    const b2 = buildDistrictBuilding(b1.club, 'north-2', 'bobblehead_megastore');
+    const b1Up2 = buildDistrictBuilding(b1.club, 'north-1', 'nacho_cantina');
+    expect(b1Up2.built).toBe(true);
+    const b1Up3 = buildDistrictBuilding(b1Up2.club, 'north-1', 'nacho_cantina');
+    expect(b1Up3.built).toBe(true);
+    expect(buildDistrictBuilding(b1Up3.club, 'north-1', 'nacho_cantina').built).toBe(false);
+    expect(buildDistrictBuilding({ ...b1.club, economy: { ...b1.club.economy, cash: 50 } }, 'east-1', 'broadcast_tower').built).toBe(false);
+    expect(buildDistrictBuilding(b1.club, 'bad-slot', 'nacho_cantina').built).toBe(false);
+    const b2 = buildDistrictBuilding(b1Up3.club, 'north-2', 'bobblehead_megastore');
     expect(b2.built).toBe(true);
 
     const bonuses = evaluateDistrictBonuses(b2.club.stadium.districtTiles);

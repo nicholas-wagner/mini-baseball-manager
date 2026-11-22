@@ -94,9 +94,12 @@ describe('Milestone 7 Front Office (TASK-039, TASK-040, TASK-042) + Dynamic Weat
     const stashed = stashProspectInAcademy(club, prospect);
     expect(stashed.stashed).toBe(true);
     expect(stashed.club.academyProspects).toHaveLength(1);
+    expect(stashProspectInAcademy(stashed.club, prospect).stashed).toBe(false);
+    expect(callUpAcademyProspect(stashed.club, 'missing-id').calledUp).toBe(false);
 
     const trained = runAcademyPassiveDevelopment(rng, stashed.club);
     expect(trained.club.academyProspects[0].xp).toBeGreaterThan(prospect.xp);
+    expect(runAcademyPassiveDevelopment(rng, club).developedCount).toBe(0);
 
     const calledUp = callUpAcademyProspect(trained.club, prospect.id);
     expect(calledUp.calledUp).toBe(true);
@@ -125,11 +128,22 @@ describe('Milestone 7 Front Office (TASK-039, TASK-040, TASK-042) + Dynamic Weat
     expect(issue.headline.length).toBeGreaterThan(10);
     expect(issue.subhead.length).toBeGreaterThan(10);
     expect(issue.spotlightPlayerId).toBeTruthy();
+    expect(generateSandlotGazetteIssue({ seasonNumber: 2, seriesIndex: 5, humanClub: { ...club, streak: 5 } }).headline).toMatch(/RED-HOT/i);
+    expect(generateSandlotGazetteIssue({ seasonNumber: 2, seriesIndex: 6, humanClub: { ...club, streak: -5 }, tradeHeadline: 'Blockbuster deal!' }).headline).toMatch(/SLUMP/i);
+    expect(generateSandlotGazetteIssue({ seasonNumber: 2, seriesIndex: 7, humanClub: { ...club, streak: 0 } }).headline).toMatch(/RACE/i);
 
-    // Indoor dome always stays clear & windless; outdoor parks roll wind/sunset/night/drizzle
+    // Indoor dome always stays clear & windless; outdoor parks roll varied weather conditions
     const domeWeather = rollGameDayWeather(rng, { isDome: true, hasNightLights: true });
     expect(domeWeather.condition).toBe('dome_controlled');
     expect(domeWeather.windMph).toBe(0);
+    expect(evaluateWeatherSimulationImpact(domeWeather).hudLabel).toMatch(/Indoor Dome/i);
+
+    const seenConditions = new Set<string>();
+    for (let i = 0; i < 60; i += 1) {
+      const w = rollGameDayWeather(rng, { isDome: false, hasNightLights: true });
+      seenConditions.add(w.condition);
+    }
+    expect(seenConditions.size).toBeGreaterThanOrEqual(4);
 
     const windOutImpact = evaluateWeatherSimulationImpact({
       condition: 'sunny',

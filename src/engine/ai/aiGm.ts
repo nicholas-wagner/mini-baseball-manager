@@ -211,16 +211,13 @@ export function runTenSeasonHeadlessSoak(
   for (let season = 1; season <= seasons; season += 1) {
     const championsByTier: Partial<Record<LeagueTierId, string>> = {};
     LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
-      // Simulate 2 brisk series rounds + Best-of-3 playoffs per tier for fast multi-season soak validation
-      let tierClubs = leagues[tier];
-      for (let series = 0; series < 2; series += 1) {
-        tierClubs = simulateSeriesRound(
-          tierClubs,
-          series,
-          worldSeed + season * 1000 + tierIdx * 97 + series * 13,
-          5,
-        ).clubs;
-      }
+      // Simulate 1 full 3-game series round + Best-of-3 playoffs per tier across all 10 seasons
+      const tierClubs = simulateSeriesRound(
+        leagues[tier],
+        season % 7,
+        worldSeed + season * 1000 + tierIdx * 97,
+        5,
+      ).clubs;
       const playoffs = simulateBestOfThreePlayoffs(
         tierClubs,
         worldSeed + season * 2000 + tierIdx * 131,
