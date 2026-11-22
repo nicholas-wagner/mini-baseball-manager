@@ -359,6 +359,23 @@ export interface Player {
       - **Mostly Female + Key Male Splash (`1–3` male players)**: *Thunder Anchor* — injects middle-of-the-order HR threat & triple-digit gas into a precision small-ball machine.
       - **All-Male (`100%` male)**: *Bash-Bro Chaos* — extreme HR/velo & hype bursts (`+3 Power/+3 Velocity` identity), intentionally missing composure/discipline/glove consistency (`-3 Eye/-3 Control`).
       - **All-Female (`100%` female)**: *Precision Swarm* — relentless contact, spin, speed & iron defense (`+3 Contact/+3 Movement/+3 Fielding` identity), intentionally missing easy HR/100-mph thunder (`-3 Power/-3 Velocity`).
+- **Full Realistic Multi-Season Career Arc (`TASK-041`)**:
+  - Every player follows a genuine baseball aging trajectory across seasons:
+    - **Rookie & Development (`18–24`)**: Ratings grow briskly toward `statCaps` (`1.05x–1.35x` XP & offseason skill jumps), building raw physical tools while still green in `CareerServiceProfile`.
+    - **Prime Peak (`25–30`)**: Physical tools peak near ceilings while `seasoned` savvy kicks in.
+    - **Crafty Veteran (`31–34`)**: Raw speed/velocity hold or tick down gently (`-0..-1/yr`), offset by peak `cagey_veteran` Eye/Control/high-LI composure and rookie mentorship aura.
+    - **Late-Career Decline (`35+`)**: Physical ratings gradually diminish each offseason (`Speed`, `Velocity`, `Range`, `Stamina`, `Power` drop `-1..-4/yr` based on age & durability) while `Eye`, `Control`, and `Clutch` fade much more slowly — creating authentic GM trade-offs on when to re-sign, transition to DH/RP, or watch them retire (eligible for Club HOF & hireable Coach pool!).
+- **Toggleable Athletic Injuries & Illnesses Engine (`TASK-067`)**:
+  - **New-Game Settings Toggles**: Independent `enableInjuries: boolean` and `enableIllnesses: boolean` switches in Club Creator (`UserSaveSettings`) so players can disable either or both at game start.
+  - **Low-Frequency, Fun-First Tuning**: Base occurrence probabilities are intentionally low so players are **not** constantly hurt or sick; health events add occasional realistic roster storylines and bullpen/bench depth tests without ruining the arcade fun.
+  - **Content Guardrails & Sex-Specific Support**: **Zero fatalities / deaths** and **zero STDs**; extensible declarative catalog (`src/engine/health/conditionsCatalog.ts`) supports `applicableTo: 'all' | 'male' | 'female'` (matched to `traits.playerLook`) and 4 rarity tiers (`common`, `uncommon`, `rare`, `ultra_rare`) so new rare injuries/illnesses can be added effortlessly.
+  - **Play-Through vs. Mandatory IL & Duration Tiers**:
+    - `canPlayThrough: true` (e.g., leg cramp, blister, jammed finger, mild cold, seasonal allergies, yeast infection, mild migraine): playable with condition-specific stat reductions (e.g. leg cramp `-12 Speed / -8 Range`, yeast infection `-5 Stamina / -4 Focus`) + slightly slower healing, or rest to recover faster.
+    - `canPlayThrough: false` (e.g., broken arm, fractured wrist, concussion, UCL tear, ACL tear, appendicitis, pneumonia, mononucleosis, ultra-rare early-detected breast/testicular cancer treatment & full comeback recovery): forces player onto the **Injured List (IL)** — impossible to play through!
+    - Severity bands: `day_to_day` (`1–2` games), `short_il` (`3–6` games), `long_il` (`7–14` games), `season_ending` (rest of season), and rare `career_ending_risk` (primarily weighted to aged veterans `34+` suffering catastrophic tears).
+- **Hireable Specialty Team Doctors & Head Athletic Trainers (`TASK-068`)**:
+  - **Team Doctor (`TeamDoctor`, Quality Tier `1–5`)**: Higher-budget MDs accelerate recovery (`-15%..-55%` healing time on specialty matches), cut relapse/aggravation risk, and help prevent illness outbreaks. Specialties: `orthopedic_arm` (elbow/shoulder/wrist), `orthopedic_legs` (hamstring/ankle/knee/groin), `concussion_neuro` (concussions/migraines), `internal_medicine` (flu/mono/pneumonia/GI), `womens_sports_medicine` (female-specific prevention & care), and `oncology_complex_care` (rare/ultra-rare recovery & veteran comeback).
+  - **Head Athletic Trainer (`AthleticTrainer`, Quality Tier `1–5`)**: Higher-budget trainers actively prevent injuries/illnesses before they happen and preserve long-term career durability! Specialties: `arm_care_velo` (pitcher arm health & endurance), `soft_tissue_mobility` (cramps/strains/hamstrings), `strength_durability` (smaller play-through penalties & slower `35+` aging decline), `recovery_nutrition` (faster fatigue recovery & immune boost), and `rehab_conditioning` (protects ratings after long IL stints).
 
 ### 2.2 Club, Lineup & Stadium District (`src/engine/models/club.ts`)
 
