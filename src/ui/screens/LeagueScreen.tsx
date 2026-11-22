@@ -24,12 +24,14 @@ import {
 import {
   computePlayerOverall,
   MARKET_TIER_LABELS,
+  type Player,
 } from '../../engine/models/player';
 import { formatRate3 } from '../../engine/simulation/sabermetrics';
 import { hireHumanRetiredLegendCoach } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
 import { AwardsAndHofPanel } from '../components/AwardsAndHofPanel';
+import { PlayerDossierModal } from '../components/PlayerDossierModal';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
@@ -123,6 +125,10 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
   const [selectedTier, setSelectedTier] = useState<LeagueTierId | null>(null);
   const [leagueNotice, setLeagueNotice] = useState<string | null>(null);
   const [simSeedNonce, setSimSeedNonce] = useState(1);
+  const [inspectedLeader, setInspectedLeader] = useState<{
+    player: Player;
+    clubName: string;
+  } | null>(null);
 
   if (!humanClub) return null;
 
@@ -618,21 +624,57 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
               <div className="font-display text-xs text-[#181B2C]">Home Run Leaders</div>
-              {leaders.homeRuns.slice(0, 3).map((entry) => (
-                <div key={entry.playerId} className="flex justify-between text-xs font-bold">
-                  <span className="truncate">{entry.playerName}</span>
-                  <span className="font-mono-tabular text-[#1B4332]">{entry.value} HR</span>
-                </div>
-              ))}
+              {leaders.homeRuns.slice(0, 3).map((entry) => {
+                const ownerClub = tierClubs.find((c) => c.roster.some((p) => p.id === entry.playerId));
+                const matchPlayer = ownerClub?.roster.find((p) => p.id === entry.playerId);
+                return (
+                  <button
+                    key={entry.playerId}
+                    type="button"
+                    aria-label={`Inspect leader ${entry.playerName}`}
+                    onClick={() => {
+                      if (matchPlayer) {
+                        setInspectedLeader({
+                          player: matchPlayer,
+                          clubName: ownerClub ? `${ownerClub.city} ${ownerClub.name}` : 'League Club',
+                        });
+                        soundEngine.play('ui_pop');
+                      }
+                    }}
+                    className="w-full flex justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
+                  >
+                    <span className="truncate">{entry.playerName}</span>
+                    <span className="font-mono-tabular text-[#1B4332]">{entry.value} HR</span>
+                  </button>
+                );
+              })}
             </div>
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
               <div className="font-display text-xs text-[#181B2C]">Strikeout Leaders</div>
-              {leaders.strikeouts.slice(0, 3).map((entry) => (
-                <div key={entry.playerId} className="flex justify-between text-xs font-bold">
-                  <span className="truncate">{entry.playerName}</span>
-                  <span className="font-mono-tabular text-[#1D3557]">{entry.value} K</span>
-                </div>
-              ))}
+              {leaders.strikeouts.slice(0, 3).map((entry) => {
+                const ownerClub = tierClubs.find((c) => c.roster.some((p) => p.id === entry.playerId));
+                const matchPlayer = ownerClub?.roster.find((p) => p.id === entry.playerId);
+                return (
+                  <button
+                    key={entry.playerId}
+                    type="button"
+                    aria-label={`Inspect leader ${entry.playerName}`}
+                    onClick={() => {
+                      if (matchPlayer) {
+                        setInspectedLeader({
+                          player: matchPlayer,
+                          clubName: ownerClub ? `${ownerClub.city} ${ownerClub.name}` : 'League Club',
+                        });
+                        soundEngine.play('ui_pop');
+                      }
+                    }}
+                    className="w-full flex justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
+                  >
+                    <span className="truncate">{entry.playerName}</span>
+                    <span className="font-mono-tabular text-[#1D3557]">{entry.value} K</span>
+                  </button>
+                );
+              })}
             </div>
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
               <div className="font-display text-xs text-[#181B2C]">Last Offseason Moves</div>
@@ -669,6 +711,12 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
           />
         </div>
       </ComicCard>
+
+      <PlayerDossierModal
+        player={inspectedLeader?.player ?? null}
+        clubName={inspectedLeader?.clubName}
+        onClose={() => setInspectedLeader(null)}
+      />
     </div>
   );
 }

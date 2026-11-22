@@ -9,6 +9,7 @@ import { getActiveHealthRatingPenalties } from '../health/healthEngine';
 import type {
   AtBatOutcome,
   PlayEvent,
+  PlayMathBreakdown,
   PlaySoundCue,
   TacticalCall,
 } from '../models/playEvent';
@@ -60,6 +61,24 @@ import {
   type StealPlayType,
 } from './baserunning';
 import { sampleBattedBallType } from './sabermetrics';
+import type { WeatherSimulationImpact } from './weather';
+import {
+  DEFENSIVE_SHIFTS,
+  type DefensiveShiftId,
+  type DefensiveShiftMeta,
+} from './winProbability';
+
+const SHIFTS_BY_ID: Readonly<Record<DefensiveShiftId, DefensiveShiftMeta>> = Object.fromEntries(
+  DEFENSIVE_SHIFTS.map((s) => [s.id, s]),
+) as Record<DefensiveShiftId, DefensiveShiftMeta>;
+
+const NEUTRAL_WEATHER: WeatherSimulationImpact = {
+  hrCarryMultiplier: 1,
+  pitcherControlPenalty: 0,
+  fielderErrorMultiplier: 1,
+  skyColorHex: '#8ECAE6',
+  hudLabel: 'Clear',
+};
 
 export interface PitchResolution {
   kind: 'pitch_event' | 'plate_complete' | 'steal_attempt';
@@ -76,6 +95,7 @@ export interface PitchResolution {
   fieldingHighlight?: PlayEvent['fieldingHighlight'];
   specialPowerTriggered?: PlayEvent['specialPowerTriggered'];
   pitchThrown?: PlayEvent['pitchThrown'];
+  mathBreakdown?: PlayMathBreakdown;
   battedBallType?: BattedBallType;
 }
 
@@ -191,11 +211,17 @@ function resolveBuntAttempt(
   firstBaseBonus: number,
   sideX: number,
   extraBuntBonus = 0,
+  shiftBuntOutBonus = 0,
 ): PitchResolution {
   const buntScore =
     batter.ratings.bunt + extraBuntBonus + firstBaseBonus * 2 - pitcher.ratings.fielding * 0.25;
-  const hitProb = clampProb(0.24 + (buntScore - 55) * 0.006, 0.14, 0.72);
-  const isSingle = rng.chance(hitProb);
+  const hitProb = clampProb(
+    0.24 + (buntScore - 55) * 0.006 - shiftBuntOutBonus,
+    0.08,
+    0.72,
+  );
+  const roll = rng.next();
+  const isSingle = roll < hitProb;
 
   return {
     kind: 'plate_complete',
@@ -213,6 +239,16 @@ function resolveBuntAttempt(
       landingZ: -6.4,
       apexY: 1.3,
       durationSec: 1.0,
+    },
+    mathBreakdown: {
+      effContact: Math.round(buntScore),
+      effPower: Math.round(batter.ratings.power),
+      effStuff: Math.round(pitcher.ratings.fielding),
+      effControl: Math.round(pitcher.ratings.control),
+      zonePct: 100,
+      hitPct: Math.round(hitProb * 100),
+      diceRoll: Math.max(1, Math.min(100, Math.ceil(roll * 100))),
+      activeModifiers: shiftBuntOutBonus > 0 ? ['Shift: Bunt Def'] : ['Bunt Play'],
     },
   };
 }
@@ -444,7 +480,8 @@ function resolveOutOrError(
     posEval.errorMultiplier *
     luckErrorMultiplier *
     powers.defenderHeritage.errorMultiplier *
-    powers.defenderCaps.errorMultiplier;
+    powers.defenderCaps.errorMultiplier *
+    powers.weather.fielderErrorMultiplier;
   const errorProb = clampProb(
     (0.055 - (effectiveFielding - 60) * 0.0006) * errScale,
     0.006,
@@ -537,6 +574,8 @@ export interface PitchResolverContext {
   battingChemistryBonuses?: ClubhouseChemistryReport['totalTeamRatingBonus'];
   fieldingChemistryBonuses?: ClubhouseChemistryReport['totalTeamRatingBonus'];
   ballparkId?: BallparkPresetId;
+  defensiveShift?: DefensiveShiftId;
+  weatherImpact?: WeatherSimulationImpact;
   battingPlayersById?: Readonly<Record<string, Player>>;
   catcherPopTimeBonus?: number;
   stealDefenseCall?: StealDefenseCall;
@@ -623,6 +662,8 @@ interface PowerBundle {
   fieldingStaff: ClubStaffBonuses;
   battingChem: ClubhouseChemistryReport['totalTeamRatingBonus'];
   fieldingChem: ClubhouseChemistryReport['totalTeamRatingBonus'];
+  shift: DefensiveShiftMeta;
+  weather: WeatherSimulationImpact;
   batterSurge: ActivePowerSurge | null;
   pitcherSurge: ActivePowerSurge | null;
 }
@@ -655,7 +696,7 @@ function resolveContactResult(
   const effGapPower = ctx.batter.ratings.gapPower + powers.batterRelics.gapPower;
   const gbSpeedBonus =
     battedBallType === 'ground_ball'
-      ? parkFx.groundballHitBonus + (effSpeed - 60) * 0.0022
+      ? parkFx.groundballHitBonus + (effSpeed - 60) * 0.0022 - powers.shift.groundballOutBonus
       : 0;
   const bSurge = powers.batterSurge ?? ZERO_ACTIVE_SURGE_NUMBERS;
   const defenderRange =
@@ -679,11 +720,14 @@ function resolveContactResult(
   if (ctx.rng.chance(hitProb)) {
     const hrMult =
       parkFx.hrMultiplier *
+      powers.weather.hrCarryMultiplier *
       powers.batterHeritage.hrCarryMultiplier *
       powers.batterCaps.hrCarryMultiplier *
       bSurge.hrCarryMultiplier;
+    const shiftXbhScale = Math.max(0.55, 1 - powers.shift.xbhSuppressBonus * 3.0);
     const xbhMult =
       parkFx.xbhMultiplier *
+      shiftXbhScale *
       powers.batterHeritage.xbhStretchMultiplier *
       bSurge.xbhStretchMultiplier;
     const rawHit = resolveHitType(
@@ -866,48 +910,53 @@ function computeCoEdPitchDeltas(ctx: PitchResolverContext, pitchType: PitchType)
   };
 }
 
+function resolveRequestedPowerSurges(ctx: PitchResolverContext): {
+  batterSurge: ActivePowerSurge | null;
+  pitcherSurge: ActivePowerSurge | null;
+} {
+  if (!ctx.requestedPowerId) {
+    return { batterSurge: null, pitcherSurge: null };
+  }
+  const batOpts = getActivatablePowersForPlayer(ctx.batter, 'batter');
+  if (ctx.canBatterTriggerSpecial && batOpts.some((p) => p.id === ctx.requestedPowerId)) {
+    return {
+      batterSurge: evaluateActivePowerSurge(ctx.requestedPowerId, 'batter', ctx.batter),
+      pitcherSurge: null,
+    };
+  }
+  const pitOpts = getActivatablePowersForPlayer(ctx.pitcher, 'pitcher');
+  if (ctx.canPitcherTriggerSpecial && pitOpts.some((p) => p.id === ctx.requestedPowerId)) {
+    return {
+      batterSurge: null,
+      pitcherSurge: evaluateActivePowerSurge(ctx.requestedPowerId, 'pitcher', ctx.pitcher),
+    };
+  }
+  return { batterSurge: null, pitcherSurge: null };
+}
+
 function buildPowerBundle(ctx: PitchResolverContext): PowerBundle {
   const battingStaff = ctx.battingStaffBonuses ?? ZERO_STAFF;
   const fieldingStaff = ctx.fieldingStaffBonuses ?? ZERO_STAFF;
   const battingChem = ctx.battingChemistryBonuses ?? ZERO_CHEM;
   const fieldingChem = ctx.fieldingChemistryBonuses ?? ZERO_CHEM;
-  const batterHeritage = evaluateHeritageGameplayProfile(ctx.batter, ctx.leverageIndex);
-  const pitcherHeritage = evaluateHeritageGameplayProfile(ctx.pitcher, ctx.leverageIndex);
-  const defenderHeritage = evaluateHeritageGameplayProfile(ctx.defender, ctx.leverageIndex);
-  const batterCaps = evaluateCapstoneGameplayProfile(ctx.batter, ctx.leverageIndex);
-  const pitcherCaps = evaluateCapstoneGameplayProfile(ctx.pitcher, ctx.leverageIndex);
-  const defenderCaps = evaluateCapstoneGameplayProfile(ctx.defender, ctx.leverageIndex);
-  const batterRelics = evaluatePlayerRelicBonuses(ctx.batter, battingStaff.relicBonusMultiplier);
-  const pitcherRelics = evaluatePlayerRelicBonuses(ctx.pitcher, fieldingStaff.relicBonusMultiplier);
-  const defenderRelics = evaluatePlayerRelicBonuses(ctx.defender, fieldingStaff.relicBonusMultiplier);
-
-  let batterSurge: ActivePowerSurge | null = null;
-  let pitcherSurge: ActivePowerSurge | null = null;
-
-  if (ctx.requestedPowerId) {
-    const batOpts = getActivatablePowersForPlayer(ctx.batter, 'batter');
-    const pitOpts = getActivatablePowersForPlayer(ctx.pitcher, 'pitcher');
-    if (ctx.canBatterTriggerSpecial && batOpts.some((p) => p.id === ctx.requestedPowerId)) {
-      batterSurge = evaluateActivePowerSurge(ctx.requestedPowerId, 'batter', ctx.batter);
-    } else if (ctx.canPitcherTriggerSpecial && pitOpts.some((p) => p.id === ctx.requestedPowerId)) {
-      pitcherSurge = evaluateActivePowerSurge(ctx.requestedPowerId, 'pitcher', ctx.pitcher);
-    }
-  }
+  const { batterSurge, pitcherSurge } = resolveRequestedPowerSurges(ctx);
 
   return {
-    batterHeritage,
-    pitcherHeritage,
-    defenderHeritage,
-    batterCaps,
-    pitcherCaps,
-    defenderCaps,
-    batterRelics,
-    pitcherRelics,
-    defenderRelics,
+    batterHeritage: evaluateHeritageGameplayProfile(ctx.batter, ctx.leverageIndex),
+    pitcherHeritage: evaluateHeritageGameplayProfile(ctx.pitcher, ctx.leverageIndex),
+    defenderHeritage: evaluateHeritageGameplayProfile(ctx.defender, ctx.leverageIndex),
+    batterCaps: evaluateCapstoneGameplayProfile(ctx.batter, ctx.leverageIndex),
+    pitcherCaps: evaluateCapstoneGameplayProfile(ctx.pitcher, ctx.leverageIndex),
+    defenderCaps: evaluateCapstoneGameplayProfile(ctx.defender, ctx.leverageIndex),
+    batterRelics: evaluatePlayerRelicBonuses(ctx.batter, battingStaff.relicBonusMultiplier),
+    pitcherRelics: evaluatePlayerRelicBonuses(ctx.pitcher, fieldingStaff.relicBonusMultiplier),
+    defenderRelics: evaluatePlayerRelicBonuses(ctx.defender, fieldingStaff.relicBonusMultiplier),
     battingStaff,
     fieldingStaff,
     battingChem,
     fieldingChem,
+    shift: SHIFTS_BY_ID[ctx.defensiveShift ?? 'standard'],
+    weather: ctx.weatherImpact ?? NEUTRAL_WEATHER,
     batterSurge,
     pitcherSurge,
   };
@@ -1040,6 +1089,7 @@ function computeEffectiveMatchupNumbers(
     powers.pitcherRelics.control +
     powers.fieldingStaff.pitchingControlBonus +
     powers.fieldingChem.control +
+    powers.weather.pitcherControlPenalty +
     pSurge.controlDelta +
     coEd.controlDelta +
     enduranceFx.controlDrop;
@@ -1101,11 +1151,60 @@ function resolvePrePitchTacticalAction(
       powers.batterRelics.bunt +
       (powers.batterSurge?.buntBonus ?? 0);
     return decorateActivePowerOutcome(
-      resolveBuntAttempt(ctx.rng, ctx.batter, ctx.pitcher, platoon.firstBaseStepBonus, boxSide, buntExtra),
+      resolveBuntAttempt(
+        ctx.rng,
+        ctx.batter,
+        ctx.pitcher,
+        platoon.firstBaseStepBonus,
+        boxSide,
+        buntExtra,
+        powers.shift.buntOutBonus,
+      ),
       powers,
     );
   }
   return null;
+}
+
+function collectActiveModifierTags(powers: PowerBundle): string[] {
+  const tags: string[] = [powers.batterHeritage.summaryTag, powers.pitcherHeritage.summaryTag];
+  if (powers.shift.id !== 'standard') {
+    tags.push(`Shift: ${powers.shift.shortLabel}`);
+  }
+  if (powers.weather.hrCarryMultiplier !== 1) {
+    tags.push(`Wind HR ${powers.weather.hrCarryMultiplier.toFixed(2)}x`);
+  }
+  if (powers.weather.pitcherControlPenalty < 0) {
+    tags.push(`Drizzle Grip ${powers.weather.pitcherControlPenalty}`);
+  }
+  if (powers.batterSurge) tags.push(`⚡ ${powers.batterSurge.calloutText}`);
+  if (powers.pitcherSurge) tags.push(`⚡ ${powers.pitcherSurge.calloutText}`);
+  return tags;
+}
+
+function buildPitchMathBreakdown(
+  rng: SeededRng,
+  stats: ReturnType<typeof computeEffectiveMatchupNumbers>,
+  zoneProb: number,
+  powers: PowerBundle,
+): PlayMathBreakdown {
+  const hitEstimate = clampProb(0.295 + (stats.effContact - stats.effStuff) * 0.0044, 0.05, 0.72);
+  const hrEstimate = clampProb(
+    (0.11 + (stats.effPower - 60) * 0.0038) * powers.weather.hrCarryMultiplier,
+    0.01,
+    0.52,
+  );
+  return {
+    effContact: Math.round(stats.effContact),
+    effPower: Math.round(stats.effPower),
+    effStuff: Math.round(stats.effStuff),
+    effControl: Math.round(stats.effControl),
+    zonePct: Math.round(zoneProb * 100),
+    hitPct: Math.round(hitEstimate * 100),
+    hrPct: Math.round(hrEstimate * 100),
+    diceRoll: rng.int(1, 100),
+    activeModifiers: collectActiveModifierTags(powers),
+  };
 }
 
 /** Resolves a single baseball pitch or tactical action cleanly from seeded state. */
@@ -1157,5 +1256,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
         powers,
       );
 
-  return attachPitchTelemetry(decorateActivePowerOutcome(rawResult, powers), adjustedMatchup);
+  const decorated = decorateActivePowerOutcome(rawResult, powers);
+  decorated.mathBreakdown = buildPitchMathBreakdown(ctx.rng, stats, zoneProb, powers);
+  return attachPitchTelemetry(decorated, adjustedMatchup);
 }

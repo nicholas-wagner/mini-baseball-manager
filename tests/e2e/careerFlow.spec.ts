@@ -26,12 +26,17 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /close live box score/i }).click();
   await page.getByRole('button', { name: /next pitch/i }).click();
   await expect(page.getByTestId('play-by-play-ticker')).toBeVisible();
+  await page.getByRole('button', { name: /show math/i }).click();
+  await expect(page.getByTestId('pitch-math-breakdown').first()).toBeVisible();
   await expect(page.getByTestId('active-powers-dock')).toBeVisible();
   await expect(page.getByTestId('strike-zone-plot')).toBeVisible();
 
-  // Visit Roster -> verify Trainer's Table & 1-tap PNG Baseball Card export
+  // Visit Roster -> verify Trainer's Table, Deep Scouting Dossier & 1-tap PNG Baseball Card export
   await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();
   await expect(page.getByTestId('trainers-table-panel')).toBeVisible();
+  await page.getByRole('button', { name: /full scouting dossier/i }).click();
+  await expect(page.getByTestId('player-dossier-modal')).toBeVisible();
+  await page.getByRole('button', { name: /close scouting dossier/i }).click();
   await page.getByRole('button', { name: /download 90s card/i }).click();
   await expect(page.getByTestId('cross-train-feedback')).toContainText(/exported 90s baseball card/i);
 

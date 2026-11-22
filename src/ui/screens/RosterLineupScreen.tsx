@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ArrowLeftRight,
   Download,
+  FileSearch,
   Flame,
   Gamepad2,
   Save,
@@ -47,6 +48,7 @@ import {
 import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises';
 import { useGameStore } from '../../store/gameStore';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
+import { PlayerDossierModal } from '../components/PlayerDossierModal';
 import { SaveSlotsModal } from '../components/SaveSlotsModal';
 import { TrainersTablePanel } from '../components/TrainersTablePanel';
 import { ComicButton } from '../design-system/ComicButton';
@@ -103,6 +105,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const [selectedRotationIdx, setSelectedRotationIdx] = useState<number | null>(null);
   const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [dossierOpen, setDossierOpen] = useState(false);
   const [rosterMessage, setRosterMessage] = useState<string | null>(null);
 
   if (!humanClub) return null;
@@ -497,6 +500,18 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
             />
             <ComicButton
               size="sm"
+              variant="sky"
+              icon={<FileSearch className="w-4 h-4" />}
+              className="w-full"
+              onClick={() => {
+                setDossierOpen(true);
+                soundEngine.play('ui_pop');
+              }}
+            >
+              Full Scouting Dossier
+            </ComicButton>
+            <ComicButton
+              size="sm"
               variant="gold"
               icon={<Download className="w-4 h-4" />}
               className="w-full"
@@ -709,6 +724,12 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           </div>
         </div>
       </ComicCard>
+
+      <PlayerDossierModal
+        player={dossierOpen ? inspectedPlayer : null}
+        clubName={`${humanClub.city} ${humanClub.name}`}
+        onClose={() => setDossierOpen(false)}
+      />
 
       <SaveSlotsModal open={saveModalOpen} onClose={() => setSaveModalOpen(false)} />
     </div>

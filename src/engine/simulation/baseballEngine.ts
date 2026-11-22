@@ -44,10 +44,14 @@ import {
 } from './gameState';
 import { shouldAiAttemptSteal } from './baserunning';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
+import type { WeatherSimulationImpact } from './weather';
+import type { DefensiveShiftId } from './winProbability';
 
 export interface StepPitchOptions {
   requestedPitchType?: PitchType;
   requestedPowerId?: string;
+  defensiveShift?: DefensiveShiftId;
+  weatherImpact?: WeatherSimulationImpact;
 }
 
 export function createGameSession(
@@ -110,6 +114,7 @@ function makeEvent(
     ballFlight: partial.ballFlight,
     fieldingHighlight: partial.fieldingHighlight,
     pitchThrown: partial.pitchThrown,
+    mathBreakdown: partial.mathBreakdown,
     battedBallType: partial.battedBallType,
     commentary: partial.commentary,
     soundCue: partial.soundCue,
@@ -228,6 +233,7 @@ function applyCountPitch(
     outcome: res.outcome,
     specialPowerTriggered: res.specialPowerTriggered,
     pitchThrown: res.pitchThrown,
+    mathBreakdown: res.mathBreakdown,
     commentary: res.commentary,
     soundCue: res.soundCue,
   });
@@ -487,6 +493,7 @@ function applyPlateComplete(
     ballFlight: res.ballFlight,
     fieldingHighlight: res.fieldingHighlight,
     pitchThrown: res.pitchThrown,
+    mathBreakdown: res.mathBreakdown,
     battedBallType: res.battedBallType,
     commentary: res.commentary,
     soundCue: res.soundCue,
@@ -830,7 +837,7 @@ function recordPitchFatigueIfThrown(
 export function stepPitch(
   session: GameSessionState,
   tacticalCall: TacticalCall = 'normal',
-  options?: StepPitchOptions,
+  options: StepPitchOptions = {},
 ): { nextSession: GameSessionState; events: PlayEvent[] } {
   if (session.status === 'completed') {
     return { nextSession: session, events: [] };
@@ -877,8 +884,8 @@ export function stepPitch(
     leverageIndex: leverage,
     tacticalCall: effectiveCall,
     atBatPitchHistory: next.atBatPitchHistory,
-    requestedPitchType: options?.requestedPitchType,
-    requestedPowerId: options?.requestedPowerId,
+    requestedPitchType: options.requestedPitchType,
+    requestedPowerId: options.requestedPowerId,
     battingCoEdSynergy: batting.coEdSynergy,
     fieldingCoEdSynergy: fielding.coEdSynergy,
     battingStaffBonuses: batting.staffBonuses,
@@ -886,6 +893,8 @@ export function stepPitch(
     battingChemistryBonuses: batting.chemistryBonuses,
     fieldingChemistryBonuses: fielding.chemistryBonuses,
     ballparkId: next.ballparkId,
+    defensiveShift: options.defensiveShift,
+    weatherImpact: options.weatherImpact,
     battingPlayersById: batting.playersById,
     catcherPopTimeBonus: fielding.catcherPopTimeBonus,
     stealDefenseCall: resolveStealDefenseCall(tacticalCall),

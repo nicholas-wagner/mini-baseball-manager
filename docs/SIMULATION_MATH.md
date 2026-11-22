@@ -179,6 +179,19 @@ Every player carries **both** their **National Cultural Heritage Power** (22+ na
 
 ---
 
+- **All-Weather & Shift Modifiers (Live in `pitchResolver.ts`)**:
+  - **Defensive Shifts (`DEFENSIVE_SHIFTS`)**:
+    - *Infield In*: `-4%` groundball hit chance, `-6%` bunt-single chance, slightly opens extra-base alleys (`+2%` XBH).
+    - *No Doubles*: cuts extra-base (`2B`/`3B`) multiplier sharply (`-24%` XBH scale) at the cost of `+2%` groundball singles.
+    - *Bunt Defense*: slashes bunt-single probability by **`-16%`** (`buntOutBonus`).
+  - **Dynamic Ballpark Weather (`evaluateWeatherSimulationImpact`)**:
+    - *Wind Blowing Out / In*: multiplies live Home Run carry by **`0.85×..1.18×`**.
+    - *Wet Drizzle*: penalizes pitcher grip control (**`-3` Control**) and increases wet-grass error probability (**`1.12×`**).
+- **In-Game Pitch Math & d100 Dice-Roll Inspector**:
+  - Every resolved pitch attaches a structured `PlayMathBreakdown` (`effContact`, `effPower`, `effStuff`, `effControl`, `zonePct`, `hitPct`, `hrPct`, `diceRoll` `1..100`, and active modifier badges) — toggleable live on the Game Day Play-by-Play Ticker via **Show Math / Dice Rolls**.
+
+---
+
 ## 6. How a Full Game Plays Out (Worked Example)
 
 1. **Opening Pitch (Top 1, 0–0 count, LI 0.95)**:

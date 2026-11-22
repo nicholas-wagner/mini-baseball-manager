@@ -173,6 +173,7 @@ export function GameDayScreen() {
   );
   const [modalSummary, setModalSummary] = useState<PostGameSummary | null>(null);
   const [boxScoreOpen, setBoxScoreOpen] = useState(false);
+  const [showPitchMath, setShowPitchMath] = useState(false);
   const [gameWeather, setGameWeather] = useState<GameDayWeather | null>(null);
   const hapticsEnabled = useUserPreferencesStore((s) => s.hapticsEnabled);
   const wakeLockEnabled = useUserPreferencesStore((s) => s.wakeLockEnabled);
@@ -317,8 +318,16 @@ export function GameDayScreen() {
   );
 
   const resolvePitchCallOption = useCallback(
-    (session: GameSessionState): { requestedPitchType?: PitchType; requestedPowerId?: string } => {
-      const opts: { requestedPitchType?: PitchType; requestedPowerId?: string } = {};
+    (session: GameSessionState) => {
+      const opts: {
+        requestedPitchType?: PitchType;
+        requestedPowerId?: string;
+        defensiveShift?: DefensiveShiftId;
+        weatherImpact?: ReturnType<typeof evaluateWeatherSimulationImpact>;
+      } = {
+        defensiveShift,
+        weatherImpact: gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : undefined,
+      };
       if (armedPowerId) {
         opts.requestedPowerId = armedPowerId;
       }
@@ -331,7 +340,7 @@ export function GameDayScreen() {
       }
       return opts;
     },
-    [armedPowerId, selectedPitchType],
+    [armedPowerId, defensiveShift, gameWeather, selectedPitchType],
   );
 
   const handleNextPitch = useCallback(() => {
@@ -993,10 +1002,25 @@ export function GameDayScreen() {
         </div>
 
         <div className="space-y-3">
-          <ComicCard title="PLAY-BY-PLAY TICKER" headerBg="#1B4332">
+          <ComicCard
+            title="PLAY-BY-PLAY TICKER"
+            headerBg="#1B4332"
+            badge={
+              <ComicButton
+                size="sm"
+                variant={showPitchMath ? 'gold' : 'cream'}
+                onClick={() => {
+                  setShowPitchMath((prev) => !prev);
+                  soundEngine.play('ui_pop');
+                }}
+              >
+                {showPitchMath ? 'Hide Math' : 'Show Math'}
+              </ComicButton>
+            }
+          >
             <ul
               data-testid="play-by-play-ticker"
-              className="space-y-1.5 text-xs font-bold text-[#181B2C] max-h-56 overflow-y-auto"
+              className="space-y-1.5 text-xs font-bold text-[#181B2C] max-h-64 overflow-y-auto"
             >
               {recentEvents.length === 0 ? (
                 <li className="text-[#4A5068]">Step onto the mound or tap Next Pitch!</li>
@@ -1004,12 +1028,40 @@ export function GameDayScreen() {
                 recentEvents.map((ev) => (
                   <li
                     key={ev.seq}
-                    className="p-2 rounded-lg border border-[#181B2C]/20 bg-[#FFFDF7]"
+                    className="p-2 rounded-lg border border-[#181B2C]/20 bg-[#FFFDF7] space-y-1"
                   >
-                    <span className="text-[#1B4332] font-extrabold mr-1">
-                      [{ev.half} {ev.inning}]
-                    </span>
-                    {ev.commentary}
+                    <div>
+                      <span className="text-[#1B4332] font-extrabold mr-1">
+                        [{ev.half} {ev.inning}]
+                      </span>
+                      {ev.commentary}
+                    </div>
+                    {showPitchMath && ev.mathBreakdown ? (
+                      <div
+                        data-testid="pitch-math-breakdown"
+                        className="p-1.5 rounded bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] leading-snug space-y-0.5"
+                      >
+                        <div>
+                          CON {ev.mathBreakdown.effContact} / PWR {ev.mathBreakdown.effPower} vs STU{' '}
+                          {ev.mathBreakdown.effStuff} / CTL {ev.mathBreakdown.effControl}
+                        </div>
+                        <div className="text-[#E0FBFC]">
+                          Zone {ev.mathBreakdown.zonePct}%
+                          {ev.mathBreakdown.hitPct !== undefined
+                            ? ` • Hit ${ev.mathBreakdown.hitPct}%`
+                            : ''}
+                          {ev.mathBreakdown.hrPct !== undefined
+                            ? ` • HR ${ev.mathBreakdown.hrPct}%`
+                            : ''}
+                          {` • d100 Roll: ${ev.mathBreakdown.diceRoll}`}
+                        </div>
+                        {ev.mathBreakdown.activeModifiers.length > 0 ? (
+                          <div className="text-white/80">
+                            {ev.mathBreakdown.activeModifiers.join(' • ')}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </li>
                 ))
               )}

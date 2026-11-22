@@ -132,10 +132,24 @@ export interface PlayEvent {
     isWeakPitchForPitcher: boolean;
     batterAffinity: 'favorite' | 'weak' | 'neutral';
   };
+  mathBreakdown?: PlayMathBreakdown;
   battedBallType?: BattedBallType;
   commentary: string;
   soundCue?: PlaySoundCue;
   xpAwards?: { playerId: string; xp: number }[];
+}
+
+export interface PlayMathBreakdown {
+  effContact: number;
+  effPower: number;
+  effStuff: number;
+  effControl: number;
+  zonePct: number;
+  hitPct?: number;
+  hrPct?: number;
+  stealPct?: number;
+  diceRoll: number;
+  activeModifiers: string[];
 }
 
 const HIT_OUTCOMES: ReadonlySet<AtBatOutcome> = new Set([
