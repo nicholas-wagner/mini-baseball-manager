@@ -11,7 +11,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
 2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
-4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-069`). Pick the highest-priority `READY` task!
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-070`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
 6. **Project Workflow Skills (`.agents/skills/`)** — Portable engineering skills (auto-discovered by Antigravity and readable by any AI editor):
    - [`.agents/skills/ub-tdd-craft/SKILL.md`](./.agents/skills/ub-tdd-craft/SKILL.md) — Strict TDD, behavior-focused tests, Clean Code refactoring, and CRAP-lite complexity discipline (*inspired by `unclebob/ub-mode`*).
@@ -63,6 +63,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 | **Career Arc, Health & Medical Staff** | Real multi-season aging curve (Rookie growth `18–24` → Prime `25–30` → Veteran savvy `31–34` → Physical decline `35+` → Retirement); low-frequency, new-game-toggleable **Injuries** & **Illnesses** (`common`/`uncommon`/`rare`/`ultra_rare`, extensible catalog, zero fatalities, zero STDs, sex-specific conditions supported, play-through with stat penalties vs. mandatory IL / season / rare aged-vet career-ending) mitigated by hireable specialty **Team Doctors** & **Athletic Trainers** | `docs/ARCHITECTURE.md` |
 | **Coaching Staff & Equipment Manager** | Hireable & developable **Pitching**, **Hitting**, **Bench**, **Fielding**, **Bullpen** (catchers + pitchers), and **Equipment Manager** (90s gear/relic tuning, blisters/morale) roles bounded by tier-scaled **Staff Slot Limits** (`rookie: 2` → `majors: 7`), staff salary budgets, and **philosophy trade-offs** — growing via Season XP, Offseason Clinics & retiring club legends | `docs/ARCHITECTURE.md` |
 | **Multiple Stadiums & Park Factors** | Catalog of `10` distinct 90s ballparks (*Sandlot Commons*, *Brickyard Classic*, *Bayfront Cove*, *High-Altitude Mesa*, *Neon Metro Dome*, *Harbor Shipyard*, *Sakura Garden*, *Sunbelt Cactus*, *Cornfield Twilight*, *Grand Cathedral*) across the 48-club pyramid & unlockable/commissionable home venues — each with real dimensions, grass/turf surface, simulation **Park Factors**, and distinct 3D ballpark scenery | `docs/ARCHITECTURE.md` |
+| **Speed-Driven Base Stealing** | Full baserunning steal system (`Steal 2B`, `Steal 3B`, `Double Steal`, rare `Steal of Home`, defensive `Pitchout / Hold Runner`) driven primarily by runner **`Speed`** vs. catcher **`Arm`/`Fielding`**, Bullpen Coach pop-time, LHP runner-hold & pitch velocity — tracking `SB` & `CS` (`SB%`), AI stealing in simmed games, and live Game Day odds previews | `docs/ARCHITECTURE.md` |
 
 ---
 
