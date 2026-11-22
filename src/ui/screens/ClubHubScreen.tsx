@@ -45,7 +45,7 @@ export function ClubHubScreen() {
 
   const [subTab, setSubTab] = useState<HubSubTab>('stadiums');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-  const [activeClip, setActiveClip] = useState<'idle' | 'swing' | 'pitch_throw' | 'field_dive' | 'field_run' | 'celebrate'>('idle');
+  const [activeClip, setActiveClip] = useState<'idle' | 'practice_cage' | 'practice_bullpen' | 'field_dive' | 'field_run' | 'celebrate_hr'>('idle');
   const [notice, setNotice] = useState<string | null>(null);
 
   const staffMarket = useMemo(() => {
@@ -77,7 +77,7 @@ export function ClubHubScreen() {
   const handleCommissionPark = (parkId: typeof activePark.id) => {
     const res = commissionHumanBallpark(parkId);
     setNotice(res.commissioned ? `Commissioned new home venue: ${getBallparkPreset(parkId).name}!` : (res.reason ?? 'Unavailable.'));
-    soundEngine.play(res.commissioned ? 'cash_register' : 'ui_pop');
+    soundEngine.play(res.commissioned ? 'cash_chime' : 'ui_pop');
   };
 
   const handleRunPractice = (activityId: PracticeComplexActivityId, clip: typeof activeClip) => {
@@ -297,7 +297,7 @@ export function ClubHubScreen() {
                       onClick={() => {
                         const res = hireHumanClubStaff(candidate);
                         setNotice(res.hired ? `Hired ${candidate.name} as ${STAFF_ROLE_LABELS[candidate.role]}!` : (res.reason ?? 'Could not hire.'));
-                        soundEngine.play(res.hired ? 'cash_register' : 'ui_pop');
+                        soundEngine.play(res.hired ? 'cash_chime' : 'ui_pop');
                       }}
                     >
                       Hire {STAFF_ROLE_LABELS[candidate.role].split(' ')[0]}

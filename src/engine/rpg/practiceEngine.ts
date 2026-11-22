@@ -25,7 +25,7 @@ export interface PracticeActivityMetadata {
   roleScope: 'hitter' | 'pitcher' | 'all';
   gainText: string;
   compromiseText: string;
-  chibiClip: 'swing' | 'pitch_throw' | 'field_dive' | 'field_run' | 'celebrate';
+  chibiClip: 'practice_cage' | 'practice_bullpen' | 'field_dive' | 'field_run' | 'celebrate_hr';
 }
 
 export interface PracticeComplexRequest {
@@ -49,7 +49,7 @@ export const PRACTICE_COMPLEX_ACTIVITIES: readonly PracticeActivityMetadata[] = 
     roleScope: 'hitter',
     gainText: '+2..+4 Power',
     compromiseText: '-1..-2 Contact & +12 Fatigue',
-    chibiClip: 'swing',
+    chibiClip: 'practice_cage',
   },
   {
     id: 'contact_choke_up',
@@ -57,7 +57,7 @@ export const PRACTICE_COMPLEX_ACTIVITIES: readonly PracticeActivityMetadata[] = 
     roleScope: 'hitter',
     gainText: '+2..+3 Contact & Eye',
     compromiseText: '-1..-2 Power & +10 Fatigue',
-    chibiClip: 'swing',
+    chibiClip: 'practice_cage',
   },
   {
     id: 'fielding_fungos',
@@ -81,7 +81,7 @@ export const PRACTICE_COMPLEX_ACTIVITIES: readonly PracticeActivityMetadata[] = 
     roleScope: 'pitcher',
     gainText: '+2..+3 Velocity & Arm',
     compromiseText: '-1..-2 Control & +16 Fatigue',
-    chibiClip: 'pitch_throw',
+    chibiClip: 'practice_bullpen',
   },
   {
     id: 'command_pinpoint',
@@ -89,7 +89,7 @@ export const PRACTICE_COMPLEX_ACTIVITIES: readonly PracticeActivityMetadata[] = 
     roleScope: 'pitcher',
     gainText: '+2..+4 Control',
     compromiseText: '-1 Velocity & +10 Fatigue',
-    chibiClip: 'pitch_throw',
+    chibiClip: 'practice_bullpen',
   },
   {
     id: 'slump_buster_film',
@@ -97,7 +97,7 @@ export const PRACTICE_COMPLEX_ACTIVITIES: readonly PracticeActivityMetadata[] = 
     roleScope: 'all',
     gainText: '+18..+28 Form & +8 Morale (busts cold slumps)',
     compromiseText: 'No raw stat boost & +6 Fatigue',
-    chibiClip: 'celebrate',
+    chibiClip: 'celebrate_hr',
   },
   {
     id: 'fan_meet_and_greet',
@@ -105,7 +105,7 @@ export const PRACTICE_COMPLEX_ACTIVITIES: readonly PracticeActivityMetadata[] = 
     roleScope: 'all',
     gainText: '+3..+6 Popularity & +5 Team Hype',
     compromiseText: 'No field stat gain & +8 Fatigue',
-    chibiClip: 'celebrate',
+    chibiClip: 'celebrate_hr',
   },
 ];
 

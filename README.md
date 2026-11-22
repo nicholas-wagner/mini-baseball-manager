@@ -24,11 +24,11 @@ Manage lineups, draft global prospects, develop branching player & manager skill
 
 ## Core Pillars
 
-- **90s Cartoon & 2.5D Chibi Visuals**: Cel-shaded procedural 90s SVG baseball-card portraits (with 3D card flip & Holo Foil frames) paired with articulated ~1.8-head volumetric 2.5D chibi SVG players standing on a sunlit Three.js 3D ballpark.
-- **11 Global Nationalities & Cultural Heritage Powers**: Exact weighted roster generation (`50% USA` + `5%` each Canada, Japan, South Korea, Mexico, Dominican Republic, Puerto Rico, Brazil, Argentina, Australia, Ireland) with crisp vector SVG flags and Myth/Animal Heritage Powers (*Eagle Soar*, *Kitsune Mirage*, *Huracán Swing*, *Kangaroo Bounce*, *Leprechaun's Luck*, and more).
-- **Authentic Lefty / Righty / Switch Platoon Chess**: Position-specific handedness distributions (`50% R / 40% L / 10% Switch` batting; `SP` 35% L, `RP` 50% L, `OF` 50% L, `1B` 80% L, `C` 20% L, `2B/3B/SS` 100% R), mirrored 2.5D chibi gloves/bats/ear-flaps, 1st/3rd-base batter's boxes, and throwing-shoulder OTS cameras.
-- **Procedural 90s Web Audio**: Zero-dependency Web Audio synthesizer for bat cracks, super-pitch whooshes, ballpark organ riffs (*Charge!*, *Home Run!*), and a multi-formant pink-noise stadium crowd roar.
-- **10X Roadmap**: 6-tier promotion/relegation pyramid (48 clubs), branching Player & Manager Skill Trees, Hot Streaks & Cold Slumps, Dynamic Rivalries, Sim-City Ballpark District Builder, Trade Machine, *The Sandlot Gazette* newspaper, Home Run Derby, and the Global Chibi Cup.
+- **90s Cartoon & 2.5D Chibi Visuals**: Collectible 90s manga & procedural baseball cards (3D card flip, Holo Foil frames, and **role-specific stats** for Pitchers vs. Batters/Fielders) paired with articulated ~1.8-head volumetric 2.5D chibi SVG players standing inside sunlit Three.js 3D ballparks.
+- **Global Nationalities & Cultural Heritage Powers**: Weighted international roster generation with crisp vector SVG flags and 3-tier unlockable Myth/Animal Heritage Skill Branches (*Eagle Soar*, *Kitsune Mirage*, *Huracán Swing*, *Kangaroo Bounce*, *Leprechaun's Luck*, and more).
+- **Deep Baseball Strategy, Co-Ed Archetypes & 2–60 Min Pacing**: Exact `B/T` platoon chess, `2–3` RP / `4–5` SP pitch arsenals, pitcher endurance velocity/break drop-off, `5 / 7 / 9`-inning game formats + 1st-extra-inning 2B Ghost Runner, asymmetric co-ed traits & clubhouse synergies, full sabermetrics (`AVG/OBP/SLG/OPS/ERA/WHIP/K9/Strike%/FPCT`), and **10 distinct retro stadiums with simulation Park Factors**.
+- **Full GM Career, Career Arcs, Toggleable Health & Dugout Staff**: Start in Rookie Sandlot with 6 fair-parity roster builds, climb the 6-tier 48-club pyramid to Mini Major League World Champions, navigate full offseasons (aging arcs `18–40`, retirements, expiring contracts, tier Salary Caps, 3-round Draft & FA), hire/develop **Pitching, Hitting, Bench, Fielding, Bullpen (catchers + pitchers), Equipment Manager, Team Doctor & Athletic Trainer** staff under tier slot caps, and optionally toggle low-frequency realistic Injuries & Illnesses.
+- **Procedural 90s Web Audio (28 Cues)**: Zero-dependency Web Audio synthesizer & soundboard featuring bat cracks, organ riffs, *Stomp-Stomp-Clap!*, bullpen phone rings, ump calls, fireworks, and multi-formant pink-noise stadium crowd roars.
 
 ---
 
@@ -57,8 +57,8 @@ npm run test:e2e
 
 This repository is structured so both **human contributors** and **AI coding agents** can immediately understand the architecture, invariants, and exact next TDD ticket:
 
-- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M9`, 52 vertical slices) & live Progress Dashboard (`12 / 52` done).
-- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue (`TASK-001`..`TASK-052`).
+- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M9`, 69 vertical slices) & live Progress Dashboard (**`43 / 69` done** — Milestones `M0`–`M3` 100% complete!).
+- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue (`TASK-001`..`TASK-069`).
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Canonical TypeScript interfaces, `PlayEvent` stream contracts, and 3D ballpark coordinates.
 - **[docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)** — Exact 90s color tokens, typography, touch targets, and chibi scale units.
 - **[AGENTS.md](./AGENTS.md)** — AI Agent onboarding guide, hard architectural invariants, and Definition of Done.

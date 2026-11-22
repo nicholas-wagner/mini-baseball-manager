@@ -358,6 +358,8 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
       hitting: null,
       scouting: null,
       stadium: null,
+      activeStaff: [],
+      clinicSessionsUsedThisOffseason: 0,
     });
 
     const majorsClub = createClub(createSeededRng(1999), {
