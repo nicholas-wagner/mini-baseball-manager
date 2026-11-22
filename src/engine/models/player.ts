@@ -1,4 +1,5 @@
 import type { FieldPosition, BatsHand, ThrowsHand } from '../handedness/types';
+import type { ActiveHealthStatus } from '../health/healthEngine';
 import type { NationalityId } from '../nationalities/types';
 import type { SeededRng } from '../rng/seededRng';
 
@@ -419,6 +420,7 @@ export interface Player {
   morale: number;
   formScore: number;
   formState: FormState;
+  activeHealthStatus?: ActiveHealthStatus | null;
 
   // Club & History
   contract: PlayerContract;

@@ -165,6 +165,7 @@ export function migrateSavePayload(raw: unknown): SaveFileV1 {
     return {
       ...v1,
       leagues: hydrateLeaguesDefaults(v1.leagues),
+      settings: { ...DEFAULT_SAVE_SETTINGS, ...(v1.settings ?? {}) },
     };
   }
 

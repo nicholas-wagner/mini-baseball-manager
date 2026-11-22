@@ -3,6 +3,7 @@ import {
   getPositionalHandednessBonus,
 } from '../handedness/handedness';
 import type { FieldPosition } from '../handedness/types';
+import { getActiveHealthRatingPenalties } from '../health/healthEngine';
 import type {
   AtBatOutcome,
   PlayEvent,
@@ -698,6 +699,8 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const batterHeritage = evaluateHeritageCombatBonuses(ctx.batter, ctx.leverageIndex);
   const pitcherHeritage = evaluateHeritageCombatBonuses(ctx.pitcher, ctx.leverageIndex);
   const coEd = computeCoEdPitchDeltas(ctx, pitchType);
+  const batterHealth = getActiveHealthRatingPenalties(ctx.batter);
+  const pitcherHealth = getActiveHealthRatingPenalties(ctx.pitcher);
   const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
   const pitcherRoleEval = evaluatePitcherRoleSituation(ctx.pitcher, {
     inning: ctx.inning,
@@ -709,6 +712,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
 
   const effContact =
     ctx.batter.ratings.contact +
+    batterHealth.contact +
     platoon.batterContactDelta +
     mod.contactMod +
     batterForm.contactDelta +
@@ -721,6 +725,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     coEd.contactDelta;
   const effPower =
     ctx.batter.ratings.power +
+    batterHealth.power +
     platoon.batterPowerDelta +
     mod.powerMod +
     batterForm.powerDelta +
@@ -729,9 +734,13 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     batterSkills.battingPowerDelta +
     batterHeritage.clutchBonus +
     coEd.powerDelta;
-  const effEye = ctx.batter.ratings.eye + batterSavvy.eyeDelta + coEd.eyeDelta;
+  const effEye = ctx.batter.ratings.eye + batterHealth.eye + batterSavvy.eyeDelta + coEd.eyeDelta;
   const effStuff =
-    (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 +
+    (ctx.pitcher.ratings.velocity +
+      pitcherHealth.velocity +
+      ctx.pitcher.ratings.movement +
+      pitcherHealth.movement) *
+      0.5 +
     platoon.pitcherBreakDelta +
     pitcherForm.stuffDelta +
     pitchMatchup.pitcherStuffDelta +
@@ -746,6 +755,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     enduranceFx.mphDrop;
   const effControl =
     ctx.pitcher.ratings.control +
+    pitcherHealth.control +
     pitcherForm.controlDelta +
     pitcherPosEval.controlDelta +
     pitchMatchup.pitcherControlDelta +

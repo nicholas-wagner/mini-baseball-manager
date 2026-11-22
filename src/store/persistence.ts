@@ -36,6 +36,8 @@ export interface UserSaveSettings {
   defaultWatchMode: 'live' | 'clutch' | 'sim';
   reducedMotion: boolean;
   hapticsEnabled: boolean;
+  enableInjuries: boolean;
+  enableIllnesses: boolean;
 }
 
 export const DEFAULT_SAVE_SETTINGS: UserSaveSettings = {
@@ -45,6 +47,8 @@ export const DEFAULT_SAVE_SETTINGS: UserSaveSettings = {
   defaultWatchMode: 'live',
   reducedMotion: false,
   hapticsEnabled: true,
+  enableInjuries: true,
+  enableIllnesses: true,
 };
 
 export interface SaveSlotMetadata {

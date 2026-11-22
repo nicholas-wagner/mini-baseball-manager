@@ -82,6 +82,8 @@ export interface StartNewCareerInput {
   accentColor: string;
   managerName: string;
   startingPreset?: StartingRosterPreset;
+  enableInjuries?: boolean;
+  enableIllnesses?: boolean;
   seed?: number;
 }
 
@@ -218,7 +220,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const world = generateSixTierWorld(seed, input);
       const freeAgents = generateMarketPool(createSeededRng(seed + 505), 'rookie', 12);
 
-      set({
+      set((prev) => ({
         worldSeed: seed,
         seasonNumber: 1,
         currentSeriesIndex: 0,
@@ -230,11 +232,16 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         }),
         leagues: world.leagues,
         freeAgents,
+        settings: {
+          ...prev.settings,
+          enableInjuries: input.enableInjuries ?? true,
+          enableIllnesses: input.enableIllnesses ?? true,
+        },
         lastPostGameSummary: null,
         lastPlayoffResult: null,
         lastOffseasonTransitions: [],
         activeOffseason: null,
-      });
+      }));
     },
 
     simNextSeriesRound: (regulationInnings = 5) => {

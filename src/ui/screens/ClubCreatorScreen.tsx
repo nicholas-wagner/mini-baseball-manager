@@ -29,6 +29,8 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const [monogram, setMonogram] = useState('SC');
   const [managerName, setManagerName] = useState('Coach Skip');
   const [startingPreset, setStartingPreset] = useState<StartingRosterPreset>('balanced');
+  const [enableInjuries, setEnableInjuries] = useState(true);
+  const [enableIllnesses, setEnableIllnesses] = useState(true);
   const [paletteIndex, setPaletteIndex] = useState(0);
   const [seedNonce, setSeedNonce] = useState(1994);
 
@@ -64,6 +66,8 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
       accentColor: palette.accent,
       managerName,
       startingPreset,
+      enableInjuries,
+      enableIllnesses,
       seed: seedNonce,
     });
     soundEngine.play('organ_charge');
@@ -223,6 +227,32 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+                Career Realism Toggles (Low-Frequency, Fun-First)
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <label className="inline-flex items-center gap-2 min-h-[44px] px-2.5 rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] text-xs font-extrabold text-[#181B2C] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enableInjuries}
+                    onChange={(e) => setEnableInjuries(e.target.checked)}
+                    className="w-4 h-4 accent-[#1B4332]"
+                  />
+                  Athletic Injuries ({enableInjuries ? 'ON' : 'OFF'})
+                </label>
+                <label className="inline-flex items-center gap-2 min-h-[44px] px-2.5 rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] text-xs font-extrabold text-[#181B2C] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enableIllnesses}
+                    onChange={(e) => setEnableIllnesses(e.target.checked)}
+                    className="w-4 h-4 accent-[#1B4332]"
+                  />
+                  Illnesses ({enableIllnesses ? 'ON' : 'OFF'})
+                </label>
               </div>
             </div>
 

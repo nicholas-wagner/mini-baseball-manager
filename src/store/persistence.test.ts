@@ -49,6 +49,8 @@ function buildSampleSave(seed: number, city: string): SaveFileV1 {
       defaultWatchMode: 'live',
       reducedMotion: false,
       hapticsEnabled: true,
+      enableInjuries: true,
+      enableIllnesses: true,
     },
   };
 }
