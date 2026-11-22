@@ -80,7 +80,7 @@
 ---
 
 ### `TASK-015` — New Club Creator, Roster & Lineup/Rotation Manager
-- **Status**: `READY`
+- **Status**: `IN_PROGRESS`
 - **Milestone**: M2 (`2C`)
 - **Depends On**: `TASK-013`
 - **Files to Create/Modify**:
@@ -126,7 +126,7 @@
 ---
 
 ### `TASK-018` — Local IndexedDB Persistence, Multi-Slot Saves & JSON Backup
-- **Status**: `BLOCKED` *(unblocks when `TASK-015` is `DONE`)*
+- **Status**: `IN_PROGRESS`
 - **Milestone**: M2 (`2F`)
 - **Depends On**: `TASK-015`
 - **Files to Create**:
