@@ -20,14 +20,14 @@
 | **M1** | **Design-First Visual Identity & Interactive Design Lab** | 8 / 8 | `[x]` Done | 90s Cards, 2.5D Chibi Rigs, 11 Nations, Handedness, 3D Park, Web Audio |
 | **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 6 / 6 | `[x]` Done | **MVP Gate**: Complete playable game installable on Android |
 | **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals, Compromise Training, Cooldowns, Mental/Leverage, Roles, Sabermetrics, Endurance, Pacing, Co-Ed Traits & Role Cards | 16 / 16 | `[x]` Done | Deep 2–60 min player, tactical & RPG simulation core |
-| **M4** | **Living League World**: 6-Tier Pyramid, Fair Start Presets, Market Tiers, Salary Caps, Offseason (Retirements/Expiring/Draft/FA) & Rivalries | 4 / 8 | `[/]` In Progress | Multi-season climb from Rookie Ball to World Champions |
+| **M4** | **Living League World**: 6-Tier Pyramid, Fair Start Presets, Market Tiers, Salary Caps, Offseason (Retirements/Expiring/Draft/FA) & Rivalries | 6 / 8 | `[/]` In Progress | Multi-season climb from Rookie Ball to World Champions |
 | **M5** | **Sim-City Ballpark District**: Multiple Stadiums & Park Factors, Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 1 / 6 | `[/]` In Progress | Multiple distinct 3D ballparks & interactive district builder |
 | **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches & Equipment Manager, Team Doctors & Trainers, Toggleable Injuries/Illnesses, Relics & Weather | 3 / 7 | `[/]` In Progress | Synergy combos, full coaching/equipment/medical staff, low-frequency health drama & loot relics |
 | **M7** | **10X Front Office**: Trade Machine, Deadline Drama, Prospect Academy & "The Sandlot Gazette" | 1 / 4 | `[/]` In Progress | Full GM trade negotiation, farm call-ups & 90s newspaper |
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `43 / 69` feature slices completed
+**Overall 10X Progress**: `45 / 69` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -130,10 +130,10 @@
 
 ---
 
-### Milestone 4 — Living League World: 6-Tier Pyramid, Fair Start Presets, Offseason & Salary Caps, 48 AI Clubs & Rivalries (`4 / 8`)
+### Milestone 4 — Living League World: 6-Tier Pyramid, Fair Start Presets, Offseason & Salary Caps, 48 AI Clubs & Rivalries (`6 / 8`)
 - [x] **4A. 6-Tier Promotion/Relegation Pyramid & 48 Unique Clubs** (`TASK-024`): Rookie → Low-A → High-A → AA → AAA → Mini Major League world generator, 21-game round-robin scheduler (7 three-game series), standings, tiebreakers, league leaders, 4-team Best-of-3 playoffs, and promotion/relegation ceremonies.
-- [ ] **4B. Fog-of-War Scouting & 3-Round Amateur Draft** (`TASK-025`): Scouting budget reveals rookie `statCaps` ceilings, `flexibilityProfile`, and `specialistArchetype`; interactive Draft Room honoring the 20-man roster limit & Tier Salary Cap.
-- [ ] **4C. Free Agency, Contracts, Payroll & Waivers** (`TASK-026`): Contract offers balancing expensive `all_star`s, value `veteran`s, and niche `below_average` specialists up to `MAX_ACTIVE_ROSTER_SIZE = 20` & Tier Salary Cap, bidding wars, and cut/release morale impacts.
+- [x] **4B. Fog-of-War Scouting & 3-Round Amateur Draft** (`TASK-025`): Scouting budget reveals rookie `statCaps` ceilings, `flexibilityProfile`, and `specialistArchetype`; interactive Draft Room honoring the 20-man roster limit & Tier Salary Cap.
+- [x] **4C. Free Agency, Contracts, Payroll & Waivers** (`TASK-026`): Contract offers balancing expensive `all_star`s, value `veteran`s, and niche `below_average` specialists up to `MAX_ACTIVE_ROSTER_SIZE = 20` & Tier Salary Cap, bidding wars, and cut/release morale impacts.
 - [ ] **4D. Personality-Driven AI GMs & In-Game Bullpen AI** (`TASK-027`): 5 AI philosophies weighing `marketTier`, `specialistArchetype`, `favoritePosition`, `statCaps`, and roster/cap limits across drafting, signings, platoon lineups, and lefty-specialist bullpen calls; verified via a **10-season headless soak test**.
 - [ ] **4E. Dynamic Team Rivalries Engine & Game Day Showdowns** (`TASK-028`): Cross-tier persistent Rivalry Heat (`0–100`), starter Crosstown Rival, walk-off/playoff/poached-star *Revenge Matchups*, 90s Comic "VS" splash card, +25–50% Hype charge, +25% XP, and Traveling Rivalry Cups.
 - [x] **4F. Active Roster Limit (`20` Max) & 6 Player Market Tiers** (`TASK-054`): `rookie` (cheap / `1.35x` XP / variable `statCaps`), `all_star` (rare & expensive), `veteran` (affordable steady quality / `0.30x` minimal growth), `above_average`, `average`, and `below_average` bargain specialists + `20`-man roster limit enforcement.
