@@ -18,7 +18,7 @@
 | :--- | :--- | :---: | :--- | :--- |
 | **M0** | Project Foundation, TDD Harness & Android PWA Shell | 4 / 4 | `[x]` Done | Vitest + Playwright + TS + PWA manifest green |
 | **M1** | **Design-First Visual Identity & Interactive Design Lab** | 8 / 8 | `[x]` Done | 90s Cards, 2.5D Chibi Rigs, 11 Nations, Handedness, 3D Park, Web Audio |
-| **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 1 / 6 | `[/]` In Progress | **MVP Gate**: Complete playable game installable on Android |
+| **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 2 / 6 | `[/]` In Progress | **MVP Gate**: Complete playable game installable on Android |
 | **M3** | **RPG Core**: Branching Skill Trees, Cultural Powers, Hot/Cold Streaks, Practice & Manager Tree | 0 / 5 | `[ ]` Planned | Deep 5–60 min player & manager RPG growth loop |
 | **M4** | **Living League World**: 6-Tier Pyramid, 48 AI Clubs, Draft, Free Agency & Dynamic Rivalries | 0 / 5 | `[ ]` Planned | Multi-season promotion/relegation dynasty career |
 | **M5** | **Sim-City Ballpark District**: Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 0 / 5 | `[ ]` Planned | Interactive stadium & neighborhood builder visible in 3D |
@@ -27,7 +27,7 @@
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `13 / 52` feature slices completed
+**Overall 10X Progress**: `14 / 52` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -91,7 +91,7 @@
 
 ### Milestone 2 — Core Playable MVP (`0 / 6`)
 - [x] **2A. Canonical Domain Models & Seeded Roster Generator** (`TASK-013`): Core `Player`, `Club`, `ManagerProfile`, `Lineup`, `Rotation`, and balanced Rookie Sandlot roster factory combining nationality, handedness, traits, and starting skills.
-- [ ] **2B. Seeded Pitch-by-Pitch Baseball Simulation Engine** (`TASK-014`): Full baseball rules (counts, walks, Ks, 1B/2B/3B/HR, sac flies, errors, double plays, baserunning, stamina, extra innings, **Platoon & Handedness modifiers**) emitting deterministic `PlayEvent` streams with 3D trajectories.
+- [x] **2B. Seeded Pitch-by-Pitch Baseball Simulation Engine** (`TASK-014`): Full baseball rules (counts, walks, Ks, 1B/2B/3B/HR, sac flies, errors, double plays, baserunning, stamina, extra innings, **Platoon & Handedness modifiers**) emitting deterministic `PlayEvent` streams with 3D trajectories.
 - [ ] **2C. New Club Creator & Lineup / Rotation Manager** (`TASK-015`): Quick Club Creator (city, name, monogram, mascot, 2 colors + 1-tap Randomize) + touch-friendly 9-man lineup, defensive assignment, pitching rotation, bullpen, platoon split preview, and auto-optimize helper.
 - [ ] **2D. Live 3D Game Day Engine & Full 9-Fielder Diamond Choreography** (`TASK-016`): Wire `PlayEvent` stream to Three.js ballpark with all 9 animated 2.5D chibi fielders + live baserunners, dynamic ball-follow cam, strike-zone pitch display, **1x/2x/4x speed**, **Clutch Moments Auto-Cam**, Instant Sim, tactical calls, and bullpen changes.
 - [ ] **2E. Exhibition & Opening Series Loop + Post-Game Rewards** (`TASK-017`): Box score, Play-by-Play ticker, Post-Game MVP Holo Spotlight, Player XP, Manager XP, and Club Cash payouts.

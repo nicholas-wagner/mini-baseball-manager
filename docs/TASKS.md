@@ -52,7 +52,7 @@
 ---
 
 ### `TASK-014` — Seeded Pitch-by-Pitch Baseball Simulation Engine
-- **Status**: `READY`
+- **Status**: `DONE`
 - **Milestone**: M2 (`2B`)
 - **Depends On**: `TASK-013`
 - **Files to Create**:
