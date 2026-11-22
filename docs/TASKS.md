@@ -31,7 +31,7 @@
 ## Milestone 2 — Core Playable MVP *(Next Up!)*
 
 ### `TASK-013` — Canonical Domain Models & Seeded Club/Roster Factory
-- **Status**: `READY`
+- **Status**: `DONE`
 - **Milestone**: M2 (`2A`)
 - **Depends On**: `TASK-011`, `TASK-012`
 - **Files to Create**:
@@ -52,7 +52,7 @@
 ---
 
 ### `TASK-014` — Seeded Pitch-by-Pitch Baseball Simulation Engine
-- **Status**: `BLOCKED` *(unblocks when `TASK-013` is `DONE`)*
+- **Status**: `READY`
 - **Milestone**: M2 (`2B`)
 - **Depends On**: `TASK-013`
 - **Files to Create**:
@@ -80,7 +80,7 @@
 ---
 
 ### `TASK-015` — New Club Creator, Roster & Lineup/Rotation Manager
-- **Status**: `BLOCKED` *(unblocks when `TASK-013` is `DONE`)*
+- **Status**: `READY`
 - **Milestone**: M2 (`2C`)
 - **Depends On**: `TASK-013`
 - **Files to Create/Modify**:
