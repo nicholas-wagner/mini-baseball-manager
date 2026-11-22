@@ -11,7 +11,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
 2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
-4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-070`). Pick the highest-priority `READY` task!
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-073`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
 6. **Project Workflow Skills (`.agents/skills/`)** — Portable engineering skills (auto-discovered by Antigravity and readable by any AI editor):
    - [`.agents/skills/ub-tdd-craft/SKILL.md`](./.agents/skills/ub-tdd-craft/SKILL.md) — Strict TDD, behavior-focused tests, Clean Code refactoring, and CRAP-lite complexity discipline (*inspired by `unclebob/ub-mode`*).
@@ -64,6 +64,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 | **Coaching Staff & Equipment Manager** | Hireable & developable **Pitching**, **Hitting**, **Bench**, **Fielding**, **Bullpen** (catchers + pitchers), and **Equipment Manager** (90s gear/relic tuning, blisters/morale) roles bounded by tier-scaled **Staff Slot Limits** (`rookie: 2` → `majors: 7`), staff salary budgets, and **philosophy trade-offs** — growing via Season XP, Offseason Clinics & retiring club legends | `docs/ARCHITECTURE.md` |
 | **Sandlot-to-Majors Stadiums & Park Factors** | 6-tier league stadium & capacity ladder (`500–1.5k` Rookie Sandlot → `2.2k–3.8k` Low-A → `4.5k–7k` High-A → `8k–12.5k` AA → `14k–20k` AAA → `28k–45k` Pro Major League) transforming full 3D architecture & crowd density from neighborhood sandlot up to pro multi-deck Major League cathedrals, paired with `10` distinct retro venues & real simulation **Park Factors** | `docs/ARCHITECTURE.md` |
 | **Speed-Driven Base Stealing** | Full baserunning steal system (`Steal 2B`, `Steal 3B`, `Double Steal`, rare `Steal of Home`, defensive `Pitchout / Hold Runner`) driven primarily by runner **`Speed`** vs. catcher **`Arm`/`Fielding`**, Bullpen Coach pop-time, LHP runner-hold & pitch velocity — tracking `SB` & `CS` (`SB%`), AI stealing in simmed games, and live Game Day odds previews | `docs/ARCHITECTURE.md` |
+| **4-Slot Auto-Save & Story Backstories** | Automatic save/resume across **4 independent Career Save Slots** (`slot-1`..`slot-4`) with safe 2-step delete/restart, upbeat comic **Dugout Handbook** narrated by Coach Pops, and **6 replayable Manager Backstories** granting starting + ongoing advantages/disadvantages & multi-chapter Choose-Your-Own-Adventure story arcs with persistent `storyFlags` | `docs/ARCHITECTURE.md` |
 
 ---
 
