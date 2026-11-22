@@ -1,10 +1,25 @@
-import { useState } from 'react';
-import { Building2, Gamepad2, GitBranch, Palette, Trophy, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  BookOpen,
+  Building2,
+  Gamepad2,
+  GitBranch,
+  HardDrive,
+  Palette,
+  ScrollText,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import { soundEngine } from './audio/soundEngine';
+import { getNextAvailableStoryChapter } from './engine/story/storyEngine';
+import { useCareerStoryStore } from './store/careerSlots';
 import { useGameStore } from './store/gameStore';
+import { CareerSlotsModal } from './ui/components/CareerSlotsModal';
+import { DugoutGuideModal } from './ui/components/DugoutGuideModal';
+import { PwaInstallBanner } from './ui/components/PwaInstallBanner';
+import { StoryChapterModal } from './ui/components/StoryChapterModal';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
 import { ComicCard } from './ui/design-system/ComicCard';
-import { PwaInstallBanner } from './ui/components/PwaInstallBanner';
 import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
 import { ClubHubScreen } from './ui/screens/ClubHubScreen';
 import { DesignLabScreen } from './ui/screens/DesignLabScreen';
@@ -39,7 +54,96 @@ const UPCOMING_MILESTONES: Record<
 export function App() {
   const [activeTab, setActiveTab] = useState<TabId>('lab');
   const [muted, setMuted] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [slotsOpen, setSlotsOpen] = useState(false);
   const humanClub = useGameStore((s) => s.getHumanClub());
+  const seasonNumber = useGameStore((s) => s.seasonNumber);
+  const storyState = useCareerStoryStore((s) => s.storyState);
+  const lastAutoSavedIso = useCareerStoryStore((s) => s.lastAutoSavedIso);
+  const resumeLastSavedCareer = useCareerStoryStore((s) => s.resumeLastSavedCareer);
+  const autoSaveActiveCareer = useCareerStoryStore((s) => s.autoSaveActiveCareer);
+
+  // Resume the last active saved career slot automatically on boot
+  useEffect(() => {
+    if (!useGameStore.getState().humanClubId) {
+      resumeLastSavedCareer();
+    }
+  }, [resumeLastSavedCareer]);
+
+  // Seamlessly auto-save active career whenever club/league/manager state changes
+  useEffect(() => {
+    const unsubscribe = useGameStore.subscribe((state, prev) => {
+      if (!state.humanClubId) return;
+      if (
+        state.humanClubId !== prev.humanClubId ||
+        state.leagues !== prev.leagues ||
+        state.manager !== prev.manager ||
+        state.seasonNumber !== prev.seasonNumber
+      ) {
+        autoSaveActiveCareer();
+      }
+    });
+    return unsubscribe;
+  }, [autoSaveActiveCareer]);
+
+  const hasUnreadChapter = Boolean(
+    humanClub &&
+      getNextAvailableStoryChapter(storyState, {
+        gamesPlayed: humanClub.wins + humanClub.losses,
+        seasonNumber,
+      }),
+  );
+
+  const utilityActions = (
+    <div className="flex md:flex-col gap-1.5">
+      <button
+        type="button"
+        onClick={() => {
+          soundEngine.play('ui_pop');
+          setGuideOpen(true);
+        }}
+        className="comic-btn bg-[#FFF3BF] text-[#181B2C] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px]"
+        aria-label="Open Dugout Guide"
+      >
+        <BookOpen className="w-3.5 h-3.5 shrink-0" />
+        <span className="hidden md:inline">Coach Pops’ Guide</span>
+        <span className="md:hidden">Guide</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          soundEngine.play('ui_pop');
+          setStoryOpen(true);
+        }}
+        className={`comic-btn px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] ${
+          hasUnreadChapter ? 'bg-[#FFC300] text-[#181B2C]' : 'bg-[#FBF4E4] text-[#181B2C]'
+        }`}
+        aria-label="Open Dynasty Story"
+      >
+        <ScrollText className="w-3.5 h-3.5 shrink-0" />
+        <span className="hidden md:inline">
+          Story &amp; Origins{hasUnreadChapter ? ' ★' : ''}
+        </span>
+        <span className="md:hidden">Story{hasUnreadChapter ? '★' : ''}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          soundEngine.play('ui_pop');
+          setSlotsOpen(true);
+        }}
+        className="comic-btn bg-[#D8F3DC] text-[#1B4332] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px]"
+        aria-label="Open 4 Career Save Slots"
+      >
+        <HardDrive className="w-3.5 h-3.5 shrink-0" />
+        <span className="hidden md:inline">
+          4 Save Slots{lastAutoSavedIso ? ' ✓' : ''}
+        </span>
+        <span className="md:hidden">Saves{lastAutoSavedIso ? '✓' : ''}</span>
+      </button>
+    </div>
+  );
 
   const handleToggleMute = () => {
     const nextMuted = soundEngine.toggleMute();
@@ -113,9 +217,21 @@ export function App() {
       }}
       muted={muted}
       onToggleMute={handleToggleMute}
+      utilityActions={utilityActions}
     >
       <PwaInstallBanner />
       {renderMainContent()}
+      <DugoutGuideModal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        onJumpToTab={(tab) => setActiveTab(tab)}
+      />
+      <StoryChapterModal open={storyOpen} onClose={() => setStoryOpen(false)} />
+      <CareerSlotsModal
+        open={slotsOpen}
+        onClose={() => setSlotsOpen(false)}
+        onStartNewInSlot={() => setActiveTab('gameday')}
+      />
     </AppShell>
   );
 }

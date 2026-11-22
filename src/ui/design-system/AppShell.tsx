@@ -16,6 +16,7 @@ interface AppShellProps {
   onSelectTab: (id: string) => void;
   muted: boolean;
   onToggleMute: () => void;
+  utilityActions?: ReactNode;
   children: ReactNode;
 }
 
@@ -27,6 +28,7 @@ export function AppShell({
   onSelectTab,
   muted,
   onToggleMute,
+  utilityActions,
   children,
 }: AppShellProps) {
   return (
@@ -69,6 +71,10 @@ export function AppShell({
           })}
         </nav>
 
+        {utilityActions ? (
+          <div className="space-y-1.5 pt-1 border-t border-white/15">{utilityActions}</div>
+        ) : null}
+
         <button
           type="button"
           onClick={onToggleMute}
@@ -93,14 +99,17 @@ export function AppShell({
             </div>
             <div className="font-display text-sm leading-tight truncate">{clubName}</div>
           </div>
-          <button
-            type="button"
-            onClick={onToggleMute}
-            aria-label={muted ? 'Unmute audio' : 'Mute audio'}
-            className="w-11 h-11 rounded-xl bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] shadow-[2px_2px_0_#181B2C] flex items-center justify-center shrink-0"
-          >
-            {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {utilityActions}
+            <button
+              type="button"
+              onClick={onToggleMute}
+              aria-label={muted ? 'Unmute audio' : 'Mute audio'}
+              className="w-11 h-11 rounded-xl bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] shadow-[2px_2px_0_#181B2C] flex items-center justify-center shrink-0"
+            >
+              {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 p-3 sm:p-5 pb-24 md:pb-6 max-w-7xl w-full mx-auto">

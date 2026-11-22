@@ -30,4 +30,17 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByText(/derby champ:/i)).toBeVisible();
   await page.getByRole('button', { name: /generate club export code/i }).click();
   await expect(page.locator('#club-export-code')).toHaveValue(/^MBM1:/);
+
+  // Open Coach Pops' Guide, Story & Origins CYOA, and 4 Auto-Save Slots
+  await page.getByRole('button', { name: /open dugout guide/i }).locator('visible=true').first().click();
+  await expect(page.getByText(/COACH POPS’ DUGOUT HANDBOOK/i)).toBeVisible();
+  await page.getByRole('button', { name: /close dugout handbook/i }).click();
+
+  await page.getByRole('button', { name: /open dynasty story/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('active-story-chapter')).toBeVisible();
+  await page.getByRole('button', { name: /close story modal/i }).click();
+
+  await page.getByRole('button', { name: /open 4 career save slots/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('career-slot-1')).toBeVisible();
+  await expect(page.getByTestId('career-slot-4')).toBeVisible();
 });
