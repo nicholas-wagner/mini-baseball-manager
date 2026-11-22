@@ -121,4 +121,44 @@ describe('Milestone 10 UI & 4-Slot Auto-Save Flow (TASK-071..073)', () => {
     fireEvent.click(screen.getByRole('button', { name: /persona & scrapbook/i }));
     expect(screen.getByText(/SHOWTIME AT THE SANDLOT/i)).toBeInTheDocument();
   });
+
+  it('compacts auto-save payloads and never crashes if browser localStorage throws QuotaExceededError', () => {
+    useGameStore.getState().startNewCareer({
+      city: 'Quota',
+      clubName: 'Rescuers',
+      monogram: 'QR',
+      mascot: 'Bear',
+      primaryColor: '#1D3557',
+      secondaryColor: '#E63946',
+      accentColor: '#FFD166',
+      managerName: 'Coach Safe',
+      seed: 7404,
+    });
+
+    const originalDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    const fakeStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException('QuotaExceededError', 'QuotaExceededError');
+      },
+      removeItem: () => undefined,
+    };
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: fakeStorage,
+    });
+
+    try {
+      expect(() => useCareerStoryStore.getState().autoSaveActiveCareer()).not.toThrow();
+      expect(useCareerStoryStore.getState().lastAutoSavedIso).not.toBeNull();
+      // Memory mirror still lets slot resume cleanly
+      useGameStore.setState({ humanClubId: null, manager: null });
+      expect(useCareerStoryStore.getState().resumeLastSavedCareer()).toBe(true);
+      expect(useGameStore.getState().getHumanClub()?.name).toBe('Rescuers');
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(window, 'localStorage', originalDescriptor);
+      }
+    }
+  });
 });

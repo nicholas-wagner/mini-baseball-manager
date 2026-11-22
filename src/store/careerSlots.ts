@@ -80,23 +80,100 @@ function getSafeStorage(): SimpleKeyValueStorage {
   return memoryStorageAdapter;
 }
 
-export function clearAllCareerSlotsStorage(): void {
-  const storage = getSafeStorage();
-  for (const id of CAREER_SLOT_IDS) {
-    storage.removeItem(`${STORAGE_PREFIX}${id}`);
+function safeStorageGet(key: string): string | null {
+  try {
+    const val = getSafeStorage().getItem(key);
+    if (val !== null) return val;
+  } catch {
+    // Fall back to in-memory mirror if browser storage is restricted.
   }
-  storage.removeItem(ACTIVE_SLOT_KEY);
+  return memoryFallbackStore.get(key) ?? null;
+}
+
+function safeStorageSet(key: string, value: string): boolean {
+  memoryFallbackStore.set(key, value);
+  try {
+    getSafeStorage().setItem(key, value);
+    return true;
+  } catch {
+    // Never crash gameplay or store subscribers if browser localStorage quota is exceeded.
+    return false;
+  }
+}
+
+function safeStorageRemove(key: string): void {
+  memoryFallbackStore.delete(key);
+  try {
+    getSafeStorage().removeItem(key);
+  } catch {
+    // Ignore storage removal errors in restricted browser contexts.
+  }
+}
+
+function syncSlotToIndexedDbBestEffort(slotId: CareerSlotId, payload: string | null): void {
+  if (typeof indexedDB === 'undefined' || typeof indexedDB.open !== 'function') return;
+  try {
+    const req = indexedDB.open('mbm_career_slots_v2', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('slots')) {
+        db.createObjectStore('slots');
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction('slots', 'readwrite');
+      const store = tx.objectStore('slots');
+      if (payload === null) store.delete(slotId);
+      else store.put(payload, slotId);
+    };
+  } catch {
+    // Graceful localStorage/memory fallback handles environments without IndexedDB.
+  }
+}
+
+export function clearAllCareerSlotsStorage(): void {
+  for (const id of CAREER_SLOT_IDS) {
+    safeStorageRemove(`${STORAGE_PREFIX}${id}`);
+    syncSlotToIndexedDbBestEffort(id, null);
+  }
+  safeStorageRemove(ACTIVE_SLOT_KEY);
   memoryFallbackStore.clear();
 }
 
+interface StoredSlotEnvelope extends Omit<CareerSlotRecord, 'careerJson'> {
+  careerJson?: string;
+  careerData?: unknown;
+}
+
+function serializeSlotCompact(record: CareerSlotRecord): string {
+  try {
+    const { careerJson, ...meta } = record;
+    const careerData: unknown = JSON.parse(careerJson);
+    return JSON.stringify({ ...meta, careerData });
+  } catch {
+    return JSON.stringify(record);
+  }
+}
+
 function readSlotFromStorage(slotId: CareerSlotId): CareerSlotRecord | null {
-  const storage = getSafeStorage();
-  const raw = storage.getItem(`${STORAGE_PREFIX}${slotId}`);
+  const raw = safeStorageGet(`${STORAGE_PREFIX}${slotId}`);
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as Partial<CareerSlotRecord>;
-    if (!parsed.slotId || !parsed.careerJson || !parsed.storyState) return null;
-    return parsed as CareerSlotRecord;
+    const parsed = JSON.parse(raw) as Partial<StoredSlotEnvelope>;
+    const careerJson =
+      typeof parsed.careerJson === 'string'
+        ? parsed.careerJson
+        : parsed.careerData !== undefined
+          ? JSON.stringify(parsed.careerData)
+          : null;
+    if (!parsed.slotId || !careerJson || !parsed.storyState) return null;
+    const { careerData: _omit, ...rest } = parsed;
+    void _omit;
+    return {
+      ...(rest as Omit<CareerSlotRecord, 'careerJson'>),
+      careerJson,
+    };
   } catch {
     return null;
   }
@@ -112,8 +189,7 @@ function readAllSlotsFromStorage(): Record<CareerSlotId, CareerSlotRecord | null
 }
 
 function readSavedActiveSlotId(): CareerSlotId {
-  const storage = getSafeStorage();
-  const val = storage?.getItem(ACTIVE_SLOT_KEY);
+  const val = safeStorageGet(ACTIVE_SLOT_KEY);
   if (val && (CAREER_SLOT_IDS as readonly string[]).includes(val)) {
     return val as CareerSlotId;
   }
@@ -121,8 +197,7 @@ function readSavedActiveSlotId(): CareerSlotId {
 }
 
 function writeActiveSlotId(slotId: CareerSlotId): void {
-  const storage = getSafeStorage();
-  storage?.setItem(ACTIVE_SLOT_KEY, slotId);
+  safeStorageSet(ACTIVE_SLOT_KEY, slotId);
 }
 
 interface CareerStoryStoreState {
@@ -183,11 +258,10 @@ export const useCareerStoryStore = create<CareerStoryStoreState>((set, get) => (
       careerJson,
     };
 
-    const storage = getSafeStorage();
-    if (storage) {
-      storage.setItem(`${STORAGE_PREFIX}${activeSlotId}`, JSON.stringify(record));
-      writeActiveSlotId(activeSlotId);
-    }
+    const compactSerialized = serializeSlotCompact(record);
+    safeStorageSet(`${STORAGE_PREFIX}${activeSlotId}`, compactSerialized);
+    writeActiveSlotId(activeSlotId);
+    syncSlotToIndexedDbBestEffort(activeSlotId, compactSerialized);
 
     set((state) => ({
       lastAutoSavedIso: savedAtIso,
@@ -232,8 +306,8 @@ export const useCareerStoryStore = create<CareerStoryStoreState>((set, get) => (
   },
 
   deleteCareerSlot: (slotId) => {
-    const storage = getSafeStorage();
-    storage?.removeItem(`${STORAGE_PREFIX}${slotId}`);
+    safeStorageRemove(`${STORAGE_PREFIX}${slotId}`);
+    syncSlotToIndexedDbBestEffort(slotId, null);
     const wasActive = get().activeSlotId === slotId;
     if (wasActive) {
       useGameStore.setState({ humanClubId: null, manager: null });

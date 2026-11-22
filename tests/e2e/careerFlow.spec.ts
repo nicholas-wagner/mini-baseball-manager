@@ -22,12 +22,25 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /next pitch/i }).click();
   await expect(page.getByTestId('play-by-play-ticker')).toBeVisible();
 
-  // Visit Ballpark HQ -> Stadium Progression + Home Run Derby + Serverless Club Code
+  // Visit Ballpark HQ -> Stadium Progression + Economy & District + Gazette & Front Office + Derby/Global Cup/Challenges
   await page.getByRole('button', { name: /^ballpark$/i }).locator('visible=true').first().click();
   await expect(page.getByText(/neighborhood sandlot/i)).toBeVisible();
+
+  await page.getByRole('button', { name: /economy & district/i }).click();
+  await expect(page.getByTestId('ballpark-economy-panel')).toBeVisible();
+  await page.getByRole('button', { name: /sign turbo fizz soda/i }).click();
+
+  await page.getByRole('button', { name: /gazette & front office/i }).click();
+  await expect(page.getByTestId('front-office-gazette-panel')).toBeVisible();
+  await page.getByRole('button', { name: /draw 90s surprise card/i }).click();
+  await page.getByTestId('surprise-choice-0').click();
+  await expect(page.getByTestId('surprise-outcome-banner')).toBeVisible();
+
   await page.getByRole('button', { name: /derby & sharing/i }).click();
   await page.getByRole('button', { name: /run home run derby/i }).click();
   await expect(page.getByText(/derby champ:/i)).toBeVisible();
+  await page.getByRole('button', { name: /run global chibi cup/i }).click();
+  await expect(page.getByTestId('global-cup-result')).toBeVisible();
   await page.getByRole('button', { name: /generate club export code/i }).click();
   await expect(page.locator('#club-export-code')).toHaveValue(/^MBM1:/);
 

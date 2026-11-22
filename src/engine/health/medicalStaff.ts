@@ -1,4 +1,5 @@
 import type { LeagueTierId } from '../models/club';
+import type { StaffMember, StaffQualityTier } from '../models/manager';
 import type { SeededRng } from '../rng/seededRng';
 import type { ConditionCategory } from './conditionsCatalog';
 
@@ -212,4 +213,74 @@ export function generateMedicalStaffMarket(
     createAthleticTrainer(rng, spec, rng.int(1, maxQ) as MedicalQualityTier),
   );
   return { doctors, trainers };
+}
+
+/** Adapts a specialty Team Doctor into a unified hireable StaffMember for the club dugout roster. */
+export function teamDoctorToStaffMember(doc: TeamDoctor): StaffMember {
+  return {
+    id: doc.id,
+    role: 'team_doctor',
+    name: doc.name,
+    portraitSeed: doc.portraitSeed,
+    tier: doc.tier as StaffQualityTier,
+    level: doc.tier as StaffQualityTier,
+    xp: 0,
+    salaryPerSeason: doc.salaryPerSeason,
+    yearsRemaining: 2,
+    specialtyId: doc.specialty,
+    specialtyLabel: DOCTOR_SPECIALTY_LABELS[doc.specialty],
+    perkSummary: `Prevents & speeds recovery for ${DOCTOR_SPECIALTY_LABELS[doc.specialty]} cases`,
+    tradeOffSummary: 'Occupies 1 active dugout staff slot & annual medical salary budget',
+  };
+}
+
+/** Adapts a Head Athletic Trainer into a unified hireable StaffMember for the club dugout roster. */
+export function athleticTrainerToStaffMember(trainer: AthleticTrainer): StaffMember {
+  return {
+    id: trainer.id,
+    role: 'athletic_trainer',
+    name: trainer.name,
+    portraitSeed: trainer.portraitSeed,
+    tier: trainer.tier as StaffQualityTier,
+    level: trainer.tier as StaffQualityTier,
+    xp: 0,
+    salaryPerSeason: trainer.salaryPerSeason,
+    yearsRemaining: 2,
+    specialtyId: trainer.specialty,
+    specialtyLabel: TRAINER_SPECIALTY_LABELS[trainer.specialty],
+    perkSummary: `Boosts conditioning, injury prevention & softens aging (${TRAINER_SPECIALTY_LABELS[trainer.specialty]})`,
+    tradeOffSummary: 'Occupies 1 active dugout staff slot & annual training salary budget',
+  };
+}
+
+/** Extracts active Team Doctor & Athletic Trainer records from a club's unified activeStaff list. */
+export function extractClubMedicalStaff(staff: readonly StaffMember[]): ClubMedicalStaff {
+  const docMember = staff.find((s) => s.role === 'team_doctor');
+  const trnMember = staff.find((s) => s.role === 'athletic_trainer');
+
+  const teamDoctor: TeamDoctor | null = docMember
+    ? {
+        id: docMember.id,
+        name: docMember.name,
+        portraitSeed: docMember.portraitSeed,
+        tier: docMember.tier as MedicalQualityTier,
+        specialty: docMember.specialtyId as TeamDoctorSpecialty,
+        salaryPerSeason: docMember.salaryPerSeason,
+        summary: `Tier ${docMember.tier} ${docMember.specialtyLabel}`,
+      }
+    : null;
+
+  const athleticTrainer: AthleticTrainer | null = trnMember
+    ? {
+        id: trnMember.id,
+        name: trnMember.name,
+        portraitSeed: trnMember.portraitSeed,
+        tier: trnMember.tier as MedicalQualityTier,
+        specialty: trnMember.specialtyId as AthleticTrainerSpecialty,
+        salaryPerSeason: trnMember.salaryPerSeason,
+        summary: `Tier ${trnMember.tier} ${trnMember.specialtyLabel}`,
+      }
+    : null;
+
+  return { teamDoctor, athleticTrainer };
 }

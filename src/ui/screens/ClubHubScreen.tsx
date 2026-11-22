@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Award, Building2, Dumbbell, Share2, Sparkles, Trophy, Users } from 'lucide-react';
+import {
+  Award,
+  Building2,
+  Coins,
+  Dumbbell,
+  Newspaper,
+  Sparkles,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
 import {
   BALLPARK_CATALOG,
@@ -9,9 +18,6 @@ import {
   getStadiumTierProfile,
   STADIUM_UPGRADE_CATALOG,
 } from '../../engine/ballparks/stadiumProgression';
-import { evaluateUnlockablesProgress } from '../../engine/events/unlockables';
-import { runHomeRunDerby, type HomeRunDerbyResult } from '../../engine/league/homeRunDerby';
-import { encodeClubExportCode } from '../../store/clubCode';
 import {
   computeClubStaffPayroll,
   evaluateClubStaffBonuses,
@@ -20,10 +26,12 @@ import {
   STAFF_SALARY_BUDGET_BY_TIER,
   STAFF_SLOT_LIMITS_BY_TIER,
 } from '../../engine/gm/coaches';
-import { generateMedicalStaffMarket } from '../../engine/health/medicalStaff';
 import {
-  MANAGER_SKILL_NODES,
-} from '../../engine/manager/managerTree';
+  DOCTOR_SPECIALTY_LABELS,
+  generateMedicalStaffMarket,
+  TRAINER_SPECIALTY_LABELS,
+} from '../../engine/health/medicalStaff';
+import { MANAGER_SKILL_NODES } from '../../engine/manager/managerTree';
 import { isPitcherPosition } from '../../engine/models/player';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import { evaluateClubhouseChemistry } from '../../engine/rpg/chemistry';
@@ -36,7 +44,9 @@ import {
   commissionHumanBallpark,
   equipHumanPlayerRelic,
   fireHumanClubStaff,
+  hireHumanAthleticTrainer,
   hireHumanClubStaff,
+  hireHumanTeamDoctor,
   runHumanPracticeActivity,
   runHumanStaffClinic,
   unequipHumanPlayerRelic,
@@ -44,11 +54,22 @@ import {
   upgradeHumanStadium,
 } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
+import { BallparkEconomyPanel } from '../components/BallparkEconomyPanel';
+import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
 import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
+import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
-type HubSubTab = 'stadiums' | 'staff' | 'practice' | 'manager' | 'relics' | 'spectacles';
+type HubSubTab =
+  | 'stadiums'
+  | 'economy'
+  | 'staff'
+  | 'practice'
+  | 'manager'
+  | 'relics'
+  | 'frontoffice'
+  | 'spectacles';
 
 export function ClubHubScreen() {
   const club = useGameStore((s) => s.getHumanClub());
@@ -59,10 +80,10 @@ export function ClubHubScreen() {
 
   const [subTab, setSubTab] = useState<HubSubTab>('stadiums');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-  const [activeClip, setActiveClip] = useState<'idle' | 'practice_cage' | 'practice_bullpen' | 'field_dive' | 'field_run' | 'celebrate_hr'>('idle');
+  const [activeClip, setActiveClip] = useState<
+    'idle' | 'practice_cage' | 'practice_bullpen' | 'field_dive' | 'field_run' | 'celebrate_hr'
+  >('idle');
   const [notice, setNotice] = useState<string | null>(null);
-  const [derbyResult, setDerbyResult] = useState<HomeRunDerbyResult | null>(null);
-  const [exportCode, setExportCode] = useState<string>('');
 
   const staffMarket = useMemo(() => {
     if (!club) return [];
@@ -95,7 +116,11 @@ export function ClubHubScreen() {
 
   const handleCommissionPark = (parkId: typeof activePark.id) => {
     const res = commissionHumanBallpark(parkId);
-    setNotice(res.commissioned ? `Commissioned new home venue: ${getBallparkPreset(parkId).name}!` : (res.reason ?? 'Unavailable.'));
+    setNotice(
+      res.commissioned
+        ? `Commissioned new home venue: ${getBallparkPreset(parkId).name}!`
+        : (res.reason ?? 'Unavailable.'),
+    );
     soundEngine.play(res.commissioned ? 'cash_chime' : 'ui_pop');
   };
 
@@ -126,12 +151,21 @@ export function ClubHubScreen() {
             </ComicButton>
             <ComicButton
               size="sm"
+              variant={subTab === 'economy' ? 'gold' : 'cream'}
+              active={subTab === 'economy'}
+              icon={<Coins className="w-3.5 h-3.5" />}
+              onClick={() => setSubTab('economy')}
+            >
+              Economy &amp; District
+            </ComicButton>
+            <ComicButton
+              size="sm"
               variant={subTab === 'staff' ? 'gold' : 'cream'}
               active={subTab === 'staff'}
               icon={<Users className="w-3.5 h-3.5" />}
               onClick={() => setSubTab('staff')}
             >
-              Coaches & Staff
+              Coaches &amp; Staff
             </ComicButton>
             <ComicButton
               size="sm"
@@ -158,7 +192,16 @@ export function ClubHubScreen() {
               icon={<Sparkles className="w-3.5 h-3.5" />}
               onClick={() => setSubTab('relics')}
             >
-              Relics & Chemistry
+              Relics &amp; Chemistry
+            </ComicButton>
+            <ComicButton
+              size="sm"
+              variant={subTab === 'frontoffice' ? 'gold' : 'cream'}
+              active={subTab === 'frontoffice'}
+              icon={<Newspaper className="w-3.5 h-3.5" />}
+              onClick={() => setSubTab('frontoffice')}
+            >
+              Gazette &amp; Front Office
             </ComicButton>
             <ComicButton
               size="sm"
@@ -167,7 +210,7 @@ export function ClubHubScreen() {
               icon={<Trophy className="w-3.5 h-3.5" />}
               onClick={() => setSubTab('spectacles')}
             >
-              Derby & Sharing
+              Derby &amp; Sharing
             </ComicButton>
           </div>
         }
@@ -260,6 +303,10 @@ export function ClubHubScreen() {
           </div>
         ) : null}
 
+        {subTab === 'economy' ? (
+          <BallparkEconomyPanel club={club} onNotice={setNotice} />
+        ) : null}
+
         {subTab === 'staff' ? (
           <div className="space-y-4">
             <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold">
@@ -322,13 +369,13 @@ export function ClubHubScreen() {
               </div>
             ) : (
               <p className="text-xs font-bold text-[#4A5068]">
-                No dugout coaches or Equipment Manager hired yet — pick your favorite trade-off below!
+                No dugout coaches, Equipment Manager, or medical staff hired yet — pick your favorite trade-off below!
               </p>
             )}
 
             <div className="space-y-2">
               <div className="font-display text-xs uppercase text-[#181B2C]">
-                Available Coaching & Equipment Manager Candidates
+                Available Coaching &amp; Equipment Manager Candidates
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {staffMarket.map((candidate) => (
@@ -365,20 +412,73 @@ export function ClubHubScreen() {
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-1">
-              <div className="font-display text-xs text-[#181B2C]">
-                Specialty Medical Market Preview ({medicalMarket.doctors.length} Team Doctors • {medicalMarket.trainers.length} Athletic Trainers)
+            {/* Interactive Specialty Team Doctors & Head Athletic Trainers */}
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-3">
+              <div className="font-display text-xs uppercase text-[#181B2C]">
+                🩺 Specialty Team Doctors &amp; Head Athletic Trainers ({medicalMarket.doctors.length} MDs • {medicalMarket.trainers.length} Trainers)
               </div>
-              <div className="flex flex-wrap gap-1.5 text-[10px] font-bold text-[#181B2C]">
-                {medicalMarket.doctors.slice(0, 3).map((d) => (
-                  <span key={d.id} className="px-2 py-0.5 rounded bg-white border border-[#181B2C]">
-                    {d.name}: {d.summary} (${d.salaryPerSeason.toLocaleString()})
-                  </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {medicalMarket.doctors.slice(0, 4).map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-white flex flex-col justify-between gap-1.5"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-display text-xs text-[#181B2C]">
+                          {doc.name} (Tier {doc.tier})
+                        </span>
+                        <span className="font-mono-tabular text-[11px] font-extrabold text-[#1B4332]">
+                          ${doc.salaryPerSeason.toLocaleString()}/yr
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-extrabold text-[#1D3557]">
+                        {DOCTOR_SPECIALTY_LABELS[doc.specialty]}
+                      </div>
+                    </div>
+                    <ComicButton
+                      size="sm"
+                      variant="sky"
+                      onClick={() => {
+                        const res = hireHumanTeamDoctor(doc);
+                        setNotice(res.hired ? `Hired ${doc.name} as Team Doctor!` : (res.reason ?? 'Could not hire.'));
+                        soundEngine.play(res.hired ? 'cash_chime' : 'ui_pop');
+                      }}
+                    >
+                      Hire Doctor
+                    </ComicButton>
+                  </div>
                 ))}
-                {medicalMarket.trainers.slice(0, 3).map((t) => (
-                  <span key={t.id} className="px-2 py-0.5 rounded bg-white border border-[#181B2C]">
-                    {t.name}: {t.summary} (${t.salaryPerSeason.toLocaleString()})
-                  </span>
+                {medicalMarket.trainers.slice(0, 4).map((trn) => (
+                  <div
+                    key={trn.id}
+                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-white flex flex-col justify-between gap-1.5"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-display text-xs text-[#181B2C]">
+                          {trn.name} (Tier {trn.tier})
+                        </span>
+                        <span className="font-mono-tabular text-[11px] font-extrabold text-[#1B4332]">
+                          ${trn.salaryPerSeason.toLocaleString()}/yr
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-extrabold text-[#1D3557]">
+                        {TRAINER_SPECIALTY_LABELS[trn.specialty]}
+                      </div>
+                    </div>
+                    <ComicButton
+                      size="sm"
+                      variant="turf"
+                      onClick={() => {
+                        const res = hireHumanAthleticTrainer(trn);
+                        setNotice(res.hired ? `Hired ${trn.name} as Head Athletic Trainer!` : (res.reason ?? 'Could not hire.'));
+                        soundEngine.play(res.hired ? 'cash_chime' : 'ui_pop');
+                      }}
+                    >
+                      Hire Trainer
+                    </ComicButton>
+                  </div>
                 ))}
               </div>
             </div>
@@ -592,114 +692,24 @@ export function ClubHubScreen() {
           </div>
         ) : null}
 
-        {subTab === 'spectacles' ? (
-          <div className="space-y-4">
-            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="font-display text-sm text-[#181B2C]">
-                    All-Star Home Run Derby &amp; Unlockables Gallery
-                  </div>
-                  <div className="text-xs font-bold text-[#4A5068]">
-                    Run an 8-slugger bracketed Derby across {club.leagueTier.toUpperCase()} or share your dynasty offline!
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <ComicButton
-                    size="sm"
-                    variant="gold"
-                    icon={<Trophy className="w-3.5 h-3.5" />}
-                    onClick={() => {
-                      const tierClubs = leagues[club.leagueTier] ?? [club];
-                      const res = runHomeRunDerby(
-                        createSeededRng(worldSeed + seasonNumber * 997),
-                        tierClubs,
-                        club.stadium.ballparkId ?? 'high_altitude_mesa',
-                      );
-                      setDerbyResult(res);
-                      setNotice(
-                        `HR Derby Champion: ${res.championName}! Longest bomb: ${res.longestHomeRunFt} ft!`,
-                      );
-                      soundEngine.play('trophy_fanfare');
-                    }}
-                  >
-                    Run Home Run Derby
-                  </ComicButton>
-                  <ComicButton
-                    size="sm"
-                    variant="sky"
-                    icon={<Share2 className="w-3.5 h-3.5" />}
-                    onClick={() => {
-                      const code = encodeClubExportCode(club);
-                      setExportCode(code);
-                      setNotice('Generated serverless MBM1 Club Export Code — copy and share offline!');
-                      soundEngine.play('ui_pop');
-                    }}
-                  >
-                    Generate Club Export Code
-                  </ComicButton>
-                </div>
-              </div>
-              {derbyResult ? (
-                <div className="p-2.5 rounded-xl border border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]">
-                  🏆 Derby Champ: {derbyResult.championName} • Longest HR: {derbyResult.longestHomeRunFt} ft •
-                  Prize: ${derbyResult.cashPrize.toLocaleString()}
-                </div>
-              ) : null}
-              {exportCode ? (
-                <div className="space-y-1">
-                  <label htmlFor="club-export-code" className="text-[10px] font-extrabold uppercase text-[#4A5068]">
-                    Serverless Club Export Code (Share Offline)
-                  </label>
-                  <input
-                    id="club-export-code"
-                    readOnly
-                    value={exportCode}
-                    className="w-full px-2.5 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] font-mono-tabular text-[11px]"
-                  />
-                </div>
-              ) : null}
-            </div>
+        {subTab === 'frontoffice' ? (
+          <FrontOfficeGazettePanel
+            club={club}
+            tierClubs={leagues[club.leagueTier] ?? [club]}
+            worldSeed={worldSeed}
+            seasonNumber={seasonNumber}
+            onNotice={setNotice}
+          />
+        ) : null}
 
-            {(() => {
-              const unlockStatus = evaluateUnlockablesProgress({
-                leagueTier: club.leagueTier,
-                careerWins: club.wins,
-                championshipsWon: club.stadium.championshipPennants.length,
-                retiredNumbersCount: club.stadium.retiredNumbers.length,
-                wonHomeRunDerby: Boolean(derbyResult),
-                wonGlobalCup: false,
-              });
-              return (
-                <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2">
-                  <div className="font-display text-xs text-[#181B2C]">
-                    Cosmetics &amp; Throwbacks Gallery ({unlockStatus.unlocked.length}/{unlockStatus.unlocked.length + unlockStatus.locked.length} Unlocked • {unlockStatus.completionPct}%)
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {[...unlockStatus.unlocked, ...unlockStatus.locked].slice(0, 6).map((item) => {
-                      const earned = unlockStatus.unlocked.some((u) => u.id === item.id);
-                      return (
-                        <div
-                          key={item.id}
-                          className={`p-2 rounded-xl border-2 border-[#181B2C] text-xs ${
-                            earned ? 'bg-[#D8F3DC]' : 'bg-white opacity-80'
-                          }`}
-                        >
-                          <div className="font-display text-[#181B2C]">
-                            {earned ? '★ ' : '🔒 '}
-                            {item.name}
-                          </div>
-                          <div className="text-[10px] font-bold text-[#4A5068]">
-                            {item.requirementText}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
+        {subTab === 'spectacles' ? (
+          <WorldSpectaclesPanel
+            club={club}
+            leagues={leagues}
+            worldSeed={worldSeed}
+            seasonNumber={seasonNumber}
+            onNotice={setNotice}
+          />
         ) : null}
       </ComicCard>
     </div>

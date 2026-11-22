@@ -14,11 +14,16 @@ import {
   setPlayerPlayThroughStatus,
 } from './healthEngine';
 import {
+  athleticTrainerToStaffMember,
   createAthleticTrainer,
   createTeamDoctor,
   evaluateMedicalStaffEffects,
+  extractClubMedicalStaff,
   generateMedicalStaffMarket,
+  teamDoctorToStaffMember,
 } from './medicalStaff';
+import { createClub } from '../gm/rosterFactory';
+import { hireStaffMember } from '../gm/coaches';
 
 describe('Toggleable Injuries, Illnesses & Specialty Medical Staff (TASK-067, TASK-068)', () => {
   it('maintains a rich 4-tier catalog with zero fatalities, zero STDs, sex-specific conditions & custom extensibility', () => {
@@ -180,5 +185,36 @@ describe('Toggleable Injuries, Illnesses & Specialty Medical Staff (TASK-067, TA
     const market = generateMedicalStaffMarket(rng, 'aa');
     expect(market.doctors.length).toBeGreaterThanOrEqual(4);
     expect(market.trainers.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('converts Team Doctors and Athletic Trainers into hireable StaffMembers and extracts ClubMedicalStaff', () => {
+    const rng = createSeededRng(6799);
+    const club = createClub(rng, {
+      id: 'med-club',
+      isHuman: true,
+      city: 'Metro',
+      name: 'Stars',
+      mascot: 'Med Bear',
+      colors: { primary: '#1D3557', secondary: '#E63946', accent: '#FFD166', monogram: 'MS' },
+      leagueTier: 'aa',
+    });
+    const doc = createTeamDoctor(rng, 'orthopedic_arm', 2);
+    const trainer = createAthleticTrainer(rng, 'strength_durability', 2);
+
+    const docStaff = teamDoctorToStaffMember(doc);
+    const trainerStaff = athleticTrainerToStaffMember(trainer);
+    expect(docStaff.role).toBe('team_doctor');
+    expect(trainerStaff.role).toBe('athletic_trainer');
+
+    const hiredDoc = hireStaffMember(club, docStaff);
+    expect(hiredDoc.hired).toBe(true);
+    const hiredBoth = hireStaffMember(hiredDoc.club, trainerStaff);
+    expect(hiredBoth.hired).toBe(true);
+
+    const extracted = extractClubMedicalStaff(hiredBoth.club.coaches.activeStaff);
+    expect(extracted.teamDoctor?.id).toBe(doc.id);
+    expect(extracted.teamDoctor?.specialty).toBe('orthopedic_arm');
+    expect(extracted.athleticTrainer?.id).toBe(trainer.id);
+    expect(extracted.athleticTrainer?.specialty).toBe('strength_durability');
   });
 });
