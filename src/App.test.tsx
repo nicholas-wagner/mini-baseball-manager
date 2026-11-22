@@ -26,11 +26,14 @@ describe('Mini Baseball Manager — Milestone 1 Design Lab Integration', () => {
     await user.click(cometBtn);
     expect(cometBtn).toHaveAttribute('aria-pressed', 'true');
 
-    // Roll a random procedural 90s player card
+    // Roll a weighted random procedural 90s player card + scout an Ireland player
     const beforeCards = screen.getAllByRole('article', { name: /baseball card front/i }).length;
-    await user.click(screen.getByRole('button', { name: /roll random player/i }));
+    await user.click(screen.getByRole('button', { name: /roll weighted player/i }));
     const afterCards = screen.getAllByRole('article', { name: /baseball card front/i }).length;
     expect(afterCards).toBe(beforeCards);
+
+    await user.click(screen.getByRole('button', { name: /aus.*5%/i }));
+    expect(screen.getAllByText(/kangaroo bounce/i).length).toBeGreaterThanOrEqual(1);
 
     // Navigate to Skill Tree preview tab and back to Design Lab
     await user.click(screen.getAllByRole('button', { name: /skill tree/i })[0]);

@@ -111,9 +111,10 @@ export function evaluateMiniPlayerPose(
       const rhythm = Math.sin(tau * 2);
       pose.root = { tx: 0, ty: 3 + rhythm * 2.5, rotDeg: -2, sx: 1.03, sy: 0.97 };
       pose.head = { tx: -2, ty: rhythm * 2, rotDeg: -4 };
-      pose.frontArm = { tx: 6, ty: -22 + rhythm * 3, rotDeg: -14 + rhythm * 6 };
-      pose.backArm = { tx: 42, ty: -18 + rhythm * 3, rotDeg: -24 + rhythm * 6 };
-      pose.batRotDeg = 22 + rhythm * 10;
+      // Unified two-handed bat assembly coiled cleanly outside the back shoulder!
+      pose.frontArm = { tx: 4, ty: -4 + rhythm * 2.5, rotDeg: -10 + rhythm * 5 };
+      pose.backArm = { tx: 0, ty: 0, rotDeg: 0 };
+      pose.batRotDeg = 24 + rhythm * 9;
       pose.backLeg.rotDeg = 8;
       pose.frontLeg.rotDeg = -8;
       pose.expression = 'determined';
@@ -193,9 +194,8 @@ export function evaluateMiniPlayerPose(
           sy: 1 - 0.1 * t,
         };
         pose.head = { tx: -3 * t, ty: 3 * t, rotDeg: -6 * t };
-        pose.frontArm = { tx: 10, ty: -22, rotDeg: -34 * t };
-        pose.backArm = { tx: 42, ty: -18, rotDeg: -38 * t };
-        pose.batRotDeg = 22 + 26 * t;
+        pose.frontArm = { tx: 8 * t, ty: -8 * t, rotDeg: -22 * t };
+        pose.batRotDeg = 24 + 24 * t;
         pose.auraIntensity = isBomb ? t : 0;
       } else if (phase < 0.58) {
         const raw = (phase - 0.32) / 0.26;
@@ -208,9 +208,8 @@ export function evaluateMiniPlayerPose(
           sy: 1 + 0.14 * Math.sin(raw * Math.PI),
         };
         pose.head = { tx: -4 * t, ty: -2 * t, rotDeg: 8 * t };
-        pose.frontArm = { tx: 10 - 28 * t, ty: -16, rotDeg: -34 + 118 * t };
-        pose.backArm = { tx: 42 - 44 * t, ty: -14, rotDeg: -38 + 112 * t };
-        pose.batRotDeg = 48 - 156 * t;
+        pose.frontArm = { tx: 8 - 46 * t, ty: -8 + 8 * t, rotDeg: -22 + 92 * t };
+        pose.batRotDeg = 48 - 152 * t;
         pose.backLeg.rotDeg = -22 * t;
         pose.frontLeg.rotDeg = 24 * t;
         pose.swingSmearOpacity = Math.sin(raw * Math.PI);
@@ -219,9 +218,8 @@ export function evaluateMiniPlayerPose(
       } else {
         const t = smoothstep((phase - 0.58) / 0.42);
         pose.root = { tx: -12 * (1 - t), ty: 0, rotDeg: -14 * (1 - t), sx: 1, sy: 1 };
-        pose.frontArm = { tx: -18 * (1 - t) + 6 * t, ty: -20, rotDeg: 84 * (1 - t) - 14 * t };
-        pose.backArm = { tx: -2 * (1 - t) + 42 * t, ty: -16, rotDeg: 74 * (1 - t) - 24 * t };
-        pose.batRotDeg = -108 * (1 - t) + 22 * t;
+        pose.frontArm = { tx: -38 * (1 - t) + 4 * t, ty: -4 * t, rotDeg: 70 * (1 - t) - 10 * t };
+        pose.batRotDeg = -104 * (1 - t) + 24 * t;
         pose.auraIntensity = isBomb ? 1 - t : 0;
         if (isBomb && t > 0.2) pose.expression = 'happy';
       }
@@ -233,9 +231,8 @@ export function evaluateMiniPlayerPose(
       pose.root = { tx: -5 * t, ty: 10 * t, rotDeg: -6 * t, sx: 1 + 0.07 * t, sy: 1 - 0.08 * t };
       pose.backLeg = { tx: -4 * t, ty: -5 * t, rotDeg: 20 * t };
       pose.frontLeg = { tx: 5 * t, ty: -5 * t, rotDeg: -20 * t };
-      pose.frontArm = { tx: -12 * t, ty: -8 * t, rotDeg: 32 * t };
-      pose.backArm = { tx: 18 * t, ty: -8 * t, rotDeg: 28 * t };
-      pose.batRotDeg = 22 - 108 * t;
+      pose.frontArm = { tx: -28 * t, ty: 2 * t, rotDeg: 28 * t };
+      pose.batRotDeg = 24 - 110 * t;
       pose.auraColor = '#00E5FF';
       pose.auraIntensity = 0.75 * t;
       pose.expression = 'determined';

@@ -95,6 +95,96 @@ export class RetroSoundEngine {
     osc.stop(now + duration + 0.02);
   }
 
+  private createPinkNoiseBuffer(ctx: AudioContext, duration: number): AudioBuffer {
+    const sampleRate = ctx.sampleRate;
+    const frameCount = Math.max(1, Math.floor(sampleRate * duration));
+    const buffer = ctx.createBuffer(1, frameCount, sampleRate);
+    const data = buffer.getChannelData(0);
+    // Paul Kellet's pink-noise filter: warm human crowd spectrum without harsh white hiss
+    let b0 = 0;
+    let b1 = 0;
+    let b2 = 0;
+    let b3 = 0;
+    let b4 = 0;
+    let b5 = 0;
+    let b6 = 0;
+    for (let i = 0; i < frameCount; i += 1) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.065;
+      b6 = white * 0.115926;
+    }
+    return buffer;
+  }
+
+  /**
+   * Layered stadium crowd roar:
+   * - Pink noise sculpted through 3 human vocal-tract formants ("oooh / yeeeah!")
+   * - Organic slow swell + stadium reverb tail
+   * - Staggered bleacher hand claps
+   * - Subtle distant fan whistle/cheer embedded in the swell
+   */
+  private playCrowdLayer(ctx: AudioContext, startOffset = 0, duration = 1.65, intensity = 1): void {
+    const now = ctx.currentTime + startOffset;
+    const pinkBuffer = this.createPinkNoiseBuffer(ctx, duration);
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.0001, now);
+    masterGain.gain.linearRampToValueAtTime(0.62 * intensity * this.state.volume, now + 0.24);
+    masterGain.gain.setValueAtTime(0.58 * intensity * this.state.volume, now + duration * 0.45);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    // Gentle stadium air-absorption lowpass so there is zero radio-static fizz
+    const airLowpass = ctx.createBiquadFilter();
+    airLowpass.type = 'lowpass';
+    airLowpass.frequency.setValueAtTime(2900, now);
+    masterGain.connect(airLowpass);
+    airLowpass.connect(ctx.destination);
+
+    // Three human vocal formant bands sweeping slightly upward as excitement peaks
+    const formants: readonly { startFreq: number; peakFreq: number; q: number; gain: number }[] = [
+      { startFreq: 420, peakFreq: 540, q: 2.2, gain: 0.75 }, // warm chest crowd roar
+      { startFreq: 980, peakFreq: 1240, q: 2.8, gain: 0.58 }, // "yeah!" vowel body
+      { startFreq: 1950, peakFreq: 2350, q: 3.4, gain: 0.28 }, // excited crowd shimmer
+    ];
+
+    for (const f of formants) {
+      const src = ctx.createBufferSource();
+      src.buffer = pinkBuffer;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.setValueAtTime(f.q, now);
+      bp.frequency.setValueAtTime(f.startFreq, now);
+      bp.frequency.linearRampToValueAtTime(f.peakFreq, now + 0.35);
+      bp.frequency.linearRampToValueAtTime(f.startFreq * 0.92, now + duration);
+
+      const fg = ctx.createGain();
+      fg.gain.setValueAtTime(f.gain, now);
+
+      src.connect(bp);
+      bp.connect(fg);
+      fg.connect(masterGain);
+      src.start(now);
+      src.stop(now + duration + 0.04);
+    }
+
+    // Staggered bleacher applause pops (warm soft hand claps!)
+    const clapCount = 12;
+    for (let i = 0; i < clapCount; i += 1) {
+      const clapOffset = startOffset + 0.14 + (i / clapCount) * (duration * 0.68) + (i % 3) * 0.017;
+      this.noiseBurst(ctx, clapOffset, 0.042, 1150 + (i % 4) * 210, 'bandpass', 0.13 * intensity);
+    }
+
+    // Subtle cheerful fan "woo!" glide tucked softly inside the crowd swell
+    this.tone(ctx, 740, 1120, startOffset + 0.18, 0.22, 'sine', 0.045 * intensity);
+    this.tone(ctx, 1120, 860, startOffset + 0.4, 0.26, 'sine', 0.035 * intensity);
+  }
+
   private noiseBurst(
     ctx: AudioContext,
     startOffset: number,
@@ -178,8 +268,7 @@ export class RetroSoundEngine {
         this.tone(ctx, 360, 760, 0.24, 0.14, 'triangle', 0.2);
         break;
       case 'crowd_cheer':
-        this.noiseBurst(ctx, 0, 0.75, 1100, 'bandpass', 0.36);
-        this.noiseBurst(ctx, 0.15, 0.8, 1650, 'bandpass', 0.24);
+        this.playCrowdLayer(ctx, 0, 1.75, 1.0);
         break;
       case 'organ_charge': {
         // Classic ballpark "da-da-da-DA-da-DA!" (G4-C5-E5-G5-E5-G5)
@@ -210,7 +299,7 @@ export class RetroSoundEngine {
           this.tone(ctx, freq, freq, offset, dur, 'square', 0.17);
           this.tone(ctx, freq * 0.5, freq * 0.5, offset, dur, 'triangle', 0.14);
         }
-        this.noiseBurst(ctx, 0.35, 0.9, 1300, 'bandpass', 0.28);
+        this.playCrowdLayer(ctx, 0.28, 1.6, 0.75);
         break;
       }
       case 'level_up': {

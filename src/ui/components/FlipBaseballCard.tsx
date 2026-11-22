@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { RotateCw, Sparkles, Star } from 'lucide-react';
+import { FlagBadge } from '../../art/flags/FlagBadge';
 import { renderPortraitSvgString } from '../../art/portraits/generatePortrait';
 import type {
   CardRarity,
@@ -7,6 +8,8 @@ import type {
   PortraitTeamColors,
   PortraitTraits,
 } from '../../art/portraits/types';
+import { getNationalityById } from '../../engine/nationalities/pickNationality';
+import type { NationalityId } from '../../engine/nationalities/types';
 import { getStatGrade } from '../design-system/statGrade';
 import { StatBadge } from '../design-system/StatBadge';
 
@@ -16,6 +19,8 @@ export interface BaseballCardPlayer {
   nickname: string;
   position: string;
   jerseyNumber: number;
+  nationalityId: NationalityId;
+  hometown: string;
   overall: number;
   rarity: CardRarity;
   level: number;
@@ -60,6 +65,8 @@ export function FlipBaseballCard({
     [player.traits, team, mood],
   );
 
+  const nationality = getNationalityById(player.nationalityId);
+  const heritage = nationality.heritageAbility;
   const ovrMeta = getStatGrade(player.overall);
   const frameClass =
     player.rarity === 'mvp'
@@ -74,7 +81,7 @@ export function FlipBaseballCard({
     <div className="card-perspective w-full max-w-[260px] mx-auto">
       <div
         className={[
-          'card-flipper w-full h-[370px]',
+          'card-flipper w-full h-[392px]',
           flipped ? 'is-flipped' : '',
         ]
           .filter(Boolean)
@@ -94,19 +101,21 @@ export function FlipBaseballCard({
           <div className="flex-1 bg-[#FBF4E4] rounded-[14px] border-2 border-[#181B2C] overflow-hidden flex flex-col">
             {/* Top Team Pennant */}
             <div
-              className="px-2.5 py-1.5 border-b-2 border-[#181B2C] flex items-center justify-between"
+              className="px-2.5 py-1.5 border-b-2 border-[#181B2C] flex items-center justify-between gap-1"
               style={{ backgroundColor: team.primary }}
             >
-              <span className="font-display text-[10px] tracking-wider text-white drop-shadow-[1px_1px_0_#181B2C]">
+              <span className="font-display text-[10px] tracking-wider text-white drop-shadow-[1px_1px_0_#181B2C] truncate">
                 {RARITY_LABELS[player.rarity]}
               </span>
-              <span className="px-1.5 py-0.5 rounded-md bg-[#FBF4E4] text-[#181B2C] border border-[#181B2C] font-mono-tabular text-[11px] font-extrabold">
-                #{player.jerseyNumber}
-              </span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="px-1.5 py-0.5 rounded-md bg-[#FBF4E4] text-[#181B2C] border border-[#181B2C] font-mono-tabular text-[11px] font-extrabold">
+                  #{player.jerseyNumber}
+                </span>
+              </div>
             </div>
 
             {/* Retro 90s Cartoon Portrait */}
-            <div className="relative mx-2.5 mt-2.5 rounded-xl border-[2.5px] border-[#181B2C] overflow-hidden aspect-square bg-[#7CE0FF]">
+            <div className="relative mx-2.5 mt-2 rounded-xl border-[2.5px] border-[#181B2C] overflow-hidden aspect-square bg-[#7CE0FF]">
               <div
                 className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:block"
                 dangerouslySetInnerHTML={{ __html: portraitSvg }}
@@ -118,6 +127,13 @@ export function FlipBaseballCard({
               >
                 {player.position}
               </span>
+              {/* Crisp SVG Nationality Flag Badge */}
+              <div
+                title={`${nationality.name} (${player.hometown})`}
+                className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-lg bg-[#FBF4E4]/95 border-2 border-[#181B2C] shadow-[1.5px_1.5px_0_#181B2C]"
+              >
+                <FlagBadge nationalityId={player.nationalityId} label={nationality.shortCode} />
+              </div>
               {/* OVR Badge */}
               <div
                 className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-lg border-2 border-[#181B2C] text-center shadow-[2px_2px_0_#181B2C]"
@@ -132,19 +148,26 @@ export function FlipBaseballCard({
               </span>
             </div>
 
-            {/* Nameplate & Special Powers */}
-            <div className="px-2.5 pt-2 pb-2 flex-1 flex flex-col justify-between">
+            {/* Nameplate, Cultural Heritage Ability & Special Powers */}
+            <div className="px-2.5 pt-2 pb-1.5 flex-1 flex flex-col justify-between">
               <div>
                 <h3 className="font-display text-sm leading-tight text-[#181B2C] truncate">
                   {player.name}
                 </h3>
                 <p className="text-[11px] font-bold text-[#4A5068] truncate">
-                  &ldquo;{player.nickname}&rdquo;
+                  &ldquo;{player.nickname}&rdquo; • {player.hometown}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {player.specialPowers.map((power) => (
+              <div className="flex flex-wrap gap-1 mt-1">
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-[#181B2C] text-[10px] font-extrabold text-white"
+                  style={{ backgroundColor: '#7209B7' }}
+                  title={`${heritage.mythOrAnimal}: ${heritage.shortEffect}`}
+                >
+                  ★ {heritage.name}
+                </span>
+                {player.specialPowers.slice(0, 1).map((power) => (
                   <span
                     key={power}
                     className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[#FFC300] border border-[#181B2C] text-[10px] font-extrabold text-[#181B2C]"
@@ -187,21 +210,27 @@ export function FlipBaseballCard({
         >
           <div className="flex-1 bg-[#FBF4E4] rounded-[14px] border-2 border-[#181B2C] p-3 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between border-b-2 border-[#181B2C] pb-1.5">
-                <div>
-                  <div className="font-display text-xs text-[#181B2C]">{player.name}</div>
-                  <div className="text-[10px] font-bold text-[#4A5068]">
-                    {player.position} • #{player.jerseyNumber} • LV.{player.level}
+              <div className="flex items-center justify-between border-b-2 border-[#181B2C] pb-1.5 gap-2">
+                <div className="min-w-0">
+                  <div className="font-display text-xs text-[#181B2C] truncate">{player.name}</div>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px] font-bold text-[#4A5068]">
+                    <FlagBadge nationalityId={player.nationalityId} />
+                    <span className="truncate">
+                      {player.hometown} • {player.position}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-0.5 text-[#FFC300]" aria-label="Fan Popularity">
+                <div
+                  className="flex items-center gap-0.5 text-[#FFC300] shrink-0"
+                  aria-label="Fan Popularity"
+                >
                   {Array.from({ length: popularityStars }, (_, i) => (
                     <Star key={i} className="w-3.5 h-3.5 fill-[#FFC300] stroke-[#181B2C]" />
                   ))}
                 </div>
               </div>
 
-              <div className="mt-2.5 space-y-2">
+              <div className="mt-2 space-y-1.5">
                 <StatBadge label="Contact" value={player.stats.contact} showBar />
                 <StatBadge label="Power" value={player.stats.power} showBar />
                 <StatBadge label="Pitching" value={player.stats.pitching} showBar />
@@ -210,10 +239,13 @@ export function FlipBaseballCard({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-[11px] leading-snug font-bold text-[#4A5068] bg-[#F1E4C8] p-2 rounded-lg border border-[#181B2C]/30">
-                {player.bio}
-              </p>
+            <div className="space-y-1.5">
+              <div className="bg-[#7209B7]/10 border border-[#7209B7]/40 rounded-lg p-1.5 text-[10px] leading-snug">
+                <div className="font-extrabold text-[#7209B7]">
+                  ★ {heritage.name} ({heritage.mythOrAnimal})
+                </div>
+                <div className="font-bold text-[#181B2C]">{heritage.shortEffect}</div>
+              </div>
 
               <button
                 type="button"

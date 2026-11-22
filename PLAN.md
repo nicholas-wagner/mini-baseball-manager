@@ -180,6 +180,12 @@ mini-baseball-manager/
   - *Pitchers*: **Blazing Comet Fastball**, **Ghost Knuckle**, **Tornado Slider**, **Rubber Arm**, **Ice Veins**.
   - *Hitters*: **Moonshot Bomb-Swing**, **Ninja Bunt-Specialist**, **Laser Gap-Seeker**, **Rally Spark**, **Two-Strike Magnet**.
   - *Fielders*: **Cannon Power-Arm**, **Sky-High Leap**, **Vacuum Glove**, **Turbo Cleats**.
+- **Global Nationalities & Cultural Heritage Abilities (Myths & Animals)**:
+  - Weighted player generation (**50% USA**, **5% each**: Canada, Japan, Korea, Mexico, Dominican Republic, Puerto Rico, Brazil, Argentina, Australia, Ireland — cleanly extensible for more nations!).
+  - Every player celebrates their heritage with a crisp SVG flag badge, authentic name/hometown pool, and a signature unlockable **Cultural Heritage Ability**: *Eagle Soar* (USA), *Moose Charge* (CAN), *Kitsune Mirage* (JPN), *White Tiger Pounce* (KOR), *Serpent Wind / Quetzalcoatl* (MEX), *Huracán Swing* (DOM), *Coquí Leap* (PRI), *Jaguar Dash* (BRA), *Condor Glide* (ARG), *Kangaroo Bounce* (AUS), and *Leprechaun's Luck* (IRL).
+- **Hot Streaks & Cold Slumps (Dynamic Player Form)**:
+  - Rolling performance momentum across recent games puts players into **Hot Streaks** (*🔥 On Fire!* — temporary contact/power/velocity surge, fiery card backdrop, glowing chibi sparks, bonus fan hype & faster Special Power charge) or **Cold Slumps** (*🧊 Cold Spell* — temporary batting/control dip, sweaty/nervous portrait mood).
+  - Managers can actively bust slumps via targeted **Practice Drills**, **Active Manager Pep Talks**, dropping them in the lineup for low-pressure at-bats, or narrative **Surprise Events**.
 
 ### 2. Human Manager RPG Powers
 - **Skipper Path (Active In-Game Powers, 1–3 uses/game)**: *Fired-Up Pep Talk*, *Mound Whisper*, *Clutch Focus*, *Rally Cap Magic*.
@@ -253,8 +259,8 @@ mini-baseball-manager/
 ### Milestone 3 — RPG Depth: Real Skill Trees, Special Powers, Practice & Manager Tree
 - [ ] **3A. Player Branching Skill Trees & Special Powers** (`src/engine/rpg/`, `SkillTreeGraph`): Interactive zoomable/pannable skill tree UI for Pitcher, Batter, and Fielder branches; prerequisite & SP rules; all Special Powers wired into simulation math, 3D VFX, custom animations, and SFX.
   - [ ] *TDD Gate*: Tree prerequisite/cycle/SP validation + Special Power sim-modifier & Hype-gauge tests pass.
-- [ ] **3B. Animated Practice & Training Complex** (`Practice` screen): Assign players to Batting Cages, Bullpen Lab, Fielding Fungos, Sprint Track, or Fan Meet & Greet; cute 3D chibi practice dioramas with floating `+XP`, sweat drops, fatigue trade-offs, and breakthrough crits.
-  - [ ] *TDD Gate*: Practice XP, fatigue, facility multiplier, and breakthrough crit tests pass.
+- [ ] **3B. Animated Practice, Hot Streaks/Slumps & Training Complex** (`Practice` screen): Assign players to Batting Cages, Bullpen Lab, Fielding Fungos, Sprint Track, or Fan Meet & Greet; cute 2.5D chibi practice dioramas with floating `+XP`, sweat drops, fatigue trade-offs, breakthrough crits, and **Hot Streak / Cold Slump** momentum tracking (plus slump-busting drills!).
+  - [ ] *TDD Gate*: Practice XP, fatigue, facility multiplier, breakthrough crit, and Hot Streak / Slump transition & modifier tests pass.
 - [ ] **3C. Human Manager RPG Tree & Active In-Game Powers** (`src/engine/manager/`): Manager XP, leveling, 3-branch Manager Skill Tree (Skipper Actives, Coach Passives, Mogul Passives), and in-game **Manager Power Dock** with banner animations & organ riffs.
   - [ ] *TDD Gate*: Cooldown/charge limits, passive modifier stacking, and active power sim effects tested.
 
@@ -317,6 +323,8 @@ Track every plan tweak, new feature idea, or architectural pivot here so the evo
 | 2026-11-21 | League Pacing | Locked 6 tiers × 8 teams, 21-game regular season + 4-team playoffs | Makes 3-game series ideal for 5–15 min runs while keeping seasons meaty |
 | 2026-11-21 | Gameplay / League | Added **Dynamic Team Rivalries** (heat meter, organic triggers, poached-player revenge games, comic VS cards, boosted hype/attendance, traveling Rivalry Cup) | Deepens multi-season drama and ties together visuals, RPG, economy, and trophies |
 | 2026-11-21 | Player Visuals (M1) | Upgraded players to **True 1.8-Head Volumetric 2.5D Chibi SVG Rigs** (plump 3/4 mochi cheeks, giant low-set luminous gradient eyes, tiny bean torso, stepped stubby limbs/cleats, spherical/cylindrical SVG gradients, cast head/visor shadows, and 2.5D standee rim + 3D hop physics in the ballpark) | Delivers authentic chibi proportions and tactile 2.5D depth while keeping the approved 90s card portraits intact |
+| 2026-11-21 | Global Roster & RPG | Added **11 Nationalities** (`50% USA` + `5%` each CAN/JPN/KOR/MEX/DOM/PRI/BRA/ARG/AUS/IRL, extensible) with crisp SVG flags, authentic names/hometowns, and **Cultural Heritage Myth & Animal Special Abilities** | Celebrates international baseball culture and adds memorable identity & RPG flavor to every drafted player |
+| 2026-11-21 | RPG & Simulation (M3) | Added **Hot Streaks & Cold Slumps** (dynamic player form & slump-busting via practice/manager powers) to Milestone 3 | Makes day-to-day lineup decisions, manager pep talks, and practice assignments feel alive across a 21-game season |
 
 ---
 

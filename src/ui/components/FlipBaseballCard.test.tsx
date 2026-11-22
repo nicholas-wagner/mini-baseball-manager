@@ -11,12 +11,14 @@ const samplePlayer: BaseballCardPlayer = {
   nickname: 'The Rocket Kid',
   position: 'SP',
   jerseyNumber: 24,
+  nationalityId: 'USA',
+  hometown: 'Sandlot, OH',
   overall: 89,
   rarity: 'mvp',
   level: 7,
   popularity: 85,
   traits: createPortraitTraits(9401),
-  specialPowers: ['Blazing Comet', 'Ghost Knuckle'],
+  specialPowers: ['Blazing Comet', 'Ice Veins'],
   stats: {
     contact: 62,
     power: 70,
@@ -28,7 +30,7 @@ const samplePlayer: BaseballCardPlayer = {
 };
 
 describe('FlipBaseballCard', () => {
-  it('renders front portrait details and flips to stat back cleanly', async () => {
+  it('renders front portrait, flag badge, heritage ability, and flips cleanly to stats back', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
 
@@ -38,6 +40,8 @@ describe('FlipBaseballCard', () => {
 
     expect(screen.getAllByText('Rico Comet').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Blazing Comet')).toBeInTheDocument();
+    expect(screen.getAllByText(/eagle soar/i)).toHaveLength(2);
+    expect(screen.getAllByRole('img', { name: /usa flag/i }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('MVP HOLO FOIL')).toBeInTheDocument();
 
     const flipper = container.querySelector('.card-flipper');

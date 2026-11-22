@@ -22,7 +22,10 @@ interface ActiveCallout {
 
 export interface BallparkVfxSystem {
   group: THREE.Group;
-  launchBall: (style: BallVfxStyle) => { cameraShake: number };
+  launchBall: (
+    style: BallVfxStyle,
+    calloutOverride?: { text: string; color?: string },
+  ) => { cameraShake: number };
   spawnComicCallout: (text: string, pos: { x: number; y: number; z: number }, bgColor?: string) => void;
   update: (dtSec: number) => void;
   dispose: () => void;
@@ -116,20 +119,29 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     callouts.push({ sprite, texture, elapsed: 0, duration: 1.35, startY: pos.y });
   };
 
-  const launchBall = (style: BallVfxStyle): { cameraShake: number } => {
+  const launchBall = (
+    style: BallVfxStyle,
+    calloutOverride?: { text: string; color?: string },
+  ): { cameraShake: number } => {
     const spec = BALL_TRAJECTORY_PRESETS[style];
     activeFlight = { spec, elapsed: 0 };
     ballMesh.visible = true;
 
     trailMaterials.forEach((mat, idx) => {
-      mat.color.set(idx % 2 === 0 ? spec.trailColor : spec.secondaryColor);
+      mat.color.set(
+        idx % 2 === 0 ? (calloutOverride?.color ?? spec.trailColor) : spec.secondaryColor,
+      );
     });
 
     const calloutPos =
       style === 'moonshot_hr' || style === 'line_drive' || style === 'ninja_bunt'
         ? { x: 0, y: 2.6, z: -1.5 }
         : { x: 0.4, y: 2.6, z: -8.5 };
-    spawnComicCallout(spec.calloutText, calloutPos, spec.trailColor);
+    spawnComicCallout(
+      calloutOverride?.text ?? spec.calloutText,
+      calloutPos,
+      calloutOverride?.color ?? spec.trailColor,
+    );
 
     return { cameraShake: spec.cameraShake };
   };

@@ -10,5 +10,6 @@ test('Design Lab renders 3D ballpark, retro baseball cards, and responds to inte
 
   await page.getByRole('button', { name: /batter ots 3d/i }).click();
   await page.getByRole('button', { name: /bomb-swing hr/i }).click();
-  await page.getByRole('button', { name: /roll random player/i }).click();
+  await page.getByRole('button', { name: /roll weighted player/i }).click();
+  await page.getByRole('button', { name: /aus.*5%/i }).click();
 });

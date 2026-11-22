@@ -205,7 +205,10 @@ export class DesignLabSceneController {
     callout?: { text: string; color: string; y?: number; z?: number },
   ): void {
     if (ballStyle) {
-      const { cameraShake } = this.vfx.launchBall(ballStyle);
+      const { cameraShake } = this.vfx.launchBall(
+        ballStyle,
+        callout ? { text: callout.text, color: callout.color } : undefined,
+      );
       this.trauma = Math.min(1, this.trauma + cameraShake);
       this.crowdExcitement = ballStyle === 'moonshot_hr' ? 1.0 : 0.72;
     } else if (callout) {

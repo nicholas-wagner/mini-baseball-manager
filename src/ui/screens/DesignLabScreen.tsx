@@ -3,6 +3,7 @@ import {
   Camera,
   Dices,
   Flame,
+  Globe2,
   Music,
   Palette,
   RotateCcw,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
+import { FlagBadge } from '../../art/flags/FlagBadge';
 import {
   generateRandomCardPlayer,
   INITIAL_SHOWCASE_ROSTER,
@@ -17,6 +19,9 @@ import {
 import type { PortraitMood } from '../../art/portraits/types';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
 import { soundEngine, type SoundCue } from '../../audio/soundEngine';
+import { NATIONALITIES_CATALOG } from '../../engine/nationalities/nationalitiesCatalog';
+import { getNationalityById } from '../../engine/nationalities/pickNationality';
+import type { NationalityId } from '../../engine/nationalities/types';
 import { CAMERA_PRESET_LABELS, type CameraPresetId } from '../../scene/camera/cameraRig';
 import type { CharacterAnimClip } from '../../scene/characters/animationState';
 import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
@@ -201,6 +206,36 @@ export function DesignLabScreen() {
 
   const activeTeam = SAMPLE_TEAM_PALETTES[teamIdx];
   const heroPlayer = roster.find((p) => p.id === selectedHeroId) ?? roster[0];
+  const heroNation = getNationalityById(heroPlayer.nationalityId);
+  const heroHeritage = heroNation.heritageAbility;
+
+  const handleTriggerHeritagePower = () => {
+    setActiveActionId('heritage_power');
+    setPitcherClip(heroHeritage.category === 'pitching' ? 'pitch_super' : 'celebrate_hr');
+    setBatterClip(heroHeritage.category === 'batting' ? 'bat_bomb' : 'bat_swing');
+    setFielderClip(
+      heroHeritage.category === 'fielding' ? 'field_high_jump' : 'field_run',
+    );
+    soundEngine.play(
+      heroHeritage.category === 'luck'
+        ? 'cash_chime'
+        : heroHeritage.category === 'fielding'
+          ? 'spring_boing'
+          : heroHeritage.category === 'batting'
+            ? 'bomb_crack'
+            : 'comet_pitch',
+    );
+    setTrigger({
+      nonce: Date.now() + Math.random(),
+      ballStyle: heroHeritage.ballStyle,
+      callout: {
+        text: heroHeritage.calloutText,
+        color: heroHeritage.vfxColor,
+        y: 2.75,
+        z: -8.5,
+      },
+    });
+  };
 
   const handleAction = (preset: ActionPreset) => {
     setActiveActionId(preset.id);
@@ -220,11 +255,11 @@ export function DesignLabScreen() {
     }
   };
 
-  const handleRollNewPlayer = () => {
+  const handleRollNewPlayer = (forcedNationalityId?: NationalityId) => {
     soundEngine.play('level_up');
     const nextSeed = rollSeed + 37;
     setRollSeed(nextSeed);
-    const rookie = generateRandomCardPlayer(nextSeed);
+    const rookie = generateRandomCardPlayer(nextSeed, forcedNationalityId);
     setRoster((prev) => [rookie, ...prev.slice(0, 3)]);
     setSelectedHeroId(rookie.id);
   };
@@ -326,6 +361,15 @@ export function DesignLabScreen() {
               Trigger Animations, Practice Drills &amp; Special Powers
             </div>
             <div className="flex flex-wrap gap-2">
+              <ComicButton
+                size="sm"
+                variant="violet"
+                active={activeActionId === 'heritage_power'}
+                icon={<Sparkles className="w-3.5 h-3.5" />}
+                onClick={handleTriggerHeritagePower}
+              >
+                ★ {heroHeritage.name} ({heroNation.shortCode})
+              </ComicButton>
               {ANIMATION_ACTIONS.map((action) => (
                 <ComicButton
                   key={action.id}
@@ -431,13 +475,48 @@ export function DesignLabScreen() {
             size="sm"
             variant="gold"
             icon={<Dices className="w-4 h-4" />}
-            onClick={handleRollNewPlayer}
+            onClick={() => handleRollNewPlayer()}
           >
-            Roll Random Player
+            Roll Weighted Player
           </ComicButton>
         }
       >
         <div className="space-y-4">
+          {/* Global Scouting & Cultural Heritage Abilities Strip (50% USA • 5% × 10 Nations) */}
+          <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl p-3 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 font-heading font-bold text-xs uppercase tracking-wider text-[#181B2C]">
+                <Globe2 className="w-4 h-4 text-[#7209B7]" />
+                Global Scouting &amp; Cultural Heritage Powers (50% USA • 5% × 10 Nations)
+              </span>
+              <span className="text-[11px] font-extrabold text-[#7209B7]">
+                Active: ★ {heroHeritage.name} — {heroHeritage.mythOrAnimal}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {NATIONALITIES_CATALOG.map((nat) => (
+                <button
+                  key={nat.id}
+                  type="button"
+                  title={`${nat.name} (${nat.weight}%) — ${nat.heritageAbility.name} (${nat.heritageAbility.mythOrAnimal})`}
+                  onClick={() => handleRollNewPlayer(nat.id)}
+                  className={[
+                    'px-2 py-1 rounded-xl border-2 border-[#181B2C] font-heading font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-transform hover:-translate-y-0.5',
+                    heroPlayer.nationalityId === nat.id
+                      ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
+                      : 'bg-[#FBF4E4] text-[#181B2C]',
+                  ].join(' ')}
+                >
+                  <FlagBadge nationalityId={nat.id} />
+                  <span>{nat.shortCode}</span>
+                  <span className="text-[10px] font-mono-tabular text-[#4A5068]">
+                    {nat.weight}%
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Team Palette & Expression Controls */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl p-3 space-y-2">

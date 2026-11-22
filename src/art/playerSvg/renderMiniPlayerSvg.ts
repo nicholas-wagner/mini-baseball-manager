@@ -143,36 +143,51 @@ function renderChibiStubbyLeg(
     </g>`;
 }
 
-function renderOversizedPlushMitt(cx: number, cy: number, uid: string): string {
+function renderOversizedPlushMitt(
+  cx: number,
+  cy: number,
+  uid: string,
+  facing: MiniPlayerFacing,
+): string {
+  // Orient glove upright in athletic catching posture with thumb toward torso
+  const flipX = facing === 'front' ? -1 : 1;
   return `
-    <g>
+    <g transform="translate(${cx} ${cy}) scale(${flipX} 1)">
       <!-- Drop shadow behind mitt -->
-      <circle cx="${cx + 2}" cy="${cy + 4}" r="18" fill="${INK}" opacity="0.18" />
-      <!-- Plush Bulbous 3D Chibi Mitt -->
-      <path d="M${cx - 19} ${cy - 4} C${cx - 23} ${cy - 23} ${cx + 7} ${cy - 27} ${cx + 17} ${cy - 12} C${cx + 23} ${cy - 4} ${cx + 20} ${cy + 15} ${cx + 4} ${cy + 17} C${cx - 12} ${cy + 19} ${cx - 21} ${cy + 10} ${cx - 19} ${cy - 4} Z" fill="url(#mitt-${uid})" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
-      <!-- Deep Leather Pocket & Golden Laces -->
-      <ellipse cx="${cx - 1}" cy="${cy + 3}" rx="9.5" ry="8" fill="#7D3E0D" stroke="${INK}" stroke-width="2.6" />
-      <path d="M${cx - 10} ${cy - 17} L${cx - 6} ${cy - 7} M${cx - 1} ${cy - 19} L${cx} ${cy - 8} M${cx + 8} ${cy - 15} L${cx + 6} ${cy - 6}" stroke="${INK}" stroke-width="2.6" stroke-linecap="round" />
-      <path d="M${cx - 13} ${cy - 9} L${cx - 6} ${cy - 11}" stroke="#FFE8B3" stroke-width="2.6" stroke-linecap="round" />
+      <ellipse cx="2" cy="4" rx="17" ry="15" fill="${INK}" opacity="0.18" />
+      <!-- Wrist cuff anchoring cleanly onto forearm -->
+      <rect x="-11" y="7" width="18" height="9" rx="4" fill="#9E5216" stroke="${INK}" stroke-width="3.5" />
+      <!-- Plush Bulbous 3D Chibi Mitt pointing naturally UP-AND-OUT -->
+      <path d="M-17 4 C-22 -14 -4 -26 10 -20 C19 -16 21 -3 15 8 C11 15 -8 16 -17 4 Z" fill="url(#mitt-${uid})" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
+      <!-- Deep Leather Catching Pocket & Golden Webbing Laces -->
+      <ellipse cx="-1" cy="-2" rx="9" ry="7.5" fill="#7D3E0D" stroke="${INK}" stroke-width="2.6" />
+      <path d="M-9 -17 L-5 -7 M0 -19 L1 -8 M8 -15 L6 -6" stroke="${INK}" stroke-width="2.6" stroke-linecap="round" />
+      <path d="M-12 -10 L-4 -12" stroke="#FFE8B3" stroke-width="2.6" stroke-linecap="round" />
     </g>`;
 }
 
-function renderLathed3DBat(
-  handX: number,
-  handY: number,
+function renderLathed3DBatWithTwoHandGrip(
+  gripX: number,
+  gripY: number,
   uid: string,
+  team: PortraitTeamColors,
   batRotDeg: number,
   energizedColor: string | null,
 ): string {
   const fillAttr = energizedColor ? energizedColor : `url(#bat-${uid})`;
   return `
-    <g transform="translate(${handX} ${handY}) rotate(${batRotDeg})">
-      <!-- Fat Chunky Chibi Bat Barrel with 3D Cylindrical Shading -->
-      <path d="M-4.5 6 L-11.5 -68 C-11.5 -78 11.5 -78 11.5 -68 L4.5 6 Z" fill="${fillAttr}" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
-      <ellipse cx="0" cy="-71" rx="8.5" ry="3.5" fill="#FFF2CC" opacity="0.65" />
+    <g transform="translate(${gripX} ${gripY}) rotate(${batRotDeg})">
+      <!-- Fat Chunky Chibi Bat Barrel angled cleanly away from the helmet -->
+      <path d="M-4.5 14 L-12 -64 C-12 -74 12 -74 12 -64 L4.5 14 Z" fill="${fillAttr}" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
+      <ellipse cx="0" cy="-67" rx="8.8" ry="3.6" fill="#FFF2CC" opacity="0.65" />
       <!-- Taped Grip & Rounded Knob -->
-      <rect x="-5" y="-13" width="10" height="17" rx="2.5" fill="#222538" stroke="${INK}" stroke-width="3.2" />
-      <ellipse cx="0" cy="7" rx="8" ry="4.5" fill="#E5A557" stroke="${INK}" stroke-width="3.6" />
+      <rect x="-5" y="-10" width="10" height="24" rx="2.5" fill="#222538" stroke="${INK}" stroke-width="3.2" />
+      <ellipse cx="0" cy="15" rx="8" ry="4.5" fill="#E5A557" stroke="${INK}" stroke-width="3.6" />
+      <!-- BOTH Chibi Hands Locked Together on the Bat Handle! -->
+      <circle cx="0" cy="-4" r="9.5" fill="url(#skin-${uid})" stroke="${INK}" stroke-width="3.8" />
+      <circle cx="0" cy="7" r="9.5" fill="url(#skin-${uid})" stroke="${INK}" stroke-width="3.8" />
+      <!-- Team Batting Glove Wristbands -->
+      <rect x="-8" y="-1" width="16" height="4" rx="2" fill="${team.primary}" stroke="${INK}" stroke-width="2" />
     </g>`;
 }
 
@@ -476,75 +491,140 @@ export function renderMiniPlayerSvgString(
       ? `<path d="M32 134 C68 68 178 72 212 152 C172 112 88 110 32 134 Z" fill="${pose.auraIntensity > 0.3 ? '#FFC300' : '#FFFFFF'}" opacity="${(pose.swingSmearOpacity * 0.82).toFixed(2)}" stroke="${INK}" stroke-width="2.8" />`
       : '';
 
-  // 2.5D Arm Positions (Back arm sits at x=98 in depth; Front near arm sits at x=142!)
-  const backShoulderX = 98;
-  const backShoulderY = 158;
-  const frontShoulderX = 142;
-  const frontShoulderY = 160;
+  // Anatomically consistent right-handed baseball arms & equipment!
+  // - Right-Handed Pitcher / Fielder / Catcher:
+  //   * FRONT view: Right Hand (Baseball) is viewer's LEFT (x≈78); Left Hand (Mitt) is viewer's RIGHT (x≈162)!
+  //   * BACK view:  Left Hand (Mitt) is viewer's LEFT (x≈76); Right Hand (Baseball) is viewer's RIGHT (x≈164)!
+  // - Right-Handed Batter:
+  //   * Unified two-handed bat grip positioned cleanly outside the right/back shoulder (x≈166, y≈156) so both
+  //     chibi hands stay locked together on the handle and the bat barrel angles cleanly clear of the helmet!
+  const leftSideShoulderX = 96;
+  const leftSideShoulderY = 162;
+  const rightSideShoulderX = 144;
+  const rightSideShoulderY = 162;
 
-  const backArmProp =
-    role === 'batter'
-      ? `<circle cx="84" cy="178" r="10.5" fill="url(#skin-${uid})" stroke="${INK}" stroke-width="4" />`
-      : renderOversizedPlushMitt(76, 179, uid);
-
-  const frontArmProp =
-    role === 'batter'
-      ? renderLathed3DBat(
-          156,
-          178,
-          uid,
-          pose.batRotDeg,
-          pose.auraIntensity > 0.5 ? pose.auraColor : null,
-        )
-      : role === 'pitcher'
-        ? `<g>
-             <circle cx="161" cy="180" r="11" fill="url(#ball-${uid})" stroke="${INK}" stroke-width="3.8" />
-             <path d="M155 174 Q161 180 155 186 M167 174 Q161 180 167 186" fill="none" stroke="#E63946" stroke-width="2.4" />
-           </g>`
-        : '';
-
-  const backArmSvg = `
-    <g transform="${groupTransform(backShoulderX, backShoulderY, pose.backArm)}">
-      <path d="M102 154 C88 158 80 167 82 178 L95 178 C97 170 100 164 105 160 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
-      ${backArmProp}
+  const baseballInHandSvg = (bx: number, by: number) => `
+    <g>
+      <circle cx="${bx}" cy="${by}" r="10.5" fill="url(#ball-${uid})" stroke="${INK}" stroke-width="3.6" />
+      <path d="M${bx - 5.5} ${by - 5.5} Q${bx} ${by} ${bx - 5.5} ${by + 5.5} M${bx + 5.5} ${by - 5.5} Q${bx} ${by} ${bx + 5.5} ${by + 5.5}" fill="none" stroke="#E63946" stroke-width="2.3" />
     </g>`;
 
-  const frontArmSvg = `
-    <g transform="${groupTransform(frontShoulderX, frontShoulderY, pose.frontArm)}">
-      <path d="M138 156 C152 160 160 169 158 180 L145 180 C143 172 140 166 135 162 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
-      <circle cx="155" cy="179" r="10.5" fill="url(#skin-${uid})" stroke="${INK}" stroke-width="4" />
-      ${frontArmProp}
-    </g>`;
+  let leftSideArmSvg = '';
+  let rightSideArmSvg = '';
+
+  if (role === 'batter') {
+    if (facing === 'front') {
+      // RIGHT-HANDED BATTER (FRONT VIEW):
+      // Player's RIGHT shoulder (bat side) is Viewer's LEFT (x≈71), opposite the left-ear helmet flap!
+      const mirroredArm = {
+        ...pose.frontArm,
+        tx: -pose.frontArm.tx,
+        rotDeg: -pose.frontArm.rotDeg,
+      };
+      // Right-side (player's lead left arm) reaches across chest to grip the bat handle on viewer's left
+      rightSideArmSvg = `
+        <g transform="${groupTransform(rightSideShoulderX, rightSideShoulderY, mirroredArm)}">
+          <path d="M142 158 C122 164 100 164 82 158 L84 170 C102 175 126 174 144 168 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+        </g>`;
+      // Left-side (player's back right arm) grips the bat cleanly on viewer's left, angled up-and-left!
+      leftSideArmSvg = `
+        <g transform="${groupTransform(leftSideShoulderX, leftSideShoulderY, mirroredArm)}">
+          <path d="M100 156 C86 154 76 154 71 162 L81 172 C88 167 94 165 102 166 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+          ${renderLathed3DBatWithTwoHandGrip(
+            71,
+            156,
+            uid,
+            team,
+            -pose.batRotDeg,
+            pose.auraIntensity > 0.5 ? pose.auraColor : null,
+          )}
+        </g>`;
+    } else {
+      // RIGHT-HANDED BATTER (BACK VIEW — Batter OTS 3D):
+      // Player's RIGHT shoulder (bat side) is Viewer's RIGHT (x≈169)!
+      leftSideArmSvg = `
+        <g transform="${groupTransform(leftSideShoulderX, leftSideShoulderY, pose.frontArm)}">
+          <path d="M98 158 C118 164 140 164 158 158 L156 170 C138 175 114 174 96 168 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+        </g>`;
+      rightSideArmSvg = `
+        <g transform="${groupTransform(rightSideShoulderX, rightSideShoulderY, pose.frontArm)}">
+          <path d="M140 156 C154 154 164 154 169 162 L159 172 C152 167 146 165 138 166 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+          ${renderLathed3DBatWithTwoHandGrip(
+            169,
+            156,
+            uid,
+            team,
+            pose.batRotDeg,
+            pose.auraIntensity > 0.5 ? pose.auraColor : null,
+          )}
+        </g>`;
+    }
+  } else if (facing === 'front') {
+    // FRONT VIEW: Viewer's LEFT = Player's Right Throwing Arm (palm facing forward gripping ball!);
+    // Viewer's RIGHT = Player's Left Glove Arm!
+    leftSideArmSvg = `
+      <g transform="${groupTransform(leftSideShoulderX, leftSideShoulderY, pose.frontArm)}">
+        <path d="M98 158 C84 162 76 170 76 180 L89 180 C91 172 95 167 101 164 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+        <circle cx="80" cy="180" r="10" fill="url(#skin-${uid})" stroke="${INK}" stroke-width="3.8" />
+        ${
+          role === 'pitcher'
+            ? `${baseballInHandSvg(83, 177)}
+               <!-- Chibi thumb & fingers wrapping cleanly over the inner rim of the baseball -->
+               <ellipse cx="89" cy="179" rx="4.5" ry="3.2" transform="rotate(-24 89 179)" fill="url(#skin-${uid})" stroke="${INK}" stroke-width="2.6" />`
+            : ''
+        }
+      </g>`;
+    rightSideArmSvg = `
+      <g transform="${groupTransform(rightSideShoulderX, rightSideShoulderY, pose.backArm)}">
+        <path d="M142 158 C156 158 164 164 165 174 L152 176 C150 169 146 166 140 165 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+        ${renderOversizedPlushMitt(164, 169, uid, 'front')}
+      </g>`;
+  } else {
+    // BACK VIEW: Viewer's LEFT = Player's Left Glove Arm;
+    // Viewer's RIGHT = Player's Right Throwing Arm (ball sits INSIDE palm BEHIND the back of the hand!)
+    leftSideArmSvg = `
+      <g transform="${groupTransform(leftSideShoulderX, leftSideShoulderY, pose.backArm)}">
+        <path d="M98 158 C84 158 76 164 75 174 L88 176 C90 169 94 166 100 165 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+        ${renderOversizedPlushMitt(76, 169, uid, 'back')}
+      </g>`;
+    rightSideArmSvg = `
+      <g transform="${groupTransform(rightSideShoulderX, rightSideShoulderY, pose.frontArm)}">
+        <path d="M142 158 C156 162 164 170 164 180 L151 180 C149 172 145 167 139 164 Z" fill="url(#jersey-team-${uid})" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
+        <!-- Baseball sits on the PALM (front/inside) side, drawn UNDER the back of the chibi hand! -->
+        ${role === 'pitcher' ? baseballInHandSvg(156, 174) : ''}
+        <circle cx="160" cy="180" r="10.2" fill="url(#skin-${uid})" stroke="${INK}" stroke-width="3.8" />
+      </g>`;
+  }
 
   const bgRect = transparentBg
     ? ''
     : '<rect width="240" height="260" rx="20" fill="#85E4FF" />';
 
-  // Stepped 2.5D depth layering: far leg (y=191) -> back arm -> front leg (y=197) -> bean torso -> giant chibi head -> near arm!
+  // Stepped 2.5D depth layering: far leg -> torso -> giant chibi head -> crisp foreground arms/mitt/bat!
   const bodyStack =
     facing === 'back'
       ? `
-        ${backArmSvg}
+        ${leftSideArmSvg}
         ${renderChibiStubbyLeg(104, 192, uid, team, pose.backLeg, true)}
         ${renderChibiStubbyLeg(132, 197, uid, team, pose.frontLeg, false)}
-        ${frontArmSvg}
         <g transform="${groupTransform(120, 175, pose.torso)}">
           ${renderTinyBeanTorso(uid, team, jerseyNumber, role, 'back')}
         </g>
         <g transform="${groupTransform(120, 144, pose.head)}">
           ${renderGiant3DChibiHead(uid, traits, team, 'back', role, activeMood, pose.blink, pose.sweatVisible)}
-        </g>`
+        </g>
+        ${rightSideArmSvg}`
       : `
         ${renderChibiStubbyLeg(132, 192, uid, team, pose.backLeg, true)}
-        ${backArmSvg}
         ${renderChibiStubbyLeg(104, 197, uid, team, pose.frontLeg, false)}
         <g transform="${groupTransform(120, 175, pose.torso)}">
           ${renderTinyBeanTorso(uid, team, jerseyNumber, role, 'front')}
         </g>
+        ${role === 'batter' ? rightSideArmSvg : leftSideArmSvg}
         <g transform="${groupTransform(120, 144, pose.head)}">
           ${renderGiant3DChibiHead(uid, traits, team, 'front', role, activeMood, pose.blink, pose.sweatVisible)}
         </g>
-        ${frontArmSvg}`;
+        ${role === 'batter' ? leftSideArmSvg : rightSideArmSvg}`;
 
   const groundShadowSvg = includeGroundShadow
     ? `<ellipse cx="${(118 + pose.root.tx * 0.45).toFixed(1)}" cy="235" rx="${(46 * pose.shadowScale).toFixed(1)}" ry="${(12 * pose.shadowScale).toFixed(1)}" fill="#0E2417" opacity="0.36" />
