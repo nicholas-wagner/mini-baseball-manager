@@ -23,6 +23,7 @@ import {
   selectPitchForCount,
   type PitchMatchupEvaluation,
 } from '../rpg/pitchArsenals';
+import { evaluatePitcherRoleSituation } from '../rpg/pitcherRoles';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
 
@@ -353,6 +354,8 @@ export interface PitchResolverContext {
   balls: number;
   strikes: number;
   outs: number;
+  inning: number;
+  pitchingLead: number;
   bases: BaseState;
   pitcherFatigue: number;
   battingHype: number;
@@ -544,6 +547,13 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const pitcherMental = evaluatePressureAndLuckModifiers(ctx.pitcher, ctx.leverageIndex);
   const defenderMental = evaluatePressureAndLuckModifiers(ctx.defender, ctx.leverageIndex);
   const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
+  const pitcherRoleEval = evaluatePitcherRoleSituation(ctx.pitcher, {
+    inning: ctx.inning,
+    lead: ctx.pitchingLead,
+    hasRunnersOn: ctx.bases.some((b) => b !== null),
+    leverageIndex: ctx.leverageIndex,
+    batterEffectiveSide: platoon.effectiveBatSide,
+  });
   const fatigueDrop = Math.max(0, ctx.pitcherFatigue - 45) * 0.28;
   const effContact =
     ctx.batter.ratings.contact +
@@ -564,14 +574,16 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     platoon.pitcherBreakDelta +
     pitcherForm.stuffDelta +
     pitchMatchup.pitcherStuffDelta +
-    pitcherMental.pressureRatingDelta -
+    pitcherMental.pressureRatingDelta +
+    pitcherRoleEval.stuffDelta -
     fatigueDrop;
   const effControl =
     ctx.pitcher.ratings.control +
     pitcherForm.controlDelta +
     pitcherPosEval.controlDelta +
     pitchMatchup.pitcherControlDelta +
-    pitcherMental.pressureRatingDelta;
+    pitcherMental.pressureRatingDelta +
+    pitcherRoleEval.controlDelta;
 
   const luckZoneShift = pitcherMental.luckZoneProbDelta - batterMental.luckZoneProbDelta * 0.5;
   const luckHitShift = batterMental.luckHitProbDelta - pitcherMental.luckHitProbDelta * 0.5;

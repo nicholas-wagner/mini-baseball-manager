@@ -9,6 +9,7 @@ import {
   isPitcherPosition,
   MARKET_TIER_LABELS,
   MENTAL_TRAIT_LABELS,
+  PITCHER_ROLE_SHORT_LABELS,
   PITCH_TYPE_SHORT_LABELS,
   PRESSURE_PROFILE_LABELS,
   SPECIALIST_LABELS,
@@ -387,8 +388,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                     onClick={() => setInspectedPlayerId(rp.id)}
                     className="w-full text-left py-1 text-xs font-bold text-[#4A5068] min-h-[44px]"
                   >
-                    RP {rp.name} ({rp.throws}HP) • OVR {computePlayerOverall(rp)} •{' '}
-                    {SPECIALIST_LABELS[rp.specialistArchetype]}
+                    RP {rp.name} ({rp.throws}HP
+                    {rp.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]}` : ''}) • OVR{' '}
+                    {computePlayerOverall(rp)} • {SPECIALIST_LABELS[rp.specialistArchetype]}
                   </button>
                 ))}
               </div>

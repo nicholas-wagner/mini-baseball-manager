@@ -29,6 +29,7 @@ import {
   rollBatterPitchProfile,
   rollPitcherArsenal,
 } from '../rpg/pitchArsenals';
+import { applyPitcherRoleShape, rollPitcherRole } from '../rpg/pitcherRoles';
 import {
   applySpecialistRatingShape,
   evaluatePositionAssignment,
@@ -232,7 +233,13 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   const shiftedMin = clampStat(band.min + marketSpec.ovrOffset);
   const shiftedMax = clampStat(band.max + marketSpec.ovrOffset);
   const baseRatings = rollRatingsForRole(rng, options.position, shiftedMin, shiftedMax);
-  const ratings = applySpecialistRatingShape(baseRatings, specialistArchetype, options.position);
+  const specialistRatings = applySpecialistRatingShape(baseRatings, specialistArchetype, options.position);
+  const pitcherRole = isPitcherPosition(options.position)
+    ? rollPitcherRole(rng, options.position, throws, specialistArchetype)
+    : undefined;
+  const ratings = pitcherRole
+    ? applyPitcherRoleShape(specialistRatings, pitcherRole)
+    : specialistRatings;
   const statCaps = rollStatCapsForMarketTier(rng, ratings, marketTier, options.position);
   const batterPitchProfile = rollBatterPitchProfile(rng, specialistArchetype, ratings, marketTier);
   const pitchArsenal = isPitcherPosition(options.position)
@@ -268,6 +275,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     heritageTierUnlocked: 0,
     marketTier,
     specialistArchetype,
+    ...(pitcherRole ? { pitcherRole } : {}),
     flexibilityProfile: eligibility.flexibilityProfile,
     favoritePosition: eligibility.favoritePosition,
     positionProficiency: eligibility.positionProficiency,

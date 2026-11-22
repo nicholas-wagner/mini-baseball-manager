@@ -217,6 +217,35 @@ export type GamePressureLevel =
   | 'playoff_game'
   | 'elimination_championship';
 
+export type PitcherRole =
+  | 'starter'
+  | 'long_reliever'
+  | 'short_reliever'
+  | 'loogy'
+  | 'setup_man'
+  | 'closer'
+  | 'fireman';
+
+export const PITCHER_ROLE_LABELS: Readonly<Record<PitcherRole, string>> = {
+  starter: 'Starter',
+  long_reliever: 'Long Reliever',
+  short_reliever: 'Short Reliever',
+  loogy: 'LOOGY (Lefty Specialist)',
+  setup_man: 'Setup Man',
+  closer: 'Closer',
+  fireman: 'Fireman',
+};
+
+export const PITCHER_ROLE_SHORT_LABELS: Readonly<Record<PitcherRole, string>> = {
+  starter: 'SP',
+  long_reliever: 'Long RP',
+  short_reliever: 'Short RP',
+  loogy: 'LOOGY',
+  setup_man: 'Setup',
+  closer: 'Closer',
+  fireman: 'Fireman',
+};
+
 export interface PlayerRatings {
   // Batting (1-99)
   contact: number;
@@ -295,6 +324,7 @@ export interface Player {
   // Live Status & Form
   marketTier: PlayerMarketTier;
   specialistArchetype: PlayerSpecialistArchetype;
+  pitcherRole?: PitcherRole;
   flexibilityProfile: PositionalFlexibilityProfile;
   favoritePosition: FieldPosition;
   positionProficiency: Partial<Record<FieldPosition, number>>;

@@ -8,6 +8,7 @@ import {
   rollBatterPitchProfile,
   rollPitcherArsenal,
 } from '../engine/rpg/pitchArsenals';
+import { rollPitcherRole } from '../engine/rpg/pitcherRoles';
 import {
   CURRENT_SAVE_SCHEMA_VERSION,
   DEFAULT_SAVE_SETTINGS,
@@ -33,6 +34,11 @@ function hydratePlayerDefaults(player: Player): Player {
     (isPitcherPosition(player.position)
       ? rollPitcherArsenal(seedRng, player.position, specialistArchetype, player.ratings, marketTier)
       : undefined);
+  const pitcherRole =
+    player.pitcherRole ??
+    (isPitcherPosition(player.position)
+      ? rollPitcherRole(seedRng, player.position, player.throws, specialistArchetype)
+      : undefined);
   const batterPitchProfile =
     player.batterPitchProfile ??
     rollBatterPitchProfile(seedRng, specialistArchetype, player.ratings, marketTier);
@@ -52,6 +58,7 @@ function hydratePlayerDefaults(player: Player): Player {
     ...player,
     marketTier,
     specialistArchetype,
+    ...(pitcherRole ? { pitcherRole } : {}),
     flexibilityProfile: player.flexibilityProfile ?? 'single_position',
     favoritePosition,
     positionProficiency: player.positionProficiency ?? { [favoritePosition]: 90 },

@@ -3,7 +3,11 @@ import { FastForward, Play, RefreshCw, SkipForward, Zap } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
-import { PITCH_TYPE_SHORT_LABELS, type PitchType } from '../../engine/models/player';
+import {
+  PITCHER_ROLE_SHORT_LABELS,
+  PITCH_TYPE_SHORT_LABELS,
+  type PitchType,
+} from '../../engine/models/player';
 import {
   canTriggerSpecialAbility,
   SPECIAL_ABILITY_HYPE_COST,
@@ -529,7 +533,8 @@ export function GameDayScreen() {
                       icon={<RefreshCw className="w-3.5 h-3.5" />}
                       onClick={() => handleBullpenSwap(rel.id)}
                     >
-                      Bring In {rel.name} ({rel.throws}HP)
+                      Bring In {rel.name} ({rel.throws}HP
+                      {rel.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole]}` : ''})
                     </ComicButton>
                   );
                 })}

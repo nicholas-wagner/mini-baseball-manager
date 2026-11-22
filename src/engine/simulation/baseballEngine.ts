@@ -1,7 +1,9 @@
+import { evaluatePlatoonMatchup } from '../handedness/handedness';
 import type { Club } from '../models/club';
 import type { PlayEvent, TacticalCall } from '../models/playEvent';
 import {
   createEmptySeasonStats,
+  PITCHER_ROLE_SHORT_LABELS,
   type GamePressureLevel,
   type PitchType,
   type PlayerSeasonStats,
@@ -16,6 +18,10 @@ import {
   tickAbilityCooldownsOnPlateAppearance,
   type TeamSideKey,
 } from '../rpg/abilityCooldowns';
+import {
+  evaluatePitcherRoleSituation,
+  selectBestBullpenReliever,
+} from '../rpg/pitcherRoles';
 import {
   advanceHitRunners,
   advanceWalkRunners,
@@ -388,11 +394,24 @@ function maybeSwapReliever(state: GameSessionState, events: PlayEvent[]): void {
   const fielding = getFieldingSide(state);
   if (fielding.pitcherFatigue < 82) return;
 
-  const nextRelieverId = fielding.bullpenIds.find(
-    (id) => !fielding.usedPitcherIds.includes(id),
-  );
-  if (!nextRelieverId) return;
+  const available = fielding.bullpenIds
+    .filter((id) => !fielding.usedPitcherIds.includes(id))
+    .map((id) => fielding.playersById[id])
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+  if (available.length === 0) return;
 
+  const batting = getBattingSide(state);
+  const nextBatter = getCurrentBatter(state);
+  const chosen = selectBestBullpenReliever(available, {
+    inning: state.inning,
+    lead: fielding.score - batting.score,
+    hasRunnersOn: state.bases.some((b) => b !== null),
+    leverageIndex: getCurrentLeverage(state).leverageIndex,
+    batterEffectiveSide: nextBatter.bats === 'L' ? 'L' : 'R',
+  });
+  if (!chosen) return;
+
+  const nextRelieverId = chosen.id;
   fielding.usedPitcherIds = [...fielding.usedPitcherIds, nextRelieverId];
   fielding.activePitcherId = nextRelieverId;
   fielding.pitcherFatigue = 0;
@@ -400,13 +419,13 @@ function maybeSwapReliever(state: GameSessionState, events: PlayEvent[]): void {
   const pitcherLines = getPitcherLines(state);
   pitcherLines[nextRelieverId] = createEmptyPitcherLine(nextRelieverId);
 
-  const reliever = fielding.playersById[nextRelieverId];
+  const roleTag = chosen.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[chosen.pitcherRole]}` : '';
   events.push(
     makeEvent(state, {
       type: 'pitching_change',
       outsBefore: state.outs,
       pitcherId: nextRelieverId,
-      commentary: `Bullpen call! ${reliever.name} (${reliever.throws}HP) trots in to pitch.`,
+      commentary: `Bullpen call! ${chosen.name} (${chosen.throws}HP${roleTag}) trots in to pitch.`,
       soundCue: 'organ_charge',
     }),
   );
@@ -646,9 +665,21 @@ export function stepPitch(
   const batting = getBattingSide(next);
   const firstBaseRunner = next.bases[0] ? batting.playersById[next.bases[0]] : null;
 
+  const leverage = getCurrentLeverage(next).leverageIndex;
+  const pitchingLead = fielding.score - batting.score;
   if (tacticalCall !== 'steal' && tacticalCall !== 'intentional_walk') {
+    const roleEval = evaluatePitcherRoleSituation(pitcher, {
+      inning: next.inning,
+      lead: pitchingLead,
+      hasRunnersOn: next.bases.some((b) => b !== null),
+      leverageIndex: leverage,
+      batterEffectiveSide: evaluatePlatoonMatchup(batter.bats, pitcher.throws).effectiveBatSide,
+    });
     getPitcherLines(next)[pitcher.id].pitchesThrown += 1;
-    fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + 1.45);
+    fielding.pitcherFatigue = Math.min(
+      100,
+      fielding.pitcherFatigue + 1.45 * roleEval.fatiguePerPitchMultiplier,
+    );
     next.abilityCooldowns = tickAbilityCooldownsOnPitch(next.abilityCooldowns, pitcher.id);
   }
 
@@ -665,13 +696,15 @@ export function stepPitch(
     balls: next.balls,
     strikes: next.strikes,
     outs: next.outs,
+    inning: next.inning,
+    pitchingLead,
     bases: next.bases,
     pitcherFatigue: fielding.pitcherFatigue,
     battingHype: batting.hypeGauge,
     fieldingHype: fielding.hypeGauge,
     canBatterTriggerSpecial: readiness.canBatterTriggerSpecial,
     canPitcherTriggerSpecial: readiness.canPitcherTriggerSpecial,
-    leverageIndex: getCurrentLeverage(next).leverageIndex,
+    leverageIndex: leverage,
     tacticalCall,
     atBatPitchHistory: next.atBatPitchHistory,
     requestedPitchType: options?.requestedPitchType,

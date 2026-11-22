@@ -117,12 +117,16 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
       expect(player.batterPitchProfile.favoritePitch).not.toBe(player.batterPitchProfile.weakPitch);
       expect(player.totalRatingBudget).toBeGreaterThan(300);
       if (player.position === 'SP') {
+        expect(player.pitcherRole).toBe('starter');
         expect(player.pitchArsenal!.repertoire.length).toBeGreaterThanOrEqual(4);
         expect(player.pitchArsenal!.repertoire.length).toBeLessThanOrEqual(5);
       } else if (player.position === 'RP') {
+        expect(player.pitcherRole).toBeDefined();
+        expect(player.pitcherRole).not.toBe('starter');
         expect(player.pitchArsenal!.repertoire.length).toBeGreaterThanOrEqual(2);
         expect(player.pitchArsenal!.repertoire.length).toBeLessThanOrEqual(3);
       } else {
+        expect(player.pitcherRole).toBeUndefined();
         expect(player.pitchArsenal).toBeUndefined();
       }
     }
