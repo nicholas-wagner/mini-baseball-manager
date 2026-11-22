@@ -1,5 +1,5 @@
 import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
-import { evaluateClubStaffBonuses } from '../gm/coaches';
+import { evaluateClubStaffBonuses, type ClubStaffBonuses } from '../gm/coaches';
 import type { FieldPosition } from '../handedness/types';
 import type { AiArchetype, Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
@@ -14,6 +14,10 @@ import {
   SPECIAL_ABILITY_HYPE_COST,
   type AbilityCooldownState,
 } from '../rpg/abilityCooldowns';
+import {
+  evaluateClubhouseChemistry,
+  type ClubhouseChemistryReport,
+} from '../rpg/chemistry';
 import {
   evaluateCoEdClubhouseSynergy,
   type CoEdClubhouseSynergy,
@@ -101,6 +105,8 @@ export interface TeamGameSide {
   hypeGauge: number;
   clubhouseHypeMultiplier: number;
   coEdSynergy: CoEdClubhouseSynergy;
+  staffBonuses: ClubStaffBonuses;
+  chemistryBonuses: ClubhouseChemistryReport['totalTeamRatingBonus'];
 }
 
 export interface GameSessionState {
@@ -193,6 +199,7 @@ export function createTeamGameSide(club: Club): TeamGameSide {
 
   const coEdSynergy = evaluateCoEdClubhouseSynergy(club.roster);
   const staffBonuses = evaluateClubStaffBonuses(club.coaches.activeStaff ?? []);
+  const chemistryBonuses = evaluateClubhouseChemistry(club.roster).totalTeamRatingBonus;
 
   return {
     clubId: club.id,
@@ -218,6 +225,8 @@ export function createTeamGameSide(club: Club): TeamGameSide {
       evaluateClubhouseMentalAura(club.roster).hypeGainMultiplier +
       coEdSynergy.hypeMultiplierBonus,
     coEdSynergy,
+    staffBonuses,
+    chemistryBonuses,
   };
 }
 

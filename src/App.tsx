@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   BookOpen,
   Building2,
@@ -26,12 +26,23 @@ import { StoryChapterModal } from './ui/components/StoryChapterModal';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
 import { ComicCard } from './ui/design-system/ComicCard';
 import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
-import { ClubHubScreen } from './ui/screens/ClubHubScreen';
-import { DesignLabScreen } from './ui/screens/DesignLabScreen';
 import { GameDayScreen } from './ui/screens/GameDayScreen';
-import { LeagueScreen } from './ui/screens/LeagueScreen';
-import { RosterLineupScreen } from './ui/screens/RosterLineupScreen';
-import { SkillTreeScreen } from './ui/screens/SkillTreeScreen';
+
+const ClubHubScreen = lazy(() =>
+  import('./ui/screens/ClubHubScreen').then((m) => ({ default: m.ClubHubScreen })),
+);
+const DesignLabScreen = lazy(() =>
+  import('./ui/screens/DesignLabScreen').then((m) => ({ default: m.DesignLabScreen })),
+);
+const LeagueScreen = lazy(() =>
+  import('./ui/screens/LeagueScreen').then((m) => ({ default: m.LeagueScreen })),
+);
+const RosterLineupScreen = lazy(() =>
+  import('./ui/screens/RosterLineupScreen').then((m) => ({ default: m.RosterLineupScreen })),
+);
+const SkillTreeScreen = lazy(() =>
+  import('./ui/screens/SkillTreeScreen').then((m) => ({ default: m.SkillTreeScreen })),
+);
 import {
   createKeySequenceTracker,
   DESIGN_LAB_SHORTCUT_COUNT,
@@ -283,7 +294,7 @@ export function App() {
     }
     if (activeTab === 'league') {
       return humanClub ? (
-        <LeagueScreen />
+        <LeagueScreen onPlayLivePlayoffGame={() => setActiveTab('gameday')} />
       ) : (
         <ClubCreatorScreen onCreated={() => setActiveTab('league')} />
       );
@@ -330,7 +341,15 @@ export function App() {
       utilityActions={utilityActions}
     >
       <PwaInstallBanner />
-      {renderMainContent()}
+      <Suspense
+        fallback={
+          <div className="p-6 text-center font-display text-sm text-[#181B2C] bg-[#FFFDF7] rounded-2xl border-2 border-[#181B2C] shadow-[4px_4px_0_#181B2C]">
+            ⚾ Warming Up the Bullpen...
+          </div>
+        }
+      >
+        {renderMainContent()}
+      </Suspense>
       <DugoutGuideModal
         open={guideOpen}
         onClose={() => setGuideOpen(false)}

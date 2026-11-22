@@ -7,7 +7,9 @@ import {
   Play,
   RefreshCw,
   SkipForward,
+  Sparkles,
   Sun,
+  Trophy,
   Zap,
 } from 'lucide-react';
 import { bgmEngine } from '../../audio/bgmEngine';
@@ -47,6 +49,11 @@ import {
   fatigueToEndurance,
 } from '../../engine/rpg/pitcherEndurance';
 import {
+  evaluateCapstoneGameplayProfile,
+  evaluateHeritageGameplayProfile,
+  getActivatablePowersForPlayer,
+} from '../../engine/rpg/specialPowerEffects';
+import {
   buildPlayerStatDeltas,
   createGameSession,
   manualSwapPitcher,
@@ -71,6 +78,7 @@ import {
 } from '../../engine/simulation/winProbability';
 import { choreographPlayEvent, type ChoreographedStep } from '../../scene/playback/eventChoreographer';
 import { useGameStore, type PostGameSummary } from '../../store/gameStore';
+import { usePostseasonStore } from '../../store/postseasonStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
 import { BroadcastHud } from '../components/BroadcastHud';
@@ -97,6 +105,41 @@ const GAME_LENGTH_OPTIONS: readonly { innings: GameLengthInnings; label: string 
   { innings: 9, label: '9 Inn (Classic)' },
 ];
 
+function buildComicCallout(
+  event: PlayEvent | null,
+): { title: string; subtitle: string; bg: string; text: string } | null {
+  if (!event) return null;
+  if (event.specialPowerTriggered) {
+    return {
+      title: `⚡ ${event.specialPowerTriggered.calloutText}`,
+      subtitle: event.commentary,
+      bg: event.specialPowerTriggered.vfxColor,
+      text: '#181B2C',
+    };
+  }
+  if (event.outcome === 'home_run') {
+    return { title: '💥 MOONSHOT HOME RUN!!', subtitle: event.commentary, bg: '#FFC300', text: '#181B2C' };
+  }
+  if (event.outcome === 'triple') {
+    return { title: '⚡ TRIPLE INTO THE GAP!', subtitle: event.commentary, bg: '#00E5FF', text: '#181B2C' };
+  }
+  if (event.outcome === 'double_play') {
+    return { title: '🔥 6-4-3 DOUBLE PLAY!', subtitle: event.commentary, bg: '#1D3557', text: '#FFD166' };
+  }
+  if (event.outcome === 'strikeout') {
+    return { title: '🔥 STRIKE THREE — SIT DOWN!', subtitle: event.commentary, bg: '#FF4D6D', text: '#FFFFFF' };
+  }
+  if (event.type === 'stolen_base_attempt') {
+    return {
+      title: event.outsAfter > event.outsBefore ? '🚨 CAUGHT STEALING!' : '⚡ SAFE! STOLEN BASE!',
+      subtitle: event.commentary,
+      bg: event.outsAfter > event.outsBefore ? '#E63946' : '#2FB356',
+      text: '#FFFFFF',
+    };
+  }
+  return null;
+}
+
 export function GameDayScreen() {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
@@ -119,6 +162,8 @@ export function GameDayScreen() {
   const [watchMode, setWatchMode] = useState<'live' | 'clutch' | 'paused'>('paused');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
+  const [armedPowerId, setArmedPowerId] = useState<string | null>(null);
+  const [atBatEvents, setAtBatEvents] = useState<PlayEvent[]>([]);
   const [defensiveShift, setDefensiveShift] = useState<DefensiveShiftId>('standard');
   const [winProbHistory, setWinProbHistory] = useState<number[]>([0.52]);
   const [warmingRelieverIds, setWarmingRelieverIds] = useState<string[]>([]);
@@ -131,6 +176,8 @@ export function GameDayScreen() {
   const [gameWeather, setGameWeather] = useState<GameDayWeather | null>(null);
   const hapticsEnabled = useUserPreferencesStore((s) => s.hapticsEnabled);
   const wakeLockEnabled = useUserPreferencesStore((s) => s.wakeLockEnabled);
+  const pendingLivePlayoff = usePostseasonStore((s) => s.pendingLiveGame);
+  const recordLivePlayoffResult = usePostseasonStore((s) => s.recordLivePlayoffResult);
 
   const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? opponents[0];
 
@@ -171,23 +218,30 @@ export function GameDayScreen() {
         playerStatDeltas: buildPlayerStatDeltas(finalState.boxScore),
       };
       const summary = commitCompletedGame(opponentId, result, true);
+      if (pendingLivePlayoff && pendingLivePlayoff.opponentClubId === opponentId) {
+        recordLivePlayoffResult(result.winnerClubId, result.awayScore, result.homeScore);
+      }
       if (summary) {
         setModalSummary(summary);
         setWatchMode('paused');
       }
     },
-    [commitCompletedGame],
+    [commitCompletedGame, pendingLivePlayoff, recordLivePlayoffResult],
   );
 
   const handleStartLiveGame = (autoPlay: boolean) => {
     if (!humanClub) return;
-    const opp = opponents.find((c) => c.id === selectedOpponentId) ?? opponents[0];
+    const preferredOppId = pendingLivePlayoff?.opponentClubId ?? selectedOpponentId;
+    const opp = opponents.find((c) => c.id === preferredOppId) ?? opponents[0];
     if (!opp) return;
     const seed = worldSeed + humanClub.wins + humanClub.losses + 1;
-    const session = createGameSession(opp, humanClub, seed, 'regular', gameLength);
+    const pressure = pendingLivePlayoff?.pressureLevel ?? 'regular';
+    const session = createGameSession(opp, humanClub, seed, pressure, gameLength);
     setActiveOpponentId(opp.id);
     setLiveSession(session);
     setRecentEvents([]);
+    setAtBatEvents([]);
+    setArmedPowerId(null);
     setLastChoreo(null);
     setPlaybackEvent(null);
     setSelectedPitchType(null);
@@ -248,6 +302,14 @@ export function GameDayScreen() {
           }
         }
         setRecentEvents((prev) => [...emitted.slice().reverse(), ...prev].slice(0, 12));
+        const pitchEvs = emitted.filter((ev) => Boolean(ev.pitchThrown));
+        if (pitchEvs.length > 0) {
+          const latestBatterId = pitchEvs[pitchEvs.length - 1].batterId;
+          setAtBatEvents((prev) => {
+            const sameBatter = prev.length > 0 && prev[0].batterId === latestBatterId;
+            return [...(sameBatter ? prev : []), ...pitchEvs].slice(-10);
+          });
+        }
       }
       finalizeSessionIfComplete(nextSession, emitted, oppId);
     },
@@ -255,15 +317,21 @@ export function GameDayScreen() {
   );
 
   const resolvePitchCallOption = useCallback(
-    (session: GameSessionState): { requestedPitchType?: PitchType } => {
-      if (session.half !== 'TOP' || !selectedPitchType) return {};
-      const pitcher = getCurrentPitcher(session);
-      const ownsPitch = pitcher.pitchArsenal?.repertoire.some(
-        (slot) => slot.pitchType === selectedPitchType,
-      );
-      return ownsPitch ? { requestedPitchType: selectedPitchType } : {};
+    (session: GameSessionState): { requestedPitchType?: PitchType; requestedPowerId?: string } => {
+      const opts: { requestedPitchType?: PitchType; requestedPowerId?: string } = {};
+      if (armedPowerId) {
+        opts.requestedPowerId = armedPowerId;
+      }
+      if (session.half === 'TOP' && selectedPitchType) {
+        const pitcher = getCurrentPitcher(session);
+        const ownsPitch = pitcher.pitchArsenal?.repertoire.some(
+          (slot) => slot.pitchType === selectedPitchType,
+        );
+        if (ownsPitch) opts.requestedPitchType = selectedPitchType;
+      }
+      return opts;
     },
-    [selectedPitchType],
+    [armedPowerId, selectedPitchType],
   );
 
   const handleNextPitch = useCallback(() => {
@@ -273,6 +341,7 @@ export function GameDayScreen() {
       tacticalCall,
       resolvePitchCallOption(liveSession),
     );
+    setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId);
     if (
       tacticalCall === 'steal' ||
@@ -294,6 +363,7 @@ export function GameDayScreen() {
       tacticalCall,
       resolvePitchCallOption(liveSession),
     );
+    setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId);
   };
 
@@ -359,11 +429,30 @@ export function GameDayScreen() {
     return (
       <div className="space-y-4">
         <ComicCard
-          title="CHOOSE TODAY'S MATCHUP"
-          subtitle={`${humanClub.city} ${humanClub.name} (${humanClub.wins}-${humanClub.losses}) • Home Stand`}
-          headerBg="#1B4332"
+          title={
+            pendingLivePlayoff
+              ? `🏆 ${pendingLivePlayoff.seriesLabel.toUpperCase()} — GAME ${pendingLivePlayoff.gameNumber}`
+              : "CHOOSE TODAY'S MATCHUP"
+          }
+          subtitle={`${humanClub.city} ${humanClub.name} (${humanClub.wins}-${humanClub.losses}) • ${
+            pendingLivePlayoff ? 'POSTSEASON PRESSURE ON!' : 'Home Stand'
+          }`}
+          headerBg={pendingLivePlayoff ? '#9D0208' : '#1B4332'}
         >
           <div className="space-y-4">
+            {pendingLivePlayoff ? (
+              <div
+                data-testid="playoff-matchup-banner"
+                className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold text-[#181B2C]"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-[#E63946]" />
+                  Postseason Series Queued: {pendingLivePlayoff.seriesLabel} Game{' '}
+                  {pendingLivePlayoff.gameNumber} ({pendingLivePlayoff.pressureLevel.toUpperCase()} Stakes)
+                </span>
+                <span>Tap “Start Live 3D Game” to take the field!</span>
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {opponents.map((opp) => {
                 const selected = (selectedOpponentId || opponents[0]?.id) === opp.id;
@@ -557,6 +646,23 @@ export function GameDayScreen() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
         <div className="space-y-3">
+          {(() => {
+            const callout = buildComicCallout(playbackEvent);
+            if (!callout) return null;
+            return (
+              <div
+                data-testid="comic-callout-banner"
+                className="px-3.5 py-2 rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] flex flex-wrap items-center justify-between gap-2"
+                style={{ backgroundColor: callout.bg, color: callout.text }}
+              >
+                <span className="font-display text-sm sm:text-base tracking-wide">
+                  {callout.title}
+                </span>
+                <span className="text-[11px] font-extrabold opacity-95">{callout.subtitle}</span>
+              </div>
+            );
+          })()}
+
           <LiveGameCanvas
             awayClub={activeOpponent}
             homeClub={humanClub}
@@ -579,6 +685,7 @@ export function GameDayScreen() {
               soundEngine.play('ui_pop');
             }}
             lastEvent={recentEvents[0] ?? null}
+            atBatEvents={atBatEvents}
           />
 
           <ComicCard
@@ -657,6 +764,84 @@ export function GameDayScreen() {
                   • Batter {batterSpecial.chargesLeft}/{batterSpecial.maxCharges}
                 </span>
               </div>
+
+              {/* Active National Heritage & Individual Capstone Matchup Badges + Unleash Power Dock */}
+              {(() => {
+                const batHer = evaluateHeritageGameplayProfile(currentBatter, currentLeverage.leverageIndex);
+                const pitHer = evaluateHeritageGameplayProfile(currentPitcher, currentLeverage.leverageIndex);
+                const batCaps = evaluateCapstoneGameplayProfile(currentBatter, currentLeverage.leverageIndex);
+                const pitCaps = evaluateCapstoneGameplayProfile(currentPitcher, currentLeverage.leverageIndex);
+                const humanRole: 'pitcher' | 'batter' = liveSession.half === 'BOT' ? 'batter' : 'pitcher';
+                const humanActor = humanRole === 'batter' ? currentBatter : currentPitcher;
+                const humanAvail = humanRole === 'batter' ? batterSpecial : pitcherSpecial;
+                const humanHypeNow = liveSession.home.hypeGauge;
+                const activatable = getActivatablePowersForPlayer(humanActor, humanRole);
+
+                return (
+                  <div className="space-y-2">
+                    <div
+                      data-testid="matchup-power-badges"
+                      className="flex flex-wrap gap-1.5 text-[10px] font-extrabold"
+                    >
+                      <span
+                        className="px-2 py-0.5 rounded border border-[#181B2C] bg-[#F5EEFF] text-[#4C1D95]"
+                        title={batHer.ability.shortEffect}
+                      >
+                        Batter Nation: {batHer.summaryTag}
+                        {batCaps.equippedPowerNames.length > 0
+                          ? ` + ${batCaps.equippedPowerNames.join(', ')}`
+                          : ''}
+                      </span>
+                      <span
+                        className="px-2 py-0.5 rounded border border-[#181B2C] bg-[#E0FBFC] text-[#1D3557]"
+                        title={pitHer.ability.shortEffect}
+                      >
+                        Pitcher Nation: {pitHer.summaryTag}
+                        {pitCaps.equippedPowerNames.length > 0
+                          ? ` + ${pitCaps.equippedPowerNames.join(', ')}`
+                          : ''}
+                      </span>
+                    </div>
+
+                    <div
+                      data-testid="active-powers-dock"
+                      className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#F5EEFF] space-y-1.5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold uppercase text-[#4C1D95]">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          {humanActor.name} — National &amp; Individual Powers ({humanRole})
+                        </span>
+                        <span>
+                          {humanAvail.allowed
+                            ? `READY! (${humanAvail.chargesLeft}/${humanAvail.maxCharges} left)`
+                            : `Charging Hype ${humanHypeNow}/${SPECIAL_ABILITY_HYPE_COST} (${humanAvail.reason ?? 'Locked'})`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {activatable.map((pwr) => {
+                          const armed = armedPowerId === pwr.id;
+                          return (
+                            <ComicButton
+                              key={pwr.id}
+                              size="sm"
+                              variant={armed ? 'coral' : pwr.source === 'capstone' ? 'gold' : 'violet'}
+                              active={armed}
+                              disabled={!humanAvail.allowed || liveSession.status === 'completed'}
+                              onClick={() => {
+                                setArmedPowerId((prev) => (prev === pwr.id ? null : pwr.id));
+                                soundEngine.play('clutch_stinger');
+                              }}
+                            >
+                              {armed ? `🔥 ARMED: ${pwr.name}` : `⚡ ${pwr.name}`}
+                            </ComicButton>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {liveSession.half === 'TOP' && currentPitcher.pitchArsenal ? (
                 <div

@@ -2,6 +2,7 @@ import {
   evaluateParkHitMultipliers,
   type BallparkPresetId,
 } from '../ballparks/stadiumCatalog';
+import type { ClubStaffBonuses } from '../gm/coaches';
 import { evaluatePlatoonMatchup } from '../handedness/handedness';
 import type { FieldPosition } from '../handedness/types';
 import { getActiveHealthRatingPenalties } from '../health/healthEngine';
@@ -16,16 +17,17 @@ import {
   type BattedBallType,
   type PitchType,
   type Player,
+  type PlayerRatings,
 } from '../models/player';
 import { getNationalityById } from '../nationalities/pickNationality';
 import type { SeededRng } from '../rng/seededRng';
 import { evaluateVeteranSavvyEdge } from '../rpg/careerExperience';
+import type { ClubhouseChemistryReport } from '../rpg/chemistry';
 import {
   evaluateCoEdPlayerTraitEffect,
   type CoEdClubhouseSynergy,
 } from '../rpg/coEdArchetypes';
 import { getFormStatModifiers } from '../rpg/formTracker';
-import { evaluateHeritageCombatBonuses } from '../rpg/heritageTrees';
 import { evaluatePressureAndLuckModifiers } from '../rpg/mentalAndLeverage';
 import {
   evaluatePitchMatchup,
@@ -37,7 +39,17 @@ import {
   fatigueToEndurance,
 } from '../rpg/pitcherEndurance';
 import { evaluatePitcherRoleSituation } from '../rpg/pitcherRoles';
-import { computeSkillTreeCombatBonuses } from '../rpg/skillTrees';
+import { evaluatePlayerRelicBonuses } from '../rpg/relics';
+import {
+  evaluateActivePowerSurge,
+  evaluateCapstoneGameplayProfile,
+  evaluateHeritageGameplayProfile,
+  getActivatablePowersForPlayer,
+  ZERO_ACTIVE_SURGE_NUMBERS,
+  type ActivePowerSurge,
+  type CapstoneGameplayProfile,
+  type HeritageGameplayProfile,
+} from '../rpg/specialPowerEffects';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
 import {
@@ -178,9 +190,11 @@ function resolveBuntAttempt(
   pitcher: Player,
   firstBaseBonus: number,
   sideX: number,
+  extraBuntBonus = 0,
 ): PitchResolution {
-  const buntScore = batter.ratings.bunt + firstBaseBonus * 2 - pitcher.ratings.fielding * 0.25;
-  const hitProb = clampProb(0.24 + (buntScore - 55) * 0.006, 0.14, 0.56);
+  const buntScore =
+    batter.ratings.bunt + extraBuntBonus + firstBaseBonus * 2 - pitcher.ratings.fielding * 0.25;
+  const hitProb = clampProb(0.24 + (buntScore - 55) * 0.006, 0.14, 0.72);
   const isSingle = rng.chance(hitProb);
 
   return {
@@ -209,22 +223,24 @@ function resolveHitType(
   effPower: number,
   defender: Player,
   battedBallType: BattedBallType,
-  parkHrMult = 1,
-  parkXbhMult = 1,
+  parkHrMult: number,
+  parkXbhMult: number,
+  effSpeed: number,
+  effGapPower: number,
 ): PitchResolution {
   const hrMult = battedBallType === 'fly_ball' ? 1.55 : battedBallType === 'line_drive' ? 0.9 : 0.08;
-  const gapBonus = (batter.ratings.gapPower - 60) * 0.0024;
-  const hrChance = clampProb((0.11 + (effPower - 60) * 0.0038) * hrMult * parkHrMult, 0.01, 0.48);
+  const gapBonus = (effGapPower - 60) * 0.0024;
+  const hrChance = clampProb((0.11 + (effPower - 60) * 0.0038) * hrMult * parkHrMult, 0.01, 0.56);
   const tripleChance = clampProb(
-    (0.045 + (batter.ratings.speed - 65) * 0.002 + gapBonus * 0.4) * parkXbhMult,
+    (0.045 + (effSpeed - 65) * 0.0022 + gapBonus * 0.4) * parkXbhMult,
     0.015,
-    0.14,
+    0.16,
   );
   const doubleChance = clampProb(
     (0.22 + (effPower - 60) * 0.0018 + gapBonus + (battedBallType === 'line_drive' ? 0.08 : 0)) *
       parkXbhMult,
     0.12,
-    0.42,
+    0.44,
   );
   const roll = rng.next();
   const ofSpot = rng.pick(OUTFIELD_SPOTS);
@@ -413,12 +429,25 @@ function resolveOutOrError(
   defenderPos: Exclude<FieldPosition, 'SP' | 'RP'>,
   luckErrorMultiplier: number,
   battedBallType: BattedBallType,
+  powers: PowerBundle,
 ): PitchResolution {
   const posEval = evaluatePositionAssignment(defender, defenderPos);
-  const effectiveFielding = defender.ratings.fielding + posEval.fieldingDelta;
+  const effectiveFielding =
+    defender.ratings.fielding +
+    posEval.fieldingDelta +
+    powers.defenderHeritage.defenderFieldingDelta +
+    powers.defenderCaps.defenderFieldingDelta +
+    powers.defenderRelics.fielding +
+    powers.fieldingStaff.fieldingGloveBonus +
+    powers.fieldingChem.fielding;
+  const errScale =
+    posEval.errorMultiplier *
+    luckErrorMultiplier *
+    powers.defenderHeritage.errorMultiplier *
+    powers.defenderCaps.errorMultiplier;
   const errorProb = clampProb(
-    (0.055 - (effectiveFielding - 60) * 0.0006) * posEval.errorMultiplier * luckErrorMultiplier,
-    0.012,
+    (0.055 - (effectiveFielding - 60) * 0.0006) * errScale,
+    0.006,
     0.16,
   );
   if (rng.chance(errorProb)) {
@@ -452,8 +481,13 @@ function resolveOutOrError(
     };
   }
 
-  const armSuppress = (defender.ratings.arm - 65) * 0.0025;
-  const sacChance = battedBallType === 'fly_ball' ? clampProb(0.34 - armSuppress, 0.14, 0.48) : 0.08;
+  const effectiveArm =
+    defender.ratings.arm +
+    powers.defenderHeritage.defenderArmDelta +
+    powers.defenderCaps.defenderArmDelta +
+    powers.defenderRelics.arm;
+  const armSuppress = (effectiveArm - 65) * 0.0025;
+  const sacChance = battedBallType === 'fly_ball' ? clampProb(0.34 - armSuppress, 0.1, 0.48) : 0.08;
   if (outs < 2 && bases[2] !== null && rng.chance(sacChance)) {
     const ofSpot = rng.pick(OUTFIELD_SPOTS);
     return {
@@ -495,13 +529,50 @@ export interface PitchResolverContext {
   tacticalCall: TacticalCall;
   atBatPitchHistory: readonly PitchType[];
   requestedPitchType?: PitchType;
+  requestedPowerId?: string;
   battingCoEdSynergy?: CoEdClubhouseSynergy;
   fieldingCoEdSynergy?: CoEdClubhouseSynergy;
+  battingStaffBonuses?: ClubStaffBonuses;
+  fieldingStaffBonuses?: ClubStaffBonuses;
+  battingChemistryBonuses?: ClubhouseChemistryReport['totalTeamRatingBonus'];
+  fieldingChemistryBonuses?: ClubhouseChemistryReport['totalTeamRatingBonus'];
   ballparkId?: BallparkPresetId;
   battingPlayersById?: Readonly<Record<string, Player>>;
   catcherPopTimeBonus?: number;
   stealDefenseCall?: StealDefenseCall;
 }
+
+const ZERO_STAFF: ClubStaffBonuses = {
+  pitchingVeloBonus: 0,
+  pitchingMovementBonus: 0,
+  pitchingControlBonus: 0,
+  pitcherEnduranceDrainScale: 1,
+  battingContactBonus: 0,
+  battingPowerBonus: 0,
+  battingEyeBonus: 0,
+  slumpBusterBonus: 0,
+  highLiComposureBonus: 0,
+  managerPowerCooldownBonus: 0,
+  moraleAura: 0,
+  fieldingGloveBonus: 0,
+  crossTrainRustReduction: 0,
+  bullpenWarmupBonus: 0,
+  catcherFramingZoneBonus: 0,
+  catcherPopTimeBonus: 0,
+  relieverFatigueReduction: 0,
+  relicBonusMultiplier: 1,
+  blisterPreventionBonus: 0,
+  vintageRelicFindChance: 0,
+};
+
+const ZERO_CHEM: ClubhouseChemistryReport['totalTeamRatingBonus'] = {
+  contact: 0,
+  power: 0,
+  speed: 0,
+  fielding: 0,
+  control: 0,
+  clutch: 0,
+};
 
 const BATTED_BALL_BABIP_SHIFT: Readonly<Record<BattedBallType, number>> = {
   line_drive: 0.16,
@@ -509,6 +580,52 @@ const BATTED_BALL_BABIP_SHIFT: Readonly<Record<BattedBallType, number>> = {
   fly_ball: -0.03,
   pop_up: -0.22,
 };
+
+function maybeRobHomeRunWithLeap(
+  rng: SeededRng,
+  hit: PitchResolution,
+  defender: Player,
+  defenderCaps: CapstoneGameplayProfile,
+): PitchResolution {
+  if (hit.outcome !== 'home_run' || defenderCaps.hrRobberyChance <= 0) return hit;
+  if (!rng.chance(defenderCaps.hrRobberyChance)) return hit;
+  const spot = rng.pick(OUTFIELD_SPOTS);
+  return {
+    kind: 'plate_complete',
+    outcome: 'fly_out',
+    outsAdded: 1,
+    advanceOnOut: 'none',
+    battedBallType: 'fly_ball',
+    commentary: `ROBBERY AT THE WALL! ${defender.name} scales the fence with SKY-HIGH LEAP to steal a home run!`,
+    soundCue: 'spring_boing',
+    ballFlight: { style: 'line_drive', landingX: spot.x, landingZ: -38, apexY: 13.5, durationSec: 1.5 },
+    fieldingHighlight: { fielderId: defender.id, fielderPos: spot.pos, anim: 'field_high_jump' },
+    specialPowerTriggered: {
+      actor: 'fielder',
+      powerId: 'sky_high_leap',
+      calloutText: 'SKY-HIGH LEAP! HR ROBBED!',
+      vfxColor: '#00E5FF',
+    },
+  };
+}
+
+interface PowerBundle {
+  batterHeritage: HeritageGameplayProfile;
+  pitcherHeritage: HeritageGameplayProfile;
+  defenderHeritage: HeritageGameplayProfile;
+  batterCaps: CapstoneGameplayProfile;
+  pitcherCaps: CapstoneGameplayProfile;
+  defenderCaps: CapstoneGameplayProfile;
+  batterRelics: Record<keyof PlayerRatings, number>;
+  pitcherRelics: Record<keyof PlayerRatings, number>;
+  defenderRelics: Record<keyof PlayerRatings, number>;
+  battingStaff: ClubStaffBonuses;
+  fieldingStaff: ClubStaffBonuses;
+  battingChem: ClubhouseChemistryReport['totalTeamRatingBonus'];
+  fieldingChem: ClubhouseChemistryReport['totalTeamRatingBonus'];
+  batterSurge: ActivePowerSurge | null;
+  pitcherSurge: ActivePowerSurge | null;
+}
 
 function resolveContactResult(
   ctx: PitchResolverContext,
@@ -520,6 +637,7 @@ function resolveContactResult(
   defenderLuckErrMult: number,
   pitchType: PitchType,
   gbRateShift: number,
+  powers: PowerBundle,
 ): PitchResolution {
   const fatiguedPitcherProfile = {
     ...ctx.pitcher.battedBallProfile,
@@ -533,30 +651,54 @@ function resolveContactResult(
   );
   const effectiveSide = evaluatePlatoonMatchup(ctx.batter.bats, ctx.pitcher.throws).effectiveBatSide;
   const parkFx = evaluateParkHitMultipliers(ctx.ballparkId, effectiveSide);
-  const gbSpeedBonus = battedBallType === 'ground_ball' ? parkFx.groundballHitBonus : 0;
-  const rangeSuppress = (ctx.defender.ratings.range - 62) * 0.0018;
+  const effSpeed = ctx.batter.ratings.speed + powers.batterRelics.speed + powers.battingChem.speed;
+  const effGapPower = ctx.batter.ratings.gapPower + powers.batterRelics.gapPower;
+  const gbSpeedBonus =
+    battedBallType === 'ground_ball'
+      ? parkFx.groundballHitBonus + (effSpeed - 60) * 0.0022
+      : 0;
+  const bSurge = powers.batterSurge ?? ZERO_ACTIVE_SURGE_NUMBERS;
+  const defenderRange =
+    ctx.defender.ratings.range +
+    powers.defenderHeritage.defenderRangeDelta +
+    powers.defenderCaps.defenderRangeDelta +
+    powers.defenderRelics.range;
+  const rangeSuppress = (defenderRange - 62) * 0.0018;
   const hitProb = clampProb(
     0.295 +
       (effContact - effStuff) * 0.0044 +
       firstBaseStepBonus * 0.008 +
       luckHitShift +
+      bSurge.hitProbBonus +
       BATTED_BALL_BABIP_SHIFT[battedBallType] +
       gbSpeedBonus -
       rangeSuppress,
     0.04,
-    0.66,
+    0.76,
   );
   if (ctx.rng.chance(hitProb)) {
-    const hit = resolveHitType(
+    const hrMult =
+      parkFx.hrMultiplier *
+      powers.batterHeritage.hrCarryMultiplier *
+      powers.batterCaps.hrCarryMultiplier *
+      bSurge.hrCarryMultiplier;
+    const xbhMult =
+      parkFx.xbhMultiplier *
+      powers.batterHeritage.xbhStretchMultiplier *
+      bSurge.xbhStretchMultiplier;
+    const rawHit = resolveHitType(
       ctx.rng,
       ctx.batter,
       effPower,
       ctx.defender,
       battedBallType,
-      parkFx.hrMultiplier,
-      parkFx.xbhMultiplier,
+      hrMult,
+      xbhMult,
+      effSpeed,
+      effGapPower,
     );
-    if (ctx.canBatterTriggerSpecial) {
+    const hit = maybeRobHomeRunWithLeap(ctx.rng, rawHit, ctx.defender, powers.defenderCaps);
+    if (hit.outcome !== 'fly_out' && ctx.canBatterTriggerSpecial && !powers.batterSurge) {
       hit.specialPowerTriggered = buildHeritagePowerTrigger(ctx.batter, 'batter');
     }
     return hit;
@@ -570,6 +712,7 @@ function resolveContactResult(
     ctx.defenderPos,
     defenderLuckErrMult,
     battedBallType,
+    powers,
   );
 }
 
@@ -617,14 +760,19 @@ function evaluateSwingResult(
   defenderLuckErrMult: number,
   pitchType: PitchType,
   gbRateShift: number,
+  powers: PowerBundle,
 ): PitchResolution {
+  const whiffPenalty =
+    powers.pitcherHeritage.pitcherWhiffBonus +
+    powers.pitcherCaps.pitcherWhiffBonus +
+    (powers.pitcherSurge?.whiffBonus ?? 0);
   const contactProb = inZone
-    ? clampProb(0.76 + (effContact - effStuff) * 0.0048, 0.48, 0.94)
-    : clampProb(0.48 + (effContact - effStuff) * 0.0032, 0.25, 0.74);
+    ? clampProb(0.76 + (effContact - effStuff) * 0.0048 - whiffPenalty, 0.34, 0.95)
+    : clampProb(0.48 + (effContact - effStuff) * 0.0032 - whiffPenalty, 0.16, 0.76);
 
   if (!ctx.rng.chance(contactProb)) {
     const whiff = resolveSwingingStrikeOrOut(ctx.strikes, ctx.batter.name);
-    if (whiff.outcome === 'strikeout' && ctx.canPitcherTriggerSpecial) {
+    if (whiff.outcome === 'strikeout' && ctx.canPitcherTriggerSpecial && !powers.pitcherSurge) {
       whiff.specialPowerTriggered = buildHeritagePowerTrigger(ctx.pitcher, 'pitcher');
     }
     return whiff;
@@ -651,6 +799,7 @@ function evaluateSwingResult(
     defenderLuckErrMult,
     pitchType,
     gbRateShift,
+    powers,
   );
 }
 
@@ -717,49 +866,83 @@ function computeCoEdPitchDeltas(ctx: PitchResolverContext, pitchType: PitchType)
   };
 }
 
-/** Resolves a single baseball pitch or tactical action cleanly from seeded state. */
-export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
-  if (ctx.tacticalCall === 'intentional_walk') {
-    return {
-      kind: 'plate_complete',
-      outcome: 'walk',
-      outsAdded: 0,
-      commentary: `Pitching coach flashes four fingers — ${ctx.batter.name} takes first intentionally.`,
-      soundCue: 'ui_pop',
-    };
-  }
-  const stealPlay = resolveStealPlayTypeFromCall(ctx.tacticalCall, ctx.bases);
-  const stealResult = stealPlay ? resolveStealAttempt(ctx, stealPlay) : null;
-  if (stealResult) {
-    return stealResult;
+function buildPowerBundle(ctx: PitchResolverContext): PowerBundle {
+  const battingStaff = ctx.battingStaffBonuses ?? ZERO_STAFF;
+  const fieldingStaff = ctx.fieldingStaffBonuses ?? ZERO_STAFF;
+  const battingChem = ctx.battingChemistryBonuses ?? ZERO_CHEM;
+  const fieldingChem = ctx.fieldingChemistryBonuses ?? ZERO_CHEM;
+  const batterHeritage = evaluateHeritageGameplayProfile(ctx.batter, ctx.leverageIndex);
+  const pitcherHeritage = evaluateHeritageGameplayProfile(ctx.pitcher, ctx.leverageIndex);
+  const defenderHeritage = evaluateHeritageGameplayProfile(ctx.defender, ctx.leverageIndex);
+  const batterCaps = evaluateCapstoneGameplayProfile(ctx.batter, ctx.leverageIndex);
+  const pitcherCaps = evaluateCapstoneGameplayProfile(ctx.pitcher, ctx.leverageIndex);
+  const defenderCaps = evaluateCapstoneGameplayProfile(ctx.defender, ctx.leverageIndex);
+  const batterRelics = evaluatePlayerRelicBonuses(ctx.batter, battingStaff.relicBonusMultiplier);
+  const pitcherRelics = evaluatePlayerRelicBonuses(ctx.pitcher, fieldingStaff.relicBonusMultiplier);
+  const defenderRelics = evaluatePlayerRelicBonuses(ctx.defender, fieldingStaff.relicBonusMultiplier);
+
+  let batterSurge: ActivePowerSurge | null = null;
+  let pitcherSurge: ActivePowerSurge | null = null;
+
+  if (ctx.requestedPowerId) {
+    const batOpts = getActivatablePowersForPlayer(ctx.batter, 'batter');
+    const pitOpts = getActivatablePowersForPlayer(ctx.pitcher, 'pitcher');
+    if (ctx.canBatterTriggerSpecial && batOpts.some((p) => p.id === ctx.requestedPowerId)) {
+      batterSurge = evaluateActivePowerSurge(ctx.requestedPowerId, 'batter', ctx.batter);
+    } else if (ctx.canPitcherTriggerSpecial && pitOpts.some((p) => p.id === ctx.requestedPowerId)) {
+      pitcherSurge = evaluateActivePowerSurge(ctx.requestedPowerId, 'pitcher', ctx.pitcher);
+    }
   }
 
-  const platoon = evaluatePlatoonMatchup(ctx.batter.bats, ctx.pitcher.throws);
-  if (ctx.tacticalCall === 'bunt') {
-    const boxSide = platoon.effectiveBatSide === 'L' ? 1 : -1;
-    return resolveBuntAttempt(ctx.rng, ctx.batter, ctx.pitcher, platoon.firstBaseStepBonus, boxSide);
-  }
-
-  const pitchType = selectPitchForCount(
-    ctx.rng,
-    ctx.pitcher,
-    ctx.batter,
-    ctx.balls,
-    ctx.strikes,
-    ctx.atBatPitchHistory,
-    ctx.requestedPitchType,
-  );
-  const repeatCount = countTrailingPitchRepeats(ctx.atBatPitchHistory, pitchType);
-  const pitchMatchup = evaluatePitchMatchup(ctx.pitcher, ctx.batter, pitchType, repeatCount);
-  const enduranceFx = evaluatePitcherEnduranceEffect(
-    fatigueToEndurance(ctx.pitcherFatigue),
-    pitchType,
-  );
-  const adjustedMatchup: PitchMatchupEvaluation = {
-    ...pitchMatchup,
-    mph: Math.max(58, pitchMatchup.mph + enduranceFx.mphDrop),
+  return {
+    batterHeritage,
+    pitcherHeritage,
+    defenderHeritage,
+    batterCaps,
+    pitcherCaps,
+    defenderCaps,
+    batterRelics,
+    pitcherRelics,
+    defenderRelics,
+    battingStaff,
+    fieldingStaff,
+    battingChem,
+    fieldingChem,
+    batterSurge,
+    pitcherSurge,
   };
+}
 
+function decorateActivePowerOutcome(
+  res: PitchResolution,
+  powers: PowerBundle,
+): PitchResolution {
+  const surge = powers.batterSurge ?? powers.pitcherSurge;
+  if (!surge || res.specialPowerTriggered) return res;
+  return {
+    ...res,
+    commentary: `⚡ ${surge.calloutText} — ${res.commentary}`,
+    soundCue: surge.soundCue,
+    ballFlight: res.ballFlight ? { ...res.ballFlight, style: surge.ballStyle } : res.ballFlight,
+    specialPowerTriggered: {
+      actor: surge.actor,
+      powerId: surge.powerId,
+      calloutText: surge.calloutText,
+      vfxColor: surge.vfxColor,
+    },
+  };
+}
+
+function computeEffectiveMatchupNumbers(
+  ctx: PitchResolverContext,
+  pitchType: PitchType,
+  pitchMatchup: PitchMatchupEvaluation,
+  enduranceFx: ReturnType<typeof evaluatePitcherEnduranceEffect>,
+  platoon: ReturnType<typeof evaluatePlatoonMatchup>,
+  powers: PowerBundle,
+) {
+  const bSurge = powers.batterSurge ?? ZERO_ACTIVE_SURGE_NUMBERS;
+  const pSurge = powers.pitcherSurge ?? ZERO_ACTIVE_SURGE_NUMBERS;
   const mod = TACTICAL_CONFIG[ctx.tacticalCall];
   const batterForm = getFormStatModifiers(ctx.batter.formState);
   const pitcherForm = getFormStatModifiers(ctx.pitcher.formState);
@@ -768,10 +951,6 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const defenderMental = evaluatePressureAndLuckModifiers(ctx.defender, ctx.leverageIndex);
   const batterSavvy = evaluateVeteranSavvyEdge(ctx.batter.careerService.experienceTier, ctx.leverageIndex);
   const pitcherSavvy = evaluateVeteranSavvyEdge(ctx.pitcher.careerService.experienceTier, ctx.leverageIndex);
-  const batterSkills = computeSkillTreeCombatBonuses(ctx.batter);
-  const pitcherSkills = computeSkillTreeCombatBonuses(ctx.pitcher);
-  const batterHeritage = evaluateHeritageCombatBonuses(ctx.batter, ctx.leverageIndex);
-  const pitcherHeritage = evaluateHeritageCombatBonuses(ctx.pitcher, ctx.leverageIndex);
   const coEd = computeCoEdPitchDeltas(ctx, pitchType);
   const batterHealth = getActiveHealthRatingPenalties(ctx.batter);
   const pitcherHealth = getActiveHealthRatingPenalties(ctx.pitcher);
@@ -793,9 +972,12 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitchMatchup.batterContactDelta +
     batterMental.pressureRatingDelta +
     batterSavvy.composureDelta +
-    batterSkills.battingContactDelta +
-    batterHeritage.passiveBonus +
-    batterHeritage.clutchBonus +
+    powers.batterCaps.batterContactDelta +
+    powers.batterHeritage.batterContactDelta +
+    powers.batterRelics.contact +
+    powers.battingStaff.battingContactBonus +
+    powers.battingChem.contact +
+    bSurge.contactDelta +
     coEd.contactDelta;
   const effPower =
     ctx.batter.ratings.power +
@@ -805,15 +987,32 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     batterForm.powerDelta +
     pitchMatchup.batterPowerDelta +
     batterMental.pressureRatingDelta +
-    batterSkills.battingPowerDelta +
-    batterHeritage.clutchBonus +
+    powers.batterCaps.batterPowerDelta +
+    powers.batterHeritage.batterPowerDelta +
+    powers.batterRelics.power +
+    powers.battingStaff.battingPowerBonus +
+    powers.battingChem.power +
+    bSurge.powerDelta +
     coEd.powerDelta;
-  const effEye = ctx.batter.ratings.eye + batterHealth.eye + batterSavvy.eyeDelta + coEd.eyeDelta;
+  const effEye =
+    ctx.batter.ratings.eye +
+    batterHealth.eye +
+    batterSavvy.eyeDelta +
+    powers.batterHeritage.batterEyeDelta +
+    powers.batterCaps.batterEyeDelta +
+    powers.batterRelics.eye +
+    powers.battingStaff.battingEyeBonus +
+    bSurge.eyeDelta +
+    coEd.eyeDelta;
   const effStuff =
     (ctx.pitcher.ratings.velocity +
       pitcherHealth.velocity +
+      powers.pitcherRelics.velocity +
+      powers.fieldingStaff.pitchingVeloBonus +
       ctx.pitcher.ratings.movement +
-      pitcherHealth.movement) *
+      pitcherHealth.movement +
+      powers.pitcherRelics.movement +
+      powers.fieldingStaff.pitchingMovementBonus) *
       0.5 +
     platoon.pitcherBreakDelta +
     pitcherForm.stuffDelta +
@@ -821,9 +1020,9 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitcherMental.pressureRatingDelta +
     pitcherSavvy.composureDelta +
     pitcherRoleEval.stuffDelta +
-    pitcherSkills.pitchingStuffDelta +
-    pitcherHeritage.passiveBonus +
-    pitcherHeritage.clutchBonus +
+    powers.pitcherCaps.pitcherStuffDelta +
+    powers.pitcherHeritage.pitcherStuffDelta +
+    pSurge.stuffDelta +
     coEd.stuffDelta +
     Math.round(enduranceFx.breakDrop * coEd.breakingHangScale) +
     enduranceFx.mphDrop;
@@ -836,25 +1035,109 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitcherMental.pressureRatingDelta +
     pitcherSavvy.controlDelta +
     pitcherRoleEval.controlDelta +
-    pitcherSkills.pitchingControlDelta +
+    powers.pitcherCaps.pitcherControlDelta +
+    powers.pitcherHeritage.pitcherControlDelta +
+    powers.pitcherRelics.control +
+    powers.fieldingStaff.pitchingControlBonus +
+    powers.fieldingChem.control +
+    pSurge.controlDelta +
     coEd.controlDelta +
     enduranceFx.controlDrop;
 
-  const luckZoneShift = pitcherMental.luckZoneProbDelta - batterMental.luckZoneProbDelta * 0.5;
-  const luckHitShift = batterMental.luckHitProbDelta - pitcherMental.luckHitProbDelta * 0.5;
-  const zoneProb = clampProb(
-    0.55 + (effControl - effEye) * 0.0025 + luckZoneShift,
-    0.40,
-    0.72,
+  const luckZoneShift =
+    pitcherMental.luckZoneProbDelta -
+    batterMental.luckZoneProbDelta * 0.5 +
+    powers.pitcherHeritage.luckZoneProbDelta +
+    powers.fieldingStaff.catcherFramingZoneBonus +
+    pSurge.luckZoneProbDelta;
+  const luckHitShift =
+    batterMental.luckHitProbDelta -
+    pitcherMental.luckHitProbDelta * 0.5 +
+    powers.batterHeritage.luckHitProbDelta +
+    bSurge.luckHitProbDelta;
+  const powerChaseShift =
+    powers.pitcherCaps.chaseRateDelta +
+    powers.batterCaps.chaseRateDelta +
+    pSurge.chaseRateDelta +
+    bSurge.chaseRateDelta;
+
+  return {
+    effContact,
+    effPower,
+    effEye,
+    effStuff,
+    effControl,
+    luckZoneShift,
+    luckHitShift,
+    defenderLuckErrMult: defenderMental.luckErrorMultiplier,
+    swingMod: mod.swingMod,
+    chaseShift: mod.chaseMod + pitchMatchup.chaseRateDelta + coEd.chaseRateDelta + powerChaseShift,
+    mphBoost: powers.pitcherCaps.mphBonus + pSurge.mphBonus,
+  };
+}
+
+function resolvePrePitchTacticalAction(
+  ctx: PitchResolverContext,
+  powers: PowerBundle,
+  platoon: ReturnType<typeof evaluatePlatoonMatchup>,
+): PitchResolution | null {
+  if (ctx.tacticalCall === 'intentional_walk') {
+    return {
+      kind: 'plate_complete',
+      outcome: 'walk',
+      outsAdded: 0,
+      commentary: `Pitching coach flashes four fingers — ${ctx.batter.name} takes first intentionally.`,
+      soundCue: 'ui_pop',
+    };
+  }
+  const stealPlay = resolveStealPlayTypeFromCall(ctx.tacticalCall, ctx.bases);
+  const stealResult = stealPlay ? resolveStealAttempt(ctx, stealPlay) : null;
+  if (stealResult) return stealResult;
+
+  if (ctx.tacticalCall === 'bunt') {
+    const boxSide = platoon.effectiveBatSide === 'L' ? 1 : -1;
+    const buntExtra =
+      powers.batterCaps.buntBonus +
+      powers.batterRelics.bunt +
+      (powers.batterSurge?.buntBonus ?? 0);
+    return decorateActivePowerOutcome(
+      resolveBuntAttempt(ctx.rng, ctx.batter, ctx.pitcher, platoon.firstBaseStepBonus, boxSide, buntExtra),
+      powers,
+    );
+  }
+  return null;
+}
+
+/** Resolves a single baseball pitch or tactical action cleanly from seeded state. */
+export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
+  const powers = buildPowerBundle(ctx);
+  const platoon = evaluatePlatoonMatchup(ctx.batter.bats, ctx.pitcher.throws);
+  const prePitch = resolvePrePitchTacticalAction(ctx, powers, platoon);
+  if (prePitch) return prePitch;
+
+  const pitchType = selectPitchForCount(
+    ctx.rng,
+    ctx.pitcher,
+    ctx.batter,
+    ctx.balls,
+    ctx.strikes,
+    ctx.atBatPitchHistory,
+    ctx.requestedPitchType,
   );
+  const repeatCount = countTrailingPitchRepeats(ctx.atBatPitchHistory, pitchType);
+  const pitchMatchup = evaluatePitchMatchup(ctx.pitcher, ctx.batter, pitchType, repeatCount);
+  const enduranceFx = evaluatePitcherEnduranceEffect(fatigueToEndurance(ctx.pitcherFatigue), pitchType);
+  const stats = computeEffectiveMatchupNumbers(ctx, pitchType, pitchMatchup, enduranceFx, platoon, powers);
+  const adjustedMatchup: PitchMatchupEvaluation = {
+    ...pitchMatchup,
+    mph: Math.max(58, pitchMatchup.mph + enduranceFx.mphDrop + stats.mphBoost),
+  };
+
+  const zoneProb = clampProb(0.55 + (stats.effControl - stats.effEye) * 0.0025 + stats.luckZoneShift, 0.38, 0.76);
   const inZone = ctx.rng.chance(zoneProb);
   const swingProb = inZone
-    ? clampProb(0.67 + mod.swingMod, 0.52, 0.85)
-    : clampProb(
-        0.26 - (effEye - 65) * 0.002 + mod.chaseMod + pitchMatchup.chaseRateDelta + coEd.chaseRateDelta,
-        0.10,
-        0.48,
-      );
+    ? clampProb(0.67 + stats.swingMod, 0.52, 0.86)
+    : clampProb(0.26 - (stats.effEye - 65) * 0.002 + stats.chaseShift, 0.08, 0.54);
 
   const rawResult = !ctx.rng.chance(swingProb)
     ? inZone
@@ -863,15 +1146,16 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     : evaluateSwingResult(
         ctx,
         inZone,
-        effContact,
-        effPower,
-        effStuff,
+        stats.effContact,
+        stats.effPower,
+        stats.effStuff,
         platoon.firstBaseStepBonus,
-        luckHitShift,
-        defenderMental.luckErrorMultiplier,
+        stats.luckHitShift,
+        stats.defenderLuckErrMult,
         pitchType,
         enduranceFx.gbRateShift,
+        powers,
       );
 
-  return attachPitchTelemetry(rawResult, adjustedMatchup);
+  return attachPitchTelemetry(decorateActivePowerOutcome(rawResult, powers), adjustedMatchup);
 }

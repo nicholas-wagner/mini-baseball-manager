@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, FastForward, Trophy } from 'lucide-react';
+import { ArrowDown, ArrowUp, FastForward, Gamepad2, Trophy, UserPlus } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
+import { STAFF_ROLE_LABELS } from '../../engine/gm/coaches';
 import {
   computeClubPayroll,
   TIER_SALARY_CAPS,
   validateSalaryCapRoom,
 } from '../../engine/gm/offseasonEngine';
 import { LEAGUE_TIER_LABELS } from '../../engine/league/clubCatalog';
+import {
+  getNextHumanPlayoffMatchup,
+  type PlayoffSeriesState,
+} from '../../engine/league/playoffBracket';
 import {
   computeTierStandings,
   getTierLeagueLeaders,
@@ -21,15 +26,83 @@ import {
   MARKET_TIER_LABELS,
 } from '../../engine/models/player';
 import { formatRate3 } from '../../engine/simulation/sabermetrics';
+import { hireHumanRetiredLegendCoach } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
+import { usePostseasonStore } from '../../store/postseasonStore';
 import { AwardsAndHofPanel } from '../components/AwardsAndHofPanel';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
-export function LeagueScreen() {
+interface LeagueScreenProps {
+  onPlayLivePlayoffGame?: () => void;
+}
+
+function SeriesBracketCard({
+  series,
+  humanClubId,
+}: {
+  series: PlayoffSeriesState;
+  humanClubId: string;
+}) {
+  return (
+    <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
+      <div className="flex items-center justify-between gap-1">
+        <span className="font-display text-[11px] text-[#181B2C]">{series.label}</span>
+        <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] font-extrabold">
+          {series.winnerClubId ? 'FINAL' : `G${series.games.length + 1}`}
+        </span>
+      </div>
+      <div
+        className={`flex items-center justify-between px-2 py-1 rounded border text-xs font-extrabold ${
+          series.winnerClubId === series.highSeedClubId
+            ? 'bg-[#D8F3DC] border-[#1B4332] text-[#1B4332]'
+            : series.highSeedClubId === humanClubId
+              ? 'bg-[#FFF3BF] border-[#181B2C] text-[#181B2C]'
+              : 'bg-white border-[#181B2C]/25 text-[#181B2C]'
+        }`}
+      >
+        <span className="truncate">
+          #{series.highSeedRank} {series.highSeedName}
+          {series.highSeedClubId === humanClubId ? ' (YOU)' : ''}
+        </span>
+        <span className="font-display text-sm ml-2">{series.highSeedWins}</span>
+      </div>
+      <div
+        className={`flex items-center justify-between px-2 py-1 rounded border text-xs font-extrabold ${
+          series.winnerClubId === series.lowSeedClubId
+            ? 'bg-[#D8F3DC] border-[#1B4332] text-[#1B4332]'
+            : series.lowSeedClubId === humanClubId
+              ? 'bg-[#FFF3BF] border-[#181B2C] text-[#181B2C]'
+              : 'bg-white border-[#181B2C]/25 text-[#181B2C]'
+        }`}
+      >
+        <span className="truncate">
+          #{series.lowSeedRank} {series.lowSeedName}
+          {series.lowSeedClubId === humanClubId ? ' (YOU)' : ''}
+        </span>
+        <span className="font-display text-sm ml-2">{series.lowSeedWins}</span>
+      </div>
+      {series.games.length > 0 ? (
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {series.games.map((g) => (
+            <span
+              key={g.gameNumber}
+              className="px-1.5 py-0.5 rounded bg-[#F1E4C8] border border-[#181B2C]/30 text-[10px] font-mono-tabular font-bold text-[#181B2C]"
+            >
+              G{g.gameNumber}: {g.awayScore}-{g.homeScore}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
   const manager = useGameStore((s) => s.manager);
+  const worldSeed = useGameStore((s) => s.worldSeed);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const lastOffseasonTransitions = useGameStore((s) => s.lastOffseasonTransitions);
@@ -41,8 +114,15 @@ export function LeagueScreen() {
   const signOffseasonAgent = useGameStore((s) => s.signOffseasonAgent);
   const finishInteractiveOffseason = useGameStore((s) => s.finishInteractiveOffseason);
 
+  const playoffBracket = usePostseasonStore((s) => s.bracket);
+  const startBracket = usePostseasonStore((s) => s.startBracket);
+  const simNextBracketGame = usePostseasonStore((s) => s.simNextGame);
+  const queueLivePlayoffGame = usePostseasonStore((s) => s.queueLivePlayoffGame);
+  const clearBracket = usePostseasonStore((s) => s.clearBracket);
+
   const [selectedTier, setSelectedTier] = useState<LeagueTierId | null>(null);
   const [leagueNotice, setLeagueNotice] = useState<string | null>(null);
+  const [simSeedNonce, setSimSeedNonce] = useState(1);
 
   if (!humanClub) return null;
 
@@ -77,9 +157,23 @@ export function LeagueScreen() {
   const handleFinishOffseason = () => {
     const nextSeason = finishInteractiveOffseason();
     if (!nextSeason) return;
+    clearBracket();
     soundEngine.play('organ_rally');
     setLeagueNotice(`Season ${nextSeason} underway! Rosters and Salary Caps locked for Opening Day.`);
   };
+
+  const humanTierClubs = leagues[humanClub.leagueTier];
+  const humanTierStandings = computeTierStandings(humanTierClubs);
+  const humanTierClubsById = Object.fromEntries(humanTierClubs.map((c) => [c.id, c]));
+  const activeTierBracket =
+    playoffBracket &&
+    playoffBracket.tier === humanClub.leagueTier &&
+    playoffBracket.seasonNumber === seasonNumber
+      ? playoffBracket
+      : null;
+  const nextHumanPlayoff = activeTierBracket
+    ? getNextHumanPlayoffMatchup(activeTierBracket, humanClub.id)
+    : null;
 
   const offseasonHumanClub = activeOffseason
     ? Object.values(activeOffseason.leagues)
@@ -164,6 +258,40 @@ export function LeagueScreen() {
                       Yrs — {ret.clubName})
                     </div>
                   ))}
+                  {activeOffseason.retiredCoachCandidates.length > 0 ? (
+                    <div className="pt-1.5 border-t border-dashed border-[#181B2C]/20 space-y-1.5">
+                      <div className="text-[10px] font-extrabold uppercase text-[#7209B7]">
+                        Retiring Club Legends Open to Coaching
+                      </div>
+                      {activeOffseason.retiredCoachCandidates.slice(0, 3).map((legend) => (
+                        <div
+                          key={legend.formerPlayerId}
+                          className="p-2 rounded-lg border border-[#7209B7]/40 bg-[#F5EEFF] flex flex-wrap items-center justify-between gap-2"
+                        >
+                          <div className="text-[11px] font-extrabold text-[#181B2C]">
+                            {legend.name} — {STAFF_ROLE_LABELS[legend.recommendedRole]} (Tier{' '}
+                            {legend.startingTier} • Peak {legend.careerOvrPeak})
+                          </div>
+                          <ComicButton
+                            size="sm"
+                            variant="violet"
+                            icon={<UserPlus className="w-3.5 h-3.5" />}
+                            onClick={() => {
+                              const res = hireHumanRetiredLegendCoach(legend);
+                              if (res.hired) soundEngine.play('trophy_fanfare');
+                              setLeagueNotice(
+                                res.hired
+                                  ? `Hired Club Legend ${res.coachName} to your coaching staff!`
+                                  : (res.reason ?? 'Unable to hire legend coach.'),
+                              );
+                            }}
+                          >
+                            Hire Legend as Coach
+                          </ComicButton>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {activeOffseason.pendingExpiringPlayers.length === 0 ? (
                     <div className="text-[11px] font-bold text-[#1B4332]">
                       All your expiring contracts are resolved!
@@ -301,6 +429,116 @@ export function LeagueScreen() {
                   })}
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {/* Interactive Best-of-3 Postseason Playoff Bracket */}
+          {!activeOffseason ? (
+            <div
+              data-testid="playoff-bracket-panel"
+              className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2.5 shadow-[3px_3px_0_#181B2C]"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="font-display text-xs sm:text-sm text-[#181B2C]">
+                    🏆 {LEAGUE_TIER_LABELS[humanClub.leagueTier].toUpperCase()} — BEST-OF-3 PLAYOFF BRACKET
+                  </div>
+                  <div className="text-[11px] font-bold text-[#4A5068]">
+                    {activeTierBracket
+                      ? activeTierBracket.championClubId
+                        ? `Champion crowned: ${humanTierClubsById[activeTierBracket.championClubId]?.name ?? 'Winner'}! Proceed to Offseason HQ.`
+                        : 'Play your club’s playoff games live in 3D or sim game-by-game!'
+                      : regularSeasonDone
+                        ? 'Regular season complete! Launch the interactive Best-of-3 Postseason Bracket.'
+                        : `Projected Top-4 Playoff Picture: #1 ${humanTierStandings[0]?.clubName ?? ''} vs #4 ${humanTierStandings[3]?.clubName ?? ''} • #2 ${humanTierStandings[1]?.clubName ?? ''} vs #3 ${humanTierStandings[2]?.clubName ?? ''}`}
+                  </div>
+                </div>
+                {regularSeasonDone && !activeTierBracket ? (
+                  <ComicButton
+                    size="sm"
+                    variant="gold"
+                    icon={<Trophy className="w-4 h-4" />}
+                    onClick={() => {
+                      startBracket(humanTierClubs, humanClub.leagueTier, seasonNumber);
+                      soundEngine.play('organ_charge');
+                      setLeagueNotice('Best-of-3 Postseason Bracket live! Play in 3D or sim games.');
+                    }}
+                  >
+                    Launch Best-of-3 Playoff Bracket
+                  </ComicButton>
+                ) : null}
+              </div>
+
+              {activeTierBracket ? (
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                    <SeriesBracketCard
+                      series={activeTierBracket.semifinalA}
+                      humanClubId={humanClub.id}
+                    />
+                    <SeriesBracketCard
+                      series={activeTierBracket.semifinalB}
+                      humanClubId={humanClub.id}
+                    />
+                    {activeTierBracket.championship ? (
+                      <SeriesBracketCard
+                        series={activeTierBracket.championship}
+                        humanClubId={humanClub.id}
+                      />
+                    ) : (
+                      <div className="p-3 rounded-xl border-2 border-dashed border-[#181B2C]/40 bg-white/70 flex flex-col items-center justify-center text-center text-xs font-bold text-[#4A5068]">
+                        <Trophy className="w-5 h-5 text-[#FFC300] mb-1" />
+                        <span>Championship Series</span>
+                        <span className="text-[10px]">Awaiting Semifinal Winners</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {!activeTierBracket.championClubId ? (
+                    <div className="flex flex-wrap gap-2">
+                      {nextHumanPlayoff ? (
+                        <ComicButton
+                          size="sm"
+                          variant="turf"
+                          icon={<Gamepad2 className="w-4 h-4" />}
+                          onClick={() => {
+                            queueLivePlayoffGame({
+                              seriesId: nextHumanPlayoff.seriesId,
+                              seriesLabel: nextHumanPlayoff.seriesLabel,
+                              gameNumber: nextHumanPlayoff.gameNumber,
+                              opponentClubId: nextHumanPlayoff.opponentClubId,
+                              pressureLevel: nextHumanPlayoff.pressureLevel,
+                            });
+                            soundEngine.play('organ_charge');
+                            if (onPlayLivePlayoffGame) {
+                              onPlayLivePlayoffGame();
+                            }
+                          }}
+                        >
+                          Play Live 3D: {nextHumanPlayoff.seriesLabel} G{nextHumanPlayoff.gameNumber} vs{' '}
+                          {nextHumanPlayoff.opponentName}
+                        </ComicButton>
+                      ) : null}
+                      <ComicButton
+                        size="sm"
+                        variant="sky"
+                        icon={<FastForward className="w-4 h-4" />}
+                        onClick={() => {
+                          const summary = simNextBracketGame(
+                            humanTierClubsById,
+                            worldSeed + seasonNumber * 101 + simSeedNonce * 37,
+                          );
+                          setSimSeedNonce((n) => n + 1);
+                          soundEngine.play('bat_crack');
+                          if (summary) setLeagueNotice(summary);
+                        }}
+                      >
+                        Sim Next Playoff Game
+                      </ComicButton>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
 

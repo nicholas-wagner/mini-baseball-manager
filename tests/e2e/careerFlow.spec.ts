@@ -26,6 +26,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /close live box score/i }).click();
   await page.getByRole('button', { name: /next pitch/i }).click();
   await expect(page.getByTestId('play-by-play-ticker')).toBeVisible();
+  await expect(page.getByTestId('active-powers-dock')).toBeVisible();
+  await expect(page.getByTestId('strike-zone-plot')).toBeVisible();
 
   // Visit Roster -> verify Trainer's Table & 1-tap PNG Baseball Card export
   await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();
@@ -63,8 +65,9 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /generate club export code/i }).click();
   await expect(page.locator('#club-export-code')).toHaveValue(/^MBM1:/);
 
-  // Visit League tab and confirm Season Awards & Club Hall of Fame Ballot render
+  // Visit League tab and confirm Playoff Bracket + Season Awards & Club Hall of Fame Ballot render
   await page.getByRole('button', { name: /^league$/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('playoff-bracket-panel')).toBeVisible();
   await expect(page.getByTestId('awards-and-hof-panel')).toBeVisible();
 
   // Open Coach Pops' Guide, Story & Origins CYOA, and 4 Auto-Save Slots

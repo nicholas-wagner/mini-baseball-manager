@@ -80,6 +80,8 @@ import {
   equipRelicOnPlayer,
   unequipRelicFromPlayer,
 } from '../engine/rpg/relics';
+import { hireRetiredLegendCoachForClub } from '../engine/league/playoffBracket';
+import type { RetiredLegendCoachCandidate } from '../engine/rpg/lifecycle';
 import { useGameStore } from './gameStore';
 
 function replaceHumanClub(
@@ -535,4 +537,36 @@ export function setHumanPlayerPlayThrough(
   };
   useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updatedClub) });
   return { allowed: true };
+}
+
+export function hireHumanRetiredLegendCoach(
+  legend: RetiredLegendCoachCandidate,
+): { hired: boolean; reason?: string; coachName?: string } {
+  const state = useGameStore.getState();
+  const baseClub = state.activeOffseason
+    ? Object.values(state.activeOffseason.leagues)
+        .flat()
+        .find((c) => c.id === state.activeOffseason?.humanClubId) ?? state.getHumanClub()
+    : state.getHumanClub();
+  if (!baseClub) return { hired: false, reason: 'No active club.' };
+
+  const res = hireRetiredLegendCoachForClub(baseClub, legend);
+  if (!res.hired) return { hired: false, reason: res.reason };
+
+  const nextLeagues = replaceHumanClub(state.leagues, res.club);
+  if (state.activeOffseason) {
+    useGameStore.setState({
+      leagues: nextLeagues,
+      activeOffseason: {
+        ...state.activeOffseason,
+        leagues: replaceHumanClub(state.activeOffseason.leagues, res.club),
+        retiredCoachCandidates: state.activeOffseason.retiredCoachCandidates.filter(
+          (c) => c.formerPlayerId !== legend.formerPlayerId,
+        ),
+      },
+    });
+  } else {
+    useGameStore.setState({ leagues: nextLeagues });
+  }
+  return { hired: true, coachName: res.staff.name };
 }

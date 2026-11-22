@@ -55,8 +55,26 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // Precache core app shell & PWA icons only; cache large player portrait PNGs on-demand via CacheFirst
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}', 'icons/*.png'],
+        globIgnores: ['**/assets/mbm-*.png', '**/assets/felix-*.png', '**/assets/manny-*.png'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/.*\.png$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mbm-portraits-v1',
+              expiration: {
+                maxEntries: 260,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
       },
       devOptions: {
         enabled: true,
@@ -69,6 +87,8 @@ export default defineConfig({
         manualChunks: {
           three: ['three'],
           react: ['react', 'react-dom'],
+          lucide: ['lucide-react'],
+          zustand: ['zustand'],
         },
       },
     },

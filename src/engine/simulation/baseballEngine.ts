@@ -20,6 +20,7 @@ import {
 } from '../rpg/abilityCooldowns';
 import { computePitchEnduranceDrain } from '../rpg/pitcherEndurance';
 import { selectBestBullpenReliever } from '../rpg/pitcherRoles';
+import { evaluateHeritageGameplayProfile } from '../rpg/specialPowerEffects';
 import {
   advanceHitRunners,
   advanceWalkRunners,
@@ -46,6 +47,7 @@ import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
 
 export interface StepPitchOptions {
   requestedPitchType?: PitchType;
+  requestedPowerId?: string;
 }
 
 export function createGameSession(
@@ -167,6 +169,33 @@ function recordRunsScored(
   else row.home += count;
 }
 
+function consumeCountPitchPowerOrHype(
+  state: GameSessionState,
+  res: PitchResolution,
+  batterId: string,
+  pitcherId: string,
+): void {
+  const batting = getBattingSide(state);
+  const fielding = getFieldingSide(state);
+  const battingKey: TeamSideKey = state.half === 'TOP' ? 'away' : 'home';
+  const fieldingKey: TeamSideKey = state.half === 'TOP' ? 'home' : 'away';
+
+  if (res.specialPowerTriggered?.actor === 'batter') {
+    const used = recordSpecialAbilityUse(state.abilityCooldowns, battingKey, { id: batterId }, 'batter', batting.hypeGauge, 0);
+    state.abilityCooldowns = used.nextState;
+    batting.hypeGauge = used.nextHype;
+    return;
+  }
+  if (res.specialPowerTriggered?.actor === 'pitcher') {
+    const used = recordSpecialAbilityUse(state.abilityCooldowns, fieldingKey, { id: pitcherId }, 'pitcher', fielding.hypeGauge, fielding.pitcherFatigue);
+    state.abilityCooldowns = used.nextState;
+    fielding.hypeGauge = used.nextHype;
+    fielding.pitcherFatigue = used.nextFatigue;
+    return;
+  }
+  batting.hypeGauge = Math.min(100, batting.hypeGauge + 4);
+}
+
 function applyCountPitch(
   state: GameSessionState,
   res: PitchResolution,
@@ -186,8 +215,7 @@ function applyCountPitch(
     if (state.strikes < 2) state.strikes += 1;
   }
 
-  const batting = getBattingSide(state);
-  batting.hypeGauge = Math.min(100, batting.hypeGauge + 4);
+  consumeCountPitchPowerOrHype(state, res, batterId, pitcherId);
   if (res.pitchThrown) {
     state.atBatPitchHistory.push(res.pitchThrown.pitchType);
   }
@@ -198,6 +226,7 @@ function applyCountPitch(
     batterId,
     pitcherId,
     outcome: res.outcome,
+    specialPowerTriggered: res.specialPowerTriggered,
     pitchThrown: res.pitchThrown,
     commentary: res.commentary,
     soundCue: res.soundCue,
@@ -782,7 +811,16 @@ function recordPitchFatigueIfThrown(
   leverage: number,
 ): void {
   if (STEAL_TACTICAL_CALLS.has(effectiveCall) || effectiveCall === 'intentional_walk') return;
-  const drain = computePitchEnduranceDrain(pitcher, leverage, next.regulationInnings);
+  const heritage = evaluateHeritageGameplayProfile(pitcher, leverage);
+  const relieverScale =
+    pitcher.position === 'RP'
+      ? Math.max(0.65, 1 - fielding.staffBonuses.relieverFatigueReduction)
+      : 1;
+  const drain =
+    computePitchEnduranceDrain(pitcher, leverage, next.regulationInnings) *
+    heritage.enduranceDrainScale *
+    fielding.staffBonuses.pitcherEnduranceDrainScale *
+    relieverScale;
   getPitcherLines(next)[pitcher.id].pitchesThrown += 1;
   fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + drain);
   next.abilityCooldowns = tickAbilityCooldownsOnPitch(next.abilityCooldowns, pitcher.id);
@@ -840,8 +878,13 @@ export function stepPitch(
     tacticalCall: effectiveCall,
     atBatPitchHistory: next.atBatPitchHistory,
     requestedPitchType: options?.requestedPitchType,
+    requestedPowerId: options?.requestedPowerId,
     battingCoEdSynergy: batting.coEdSynergy,
     fieldingCoEdSynergy: fielding.coEdSynergy,
+    battingStaffBonuses: batting.staffBonuses,
+    fieldingStaffBonuses: fielding.staffBonuses,
+    battingChemistryBonuses: batting.chemistryBonuses,
+    fieldingChemistryBonuses: fielding.chemistryBonuses,
     ballparkId: next.ballparkId,
     battingPlayersById: batting.playersById,
     catcherPopTimeBonus: fielding.catcherPopTimeBonus,
@@ -1000,8 +1043,9 @@ export function simFullGame(
   homeClub: Club,
   seed: number,
   regulationInnings: GameLengthInnings = 9,
+  gamePressureLevel: GamePressureLevel = 'regular',
 ): GameSessionResult {
-  let state = createGameSession(awayClub, homeClub, seed, 'regular', regulationInnings);
+  let state = createGameSession(awayClub, homeClub, seed, gamePressureLevel, regulationInnings);
   const events: PlayEvent[] = [];
 
   for (let i = 0; i < 1200 && state.status === 'in_progress'; i += 1) {

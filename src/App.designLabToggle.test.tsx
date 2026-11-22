@@ -12,7 +12,7 @@ describe('App — Production Hidden Design Lab with 5x "d" Secret Toggle', () =>
     useGameStore.setState({ humanClubId: null, manager: null });
   });
 
-  it('hides Design Lab by default on production launch, ignores typing "d" inside inputs, and toggles show/hide on 5x "d"', () => {
+  it('hides Design Lab by default on production launch, ignores typing "d" inside inputs, and toggles show/hide on 5x "d"', async () => {
     render(<App />);
 
     // 1. Default landing is Play Ball (Club Creator), NOT Design Lab, and Design Lab tab is hidden
@@ -31,7 +31,9 @@ describe('App — Production Hidden Design Lab with 5x "d" Secret Toggle', () =>
       fireEvent.keyDown(window, { key: 'd' });
     }
     expect(screen.getAllByRole('button', { name: /design lab/i }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('region', { name: /live baseball scoreboard/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: /live baseball scoreboard/i }, { timeout: 8000 }),
+    ).toBeInTheDocument();
 
     // 4. Pressing "d" 5 times again hides Design Lab and returns to Play Ball
     for (let i = 0; i < 5; i += 1) {

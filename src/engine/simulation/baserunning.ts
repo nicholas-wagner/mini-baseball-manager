@@ -6,6 +6,10 @@ import type { Player } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
 import { getFormStatModifiers } from '../rpg/formTracker';
 import { evaluatePlayerRelicBonuses } from '../rpg/relics';
+import {
+  evaluateCapstoneGameplayProfile,
+  evaluateHeritageGameplayProfile,
+} from '../rpg/specialPowerEffects';
 import type { BaseState } from './gameState';
 
 export type StealPlayType = 'steal_2b' | 'steal_3b' | 'double_steal' | 'steal_home';
@@ -70,21 +74,25 @@ function clampProb(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-/** Computes effective live baserunning speed combining base Speed, relics, form, health, and fatigue. */
+/** Computes effective live baserunning speed combining base Speed, relics, powers, form, health, and fatigue. */
 export function computeEffectiveStealSpeed(runner: Player): number {
   const health = getActiveHealthRatingPenalties(runner);
   const relics = evaluatePlayerRelicBonuses(runner);
   const form = getFormStatModifiers(runner.formState);
+  const heritage = evaluateHeritageGameplayProfile(runner, 1.0);
+  const capstones = evaluateCapstoneGameplayProfile(runner, 1.0);
   const specialistJump = runner.specialistArchetype === 'speed_smallball' ? 6 : 0;
-  const fatiguePenalty = Math.floor(runner.fatigue / 22);
+  const fatiguePenalty = Math.floor((runner.fatigue * heritage.enduranceDrainScale) / 22);
   const raw =
     runner.ratings.speed +
     health.speed +
     relics.speed +
+    heritage.stealSpeedDelta +
+    capstones.stealSpeedDelta +
     Math.round(form.contactDelta * 0.4) +
     specialistJump -
     fatiguePenalty;
-  return Math.max(20, Math.min(105, raw));
+  return Math.max(20, Math.min(108, raw));
 }
 
 /**
@@ -98,9 +106,17 @@ export function computeStealSuccessProbability(ctx: StealMatchupContext): number
       ? (effSpeed - 60) * 0.0078
       : (effSpeed - 60) * 0.0115;
 
+  const catcherHeritage = evaluateHeritageGameplayProfile(ctx.catcher, 1.0);
+  const catcherCapstones = evaluateCapstoneGameplayProfile(ctx.catcher, 1.0);
+  const catcherArm =
+    ctx.catcher.ratings.arm + catcherHeritage.defenderArmDelta + catcherCapstones.defenderArmDelta;
+  const catcherFld =
+    ctx.catcher.ratings.fielding +
+    catcherHeritage.defenderFieldingDelta +
+    catcherCapstones.defenderFieldingDelta;
   const catcherThrowSkill =
-    ctx.catcher.ratings.arm * 0.72 +
-    ctx.catcher.ratings.fielding * 0.28 +
+    catcherArm * 0.72 +
+    catcherFld * 0.28 +
     (ctx.catcherPopTimeBonus ?? 0) * 2.5;
   const catcherEdge = (catcherThrowSkill - 60) * 0.0055;
 

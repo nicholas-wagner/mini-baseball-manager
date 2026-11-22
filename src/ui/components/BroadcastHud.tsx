@@ -27,6 +27,44 @@ interface BroadcastHudProps {
   activeTacticalCall: TacticalCall;
   onSelectStealCall: (call: TacticalCall) => void;
   lastEvent: PlayEvent | null;
+  atBatEvents?: readonly PlayEvent[];
+}
+
+interface PlottedPitchDot {
+  num: number;
+  cx: number;
+  cy: number;
+  fill: string;
+  label: string;
+}
+
+function plotAtBatPitches(events: readonly PlayEvent[]): PlottedPitchDot[] {
+  const pitchEvents = events.filter((e) => Boolean(e.pitchThrown)).slice(-8);
+  return pitchEvents.map((ev, idx) => {
+    const hash = Math.abs(Math.imul(ev.seq + 17, 2654435761)) % 1000;
+    const normX = (hash % 100) / 100;
+    const normY = Math.floor(hash / 100) / 10;
+    const isBall = ev.outcome === 'ball' || ev.outcome === 'walk';
+    const isFoul = ev.outcome === 'foul';
+    const isStrike =
+      ev.outcome === 'called_strike' ||
+      ev.outcome === 'swinging_strike' ||
+      ev.outcome === 'strikeout';
+    const cx = isBall
+      ? normX < 0.5
+        ? 10 + normX * 14
+        : 60 + (normX - 0.5) * 14
+      : 22 + normX * 36;
+    const cy = isBall ? 12 + normY * 54 : 18 + normY * 42;
+    const fill = isBall ? '#2FB356' : isStrike ? '#FF4D6D' : isFoul ? '#FFC300' : '#00E5FF';
+    return {
+      num: idx + 1,
+      cx: Math.round(cx),
+      cy: Math.round(cy),
+      fill,
+      label: `${ev.pitchThrown!.mph} mph ${PITCH_TYPE_SHORT_LABELS[ev.pitchThrown!.pitchType]}`,
+    };
+  });
 }
 
 const STEAL_PLAY_TO_CALL: Readonly<Record<StealPlayType, TacticalCall>> = {
@@ -59,6 +97,7 @@ export function BroadcastHud({
   activeTacticalCall,
   onSelectStealCall,
   lastEvent,
+  atBatEvents = [],
 }: BroadcastHudProps) {
   const homeWp = estimateHomeWinProbability(session);
   const homePct = Math.round(homeWp * 100);
@@ -79,6 +118,9 @@ export function BroadcastHud({
   const humanBatting = session.half === 'BOT';
   const hasRunners = session.bases.some((b) => b !== null);
   const sparkPoints = buildSparklinePoints(winProbHistory.length > 0 ? winProbHistory : [homeWp]);
+  const plottedPitches = plotAtBatPitches(
+    atBatEvents.length > 0 ? atBatEvents : lastEvent ? [lastEvent] : [],
+  );
 
   return (
     <div
@@ -120,10 +162,53 @@ export function BroadcastHud({
         {lastEvent?.pitchThrown ? (
           <div
             data-testid="strike-zone-tracker"
-            className="px-2.5 py-1 rounded-xl border border-[#181B2C] bg-[#181B2C] text-[#FFD166] text-[11px] font-mono-tabular font-bold"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#181B2C] text-[#FFD166]"
           >
-            LAST PITCH: {lastEvent.pitchThrown.mph} MPH{' '}
-            {PITCH_TYPE_SHORT_LABELS[lastEvent.pitchThrown.pitchType]}
+            <svg
+              data-testid="strike-zone-plot"
+              viewBox="0 0 80 78"
+              className="w-12 h-12 rounded bg-[#101425] border border-white/25 shrink-0"
+              aria-label="Strike zone pitch location plot"
+            >
+              {/* 3x3 Strike Zone */}
+              <rect x="20" y="14" width="40" height="48" fill="none" stroke="#FFD166" strokeWidth="1.5" />
+              <line x1="33.3" y1="14" x2="33.3" y2="62" stroke="#FFD166" strokeOpacity="0.35" strokeWidth="0.8" />
+              <line x1="46.6" y1="14" x2="46.6" y2="62" stroke="#FFD166" strokeOpacity="0.35" strokeWidth="0.8" />
+              <line x1="20" y1="30" x2="60" y2="30" stroke="#FFD166" strokeOpacity="0.35" strokeWidth="0.8" />
+              <line x1="20" y1="46" x2="60" y2="46" stroke="#FFD166" strokeOpacity="0.35" strokeWidth="0.8" />
+              {/* Home plate pentagon */}
+              <polygon points="28,68 52,68 52,72 40,76 28,72" fill="#FBF4E4" fillOpacity="0.8" />
+              {plottedPitches.map((dot) => (
+                <g key={dot.num}>
+                  <circle cx={dot.cx} cy={dot.cy} r="5.5" fill={dot.fill} stroke="#181B2C" strokeWidth="1" />
+                  <text
+                    x={dot.cx}
+                    y={dot.cy + 2.6}
+                    textAnchor="middle"
+                    fill="#181B2C"
+                    fontSize="7"
+                    fontWeight="900"
+                  >
+                    {dot.num}
+                  </text>
+                </g>
+              ))}
+            </svg>
+            <div className="text-[10px] font-mono-tabular font-bold leading-tight">
+              <div className="text-[#FFD166]">
+                {lastEvent.pitchThrown.mph} MPH {PITCH_TYPE_SHORT_LABELS[lastEvent.pitchThrown.pitchType]}
+              </div>
+              <div className="text-[#E0FBFC] uppercase text-[9px]">
+                {lastEvent.pitchThrown.isFavoritePitch
+                  ? '★ Signature Pitch'
+                  : lastEvent.pitchThrown.isWeakPitchForPitcher
+                    ? '⚠️ Weak Pitch'
+                    : 'Zone Tracker'}
+              </div>
+              <div className="text-[9px] text-white/75">
+                {plottedPitches.length} pitch{plottedPitches.length === 1 ? '' : 'es'} in AB
+              </div>
+            </div>
           </div>
         ) : null}
       </div>
