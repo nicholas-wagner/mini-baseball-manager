@@ -316,6 +316,7 @@ Track every plan tweak, new feature idea, or architectural pivot here so the evo
 | 2026-11-21 | Visuals & Stack | Locked Toon-Shaded Chibi 3D (imperative Three.js) + 90s Baseball Card UI + Vite/React/TS/Vitest/Playwright/PWA + Web Audio synth | Balances 60 FPS Android performance, 90s charm, and clean TDD separation |
 | 2026-11-21 | League Pacing | Locked 6 tiers × 8 teams, 21-game regular season + 4-team playoffs | Makes 3-game series ideal for 5–15 min runs while keeping seasons meaty |
 | 2026-11-21 | Gameplay / League | Added **Dynamic Team Rivalries** (heat meter, organic triggers, poached-player revenge games, comic VS cards, boosted hype/attendance, traveling Rivalry Cup) | Deepens multi-season drama and ties together visuals, RPG, economy, and trophies |
+| 2026-11-21 | Player Visuals (M1) | Upgraded players from basic 3D primitives to **Articulated Multi-Angle Illustrated SVGs** (cel-shaded 90s card portraits + animated Front/Back full-body Mini-Player SVGs used both natively in UI and as camera-aware 2.5D cutouts inside the 3D ballpark) | Delivers authentic, expressive 90s cartoon charm and razor-sharp character art at every zoom level |
 
 ---
 

@@ -45,8 +45,11 @@ export interface PortraitTraits {
   headShape: HeadShape;
   skinTone: string;
   skinShadow: string;
+  skinHighlight: string;
+  irisColor: string;
   hairStyle: HairStyle;
   hairColor: string;
+  hairHighlight: string;
   capStyle: CapStyle;
   eyeStyle: EyeStyle;
   mouthStyle: MouthStyle;

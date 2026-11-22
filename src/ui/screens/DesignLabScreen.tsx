@@ -22,6 +22,7 @@ import type { CharacterAnimClip } from '../../scene/characters/animationState';
 import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
 import { BallparkCanvas, type ShowcaseTrigger } from '../components/BallparkCanvas';
 import { FlipBaseballCard, type BaseballCardPlayer } from '../components/FlipBaseballCard';
+import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { ScoreboardStrip } from '../design-system/ScoreboardStrip';
@@ -337,6 +338,84 @@ export function DesignLabScreen() {
                 </ComicButton>
               ))}
             </div>
+          </div>
+        </div>
+      </ComicCard>
+
+      {/* Live Articulated Vector SVG Mini-Player Showcase */}
+      <ComicCard
+        title="Articulated Mini-Player SVG Rig Inspector"
+        subtitle={`Pure Vector SVG Characters (${heroPlayer.name}) • Live Multi-Angle & Gear Variants`}
+        headerBg={activeTeam.primary}
+        badge={
+          <span className="px-2.5 py-1 rounded-full bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] font-display text-[11px]">
+            100% VECTOR SVG
+          </span>
+        }
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
+            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
+              PITCHER • FRONT
+            </span>
+            <MiniPlayerSvg
+              traits={heroPlayer.traits}
+              team={activeTeam}
+              jerseyNumber={heroPlayer.jerseyNumber}
+              role="pitcher"
+              facing="front"
+              clip={pitcherClip}
+              moodOverride={mood === 'happy' ? undefined : mood}
+              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+            />
+          </div>
+
+          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
+            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
+              PITCHER • BACK (#{heroPlayer.jerseyNumber})
+            </span>
+            <MiniPlayerSvg
+              traits={heroPlayer.traits}
+              team={activeTeam}
+              jerseyNumber={heroPlayer.jerseyNumber}
+              role="pitcher"
+              facing="back"
+              clip={pitcherClip}
+              moodOverride={mood === 'happy' ? undefined : mood}
+              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+            />
+          </div>
+
+          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
+            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
+              BATTER • HELMET &amp; BAT
+            </span>
+            <MiniPlayerSvg
+              traits={heroPlayer.traits}
+              team={activeTeam}
+              jerseyNumber={heroPlayer.jerseyNumber}
+              role="batter"
+              facing="front"
+              clip={batterClip}
+              moodOverride={mood === 'happy' ? undefined : mood}
+              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+            />
+          </div>
+
+          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
+            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
+              FIELDER • LEAP / DIVE
+            </span>
+            <MiniPlayerSvg
+              traits={heroPlayer.traits}
+              team={activeTeam}
+              jerseyNumber={heroPlayer.jerseyNumber}
+              role="fielder"
+              facing="front"
+              clip={fielderClip}
+              moodOverride={mood === 'happy' ? undefined : mood}
+              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+            />
           </div>
         </div>
       </ComicCard>

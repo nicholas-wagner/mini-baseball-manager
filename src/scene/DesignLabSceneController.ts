@@ -92,46 +92,56 @@ export class DesignLabSceneController {
     this.vfx = createBallparkVfxSystem();
     this.scene.add(this.vfx.group);
 
-    // Featured Chibi Pitcher on the Mound (faces +Z toward Home Plate)
-    this.pitcher = createChibiPlayerRig({
-      traits: initialHeroTraits,
-      team: initialHeroTeam,
-      jerseyNumber: initialJersey,
-      role: 'pitcher',
-    });
+    // Featured Chibi Pitcher on the Mound (logicalYaw = 0 -> faces +Z toward Home Plate)
+    this.pitcher = createChibiPlayerRig(
+      {
+        traits: initialHeroTraits,
+        team: initialHeroTeam,
+        jerseyNumber: initialJersey,
+        role: 'pitcher',
+      },
+      0,
+    );
     this.pitcher.root.position.set(0, 0.24, -10.2);
     this.scene.add(this.pitcher.root);
 
-    // Opposing Chibi Batter at Home Plate (faces -Z toward Pitcher)
+    // Opposing Chibi Batter at Home Plate (logicalYaw = PI -> faces -Z toward Pitcher)
     const rivalTeam = SAMPLE_TEAM_PALETTES[1];
-    this.batter = createChibiPlayerRig({
-      traits: createPortraitTraits(4412),
-      team: rivalTeam,
-      jerseyNumber: 7,
-      role: 'batter',
-    });
+    this.batter = createChibiPlayerRig(
+      {
+        traits: createPortraitTraits(4412),
+        team: rivalTeam,
+        jerseyNumber: 7,
+        role: 'batter',
+      },
+      Math.PI,
+    );
     this.batter.root.position.set(-0.92, 0.04, 0.15);
-    this.batter.root.rotation.y = Math.PI;
     this.scene.add(this.batter.root);
 
-    // Chibi Catcher behind Home Plate
-    this.catcher = createChibiPlayerRig({
-      traits: createPortraitTraits(3105),
-      team: initialHeroTeam,
-      jerseyNumber: 2,
-      role: 'catcher',
-    });
+    // Chibi Catcher behind Home Plate (logicalYaw = PI -> faces -Z toward Pitcher)
+    this.catcher = createChibiPlayerRig(
+      {
+        traits: createPortraitTraits(3105),
+        team: initialHeroTeam,
+        jerseyNumber: 2,
+        role: 'catcher',
+      },
+      Math.PI,
+    );
     this.catcher.root.position.set(0, 0.04, 1.75);
-    this.catcher.root.rotation.y = Math.PI;
     this.scene.add(this.catcher.root);
 
-    // Chibi Center-Right Fielder ready to dive or Sky-High Leap!
-    this.fielder = createChibiPlayerRig({
-      traits: createPortraitTraits(7721),
-      team: initialHeroTeam,
-      jerseyNumber: 19,
-      role: 'fielder',
-    });
+    // Chibi Center-Right Fielder ready to dive or Sky-High Leap! (logicalYaw = 0 -> faces +Z toward Home)
+    this.fielder = createChibiPlayerRig(
+      {
+        traits: createPortraitTraits(7721),
+        team: initialHeroTeam,
+        jerseyNumber: 19,
+        role: 'fielder',
+      },
+      0,
+    );
     this.fielder.root.position.set(7.5, 0.04, -22.5);
     this.scene.add(this.fielder.root);
 
@@ -218,17 +228,7 @@ export class DesignLabSceneController {
     this.trauma = Math.max(0, this.trauma - dt * 1.45);
     this.crowdExcitement = Math.max(0.22, this.crowdExcitement - dt * 0.25);
 
-    // Update animated chibi players
-    this.pitcher.updatePose(this.pitcherClip, this.elapsedSec, this.moodOverride);
-    this.batter.updatePose(this.batterClip, this.elapsedSec);
-    this.catcher.updatePose('field_ready', this.elapsedSec * 0.8);
-    this.fielder.updatePose(this.fielderClip, this.elapsedSec);
-
-    // Update stadium crowd, clouds & VFX
-    this.ballpark.update(this.elapsedSec, this.crowdExcitement);
-    this.vfx.update(dt);
-
-    // Smoothly damp camera & apply screen shake
+    // Smoothly damp camera & apply screen shake first so 2.5D SVG cutouts know exact camera angle
     const targetPose = getCameraPresetPose(
       this.cameraPreset,
       this.elapsedSec,
@@ -251,6 +251,16 @@ export class DesignLabSceneController {
       this.cameraPose.lookAt.y,
       this.cameraPose.lookAt.z,
     );
+
+    // Update animated 2.5D SVG players with live camera position for front/back switching!
+    this.pitcher.updatePose(this.pitcherClip, this.elapsedSec, this.moodOverride, this.camera.position);
+    this.batter.updatePose(this.batterClip, this.elapsedSec, undefined, this.camera.position);
+    this.catcher.updatePose('field_ready', this.elapsedSec * 0.8, undefined, this.camera.position);
+    this.fielder.updatePose(this.fielderClip, this.elapsedSec, undefined, this.camera.position);
+
+    // Update stadium crowd, clouds & VFX
+    this.ballpark.update(this.elapsedSec, this.crowdExcitement);
+    this.vfx.update(dt);
 
     this.renderer.render(this.scene, this.camera);
   };
