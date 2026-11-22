@@ -5,6 +5,7 @@ import { useGameStore } from './store/gameStore';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
 import { ComicCard } from './ui/design-system/ComicCard';
 import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
+import { ClubHubScreen } from './ui/screens/ClubHubScreen';
 import { DesignLabScreen } from './ui/screens/DesignLabScreen';
 import { GameDayScreen } from './ui/screens/GameDayScreen';
 import { LeagueScreen } from './ui/screens/LeagueScreen';
@@ -78,6 +79,10 @@ export function App() {
       ) : (
         <ClubCreatorScreen onCreated={() => setActiveTab('skills')} />
       );
+    }
+
+    if (activeTab === 'economy' && humanClub) {
+      return <ClubHubScreen />;
     }
 
     const upcoming = UPCOMING_MILESTONES[activeTab];

@@ -2,6 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { FastForward, Play, RefreshCw, SkipForward, Zap } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
+import {
+  createInGameManagerPowerTracker,
+  MANAGER_POWER_CATALOG,
+  triggerInGameManagerPower,
+  type InGameManagerPowerTracker,
+} from '../../engine/manager/managerTree';
+import type { ManagerPowerId } from '../../engine/models/manager';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import {
   PITCHER_ROLE_SHORT_LABELS,
@@ -79,6 +86,9 @@ export function GameDayScreen() {
   const [watchMode, setWatchMode] = useState<'live' | 'clutch' | 'paused'>('paused');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
+  const [powerTracker, setPowerTracker] = useState<InGameManagerPowerTracker>(() =>
+    createInGameManagerPowerTracker(),
+  );
   const [modalSummary, setModalSummary] = useState<PostGameSummary | null>(null);
 
   const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? opponents[0];
@@ -115,6 +125,7 @@ export function GameDayScreen() {
     setRecentEvents([]);
     setLastChoreo(null);
     setSelectedPitchType(null);
+    setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setWatchMode(autoPlay ? 'live' : 'paused');
     soundEngine.play('organ_charge');
@@ -489,6 +500,46 @@ export function GameDayScreen() {
                           {isFav ? '★ ' : ''}
                           {PITCH_TYPE_SHORT_LABELS[slot.pitchType]} ({slot.mastery})
                           {hitsWeak ? ' 🎯' : hitsFav ? ' ⚠️' : ''}
+                        </ComicButton>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {manager && manager.activePowerIds.length > 0 ? (
+                <div
+                  data-testid="manager-power-dock"
+                  className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] space-y-1.5"
+                >
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#181B2C]">
+                    Manager Skipper Power Dock (1 Charge / Game Each)
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {manager.activePowerIds.map((powerId: ManagerPowerId) => {
+                      const meta = MANAGER_POWER_CATALOG[powerId];
+                      const used = powerTracker.usedPowerIds.includes(powerId);
+                      return (
+                        <ComicButton
+                          key={powerId}
+                          size="sm"
+                          variant={used ? 'cream' : 'gold'}
+                          disabled={used || liveSession.status === 'completed'}
+                          onClick={() => {
+                            const res = triggerInGameManagerPower(
+                              powerTracker,
+                              manager,
+                              powerId,
+                              liveSession,
+                              'home',
+                            );
+                            if (res.used && res.event) {
+                              setPowerTracker(res.tracker);
+                              applyStepResult(res.session, [res.event], activeOpponent.id);
+                            }
+                          }}
+                        >
+                          ⚡ {meta.label} {used ? '(Used)' : '(1/1)'}
                         </ComicButton>
                       );
                     })}
