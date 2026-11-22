@@ -2,10 +2,7 @@ import {
   evaluateParkHitMultipliers,
   type BallparkPresetId,
 } from '../ballparks/stadiumCatalog';
-import {
-  evaluatePlatoonMatchup,
-  getPositionalHandednessBonus,
-} from '../handedness/handedness';
+import { evaluatePlatoonMatchup } from '../handedness/handedness';
 import type { FieldPosition } from '../handedness/types';
 import { getActiveHealthRatingPenalties } from '../health/healthEngine';
 import type {
@@ -43,6 +40,13 @@ import { evaluatePitcherRoleSituation } from '../rpg/pitcherRoles';
 import { computeSkillTreeCombatBonuses } from '../rpg/skillTrees';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
+import {
+  resolveBaseStealPlay,
+  resolveDefaultStealPlay,
+  type StealDefenseCall,
+  type StealPlayResolution,
+  type StealPlayType,
+} from './baserunning';
 import { sampleBattedBallType } from './sabermetrics';
 
 export interface PitchResolution {
@@ -53,6 +57,7 @@ export interface PitchResolution {
   runnerId?: string;
   advanceOnOut?: 'sac_fly' | 'double_play' | 'none';
   stealSuccess?: boolean;
+  stealResolution?: StealPlayResolution;
   commentary: string;
   soundCue: PlaySoundCue;
   ballFlight?: PlayEvent['ballFlight'];
@@ -75,6 +80,11 @@ const TACTICAL_CONFIG: Readonly<Record<TacticalCall, TacticalModifiers>> = {
   power: { contactMod: -8, powerMod: 12, swingMod: 0.08, chaseMod: 0.06 },
   bunt: { contactMod: 4, powerMod: -20, swingMod: 0, chaseMod: 0 },
   steal: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
+  steal_3b: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
+  double_steal: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
+  steal_home: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
+  pitchout: { contactMod: 0, powerMod: 0, swingMod: -0.5, chaseMod: -0.5 },
+  hold_runner: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
   intentional_walk: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
 };
 
@@ -116,34 +126,49 @@ function buildHeritagePowerTrigger(
   };
 }
 
+function resolveStealPlayTypeFromCall(
+  call: TacticalCall,
+  bases: BaseState,
+): StealPlayType | null {
+  if (call === 'steal') return resolveDefaultStealPlay(bases);
+  if (call === 'steal_3b' || call === 'double_steal' || call === 'steal_home') return call;
+  return null;
+}
+
 function resolveStealAttempt(
-  rng: SeededRng,
-  runner: Player,
-  pitcher: Player,
-  catcher: Player,
-): PitchResolution {
-  const holdBonus = getPositionalHandednessBonus(pitcher.position, pitcher.throws).pickoffHoldBonus;
-  const stealProb = clampProb(
-    0.6 + (runner.ratings.speed - catcher.ratings.arm) * 0.0055 - holdBonus * 0.015,
-    0.22,
-    0.88,
+  ctx: PitchResolverContext,
+  playType: StealPlayType,
+): PitchResolution | null {
+  const playersMap: Record<string, Player> = ctx.battingPlayersById
+    ? { ...ctx.battingPlayersById }
+    : {};
+  if (ctx.firstBaseRunner) {
+    playersMap[ctx.firstBaseRunner.id] = ctx.firstBaseRunner;
+  }
+  const result = resolveBaseStealPlay(
+    ctx.rng,
+    playType,
+    ctx.bases,
+    playersMap,
+    ctx.pitcher,
+    ctx.catcher,
+    {
+      pitcherFatigue: ctx.pitcherFatigue,
+      catcherPopTimeBonus: ctx.catcherPopTimeBonus,
+      defenseCall: ctx.stealDefenseCall,
+    },
   );
-  const success = rng.chance(stealProb);
+  if (!result) return null;
   return {
     kind: 'steal_attempt',
     outcome: 'ball',
-    outsAdded: success ? 0 : 1,
-    runnerId: runner.id,
-    stealSuccess: success,
-    commentary: success
-      ? `${runner.name} swipes second base with a dusty slide!`
-      : `${catcher.name} fires a laser to nail ${runner.name} trying to steal!`,
-    soundCue: success ? 'dirt_slide' : 'glove_pop',
-    fieldingHighlight: {
-      fielderId: catcher.id,
-      fielderPos: 'C',
-      anim: success ? 'field_run' : 'field_dive',
-    },
+    outsAdded: result.outsAdded,
+    runnerId: result.stolenBaseRunnerIds[0] ?? result.caughtStealingRunnerId ?? undefined,
+    stealSuccess: result.success,
+    stealResolution: result,
+    commentary: result.commentary,
+    soundCue: result.soundCue,
+    fieldingHighlight: result.fieldingHighlight,
   };
 }
 
@@ -453,6 +478,9 @@ export interface PitchResolverContext {
   battingCoEdSynergy?: CoEdClubhouseSynergy;
   fieldingCoEdSynergy?: CoEdClubhouseSynergy;
   ballparkId?: BallparkPresetId;
+  battingPlayersById?: Readonly<Record<string, Player>>;
+  catcherPopTimeBonus?: number;
+  stealDefenseCall?: StealDefenseCall;
 }
 
 const BATTED_BALL_BABIP_SHIFT: Readonly<Record<BattedBallType, number>> = {
@@ -680,8 +708,10 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
       soundCue: 'ui_pop',
     };
   }
-  if (ctx.tacticalCall === 'steal' && ctx.firstBaseRunner) {
-    return resolveStealAttempt(ctx.rng, ctx.firstBaseRunner, ctx.pitcher, ctx.catcher);
+  const stealPlay = resolveStealPlayTypeFromCall(ctx.tacticalCall, ctx.bases);
+  const stealResult = stealPlay ? resolveStealAttempt(ctx, stealPlay) : null;
+  if (stealResult) {
+    return stealResult;
   }
 
   const platoon = evaluatePlatoonMatchup(ctx.batter.bats, ctx.pitcher.throws);

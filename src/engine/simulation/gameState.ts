@@ -1,6 +1,7 @@
 import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
+import { evaluateClubStaffBonuses } from '../gm/coaches';
 import type { FieldPosition } from '../handedness/types';
-import type { Club, LineupSlot } from '../models/club';
+import type { AiArchetype, Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
 import type {
   GameLengthInnings,
@@ -41,6 +42,7 @@ export interface BatterBoxLine {
   strikeouts: number;
   sacFlies: number;
   stolenBases: number;
+  caughtStealing: number;
   groundBalls: number;
   lineDrives: number;
   flyBalls: number;
@@ -80,6 +82,8 @@ export interface GameBoxScore {
 export interface TeamGameSide {
   clubId: string;
   isHuman: boolean;
+  aiArchetype: AiArchetype;
+  catcherPopTimeBonus: number;
   city: string;
   name: string;
   mascot: string;
@@ -146,6 +150,7 @@ function createEmptyBatterLine(playerId: string): BatterBoxLine {
     strikeouts: 0,
     sacFlies: 0,
     stolenBases: 0,
+    caughtStealing: 0,
     groundBalls: 0,
     lineDrives: 0,
     flyBalls: 0,
@@ -187,10 +192,13 @@ export function createTeamGameSide(club: Club): TeamGameSide {
     club.roster[club.roster.length - 1].id;
 
   const coEdSynergy = evaluateCoEdClubhouseSynergy(club.roster);
+  const staffBonuses = evaluateClubStaffBonuses(club.coaches.activeStaff ?? []);
 
   return {
     clubId: club.id,
     isHuman: club.isHuman,
+    aiArchetype: club.aiArchetype,
+    catcherPopTimeBonus: staffBonuses.catcherPopTimeBonus,
     city: club.city,
     name: club.name,
     mascot: club.mascot,

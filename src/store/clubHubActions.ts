@@ -3,6 +3,10 @@ import {
   type BallparkPresetId,
 } from '../engine/ballparks/stadiumCatalog';
 import {
+  upgradeStadiumFacility,
+  type StadiumUpgradeId,
+} from '../engine/ballparks/stadiumProgression';
+import {
   evaluateClubStaffBonuses,
   fireStaffMember,
   hireStaffMember,
@@ -75,6 +79,18 @@ export function commissionHumanBallpark(
   if (!res.commissioned) return { commissioned: false, reason: res.reason };
   useGameStore.setState({ leagues: replaceHumanClub(state.leagues, res.club) });
   return { commissioned: true };
+}
+
+export function upgradeHumanStadium(
+  upgradeId: StadiumUpgradeId,
+): { upgraded: boolean; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { upgraded: false, reason: 'No active club.' };
+  const res = upgradeStadiumFacility(club, upgradeId);
+  if (!res.upgraded) return { upgraded: false, reason: res.reason };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, res.club) });
+  return { upgraded: true };
 }
 
 export function runHumanPracticeActivity(

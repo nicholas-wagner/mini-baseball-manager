@@ -41,6 +41,7 @@ import {
   type PitcherBoxLine,
   type TeamGameSide,
 } from './gameState';
+import { shouldAiAttemptSteal } from './baserunning';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
 
 export interface StepPitchOptions {
@@ -210,17 +211,25 @@ function applyStealAttempt(
   pitcherId: string,
 ): PlayEvent {
   const outsBefore = state.outs;
-  const runnerId = state.bases[0];
   const battingLines = getBatterLines(state);
   const pitcherLine = getPitcherLines(state)[pitcherId];
+  const detail = res.stealResolution;
 
-  if (res.stealSuccess && runnerId) {
-    state.bases = [null, runnerId, state.bases[2]];
-    if (battingLines[runnerId]) battingLines[runnerId].stolenBases += 1;
-  } else if (runnerId) {
-    state.bases = [null, state.bases[1], state.bases[2]];
-    state.outs += 1;
-    pitcherLine.outsRecorded += 1;
+  if (detail) {
+    state.bases = detail.basesAfter;
+    for (const runnerId of detail.stolenBaseRunnerIds) {
+      if (battingLines[runnerId]) battingLines[runnerId].stolenBases += 1;
+    }
+    if (detail.caughtStealingRunnerId) {
+      if (battingLines[detail.caughtStealingRunnerId]) {
+        battingLines[detail.caughtStealingRunnerId].caughtStealing += 1;
+      }
+      state.outs += 1;
+      pitcherLine.outsRecorded += 1;
+    }
+    if (detail.runsScoredIds.length > 0) {
+      recordRunsScored(state, getBattingSide(state), pitcherLine, battingLines[batterId], detail.runsScoredIds, true);
+    }
   }
 
   return makeEvent(state, {
@@ -716,6 +725,55 @@ function getSpecialReadinessForStep(
   };
 }
 
+const STEAL_TACTICAL_CALLS: ReadonlySet<TacticalCall> = new Set([
+  'steal',
+  'steal_3b',
+  'double_steal',
+  'steal_home',
+]);
+
+function resolveEffectiveCall(
+  rng: ReturnType<typeof createSeededRng>,
+  state: GameSessionState,
+  requested: TacticalCall,
+): TacticalCall {
+  const batting = getBattingSide(state);
+  if (requested !== 'normal' || batting.isHuman) return requested;
+  const fielding = getFieldingSide(state);
+  const aiSteal = shouldAiAttemptSteal(rng, {
+    bases: state.bases,
+    playersById: batting.playersById,
+    pitcher: getCurrentPitcher(state),
+    catcher: getDefenderAtPosition(fielding, 'C'),
+    outs: state.outs,
+    scoreDiff: batting.score - fielding.score,
+    aiArchetype: batting.aiArchetype,
+    pitcherFatigue: fielding.pitcherFatigue,
+    catcherPopTimeBonus: fielding.catcherPopTimeBonus,
+  });
+  if (!aiSteal) return 'normal';
+  return aiSteal === 'steal_2b' ? 'steal' : aiSteal;
+}
+
+function resolveStealDefenseCall(call: TacticalCall): 'normal' | 'hold_runner' | 'pitchout' {
+  if (call === 'pitchout' || call === 'hold_runner') return call;
+  return 'normal';
+}
+
+function recordPitchFatigueIfThrown(
+  next: GameSessionState,
+  effectiveCall: TacticalCall,
+  pitcher: ReturnType<typeof getCurrentPitcher>,
+  fielding: TeamGameSide,
+  leverage: number,
+): void {
+  if (STEAL_TACTICAL_CALLS.has(effectiveCall) || effectiveCall === 'intentional_walk') return;
+  const drain = computePitchEnduranceDrain(pitcher, leverage, next.regulationInnings);
+  getPitcherLines(next)[pitcher.id].pitchesThrown += 1;
+  fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + drain);
+  next.abilityCooldowns = tickAbilityCooldownsOnPitch(next.abilityCooldowns, pitcher.id);
+}
+
 /** Advances the deterministic baseball simulation by one pitch or tactical action. */
 export function stepPitch(
   session: GameSessionState,
@@ -738,14 +796,10 @@ export function stepPitch(
   const batting = getBattingSide(next);
   const firstBaseRunner = next.bases[0] ? batting.playersById[next.bases[0]] : null;
 
+  const effectiveCall = resolveEffectiveCall(rng, next, tacticalCall);
   const leverage = getCurrentLeverage(next).leverageIndex;
   const pitchingLead = fielding.score - batting.score;
-  if (tacticalCall !== 'steal' && tacticalCall !== 'intentional_walk') {
-    const drain = computePitchEnduranceDrain(pitcher, leverage, next.regulationInnings);
-    getPitcherLines(next)[pitcher.id].pitchesThrown += 1;
-    fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + drain);
-    next.abilityCooldowns = tickAbilityCooldownsOnPitch(next.abilityCooldowns, pitcher.id);
-  }
+  recordPitchFatigueIfThrown(next, effectiveCall, pitcher, fielding, leverage);
 
   const readiness = getSpecialReadinessForStep(next, batter, pitcher);
   const defenderPos = rng.pick(['SS', '2B', 'CF', 'LF', 'RF'] as const);
@@ -769,12 +823,15 @@ export function stepPitch(
     canBatterTriggerSpecial: readiness.canBatterTriggerSpecial,
     canPitcherTriggerSpecial: readiness.canPitcherTriggerSpecial,
     leverageIndex: leverage,
-    tacticalCall,
+    tacticalCall: effectiveCall,
     atBatPitchHistory: next.atBatPitchHistory,
     requestedPitchType: options?.requestedPitchType,
     battingCoEdSynergy: batting.coEdSynergy,
     fieldingCoEdSynergy: fielding.coEdSynergy,
     ballparkId: next.ballparkId,
+    battingPlayersById: batting.playersById,
+    catcherPopTimeBonus: fielding.catcherPopTimeBonus,
+    stealDefenseCall: resolveStealDefenseCall(tacticalCall),
   });
 
   events.push(dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
@@ -807,7 +864,7 @@ export function stepAtBat(
     const step = stepPitch(current, activeCall, options);
     current = step.nextSession;
     events.push(...step.events);
-    activeCall = activeCall === 'steal' ? 'normal' : activeCall;
+    activeCall = STEAL_TACTICAL_CALLS.has(activeCall) ? 'normal' : activeCall;
 
     const currentBatterIdx = getBattingSide(current).lineupIndex;
     const paResolved =

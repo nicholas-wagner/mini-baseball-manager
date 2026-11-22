@@ -8,6 +8,10 @@ import type { Player } from '../../engine/models/player';
 import type { GameSessionState } from '../../engine/simulation/gameState';
 import { createMiniBallpark } from '../ballpark/ballparkBuilder';
 import {
+  createStadiumEvolutionOverlay,
+  type StadiumEvolutionOverlay,
+} from '../ballpark/stadiumUpgrades';
+import {
   computeShakeOffset,
   dampCameraPose,
   getCameraPresetPose,
@@ -49,6 +53,8 @@ export class GameSceneController {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private ballpark: ReturnType<typeof createMiniBallpark>;
+  private stadiumOverlay: StadiumEvolutionOverlay | null = null;
+  private stadiumSignature = '';
   private vfx: ReturnType<typeof createBallparkVfxSystem>;
   private defenders = new Map<DiamondDefenderPos, ChibiPlayerRig>();
   private batterRig: ChibiPlayerRig;
@@ -145,6 +151,21 @@ export class GameSceneController {
   ): void {
     const fieldingClub = session.half === 'TOP' ? homeClub : awayClub;
     const battingClub = session.half === 'TOP' ? awayClub : homeClub;
+
+    const nextSig = `${homeClub.leagueTier}:${homeClub.stadium.ballparkId ?? 'sandlot'}:${homeClub.stadium.seatingTier}:${Number(homeClub.stadium.hasJumbotron)}:${Number(homeClub.stadium.hasNightLights)}:${Number(homeClub.stadium.hasMascotCannon)}:${homeClub.stadium.retiredNumbers.length}:${homeClub.stadium.championshipPennants.length}`;
+    if (nextSig !== this.stadiumSignature) {
+      this.stadiumSignature = nextSig;
+      if (this.stadiumOverlay) {
+        this.scene.remove(this.stadiumOverlay.group);
+        this.stadiumOverlay.dispose();
+      }
+      this.stadiumOverlay = createStadiumEvolutionOverlay(
+        homeClub.leagueTier,
+        homeClub.stadium,
+        homeClub.economy.activeSponsorIds,
+      );
+      this.scene.add(this.stadiumOverlay.group);
+    }
     const fieldingSide = session.half === 'TOP' ? session.home : session.away;
     const battingSide = session.half === 'TOP' ? session.away : session.home;
     const fieldingTeam = toTeamColors(fieldingClub);
@@ -283,6 +304,7 @@ export class GameSceneController {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
     this.vfx.dispose();
+    if (this.stadiumOverlay) this.stadiumOverlay.dispose();
     this.ballpark.dispose();
     for (const rig of this.defenders.values()) rig.dispose();
     this.batterRig.dispose();

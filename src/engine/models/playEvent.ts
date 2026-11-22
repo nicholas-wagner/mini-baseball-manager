@@ -38,6 +38,11 @@ export type TacticalCall =
   | 'power'
   | 'bunt'
   | 'steal'
+  | 'steal_3b'
+  | 'double_steal'
+  | 'steal_home'
+  | 'pitchout'
+  | 'hold_runner'
   | 'intentional_walk';
 
 export type PlayEventType =

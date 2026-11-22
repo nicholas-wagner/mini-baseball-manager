@@ -41,9 +41,16 @@ import {
   type GameSessionResult,
   type GameSessionState,
 } from '../../engine/simulation/gameState';
+import {
+  estimateHomeWinProbability,
+  evaluateBullpenWarmup,
+  tickBullpenWarmups,
+  type DefensiveShiftId,
+} from '../../engine/simulation/winProbability';
 import { choreographPlayEvent, type ChoreographedStep } from '../../scene/playback/eventChoreographer';
 import { useGameStore, type PostGameSummary } from '../../store/gameStore';
 import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
+import { BroadcastHud } from '../components/BroadcastHud';
 import { LiveGameCanvas } from '../components/LiveGameCanvas';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
 import { ComicButton } from '../design-system/ComicButton';
@@ -86,6 +93,10 @@ export function GameDayScreen() {
   const [watchMode, setWatchMode] = useState<'live' | 'clutch' | 'paused'>('paused');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
+  const [defensiveShift, setDefensiveShift] = useState<DefensiveShiftId>('standard');
+  const [winProbHistory, setWinProbHistory] = useState<number[]>([0.52]);
+  const [warmingRelieverIds, setWarmingRelieverIds] = useState<string[]>([]);
+  const [warmupCounts, setWarmupCounts] = useState<Record<string, number>>({});
   const [powerTracker, setPowerTracker] = useState<InGameManagerPowerTracker>(() =>
     createInGameManagerPowerTracker(),
   );
@@ -125,6 +136,10 @@ export function GameDayScreen() {
     setRecentEvents([]);
     setLastChoreo(null);
     setSelectedPitchType(null);
+    setDefensiveShift('standard');
+    setWinProbHistory([estimateHomeWinProbability(session)]);
+    setWarmingRelieverIds([]);
+    setWarmupCounts({});
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setWatchMode(autoPlay ? 'live' : 'paused');
@@ -134,6 +149,10 @@ export function GameDayScreen() {
   const applyStepResult = useCallback(
     (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string) => {
       setLiveSession(nextSession);
+      setWinProbHistory((prev) => [...prev.slice(-23), estimateHomeWinProbability(nextSession)]);
+      if (warmingRelieverIds.length > 0) {
+        setWarmupCounts((prev) => tickBullpenWarmups(prev, warmingRelieverIds));
+      }
       const lastEvent = emitted[emitted.length - 1] ?? null;
       if (lastEvent) {
         const choreo = choreographPlayEvent(lastEvent, speed);
@@ -145,7 +164,7 @@ export function GameDayScreen() {
       }
       finalizeSessionIfComplete(nextSession, emitted, oppId);
     },
-    [finalizeSessionIfComplete, speed],
+    [finalizeSessionIfComplete, speed, warmingRelieverIds],
   );
 
   const resolvePitchCallOption = useCallback(
@@ -168,7 +187,15 @@ export function GameDayScreen() {
       resolvePitchCallOption(liveSession),
     );
     applyStepResult(nextSession, events, activeOpponentId);
-    if (tacticalCall === 'steal' || tacticalCall === 'intentional_walk') {
+    if (
+      tacticalCall === 'steal' ||
+      tacticalCall === 'steal_3b' ||
+      tacticalCall === 'double_steal' ||
+      tacticalCall === 'steal_home' ||
+      tacticalCall === 'pitchout' ||
+      tacticalCall === 'hold_runner' ||
+      tacticalCall === 'intentional_walk'
+    ) {
       setTacticalCall('normal');
     }
   }, [activeOpponentId, applyStepResult, liveSession, resolvePitchCallOption, tacticalCall]);
@@ -385,6 +412,22 @@ export function GameDayScreen() {
             homeClub={humanClub}
             session={liveSession}
             choreo={lastChoreo}
+            lastEvent={recentEvents[0] ?? null}
+          />
+
+          <BroadcastHud
+            session={liveSession}
+            winProbHistory={winProbHistory}
+            defensiveShift={defensiveShift}
+            onSelectShift={(shift) => {
+              setDefensiveShift(shift);
+              soundEngine.play('ui_pop');
+            }}
+            activeTacticalCall={tacticalCall}
+            onSelectStealCall={(call) => {
+              setTacticalCall((prev) => (prev === call ? 'normal' : call));
+              soundEngine.play('ui_pop');
+            }}
             lastEvent={recentEvents[0] ?? null}
           />
 
@@ -646,18 +689,53 @@ export function GameDayScreen() {
                 {availableRelievers.map((relId) => {
                   const rel = liveSession.home.playersById[relId];
                   if (!rel) return null;
+                  const warmup = evaluateBullpenWarmup(rel.id, warmupCounts[rel.id] ?? 0);
+                  const isWarming = warmingRelieverIds.includes(rel.id);
                   return (
-                    <ComicButton
-                      key={rel.id}
-                      size="sm"
-                      variant="cream"
-                      className="w-full justify-between"
-                      icon={<RefreshCw className="w-3.5 h-3.5" />}
-                      onClick={() => handleBullpenSwap(rel.id)}
-                    >
-                      Bring In {rel.name} ({rel.throws}HP
-                      {rel.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole]}` : ''})
-                    </ComicButton>
+                    <div key={rel.id} className="space-y-1 p-2 rounded-xl border border-[#181B2C]/20 bg-[#FFFDF7]">
+                      <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
+                        <span className="text-[#181B2C]">
+                          {rel.name} ({rel.throws}HP
+                          {rel.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole]}` : ''})
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded border border-[#181B2C] uppercase ${
+                            warmup.status === 'hot'
+                              ? 'bg-[#2FB356] text-white'
+                              : warmup.status === 'warming'
+                                ? 'bg-[#FFC300] text-[#181B2C]'
+                                : warmup.status === 'overcooked'
+                                  ? 'bg-[#FF4D6D] text-white'
+                                  : 'bg-[#E2E8F0] text-[#181B2C]'
+                          }`}
+                        >
+                          {warmup.status}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <ComicButton
+                          size="sm"
+                          variant={isWarming ? 'gold' : 'sky'}
+                          onClick={() => {
+                            soundEngine.play('bullpen_phone');
+                            setWarmingRelieverIds((prev) =>
+                              prev.includes(rel.id) ? prev.filter((id) => id !== rel.id) : [...prev, rel.id],
+                            );
+                          }}
+                        >
+                          {isWarming ? 'Sit Down' : 'Warm Up'}
+                        </ComicButton>
+                        <ComicButton
+                          size="sm"
+                          variant="cream"
+                          className="flex-1 justify-between"
+                          icon={<RefreshCw className="w-3.5 h-3.5" />}
+                          onClick={() => handleBullpenSwap(rel.id)}
+                        >
+                          Bring In {rel.name}
+                        </ComicButton>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
