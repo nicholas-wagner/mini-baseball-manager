@@ -19,7 +19,7 @@
 | **M0** | Project Foundation, TDD Harness & Android PWA Shell | 4 / 4 | `[x]` Done | Vitest + Playwright + TS + PWA manifest green |
 | **M1** | **Design-First Visual Identity & Interactive Design Lab** | 8 / 8 | `[x]` Done | 90s Cards, 2.5D Chibi Rigs, 11 Nations, Handedness, 3D Park, Web Audio |
 | **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 6 / 6 | `[x]` Done | **MVP Gate**: Complete playable game installable on Android |
-| **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals, Compromise Training, Cooldowns, Luck/Mental/Leverage, Pitcher Roles & Sabermetrics | 6 / 11 | `[/]` In Progress | Deep 5–60 min player, tactical & RPG simulation core |
+| **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals, Compromise Training, Cooldowns, Luck/Mental/Leverage, Pitcher Roles, Sabermetrics & Veteran XP | 6 / 12 | `[/]` In Progress | Deep 5–60 min player, tactical & RPG simulation core |
 | **M4** | **Living League World**: 6-Tier Pyramid, Market Tiers & Roster Cap, 48 AI Clubs, Draft, FA & Rivalries | 1 / 6 | `[/]` In Progress | Multi-season promotion/relegation dynasty career |
 | **M5** | **Sim-City Ballpark District**: Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 0 / 5 | `[ ]` Planned | Interactive stadium & neighborhood builder visible in 3D |
 | **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches, 90s Gear Relics, Weather & Night Games | 0 / 5 | `[ ]` Planned | Synergy combos, coaching staff, loot relics & live weather |
@@ -27,7 +27,7 @@
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `25 / 59` feature slices completed
+**Overall 10X Progress**: `25 / 60` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -48,6 +48,7 @@
    - **Compromise-First Training & Anti-Overpower Balance**: Every drill (batting approach, pitch recognition, bullpen pitch lab, conditioning, positional cross-training) improves target skills at a realistic trade-off elsewhere inside `statCaps` & `totalRatingBudget`—preventing homogenous 99-overall super-clones while letting rare, expensive **All-Stars** shine as genuine franchise unicorns.
    - **Scarce, High-Impact Special Abilities**: Super-power swings, signature pitches, Cultural Heritage finishers, and Manager Skipper calls run on strict per-game charges, multi-batter/PA cooldowns, Hype-gauge consumption, and fatigue exertion—turning them into dramatic clutch trump cards instead of every-at-bat spam.
    - **Luck, Mental Traits & High-Leverage Pressure Drama**: Subtle universal **Luck** nudges bloops, borderline calls, and lucky breaks; authentic clubhouse identities (**Good Clubhouse Guy**, **High-Energy Sparkplug**, **Ice in Their Veins**, **Big-Game Riser**, and **Pressure Wilter**) collide with dynamic **Leverage Index (`LI`)** and critical postseason/rivalry stakes!
+   - **Slow-Earned Career Experience & Veteran Savvy**: Real baseball mileage (**seasons played, career games, at-bats/innings, playoff games**) takes multiple full seasons to earn, granting **Cagey Veterans** a subtle, authentic discipline/command/composure edge over green **Rookies** (while rookies grow skills faster over time).
    - **Human Manager RPG Tree**: Active in-game powers (*Pep Talk*, *Mound Whisper*, *Clutch Focus*, *Rally Cap Magic*, *Bullpen Freeze*) + permanent Coach & Mogul passives.
    - **Hot Streaks & Cold Slumps**: Dynamic momentum curves reflected on cards, portraits, and headlines — busted actively via animated Practice Drills or Manager Pep Talks.
    - **Clubhouse Chemistry & Synergy Bonds**: Personality archetypes (*Prankster*, *Clutch Captain*, *Quiet Assassin*, *Showboat*, *Gym Rat*, *Rival Hunter*) form live combos (*Bash Brothers*, *Battery Telepathy*, *Turn-Two Wizards*).
@@ -106,7 +107,7 @@
 
 ---
 
-### Milestone 3 — RPG Core: Skill Trees, Specialists, Pitch Arsenals, Mental/Leverage, Pitcher Roles & Sabermetrics (`6 / 11`)
+### Milestone 3 — RPG Core: Skill Trees, Specialists, Pitch Arsenals, Mental/Leverage, Pitcher Roles, Sabermetrics & Veteran XP (`6 / 12`)
 - [ ] **3A. Player Branching Skill Trees & Capstone Special Powers** (`TASK-019`): Pure graph engine + pan/zoom interactive Skill Tree UI for Pitcher, Batter, and Fielder paths respecting `statCaps` & `totalRatingBudget`, with charge/cooldown/fatigue-gated capstone Special Powers & evolving `specialistArchetype`.
 - [ ] **3B. 3-Tier Cultural Heritage Myth/Animal Skill Branches** (`TASK-020`): Expand each nationality's Heritage Ability into a 3-node unlockable progression with bespoke 3D VFX, `65–100` Hype-gauge consumption, strict charge/cooldown caps, and sim effects.
 - [x] **3C. Dynamic Hot Streaks & Cold Slumps Engine** (`TASK-021`): Rolling multi-game form tracker driving 🔥 *On Fire!* & 🧊 *Cold Spell* stat curves, reactive 90s card frames/moods, and slump-busting triggers.
@@ -118,6 +119,7 @@
 - [x] **3I. Luck Attribute, Clubhouse/Mental Traits, Pressure Risers vs. Wilters & Dynamic Leverage Engine** (`TASK-057`): Subtle universal `luck` modifier, `clubhouse_glue` / `high_energy` / `ice_veins` / `pressure_riser` / `pressure_wilt` traits, and real-time Leverage Index (`LI`) × Game Stakes (`regular` → `elimination_championship`) pressure swings.
 - [x] **3J. Specialized Pitching Staff Roles (`Starter`, `Long/Short Reliever`, `LOOGY`, `Setup`, `Closer`, `Fireman`)** (`TASK-058`): Role-fit sim bonuses/penalties, authentic LHP LOOGY & high-LI Fireman deployment, AI bullpen hierarchy, and Bullpen Phone role badges.
 - [ ] **3K. Balls/Strikes Command, Batted-Ball Profiles (`GB%/LD%/FB%/Pop-Up%`), Fielder Range/Arm/FPCT & Full Sabermetrics** (`TASK-059`): `gapPower`, `range`, `BattedBallProfile` (`pop_out`), zone Strike%/Walk-Rate command, defender range/arm/FPCT, and full derived stats (`AVG`, `OBP`, `SLG`, `OPS`, `WHIP`, `ERA`, `K/9`, `BB/9`, `Strike%`, `GB%`, `LD%`, `FB%`, `PopUp%`, `FPCT`).
+- [ ] **3L. Slow-Earned Career Experience (`Seasons/Games/ABs/IP`) & Veteran Savvy Advantage** (`TASK-060`): Cumulative multi-season baseball experience (`rookie_green` → `developing` → `seasoned` → `cagey_veteran`), slower earned RPG level XP pacing, and a subtle veteran composure/discipline/command edge over green rookies.
 
 ---
 
@@ -192,6 +194,7 @@
 | 2026-11-21 | Specialists, Positions & Market Tiers (`TASK-053`, `TASK-054`) | Added player Specialists, `PositionalFlexibilityProfile` (`1B`-only vs `SS/2B` vs all-infield utility), `favoritePosition` boost, Cross-Training focus/rust trade-off, `MAX_ACTIVE_ROSTER_SIZE = 20`, and 6 `PlayerMarketTier` curves (`rookie`, `all_star`, `veteran`, `above_average`, `average`, `below_average`) | Creates meaningful draft, free-agency budget, and roster-construction choices instead of interchangeable clones |
 | 2026-11-21 | Pitch Arsenals, Matchups, Compromise Training & Ability Cooldowns (`TASK-055`, `TASK-056`) | Added `2–3` RP / `4–5` SP pitch arsenals, pitcher `favoritePitch`/`weakestPitch`, batter `favoritePitch`/`weakPitch` matchup curves, compromise-first training trade-offs inside `totalRatingBudget` (keeping rare `all_star`s elite without overpowered 99-all-stat clones), and strict charge/cooldown/Hype/fatigue gates on Special Swings, Pitches & Heritage Powers | Deepens mound-vs-plate tactical chess, prevents runaway stat inflation, and keeps special abilities exciting clutch finishers instead of constant spam |
 | 2026-11-21 | Luck, Mental Traits, Leverage, Pitcher Roles & Full Sabermetrics (`TASK-057`, `TASK-058`, `TASK-059`) | Added subtle universal `luck`, clubhouse/mental traits (`clubhouse_glue`, `high_energy`, `ice_veins`, `pressure_riser`, `pressure_wilt`), dynamic Leverage Index (`LI`) × Game Stakes pressure engine, 7 specialized `PitcherRole` profiles (`starter`, `long_reliever`, `short_reliever`, `loogy`, `setup_man`, `closer`, `fireman`), `gapPower` / `range` / `arm` / `fielding`, batted-ball profiles (`GB%`, `LD%`, `FB%`, `PopUp%`, `pop_out`), zone Strike%/Walk-Rate, and derived sabermetrics (`AVG`, `OBP`, `SLG`, `OPS`, `WHIP`, `ERA`, `K/9`, `BB/9`, `Strike%`, `FPCT`) | Elevates in-game bullpen & clutch decision-making and gives baseball fans rich, authentic stat profiles behind the charming 90s chibi presentation |
+| 2026-11-21 | Slow-Earned Career Experience & Veteran Savvy (`TASK-060`) | Added `CareerServiceProfile` (`seasonsPlayed`, `careerGames`, `careerPAs`/`IP`, `careerPlayoffGames` → `experienceScore 0..100` across `rookie_green` → `cagey_veteran`) and realistic slower RPG XP level pacing | Makes career experience genuinely take multiple seasons to build and rewards signing/keeping seasoned veterans with a subtle composure, discipline & command edge over green rookies |
 
 ---
 

@@ -146,6 +146,19 @@ export interface BattedBallProfile {
   popUpRateBias: number; // -8..+8 percentage-point shift on Pop-Up Rate (PopUp%)
 }
 
+export type CareerExperienceTier =
+  | 'rookie_green'  // 0–14 expScore: 0 seasons / green rookie (-1..-2 high-LI jitters, offset by 1.35x skill growth)
+  | 'developing'    // 15–39 expScore: 1–2 seasons / ~20–55 games (neutral composure)
+  | 'seasoned'      // 40–69 expScore: 3–5 seasons / ~60–115 games (+1 Eye/Control, +1 high-LI composure)
+  | 'cagey_veteran';// 70–100 expScore: 6+ seasons / 120+ games / 450+ PAs or 180+ IP (+2..+3 Eye/Control, +2 high-LI poise, -15% rust)
+
+export interface CareerServiceProfile {
+  seasonsPlayed: number;       // Legitimately earned season-by-season (veterans spawn with 6–12, rookies at 0)
+  careerPlayoffGames: number;  // High-leverage postseason games logged
+  experienceScore: number;     // 0..100 derived slowly from seasonsPlayed + careerGames + PAs/IP + playoffGames
+  experienceTier: CareerExperienceTier;
+}
+
 export interface PlayerRatings {
   // Batting (1–99) — drives AVG, OBP, SLG, OPS, BB%, K%
   contact: number;
@@ -252,6 +265,7 @@ export interface Player {
   battedBallProfile?: BattedBallProfile; // Drives GB% / LD% / FB% / PopUp% tendencies for batters & pitchers
   mentalTraits?: MentalTraitId[]; // Good clubhouse guy, high energy, ice veins, pressure riser/wilter, etc.
   pressureProfile?: PressureResponseProfile; // ice_veins | clutch_riser | steady | pressure_wilt
+  careerService?: CareerServiceProfile; // Slow-earned seasons/games/ABs/IP experience granting veterans a subtle edge over rookies
   ratings: PlayerRatings;
   statCaps: PlayerRatings; // Per-tool max rating ceilings (1..99), widest variance on rookies
   totalRatingBudget: number; // Archetype + marketTier tool envelope preventing generic 99-all-stat overpowered clones (rare 'all_star' carries elite budget)
@@ -301,6 +315,7 @@ export interface Player {
   - **Clubhouse & Mental Traits + Pressure Response**: Good Clubhouse Guys (`clubhouse_glue`) stabilize morale & chemistry; Sparkplugs (`high_energy`) accelerate Hype; **Ice-in-Veins / Pressure Risers** surge (`+4..+7`) when dynamic **Leverage Index (`LI`, `0.4` blowout → `1.6+` High Leverage → `2.4+` Critical Moment)** or game stakes (`rivalry_showdown`, `playoff_game`, `elimination_championship`) spike; **Pressure Wilters (`pressure_wilt`)** tighten up (`-4..-8`) in crunch time!
 - **Specialized Pitching Staff Roles (`PitcherRole`)**: `starter`, `long_reliever`, `short_reliever`, `loogy` (southpaw platoon assassin), `setup_man` (7th–8th bridge), `closer` (9th+ save specialist), and `fireman` (high-LI multi-inning jam stopper with inherited runners).
 - **Balls & Strikes, Batted-Ball Profiles & Sabermetrics**: Explicit ball/strike counts & zone strike rate (`Strike%`, `BB%`, `K%`), batted-ball profiles (`GB%`, `LD%`, `FB%`, `PopUp%`, `pop_out`), defender `fielding` (`FPCT`), `range` (converting hits to outs), and `arm` (runner throws), plus full derived stat lines (`AVG`, `OBP`, `SLG`, `OPS`, `ISO`, `BABIP`, `ERA`, `WHIP`, `K/9`, `BB/9`, `FPCT`).
+- **Slow-Earned Career Experience & Veteran Savvy Advantage**: Career Experience (`CareerServiceProfile`: `seasonsPlayed`, `careerGames`, `careerPAs`/`IP`, `careerPlayoffGames` -> `experienceScore 0..100`) takes multiple full seasons of real games/at-bats to climb from `rookie_green` -> `developing` -> `seasoned` -> `cagey_veteran` (and RPG level XP thresholds scale slowly per level). Seasoned pros and veterans gain a small, realistic edge over green rookies (`+2..+3` Eye/Control, `+2` high-LI composure vs rookie jitters `-1..-2`, and reduced rust decay).
 
 ### 2.2 Club, Lineup & Stadium District (`src/engine/models/club.ts`)
 
