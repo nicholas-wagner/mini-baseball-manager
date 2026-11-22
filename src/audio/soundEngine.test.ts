@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { RetroSoundEngine } from './soundEngine';
+import {
+  ALL_SOUNDBOARD_CUES,
+  RetroSoundEngine,
+  type SoundCue,
+} from './soundEngine';
+
+const EXPECTED_NEW_CUES: readonly SoundCue[] = [
+  'strikeout_punch',
+  'dirt_slide',
+  'foul_clank',
+  'double_play_snap',
+  'error_bonk',
+  'tornado_whoosh',
+  'bullpen_phone',
+  'crowd_gasp',
+  'organ_rally',
+  'stadium_stomp_clap',
+  'fireworks_boom',
+  'clutch_stinger',
+  'card_flip',
+  'trophy_fanfare',
+];
 
 describe('RetroSoundEngine', () => {
   it('tracks cues and respects mute toggle safely without AudioContext', () => {
@@ -24,5 +45,22 @@ describe('RetroSoundEngine', () => {
     expect(engine.getState().volume).toBe(1);
     engine.setVolume(-0.4);
     expect(engine.getState().volume).toBe(0);
+  });
+
+  it('exposes all 28 ballpark, action, and RPG sound cues in ALL_SOUNDBOARD_CUES and plays each cleanly', () => {
+    expect(ALL_SOUNDBOARD_CUES).toHaveLength(28);
+    const cueSet = new Set(ALL_SOUNDBOARD_CUES.map((item) => item.cue));
+    expect(cueSet.size).toBe(28);
+
+    for (const cue of EXPECTED_NEW_CUES) {
+      expect(cueSet.has(cue)).toBe(true);
+    }
+
+    const engine = new RetroSoundEngine();
+    for (const item of ALL_SOUNDBOARD_CUES) {
+      expect(item.label.length).toBeGreaterThan(2);
+      expect(engine.play(item.cue)).toBe(true);
+      expect(engine.getState().lastCue).toBe(item.cue);
+    }
   });
 });

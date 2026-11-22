@@ -36,6 +36,7 @@ import {
 } from '../../engine/simulation/gameState';
 import { choreographPlayEvent, type ChoreographedStep } from '../../scene/playback/eventChoreographer';
 import { useGameStore, type PostGameSummary } from '../../store/gameStore';
+import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
 import { LiveGameCanvas } from '../components/LiveGameCanvas';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
 import { ComicButton } from '../design-system/ComicButton';
@@ -306,6 +307,8 @@ export function GameDayScreen() {
             </div>
           </div>
         </ComicCard>
+
+        <BallparkSoundboardCard />
 
         <PostGameSummaryModal
           summary={modalSummary}

@@ -26,6 +26,8 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       render(<GameDayScreen />);
 
       expect(screen.getByText(/choose today's matchup/i)).toBeInTheDocument();
+      expect(screen.getByTestId('ballpark-soundboard')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /walk-off fireworks/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /5 inn \(blitz\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /7 inn \(quick\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /9 inn \(classic\)/i })).toBeInTheDocument();

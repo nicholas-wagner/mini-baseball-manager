@@ -133,7 +133,7 @@ function resolveStealAttempt(
     commentary: success
       ? `${runner.name} swipes second base with a dusty slide!`
       : `${catcher.name} fires a laser to nail ${runner.name} trying to steal!`,
-    soundCue: success ? 'crowd_cheer' : 'glove_pop',
+    soundCue: success ? 'dirt_slide' : 'glove_pop',
     fieldingHighlight: {
       fielderId: catcher.id,
       fielderPos: 'C',
@@ -373,7 +373,7 @@ function resolveOutOrError(
       outsAdded: 0,
       battedBallType,
       commentary: `Booted it! ${batter.name} reaches on an infield error.`,
-      soundCue: 'spring_boing',
+      soundCue: 'error_bonk',
       ballFlight: { style: 'line_drive', landingX: inf.x, landingZ: inf.z, apexY: 2.0, durationSec: 0.8 },
       fieldingHighlight: { fielderId: defender.id, fielderPos: inf.pos, anim: 'field_dive' },
     };
@@ -389,7 +389,7 @@ function resolveOutOrError(
       advanceOnOut: 'double_play',
       battedBallType: 'ground_ball',
       commentary: `Around the horn! ${batter.name} grounds into a 6-4-3 double play.`,
-      soundCue: 'glove_pop',
+      soundCue: 'double_play_snap',
       ballFlight: { style: 'line_drive', landingX: dpSpot.x, landingZ: dpSpot.z, apexY: 1.8, durationSec: 0.78 },
       fieldingHighlight: { fielderId: defender.id, fielderPos: dpSpot.pos, anim: 'field_run' },
     };
@@ -507,7 +507,7 @@ function resolveCalledStrikeOrOut(strikes: number, batterName: string): PitchRes
     outcome: isK ? 'strikeout' : 'called_strike',
     outsAdded: isK ? 1 : 0,
     commentary: isK ? `${batterName} is caught looking for strike three!` : 'Painted the corner for a called strike.',
-    soundCue: 'glove_pop',
+    soundCue: isK ? 'strikeout_punch' : 'glove_pop',
   };
 }
 
@@ -518,7 +518,7 @@ function resolveSwingingStrikeOrOut(strikes: number, batterName: string): PitchR
     outcome: isK ? 'strikeout' : 'swinging_strike',
     outsAdded: isK ? 1 : 0,
     commentary: isK ? `${batterName} whiffs on strike three!` : 'Big swing and a miss!',
-    soundCue: 'pitch_whoosh',
+    soundCue: isK ? 'strikeout_punch' : 'pitch_whoosh',
   };
 }
 
@@ -564,7 +564,7 @@ function evaluateSwingResult(
       outcome: 'foul',
       outsAdded: 0,
       commentary: `${ctx.batter.name} fouls one back into the screen.`,
-      soundCue: 'bat_crack',
+      soundCue: 'foul_clank',
     };
   }
 

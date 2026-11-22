@@ -490,7 +490,7 @@ function maybeSwapReliever(state: GameSessionState, events: PlayEvent[]): void {
       outsBefore: state.outs,
       pitcherId: nextRelieverId,
       commentary: `Bullpen call! ${chosen.name} (${chosen.throws}HP${roleTag}) trots in to pitch.`,
-      soundCue: 'organ_charge',
+      soundCue: 'bullpen_phone',
     }),
   );
 }
@@ -530,7 +530,7 @@ export function manualSwapPitcher(
     outsBefore: next.outs,
     pitcherId: relieverId,
     commentary: `Manager calls the pen — ${reliever.name} (${reliever.throws}HP) takes the mound!`,
-    soundCue: 'organ_charge',
+    soundCue: 'bullpen_phone',
   });
   return { nextSession: next, event };
 }
@@ -568,7 +568,7 @@ function completeGame(state: GameSessionState, events: PlayEvent[], reason: stri
       type: 'game_end',
       outsBefore: state.outs,
       commentary: `${reason} Final: ${state.away.name} ${state.away.score}, ${state.home.name} ${state.home.score}!`,
-      soundCue: 'crowd_cheer',
+      soundCue: reason.toLowerCase().includes('walk-off') ? 'fireworks_boom' : 'crowd_cheer',
     }),
   );
 }

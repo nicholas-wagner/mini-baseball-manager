@@ -63,7 +63,7 @@ export function LeagueScreen() {
   const handleOpenOffseason = () => {
     const off = beginInteractiveOffseason(5);
     if (!off) return;
-    soundEngine.play('crowd_cheer');
+    soundEngine.play(off.humanWonWorldChampionship ? 'fireworks_boom' : 'trophy_fanfare');
     setSelectedTier(null);
     setLeagueNotice(
       off.humanWonWorldChampionship
@@ -75,7 +75,7 @@ export function LeagueScreen() {
   const handleFinishOffseason = () => {
     const nextSeason = finishInteractiveOffseason();
     if (!nextSeason) return;
-    soundEngine.play('organ_charge');
+    soundEngine.play('organ_rally');
     setLeagueNotice(`Season ${nextSeason} underway! Rosters and Salary Caps locked for Opening Day.`);
   };
 
@@ -238,6 +238,7 @@ export function LeagueScreen() {
                           variant="gold"
                           onClick={() => {
                             const r = draftOffseasonRookie(prospect.id);
+                            if (r.drafted) soundEngine.play('trophy_fanfare');
                             setLeagueNotice(
                               r.drafted
                                 ? `Drafted ${prospect.position} ${prospect.name}!`
