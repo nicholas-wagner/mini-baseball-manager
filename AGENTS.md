@@ -11,7 +11,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
 2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
-4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-052`). Pick the highest-priority `READY` task!
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-054`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
 6. **Project Workflow Skills (`.agents/skills/`)** — Portable engineering skills (auto-discovered by Antigravity and readable by any AI editor):
    - [`.agents/skills/ub-tdd-craft/SKILL.md`](./.agents/skills/ub-tdd-craft/SKILL.md) — Strict TDD, behavior-focused tests, Clean Code refactoring, and CRAP-lite complexity discipline (*inspired by `unclebob/ub-mode`*).
@@ -48,6 +48,8 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 | **Player Art** | Cards use cel-shaded 90s SVG portraits (`generatePortrait.ts`); field & rig characters use ~1.8-head volumetric 2.5D chibi SVG rigs (`renderMiniPlayerSvg.ts`) rendered both in DOM (`MiniPlayerSvg.tsx`) and as camera-aware 2.5D standees in Three.js (`chibiBuilder.ts`) | `src/art/portraits/`, `src/art/playerSvg/` |
 | **League Pyramid** | 6 tiers × 8 teams (48 clubs): Rookie → Low-A → High-A → AA → AAA → Mini Major League; 21-game regular season (3× round-robin) + 4-team Best-of-3 playoffs | `PLAN.md` |
 | **Audio** | 100% procedural Web Audio API (`soundEngine.ts`); zero external audio downloads; global mute toggle | `src/audio/soundEngine.ts` |
+| **Specialists & Positions** | `PlayerSpecialistArchetype` + `PositionalFlexibilityProfile` (`1B`-only, `SS/2B`, all-infield, etc.) + `favoritePosition` boost (`+5 FLD/+4 CTL, +3 CLU`) + Cross-Training opportunity cost & `-4..-8` positional rust | `docs/ARCHITECTURE.md` |
+| **Roster Cap & Market Tiers** | `MAX_ACTIVE_ROSTER_SIZE = 20`; 6 `PlayerMarketTier` profiles (`rookie` cheap/high-variable-ceiling, `all_star` rare/expensive, `veteran` affordable/steady/minimal-growth, `above_average`, `average`, `below_average` bargain specialist) | `docs/ARCHITECTURE.md` |
 
 ---
 
