@@ -335,7 +335,7 @@ export function WorldSpectaclesPanel({
             onClick={() => {
               const res = launchHumanJuneMiracleScenario();
               onNotice(res.summary);
-              soundEngine.play('organ_charge');
+              soundEngine.play('stadium_airhorn');
             }}
           >
             Launch 1994 June Miracle (1–10)

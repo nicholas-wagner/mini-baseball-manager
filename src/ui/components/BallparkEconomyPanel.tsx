@@ -136,7 +136,7 @@ export function BallparkEconomyPanel({ club, onNotice }: BallparkEconomyPanelPro
                       club.economy.concessionPrice,
                       tier,
                     );
-                    soundEngine.play('ui_pop');
+                    soundEngine.play('vendor_bell');
                   }}
                 >
                   {tier === 1 ? 'Lv.1 Hot Dogs' : tier === 2 ? 'Lv.2 Nachos' : 'Lv.3 Helmet Bowls'}
@@ -220,7 +220,7 @@ export function BallparkEconomyPanel({ club, onNotice }: BallparkEconomyPanelPro
                   variant={selectedPromoId === promo.id ? 'gold' : 'cream'}
                   onClick={() => {
                     setSelectedPromoId(promo.id);
-                    soundEngine.play('ui_pop');
+                    soundEngine.play('vendor_bell');
                   }}
                 >
                   {promo.name} (+{Math.round(promo.attendanceBoostPct * 100)}%)

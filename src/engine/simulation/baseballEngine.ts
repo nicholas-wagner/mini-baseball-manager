@@ -619,6 +619,26 @@ function getThreeOutFinishReason(state: GameSessionState): string | null {
   return null;
 }
 
+function isStretchTimeStart(state: GameSessionState): boolean {
+  if (state.half !== 'BOT') return false;
+  const stretchMap: Readonly<Record<GameLengthInnings, number>> = { 5: 4, 7: 5, 9: 7 };
+  return state.inning === stretchMap[state.regulationInnings];
+}
+
+function emitNextHalfStartEvent(state: GameSessionState, events: PlayEvent[]): void {
+  const stretch = isStretchTimeStart(state);
+  events.push(
+    makeEvent(state, {
+      type: 'inning_start',
+      outsBefore: 0,
+      commentary: stretch
+        ? `7th-Inning Stretch vibes! Bottom of inning ${state.inning}.`
+        : `${state.half === 'TOP' ? 'Top' : 'Bottom'} of inning ${state.inning}.`,
+      soundCue: stretch ? 'organ_seventh_stretch' : undefined,
+    }),
+  );
+}
+
 function advanceHalfOrFinish(state: GameSessionState, events: PlayEvent[]): void {
   if (
     state.half === 'BOT' &&
@@ -646,13 +666,7 @@ function advanceHalfOrFinish(state: GameSessionState, events: PlayEvent[]): void
   }
 
   rotateToNextHalfInning(state);
-  events.push(
-    makeEvent(state, {
-      type: 'inning_start',
-      outsBefore: 0,
-      commentary: `${state.half === 'TOP' ? 'Top' : 'Bottom'} of inning ${state.inning}.`,
-    }),
-  );
+  emitNextHalfStartEvent(state, events);
 }
 
 function cloneSessionForStep(session: GameSessionState): GameSessionState {

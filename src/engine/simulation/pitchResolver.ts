@@ -261,7 +261,7 @@ function resolveHitType(
       outsAdded: 0,
       battedBallType,
       commentary: `Off the wall! ${batter.name} motors all the way to third!`,
-      soundCue: 'bat_crack',
+      soundCue: 'wall_thud',
       ballFlight: {
         style: 'line_drive',
         landingX: ofSpot.x * 1.1,
@@ -273,22 +273,12 @@ function resolveHitType(
   }
 
   if (roll < hrChance + tripleChance + doubleChance) {
-    return {
-      kind: 'plate_complete',
-      outcome: 'double',
-      totalBases: 2,
-      outsAdded: 0,
+    return buildDoubleResolution(
+      batter.name,
+      ofSpot.x,
       battedBallType,
-      commentary: `${batter.name} laces a gap double!`,
-      soundCue: 'bat_crack',
-      ballFlight: {
-        style: 'line_drive',
-        landingX: ofSpot.x * 0.85,
-        landingZ: -29,
-        apexY: 5.2,
-        durationSec: 1.1,
-      },
-    };
+      roll < hrChance + tripleChance + doubleChance * 0.35,
+    );
   }
 
   return {
@@ -305,6 +295,32 @@ function resolveHitType(
       landingZ: -21,
       apexY: 3.4,
       durationSec: 0.9,
+    },
+  };
+}
+
+function buildDoubleResolution(
+  batterName: string,
+  spotX: number,
+  battedBallType: BattedBallType,
+  offWall: boolean,
+): PitchResolution {
+  return {
+    kind: 'plate_complete',
+    outcome: 'double',
+    totalBases: 2,
+    outsAdded: 0,
+    battedBallType,
+    commentary: offWall
+      ? `Off the wall! ${batterName} rattles a stand-up double!`
+      : `${batterName} laces a gap double!`,
+    soundCue: offWall ? 'wall_thud' : 'bat_crack',
+    ballFlight: {
+      style: 'line_drive',
+      landingX: spotX * 0.85,
+      landingZ: -29,
+      apexY: 5.2,
+      durationSec: 1.1,
     },
   };
 }
@@ -361,14 +377,18 @@ function buildSimpleOut(
 ): PitchResolution {
   const preset = SIMPLE_OUT_PRESETS[battedBallType];
   const spot = preset.outfield ? rng.pick(OUTFIELD_SPOTS) : rng.pick(INFIELD_SPOTS);
+  const brokenBat =
+    (battedBallType === 'ground_ball' || battedBallType === 'pop_up') && rng.chance(0.22);
   return {
     kind: 'plate_complete',
     outcome: preset.outcome,
     outsAdded: 1,
     advanceOnOut: 'none',
     battedBallType,
-    commentary: `${batter.name} ${preset.suffix}`,
-    soundCue: 'glove_pop',
+    commentary: brokenBat
+      ? `Shattered bat! ${batter.name} ${preset.suffix}`
+      : `${batter.name} ${preset.suffix}`,
+    soundCue: brokenBat ? 'broken_bat' : 'glove_pop',
     ballFlight: {
       style: 'line_drive',
       landingX: spot.x,
@@ -560,7 +580,7 @@ function resolveCalledStrikeOrOut(strikes: number, batterName: string): PitchRes
     outcome: isK ? 'strikeout' : 'called_strike',
     outsAdded: isK ? 1 : 0,
     commentary: isK ? `${batterName} is caught looking for strike three!` : 'Painted the corner for a called strike.',
-    soundCue: isK ? 'strikeout_punch' : 'glove_pop',
+    soundCue: isK ? 'ump_strike_call' : 'glove_pop',
   };
 }
 
@@ -582,7 +602,7 @@ function resolveBallOrWalk(balls: number, batterName: string): PitchResolution {
     outcome: isWalk ? 'walk' : 'ball',
     outsAdded: 0,
     commentary: isWalk ? `${batterName} draws a patient four-ball walk.` : 'Outside the zone for a ball.',
-    soundCue: 'glove_pop',
+    soundCue: isWalk ? 'walk_ball_four' : 'glove_pop',
   };
 }
 

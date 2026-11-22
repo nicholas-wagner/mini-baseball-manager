@@ -169,8 +169,13 @@ export function GameDayScreen() {
             ? before.basesAfter[0] : liveSession?.bases[0]) ?? undefined;
         }
         setLastChoreo(choreo);
-        if (choreo.soundCue) {
+        if (lastEvent.specialPowerTriggered) {
+          soundEngine.play('heritage_power_surge');
+        } else if (choreo.soundCue) {
           soundEngine.play(choreo.soundCue);
+        }
+        if (emitted.some((ev) => ev.soundCue === 'organ_seventh_stretch')) {
+          soundEngine.play('organ_seventh_stretch');
         }
         setRecentEvents((prev) => [...emitted.slice().reverse(), ...prev].slice(0, 12));
       }

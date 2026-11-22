@@ -125,6 +125,7 @@ export function FrontOfficeGazettePanel({
 
   const handleResolveChoice = (choiceId: string) => {
     if (!activeCard) return;
+    const isRainCard = activeCard.id.includes('rain');
     const res = resolveHumanSurpriseEvent(activeCard, choiceId);
     if (res.applied && res.choice) {
       const bonusNote = res.boostedPlayerName ? ` (+${res.choice.bonusSp} SP to ${res.boostedPlayerName}!)` : '';
@@ -132,7 +133,7 @@ export function FrontOfficeGazettePanel({
       setLastOutcome(msg);
       setActiveCard(null);
       onNotice(msg);
-      soundEngine.play(res.choice.cashDelta >= 0 ? 'cash_chime' : 'level_up');
+      soundEngine.play(isRainCard ? 'rain_thunder' : res.choice.cashDelta >= 0 ? 'cash_chime' : 'level_up');
     }
   };
 
@@ -309,7 +310,7 @@ export function FrontOfficeGazettePanel({
                       cashSweetener,
                     });
                     onNotice(res.reason);
-                    soundEngine.play(res.executed ? 'cash_chime' : 'ui_pop');
+                    soundEngine.play(res.executed ? 'trade_gavel' : 'ui_pop');
                   }}
                 >
                   Execute Trade

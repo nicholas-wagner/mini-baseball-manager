@@ -3,13 +3,25 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const envRecord = (
+  globalThis as { process?: { env?: Record<string, string | undefined> } }
+).process?.env;
+const rawBase = envRecord?.VITE_BASE_PATH ?? '/';
+const base = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'],
+      includeAssets: [
+        'icons/icon.svg',
+        'icons/icon-192.png',
+        'icons/icon-512.png',
+        'icons/icon-maskable-512.png',
+      ],
       manifest: {
         name: 'Mini Baseball Manager',
         short_name: 'MiniBaseball',
@@ -18,8 +30,8 @@ export default defineConfig({
         background_color: '#FBF4E4',
         display: 'standalone',
         orientation: 'any',
-        scope: '/',
-        start_url: '/',
+        scope: base,
+        start_url: base,
         categories: ['games', 'sports'],
         icons: [
           {

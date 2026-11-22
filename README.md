@@ -52,6 +52,10 @@ npm run typecheck && npm run lint && npm run build
 npm run test:e2e
 ```
 
+### Android PWA Hosting (GitHub Pages)
+
+Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml), building the offline Workbox Service Worker and manifest with the repository subpath (`VITE_BASE_PATH`) and publishing to GitHub Pages. Enable **Settings → Pages → Source: GitHub Actions** once in GitHub, then open the live HTTPS URL on your Android phone and tap **Install App**!
+
 ---
 
 ## Project Blueprint & Roadmap

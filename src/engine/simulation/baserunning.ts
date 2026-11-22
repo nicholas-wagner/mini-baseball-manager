@@ -249,7 +249,7 @@ function buildSteal2bOutcome(
       caughtStealingRunnerId: null,
       outsAdded: 0,
       commentary: `${leadRunner.name} (SPD ${leadRunner.ratings.speed}) swipes second base with a dusty slide!`,
-      soundCue: 'dirt_slide',
+      soundCue: 'steal_burst',
     };
   }
   return {
@@ -278,7 +278,7 @@ function buildDoubleStealOutcome(
       caughtStealingRunnerId: null,
       outsAdded: 0,
       commentary: `DOUBLE STEAL! ${leadRunner.name} leads the dash to third as both runners slide in safe!`,
-      soundCue: 'dirt_slide',
+      soundCue: 'ump_safe_call',
     };
   }
   return {
@@ -306,7 +306,7 @@ function buildSteal3bOutcome(
       caughtStealingRunnerId: null,
       outsAdded: 0,
       commentary: `${leadRunner.name} gets a blazing jump and steals third base cleanly!`,
-      soundCue: 'dirt_slide',
+      soundCue: 'steal_burst',
     };
   }
   return {
@@ -334,7 +334,7 @@ function buildStealHomeOutcome(
       caughtStealingRunnerId: null,
       outsAdded: 0,
       commentary: `UNBELIEVABLE! ${leadRunner.name} STEALS HOME with a head-first slide across the dish!`,
-      soundCue: 'crowd_cheer',
+      soundCue: 'stadium_airhorn',
     };
   }
   return {

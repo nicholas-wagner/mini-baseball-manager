@@ -69,7 +69,7 @@ export function SkillTreeScreen() {
   const handleUnlockHeritage = () => {
     const res = unlockPlayerHeritageTier(player.id);
     if (res.unlocked) {
-      soundEngine.play('level_up');
+      soundEngine.play('heritage_power_surge');
       setFeedback(
         `${player.name} awakened ${heritageBranch.ability.name} Tier ${player.heritageTierUnlocked + 1}!`,
       );
