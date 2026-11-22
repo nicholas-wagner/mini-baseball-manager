@@ -89,12 +89,49 @@ describe('FlipBaseballCard', () => {
     await user.click(screen.getByRole('button', { name: /flip rico comet card to stats/i }));
     expect(flipper).toHaveClass('is-flipped');
     expect(screen.getByText(samplePlayer.bio)).toBeVisible();
+    // Pitcher card back shows pitching-specific ratings, never Contact/Power
+    expect(screen.getByText('Velocity')).toBeVisible();
+    expect(screen.getByText('Movement')).toBeVisible();
+    expect(screen.getByText('Control')).toBeVisible();
+    expect(screen.getByText('Stamina')).toBeVisible();
+    expect(screen.queryByText('Contact')).toBeNull();
+    expect(screen.queryByText('Power')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /flip rico comet card to portrait/i }));
     expect(flipper).not.toHaveClass('is-flipped');
 
     await user.click(screen.getByRole('button', { name: /send to 3d/i }));
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows hitting/fielding ratings & batting stat line on position-player cards, never Pitching', async () => {
+    const user = userEvent.setup();
+    const batterCard: BaseballCardPlayer = {
+      ...samplePlayer,
+      id: 'batter-1',
+      name: 'Kiko Slugger',
+      position: 'SS',
+      cardStatRows: [
+        { key: 'contact', label: 'Contact', value: 86 },
+        { key: 'power', label: 'Power', value: 78 },
+        { key: 'speed', label: 'Speed', value: 91 },
+        { key: 'fielding', label: 'Fielding', value: 88 },
+        { key: 'arm', label: 'Arm', value: 82 },
+      ],
+      statLine: 'AVG .318 • OBP .385 • OPS .890 • FPCT .984',
+    };
+
+    render(<FlipBaseballCard player={batterCard} team={SAMPLE_TEAM_PALETTES[0]} />);
+    await user.click(screen.getByRole('button', { name: /flip kiko slugger card to stats/i }));
+
+    expect(screen.getByText('Contact')).toBeVisible();
+    expect(screen.getByText('Power')).toBeVisible();
+    expect(screen.getByText('Speed')).toBeVisible();
+    expect(screen.getByText('Fielding')).toBeVisible();
+    expect(screen.getByText('Arm')).toBeVisible();
+    expect(screen.getByText(/AVG \.318/i)).toBeVisible();
+    expect(screen.queryByText('Pitching')).toBeNull();
+    expect(screen.queryByText('Velocity')).toBeNull();
   });
 });
 

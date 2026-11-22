@@ -10,6 +10,10 @@ import type {
   PortraitTraits,
 } from '../../art/portraits/types';
 import type { BatsHand, FieldPosition, ThrowsHand } from '../../engine/handedness/types';
+import {
+  buildFallbackCardStatRows,
+  type CardStatRow,
+} from '../../engine/models/playerCardStats';
 import { getNationalityById } from '../../engine/nationalities/pickNationality';
 import type { NationalityId } from '../../engine/nationalities/types';
 import { getStatGrade } from '../design-system/statGrade';
@@ -38,6 +42,10 @@ export interface BaseballCardPlayer {
     pitching: number;
     fielding: number;
   };
+  /** Role-specific rating rows (Pitchers: Velocity/Movement/Control/Stamina/Clutch; Hitters: Contact/Power/Speed/Fielding/Arm). */
+  cardStatRows?: readonly CardStatRow[];
+  /** Role-specific derived sabermetric stat line (Pitchers: ERA/WHIP/K9/Strk%; Hitters: AVG/OBP/OPS/FPCT). */
+  statLine?: string;
   bio: string;
 }
 
@@ -78,6 +86,7 @@ export function FlipBaseballCard({
         : 'bg-[#FBF4E4]';
 
   const popularityStars = Math.max(1, Math.min(5, Math.round(player.popularity / 20)));
+  const statRows = player.cardStatRows ?? buildFallbackCardStatRows(player.position, player.stats);
 
   return (
     <div className="card-perspective w-full max-w-[280px] h-full mx-auto">
@@ -232,12 +241,15 @@ export function FlipBaseballCard({
               </div>
 
               <div className="mt-2 space-y-1.5">
-                <StatBadge label="Contact" value={player.stats.contact} showBar />
-                <StatBadge label="Power" value={player.stats.power} showBar />
-                <StatBadge label="Pitching" value={player.stats.pitching} showBar />
-                <StatBadge label="Speed" value={player.stats.speed} showBar />
-                <StatBadge label="Fielding" value={player.stats.fielding} showBar />
+                {statRows.map((row) => (
+                  <StatBadge key={row.key} label={row.label} value={row.value} showBar />
+                ))}
               </div>
+              {player.statLine ? (
+                <div className="mt-2 rounded-lg bg-[#181B2C] px-2 py-1 text-center font-mono-tabular text-[9px] font-bold tracking-tight text-[#FFD166]">
+                  {player.statLine}
+                </div>
+              ) : null}
             </div>
 
             <p className="my-3 border-l-[3px] pl-2 text-xs italic leading-snug" style={{ borderColor: team.primary }}>

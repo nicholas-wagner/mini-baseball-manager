@@ -8,6 +8,7 @@ import {
   type FormState,
   type Player,
 } from '../../engine/models/player';
+import { buildPlayerCardStatProfile } from '../../engine/models/playerCardStats';
 import type { BaseballCardPlayer } from '../components/FlipBaseballCard';
 
 /** Maps rolling player streak state onto retro portrait facial mood expressions. */
@@ -40,6 +41,8 @@ export function toBaseballCardPlayer(
       ? player.equippedPowerIds
       : [SPECIALIST_LABELS[player.specialistArchetype], MARKET_TIER_LABELS[player.marketTier], pitchPill];
 
+  const cardProfile = buildPlayerCardStatProfile(player);
+
   return {
     id: player.id,
     name: player.name,
@@ -63,6 +66,8 @@ export function toBaseballCardPlayer(
       pitching: pitchingStat,
       fielding: player.ratings.fielding,
     },
+    cardStatRows: cardProfile.ratings,
+    statLine: cardProfile.statLine,
     bio: player.bio,
   };
 }
