@@ -12,6 +12,7 @@ interface ManagerClipboardBannerProps {
   cash: number;
   seriesIndex: number;
   inbox: ManagerActionInbox;
+  practiceAvailable: boolean;
   quickFeedback: string | null;
   onSimNextSeries: () => void;
   onQuickPractice: () => void;
@@ -24,6 +25,7 @@ export function ManagerClipboardBanner({
   cash,
   seriesIndex,
   inbox,
+  practiceAvailable,
   quickFeedback,
   onSimNextSeries,
   onQuickPractice,
@@ -67,11 +69,12 @@ export function ManagerClipboardBanner({
 
           <ComicButton
             size="sm"
-            variant="sky"
+            variant={practiceAvailable ? 'sky' : 'cream'}
+            disabled={!practiceAvailable}
             icon={<Dumbbell className="w-4 h-4" />}
             onClick={onQuickPractice}
           >
-            Quick Team Practice (+XP)
+            {practiceAvailable ? 'Quick Team Practice (+XP)' : 'Practice Done ✓ (After Next Game)'}
           </ComicButton>
         </div>
 

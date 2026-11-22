@@ -186,6 +186,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const manager = useGameStore((s) => s.manager);
   const worldSeed = useGameStore((s) => s.worldSeed);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
+  const practiceAvailable = useGameStore((s) => s.practiceAvailable);
   const commitCompletedGame = useGameStore((s) => s.commitCompletedGame);
   const simNextSeriesRound = useGameStore((s) => s.simNextSeriesRound);
   const runQuickTeamPracticeAction = useGameStore((s) => s.runQuickTeamPracticeAction);
@@ -573,6 +574,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           cash={humanClub.economy.cash}
           seriesIndex={currentSeriesIndex}
           inbox={inbox}
+          practiceAvailable={practiceAvailable}
           quickFeedback={gmQuickFeedback}
           onSimNextSeries={handleFastSimSeries}
           onQuickPractice={handleQuickPractice}

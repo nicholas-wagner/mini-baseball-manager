@@ -110,6 +110,7 @@ export interface GameStoreState {
   worldSeed: number;
   seasonNumber: number;
   currentSeriesIndex: number;
+  practiceAvailable: boolean;
   rosterActionNonce: number;
   humanClubId: string | null;
   manager: ManagerProfile | null;
@@ -223,6 +224,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     worldSeed: 1994,
     seasonNumber: 1,
     currentSeriesIndex: 0,
+    practiceAvailable: true,
     rosterActionNonce: 1,
     humanClubId: null,
     manager: null,
@@ -245,6 +247,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         worldSeed: seed,
         seasonNumber: 1,
         currentSeriesIndex: 0,
+        practiceAvailable: true,
         rosterActionNonce: 1,
         humanClubId: world.humanClubId,
         manager: createManagerProfile({
@@ -317,6 +320,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         leagues: nextLeagues,
         manager: nextManager,
         currentSeriesIndex: nextIndex,
+        practiceAvailable: true,
       });
       return {
         seriesCompleted: nextIndex,
@@ -331,11 +335,12 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     runQuickTeamPracticeAction: () => {
       const state = get();
       const humanClub = get().getHumanClub();
-      if (!humanClub || !state.manager) return null;
+      if (!humanClub || !state.manager || !state.practiceAvailable) return null;
       const res = runQuickTeamPractice(humanClub, state.manager);
       set({
         leagues: updateHumanClubInLeagues(state.leagues, res.club),
         manager: res.manager,
+        practiceAvailable: false,
       });
       return res;
     },
@@ -454,6 +459,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       set({
         seasonNumber: done.nextSeasonNumber,
         currentSeriesIndex: 0,
+        practiceAvailable: true,
         leagues: done.leagues,
         freeAgents: done.freeAgents,
         activeOffseason: null,
@@ -790,6 +796,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         manager: progressed.manager,
         leagues: updateHumanClubInLeagues(leagues, progressed.club),
         lastPostGameSummary: summary,
+        practiceAvailable: true,
       });
 
       return summary;

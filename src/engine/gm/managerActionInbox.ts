@@ -278,6 +278,7 @@ export function runQuickTeamPractice(
       formScore: nextForm,
       formState: deriveFormState(nextForm),
       morale: Math.min(100, withLevels.morale + 4),
+      fatigue: Math.min(100, withLevels.fatigue + 4),
     };
   });
 
