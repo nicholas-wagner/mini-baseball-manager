@@ -9,6 +9,35 @@ export type ManagerPowerId =
 
 export type CoachRole = 'pitching' | 'hitting' | 'scouting' | 'stadium';
 
+export type StaffRole =
+  | 'pitching_coach'
+  | 'hitting_coach'
+  | 'bench_coach'
+  | 'fielding_coach'
+  | 'bullpen_coach'
+  | 'equipment_manager'
+  | 'team_doctor'
+  | 'athletic_trainer';
+
+export type StaffQualityTier = 1 | 2 | 3 | 4 | 5;
+
+export interface StaffMember {
+  id: string;
+  role: StaffRole;
+  name: string;
+  portraitSeed: number;
+  tier: StaffQualityTier;
+  level: StaffQualityTier;
+  xp: number;
+  salaryPerSeason: number;
+  yearsRemaining: number;
+  specialtyId: string;
+  specialtyLabel: string;
+  perkSummary: string;
+  tradeOffSummary: string;
+  formerPlayerId?: string;
+}
+
 export interface CoachMember {
   id: string;
   name: string;
@@ -24,6 +53,8 @@ export interface CoachStaffState {
   hitting: CoachMember | null;
   scouting: CoachMember | null;
   stadium: CoachMember | null;
+  activeStaff: StaffMember[];
+  clinicSessionsUsedThisOffseason: number;
 }
 
 export interface ManagerProfile {
@@ -46,6 +77,8 @@ export function createDefaultCoachStaff(): CoachStaffState {
     hitting: null,
     scouting: null,
     stadium: null,
+    activeStaff: [],
+    clinicSessionsUsedThisOffseason: 0,
   };
 }
 

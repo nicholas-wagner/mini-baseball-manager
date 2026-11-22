@@ -118,6 +118,11 @@ function hydratePlayerDefaults(player: Player): Player {
 function hydrateClubDefaults(club: Club): Club {
   return {
     ...club,
+    coaches: {
+      ...club.coaches,
+      activeStaff: club.coaches?.activeStaff ?? [],
+      clinicSessionsUsedThisOffseason: club.coaches?.clinicSessionsUsedThisOffseason ?? 0,
+    },
     roster: club.roster.map(hydratePlayerDefaults),
     academyProspects: (club.academyProspects ?? []).map(hydratePlayerDefaults),
   };
