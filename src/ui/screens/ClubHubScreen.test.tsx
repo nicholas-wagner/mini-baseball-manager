@@ -42,5 +42,11 @@ describe('ClubHubScreen — Ballparks, Coaches, Practice Complex & Manager RPG',
     const unlockButtons = screen.getAllByRole('button', { name: /unlock \(1 sp\)/i });
     await user.click(unlockButtons[0]);
     expect(screen.getByText(/unlocked manager skill:/i)).toBeInTheDocument();
+
+    // 5. Relics & Chemistry tab equips a 90s Relic onto the active player
+    await user.click(screen.getByRole('button', { name: /relics & chemistry/i }));
+    expect(screen.getByText(/clubhouse chemistry:/i)).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /equip relic/i })[0]);
+    expect(screen.getByText(/equipped golden ash bat/i)).toBeInTheDocument();
   });
 });

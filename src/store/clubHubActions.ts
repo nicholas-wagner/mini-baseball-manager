@@ -19,6 +19,10 @@ import {
   runPracticeComplexActivity,
   type PracticeComplexRequest,
 } from '../engine/rpg/practiceEngine';
+import {
+  equipRelicOnPlayer,
+  unequipRelicFromPlayer,
+} from '../engine/rpg/relics';
 import { useGameStore } from './gameStore';
 
 function replaceHumanClub(
@@ -114,4 +118,36 @@ export function unlockHumanManagerNode(nodeId: string): { unlocked: boolean; rea
   if (!res.unlocked) return { unlocked: false, reason: res.reason };
   useGameStore.setState({ manager: res.manager });
   return { unlocked: true };
+}
+
+export function equipHumanPlayerRelic(
+  playerId: string,
+  relicId: string,
+): { equipped: boolean; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { equipped: false, reason: 'No active club.' };
+  const target = club.roster.find((p) => p.id === playerId);
+  if (!target) return { equipped: false, reason: 'Player not found.' };
+  const res = equipRelicOnPlayer(target, relicId);
+  if (!res.equipped) return { equipped: false, reason: res.reason };
+  const updatedClub: Club = {
+    ...club,
+    roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+  };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updatedClub) });
+  return { equipped: true };
+}
+
+export function unequipHumanPlayerRelic(playerId: string, relicId: string): void {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return;
+  const updatedClub: Club = {
+    ...club,
+    roster: club.roster.map((p) =>
+      p.id === playerId ? unequipRelicFromPlayer(p, relicId) : p,
+    ),
+  };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updatedClub) });
 }

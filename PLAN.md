@@ -22,12 +22,12 @@
 | **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals, Compromise Training, Cooldowns, Mental/Leverage, Roles, Sabermetrics, Endurance, Pacing, Co-Ed Traits & Role Cards | 16 / 16 | `[x]` Done | Deep 2–60 min player, tactical & RPG simulation core |
 | **M4** | **Living League World**: 6-Tier Pyramid, Fair Start Presets, Market Tiers, Salary Caps, Offseason (Retirements/Expiring/Draft/FA) & Rivalries | 8 / 8 | `[x]` Done | Multi-season climb from Rookie Ball to World Champions |
 | **M5** | **Sim-City Ballpark District**: Multiple Stadiums & Park Factors, Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 1 / 6 | `[/]` In Progress | Multiple distinct 3D ballparks & interactive district builder |
-| **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches & Equipment Manager, Team Doctors & Trainers, Toggleable Injuries/Illnesses, Relics & Weather | 3 / 7 | `[/]` In Progress | Synergy combos, full coaching/equipment/medical staff, low-frequency health drama & loot relics |
+| **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches & Equipment Manager, Team Doctors & Trainers, Toggleable Injuries/Illnesses, Relics & Weather | 5 / 7 | `[/]` In Progress | Synergy combos, full coaching/equipment/medical staff, low-frequency health drama & loot relics |
 | **M7** | **10X Front Office**: Trade Machine, Deadline Drama, Prospect Academy & "The Sandlot Gazette" | 1 / 4 | `[/]` In Progress | Full GM trade negotiation, farm call-ups & 90s newspaper |
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `47 / 69` feature slices completed
+**Overall 10X Progress**: `49 / 69` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -160,10 +160,10 @@ Grow the permanent catalog to **3,000 distinct players across all six tiers**, w
 
 ---
 
-### Milestone 6 — 10X RPG Depth: Chemistry, Coaches & Equipment Manager, Medical Staff, Injuries/Illnesses, Relics & Weather (`3 / 7`)
-- [ ] **6A. Clubhouse Chemistry, Personalities & Synergy Bonds** (`TASK-034`): 7 player personality archetypes, clubhouse morale meter, and active in-game Duo/Trio Synergy Combos (*Bash Brothers*, *Battery Telepathy*, *Double-Play Wizards*, *Speed Demons*) with 3D combo popups.
+### Milestone 6 — 10X RPG Depth: Chemistry, Coaches & Equipment Manager, Medical Staff, Injuries/Illnesses, Relics & Weather (`5 / 7`)
+- [x] **6A. Clubhouse Chemistry, Personalities & Synergy Bonds** (`TASK-034`): 7 player personality archetypes, clubhouse morale meter, and active in-game Duo/Trio Synergy Combos (*Bash Brothers*, *Battery Telepathy*, *Double-Play Wizards*, *Speed Demons*) with 3D combo popups.
 - [x] **6B. Hireable & Developable Coaching Staff & Equipment Manager** (`TASK-035`): Hire and level up **Pitching Coach**, **Hitting Coach**, **Bench Coach**, **Fielding Coach**, **Bullpen Coach** *(helps catchers & pitchers)*, and **Equipment Manager** *(90s gear/relic tuning, blisters, morale & vintage finds)* with retro 90s portraits, tier-scaled active staff slot limits (`2 → 7`), salary budgets, philosophy trade-offs, Season XP growth, Offseason Clinics & retiring club legend transitions!
-- [ ] **6C. 90s Collectible Gear & Relics (RPG Loot System)** (`TASK-036`): Equippable relics (*Golden Ash Bat*, *Lucky Neon Stirrups*, *Titanium Rosin Bag*, *Spring-Loaded Cleats*, *Grandpa's Mitt*, *Iridescent 90s Shades*) earned from achievements, promos, and surprises — with live stat bonuses & visual flair.
+- [x] **6C. 90s Collectible Gear & Relics (RPG Loot System)** (`TASK-036`): Equippable relics (*Golden Ash Bat*, *Lucky Neon Stirrups*, *Titanium Rosin Bag*, *Spring-Loaded Cleats*, *Grandpa's Mitt*, *Iridescent 90s Shades*) earned from achievements, promos, and surprises — with live stat bonuses & visual flair.
 - [ ] **6D. Dynamic Ballpark Weather, Wind & Night Games** (`TASK-037`): Sunny, Golden Hour Sunset, Stadium Floodlight Night Games (unlocked via Lights upgrade), Swirling Wind (affecting HR/fly-ball trajectories & 3D flags!), and Light Drizzle / Rain-Delay events.
 - [ ] **6E. Defensive Shifts, Bullpen Warmup Phone & Win Probability HUD** (`TASK-038`): Live tactical shift calls (*Infield In*, *No Doubles*, *Bunt Defense*), interactive Bullpen Warmup status, pitch-location strike-zone mini-map, and live Win Probability sparkline.
 - [x] **6F. Toggleable Realistic Injuries & Illnesses Engine (4 Rarity Tiers & Play-Through vs. IL)** (`TASK-067`): Independent New-Game ON/OFF toggles, low fun-preserving base rates, extensible catalog (`common`/`uncommon`/`rare`/`ultra_rare`, zero fatalities, zero STDs, sex-specific conditions supported), playable minor conditions with stat dips (leg cramp, mild cold, yeast infection) vs. mandatory IL / season-ending / rare aged-veteran career-ending injuries (broken arm, UCL/ACL tear, pneumonia, early-stage cancer comeback).

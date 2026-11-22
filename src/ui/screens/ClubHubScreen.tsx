@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Award, Building2, Dumbbell, Users } from 'lucide-react';
+import { Award, Building2, Dumbbell, Sparkles, Users } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
 import {
   BALLPARK_CATALOG,
@@ -7,6 +7,7 @@ import {
 } from '../../engine/ballparks/stadiumCatalog';
 import {
   computeClubStaffPayroll,
+  evaluateClubStaffBonuses,
   generateStaffHiringPool,
   STAFF_ROLE_LABELS,
   STAFF_SALARY_BUDGET_BY_TIER,
@@ -18,16 +19,20 @@ import {
 } from '../../engine/manager/managerTree';
 import { isPitcherPosition } from '../../engine/models/player';
 import { createSeededRng } from '../../engine/rng/seededRng';
+import { evaluateClubhouseChemistry } from '../../engine/rpg/chemistry';
 import {
   PRACTICE_COMPLEX_ACTIVITIES,
   type PracticeComplexActivityId,
 } from '../../engine/rpg/practiceEngine';
+import { RELIC_CATALOG } from '../../engine/rpg/relics';
 import {
   commissionHumanBallpark,
+  equipHumanPlayerRelic,
   fireHumanClubStaff,
   hireHumanClubStaff,
   runHumanPracticeActivity,
   runHumanStaffClinic,
+  unequipHumanPlayerRelic,
   unlockHumanManagerNode,
 } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
@@ -35,7 +40,7 @@ import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
-type HubSubTab = 'stadiums' | 'staff' | 'practice' | 'manager';
+type HubSubTab = 'stadiums' | 'staff' | 'practice' | 'manager' | 'relics';
 
 export function ClubHubScreen() {
   const club = useGameStore((s) => s.getHumanClub());
@@ -68,6 +73,8 @@ export function ClubHubScreen() {
 
   const activePark = getBallparkPreset(club.stadium.ballparkId);
   const activeStaff = club.coaches.activeStaff ?? [];
+  const staffBonuses = evaluateClubStaffBonuses(activeStaff);
+  const chemistry = evaluateClubhouseChemistry(club.roster);
   const staffSlotCap = STAFF_SLOT_LIMITS_BY_TIER[club.leagueTier];
   const staffBudget = STAFF_SALARY_BUDGET_BY_TIER[club.leagueTier];
   const staffPayroll = computeClubStaffPayroll(activeStaff);
@@ -131,6 +138,15 @@ export function ClubHubScreen() {
               onClick={() => setSubTab('manager')}
             >
               Manager RPG ({manager?.skillPoints ?? 0} SP)
+            </ComicButton>
+            <ComicButton
+              size="sm"
+              variant={subTab === 'relics' ? 'gold' : 'cream'}
+              active={subTab === 'relics'}
+              icon={<Sparkles className="w-3.5 h-3.5" />}
+              onClick={() => setSubTab('relics')}
+            >
+              Relics & Chemistry
             </ComicButton>
           </div>
         }
@@ -441,6 +457,95 @@ export function ClubHubScreen() {
                   })}
                 </div>
               ))}
+            </div>
+          </div>
+        ) : null}
+
+        {subTab === 'relics' && selectedPlayer ? (
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-display text-sm text-[#181B2C]">
+                  Clubhouse Chemistry: {chemistry.chemistryTier.toUpperCase()} ({chemistry.moraleScore}/100)
+                </span>
+                <span className="text-[11px] font-extrabold text-[#1B4332]">
+                  Equipment Manager Relic Boost: {Math.round(staffBonuses.relicBonusMultiplier * 100)}%
+                </span>
+              </div>
+              {chemistry.activeBonds.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {chemistry.activeBonds.map((bond) => (
+                    <span
+                      key={bond.id}
+                      className="px-2 py-1 rounded-lg bg-[#D8F3DC] border border-[#181B2C] text-[11px] font-extrabold text-[#181B2C]"
+                    >
+                      ⚡ {bond.name}: {bond.memberNames.join(' & ')}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs font-bold text-[#4A5068]">
+                  Build high-power duos, keystone gloves, or glue captains to unlock Clubhouse Synergy Bonds!
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="relic-player-select" className="text-xs font-extrabold uppercase text-[#181B2C]">
+                  90s Gear Locker ({selectedPlayer.name} — {selectedPlayer.equippedRelicIds.length}/2 Equipped)
+                </label>
+                <select
+                  id="relic-player-select"
+                  value={selectedPlayer.id}
+                  onChange={(e) => setSelectedPlayerId(e.target.value)}
+                  className="min-h-[44px] px-2 rounded-xl border-2 border-[#181B2C] bg-white text-xs font-bold"
+                >
+                  {club.roster.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.position} — {p.name} ({p.equippedRelicIds.length}/2 Relics)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {RELIC_CATALOG.slice(0, 9).map((relic) => {
+                  const equipped = selectedPlayer.equippedRelicIds.includes(relic.id);
+                  return (
+                    <div
+                      key={relic.id}
+                      className={`p-2 rounded-xl border-2 border-[#181B2C] flex flex-col justify-between gap-1.5 ${
+                        equipped ? 'bg-[#FFF3BF]' : 'bg-white'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-display text-xs text-[#181B2C]">{relic.name}</div>
+                        <div className="text-[10px] font-bold text-[#4A5068]">{relic.flavor}</div>
+                      </div>
+                      <ComicButton
+                        size="sm"
+                        variant={equipped ? 'coral' : 'turf'}
+                        onClick={() => {
+                          if (equipped) {
+                            unequipHumanPlayerRelic(selectedPlayer.id, relic.id);
+                            setNotice(`Unequipped ${relic.name} from ${selectedPlayer.name}.`);
+                          } else {
+                            const res = equipHumanPlayerRelic(selectedPlayer.id, relic.id);
+                            setNotice(
+                              res.equipped
+                                ? `Equipped ${relic.name} on ${selectedPlayer.name}!`
+                                : (res.reason ?? 'Cannot equip.'),
+                            );
+                          }
+                          soundEngine.play('ui_pop');
+                        }}
+                      >
+                        {equipped ? 'Unequip' : 'Equip Relic'}
+                      </ComicButton>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         ) : null}
