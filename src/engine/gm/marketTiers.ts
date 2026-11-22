@@ -1,3 +1,4 @@
+import type { DrawCatalogPlayer } from '../catalog/playerCatalog';
 import type { FieldPosition } from '../handedness/types';
 import {
   MAX_ACTIVE_ROSTER_SIZE,
@@ -190,15 +191,18 @@ export function generateMarketPool(
   rng: SeededRng,
   leagueTier: LeagueTierId,
   count = 12,
+  drawIdentity?: DrawCatalogPlayer,
 ): Player[] {
-  return Array.from({ length: count }, (_, idx) =>
-    createPlayer(rng, {
-      position: MARKET_POSITIONS[idx % MARKET_POSITIONS.length],
+  return Array.from({ length: count }, (_, idx) => {
+    const position = MARKET_POSITIONS[idx % MARKET_POSITIONS.length];
+    return createPlayer(rng, {
+      position,
+      identity: drawIdentity?.(position),
       tier: leagueTier,
       marketTier: rollFreeAgentMarketTier(rng),
       idPrefix: 'fa',
-    }),
-  );
+    });
+  });
 }
 
 /** Enforces MAX_ACTIVE_ROSTER_SIZE = 20 and duplicate-ID checks before signing/drafting. */

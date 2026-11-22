@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BATTERS_BOX, batterBox } from '../playback/diamondLayout';
 import { createClayTexture, createFloodlights, createHorizon } from './parkScenery';
 import { createToonMaterial, getToonGradientMap } from '../core/toonMaterials';
 
@@ -185,24 +186,26 @@ export function createMiniBallpark(): BallparkEnvironment {
 
   // Crisp white chalk foul lines
   const chalkMat = new THREE.MeshBasicMaterial({ color: 0xfbf4e4 });
+  const { halfWidth, halfLength, lineWidth } = BATTERS_BOX;
+  const innerX = halfWidth - lineWidth, innerZ = halfLength - lineWidth;
   const boxOutline = new THREE.Shape();
-  boxOutline.moveTo(-0.64, -1.32);
-  boxOutline.lineTo(0.64, -1.32);
-  boxOutline.lineTo(0.64, 1.32);
-  boxOutline.lineTo(-0.64, 1.32);
+  boxOutline.moveTo(-halfWidth, -halfLength);
+  boxOutline.lineTo(halfWidth, -halfLength);
+  boxOutline.lineTo(halfWidth, halfLength);
+  boxOutline.lineTo(-halfWidth, halfLength);
   boxOutline.closePath();
   const inside = new THREE.Path();
-  inside.moveTo(-0.58, -1.26);
-  inside.lineTo(-0.58, 1.26);
-  inside.lineTo(0.58, 1.26);
-  inside.lineTo(0.58, -1.26);
+  inside.moveTo(-innerX, -innerZ);
+  inside.lineTo(-innerX, innerZ);
+  inside.lineTo(innerX, innerZ);
+  inside.lineTo(innerX, -innerZ);
   inside.closePath();
   boxOutline.holes.push(inside);
   const boxGeo = new THREE.ShapeGeometry(boxOutline);
-  for (const x of [-1.18, 1.18]) {
+  for (const side of ['R', 'L'] as const) {
     const box = new THREE.Mesh(boxGeo, chalkMat);
     box.rotation.x = -Math.PI / 2;
-    box.position.set(x, 0.04, 0);
+    box.position.set(batterBox(side).position.x, 0.04, 0);
     group.add(box);
   }
 

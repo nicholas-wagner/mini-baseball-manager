@@ -13,7 +13,7 @@ import {
 import type { Club, CrestEmblemId } from '../../engine/models/club';
 import { isPitcherPosition } from '../../engine/models/player';
 import { applyHumanUniformCustomization } from '../../store/clubHubActions';
-import { MiniPlayerSvg } from './MiniPlayerSvg';
+import { PaintedUniformPreview } from './PaintedUniformPreview';
 import { ComicButton } from '../design-system/ComicButton';
 
 interface UniformDesignerPanelProps {
@@ -249,7 +249,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
           <UniformKitShowcaseSvg draft={draft} clubName={`${club.city} ${club.name}`} />
           {modelPlayer ? (
             <div className="w-32 h-36 mx-auto">
-              <MiniPlayerSvg
+              <PaintedUniformPreview
                 traits={modelPlayer.traits}
                 team={{
                   primary: draft.primary,
@@ -261,7 +261,6 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                 role={isPitcherPosition(modelPlayer.position) ? 'pitcher' : 'batter'}
                 throwsHand={modelPlayer.throws}
                 batSide={modelPlayer.bats === 'L' ? 'L' : 'R'}
-                facing="front"
                 clip="idle"
               />
             </div>

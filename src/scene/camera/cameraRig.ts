@@ -4,6 +4,7 @@ export type CameraPresetId =
   | 'over_shoulder_pitcher'
   | 'over_shoulder_batter'
   | 'broadcast_diamond'
+  | 'mound_portrait'
   | 'showcase_closeup'
   | 'practice_diorama';
 
@@ -23,7 +24,8 @@ export const CAMERA_PRESET_LABELS: Record<CameraPresetId, string> = {
   over_shoulder_pitcher: 'Pitcher OTS 3D',
   over_shoulder_batter: 'Batter OTS 3D',
   broadcast_diamond: 'Wide Ballpark',
-  showcase_closeup: 'Chibi Close-Up',
+  mound_portrait: 'Mound close-up',
+  showcase_closeup: 'Turntable',
   practice_diorama: 'Practice Cage',
 };
 
@@ -74,6 +76,12 @@ export function getCameraPresetPose(
         fov: 42,
       };
 
+    case 'mound_portrait':
+      return {
+        position: { x: pitcherThrows === 'R' ? 0.55 : -0.55, y: 2.05, z: -7.10 },
+        lookAt: { x: 0, y: 1.12, z: -10.2 },
+        fov: 37,
+      };
     case 'showcase_closeup': {
       const angle = turntableAngle + elapsedSec * 0.35;
       const radius = 3.9;

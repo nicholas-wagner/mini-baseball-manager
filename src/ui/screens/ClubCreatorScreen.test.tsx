@@ -30,3 +30,24 @@ describe('ClubCreatorScreen — Fair Starting Roster Presets (TASK-064)', () => 
     expect(club.roster.every((p) => p.marketTier === 'rookie')).toBe(true);
   });
 });
+
+it('deals a fresh roster when founding two clubs with the default choices', async () => {
+  let seed = 4000;
+  const entropy = vi.spyOn(crypto, 'getRandomValues').mockImplementation(buffer => {
+    if (buffer instanceof Uint32Array) buffer[0] = ++seed;
+    return buffer;
+  });
+  try {
+    const found = async () => {
+      const view = render(<ClubCreatorScreen onCreated={() => {}} />);
+      await userEvent.click(screen.getByRole('button', { name: /start sandlot dynasty/i }));
+      const ids = useGameStore.getState().getHumanClub()!.roster.map(p => p.id);
+      view.unmount();
+      return ids;
+    };
+    const first = await found();
+    expect(await found()).not.toEqual(first);
+  } finally {
+    entropy.mockRestore();
+  }
+});

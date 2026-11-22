@@ -1,3 +1,4 @@
+import type { CatalogPlayer, DrawCatalogPlayer } from '../catalog/playerCatalog';
 import { rollBatsHand, rollThrowsHand } from '../handedness/handedness';
 import type { FieldPosition } from '../handedness/types';
 import type {
@@ -53,6 +54,7 @@ import { createInitialEconomy, createInitialStadium } from '../models/club';
 import { createDefaultCoachStaff } from '../models/manager';
 
 export interface CreatePlayerOptions {
+  identity?: CatalogPlayer;
   position: FieldPosition;
   tier: LeagueTierId;
   forcedNationalityId?: NationalityId;
@@ -63,6 +65,7 @@ export interface CreatePlayerOptions {
 }
 
 export interface CreateClubOptions {
+  drawIdentity?: DrawCatalogPlayer;
   id: string;
   city: string;
   name: string;
@@ -242,6 +245,36 @@ function buildPitcherOnlyProfile(
   return { ratings, pitcherRole, pitchArsenal };
 }
 
+function playerBirthplace(rng: SeededRng, options: CreatePlayerOptions) {
+  if (options.identity) return options.identity;
+  const birth = generatePlayerIdentity(rng, options.forcedNationalityId);
+  return { name: birth.fullName, nationalityId: birth.nationality.id, hometown: birth.hometown };
+}
+
+function playerProfile(
+  rng: SeededRng,
+  options: CreatePlayerOptions,
+  marketTier: PlayerMarketTier,
+  specialist: PlayerSpecialistArchetype,
+) {
+  const birthplace = playerBirthplace(rng, options);
+  const personality = rng.pick(PERSONALITIES);
+  const mental = rollMentalAndPressureProfile(rng, personality, marketTier);
+  const bats = options.identity?.bats ?? rollBatsHand(rng);
+  const throws = options.identity?.throws ?? rollThrowsHand(rng, options.position);
+  const eligibility = rollPositionalEligibility(rng, options.position, throws, specialist);
+  const traits = options.identity
+    ? { ...options.identity.traits }
+    : rollPlayerPortraitTraits(rng, rng.int(1, 999999));
+  return { birthplace, bats, throws, traits, personality, mental, eligibility };
+}
+
+function playerId(rng: SeededRng, options: CreatePlayerOptions): string {
+  if (options.identity) return options.identity.id;
+  const token = rng.int(100000, 999999);
+  return [options.idPrefix ?? 'plyr', options.position.toLowerCase(), token].join('-');
+}
+
 /** Generates a single deterministic player calibrated to position, league tier, market tier, and specialist role. */
 export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Player {
   const band = TIER_RATING_BANDS[options.tier];
@@ -250,14 +283,8 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   const specialistArchetype =
     options.specialistArchetype ?? rollSpecialistArchetype(rng, options.position, marketTier);
 
-  const identity = generatePlayerIdentity(rng, options.forcedNationalityId);
-  const personality = rng.pick(PERSONALITIES);
-  const mental = rollMentalAndPressureProfile(rng, personality, marketTier);
-  const bats = rollBatsHand(rng);
-  const throws = rollThrowsHand(rng, options.position);
-  const eligibility = rollPositionalEligibility(rng, options.position, throws, specialistArchetype);
-  const traitSeed = rng.int(1, 999999);
-  const traits = rollPlayerPortraitTraits(rng, traitSeed);
+  const { birthplace, bats, throws, traits, personality, mental, eligibility } =
+    playerProfile(rng, options, marketTier, specialistArchetype);
 
   const shiftedMin = clampStat(band.min + marketSpec.ovrOffset);
   const shiftedMax = clampStat(band.max + marketSpec.ovrOffset);
@@ -287,12 +314,9 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   const age = rng.int(marketSpec.ageRange[0], marketSpec.ageRange[1]);
   const careerService = rollInitialCareerService(rng, marketTier, age, options.position);
   const overall = computePlayerOverall({ position: options.position, ratings });
-  const token = rng.int(100000, 999999);
-  const prefix = options.idPrefix ?? 'plyr';
-
   return {
-    id: `${prefix}-${options.position.toLowerCase()}-${token}`,
-    name: identity.fullName,
+    id: playerId(rng, options),
+    name: birthplace.name,
     nickname: rng.pick(NICKNAMES),
     age,
     position: options.position,
@@ -300,8 +324,8 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     bats,
     throws,
     jerseyNumber: options.jerseyNumber ?? rng.int(1, 99),
-    nationalityId: identity.nationality.id,
-    hometown: identity.hometown,
+    nationalityId: birthplace.nationalityId,
+    hometown: birthplace.hometown,
     personality,
     rarity: deriveCardRarity(overall),
     traits,
@@ -452,6 +476,7 @@ export function createClub(rng: SeededRng, options: CreateClubOptions): Club {
     createPlayer(rng, {
       position,
       tier: options.leagueTier,
+      identity: options.drawIdentity?.(position),
       jerseyNumber: jerseys[idx],
       idPrefix: options.id,
     }),

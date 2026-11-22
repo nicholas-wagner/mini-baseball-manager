@@ -1,3 +1,4 @@
+import { PLAYER_CATALOG_BY_ID } from '../catalog/playerCatalog';
 import { TIER_SALARY_CAPS, type Club } from '../models/club';
 import {
   computePlayerOverall,
@@ -169,6 +170,7 @@ function rebuildRosterWithForcedMarketTier(
   return baseRoster.map((existing, idx) =>
     createPlayer(rng, {
       position: existing.position,
+      identity: PLAYER_CATALOG_BY_ID.get(existing.id),
       tier: 'rookie',
       jerseyNumber: existing.jerseyNumber,
       idPrefix: existing.id.split('-')[0],

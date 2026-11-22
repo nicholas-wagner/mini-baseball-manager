@@ -1,3 +1,4 @@
+import type { DiamondPlayKind } from '../../scene/playback/diamondPlay';
 import { useEffect, useRef, useState } from 'react';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../../art/portraits/types';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
@@ -8,6 +9,7 @@ import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
 
 export interface ShowcaseTrigger {
   nonce?: number;
+  infield?: DiamondPlayKind;
   onAccent?: () => void;
   ballStyle: BallVfxStyle | null;
   callout?: { text: string; color: string; y?: number; z?: number };
@@ -57,6 +59,7 @@ export function BallparkCanvas({
         heroTraits,
         heroTeam,
         heroJersey,
+        heroThrows,
       );
       controllerRef.current = controller;
       setWebglUnavailable(false);
@@ -96,7 +99,7 @@ export function BallparkCanvas({
   useEffect(() => {
     if (!trigger) return;
     if (controllerRef.current) {
-      controllerRef.current.triggerShowcaseAction(trigger.ballStyle, trigger.callout, trigger.onAccent);
+      controllerRef.current.triggerShowcaseAction(trigger.ballStyle, trigger.callout, trigger.onAccent, trigger.infield);
     } else {
       trigger.onAccent?.();
     }

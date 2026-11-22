@@ -197,6 +197,11 @@ function findClubAcrossLeagues(
   return null;
 }
 
+/** Sample entropy once when founding a career. All subsequent draws use its saved seed. */
+export function newCareerSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0];
+}
+
 export function createGameStore(repository: SaveRepository = createSaveRepository()) {
   return create<GameStoreState>()((set, get) => ({
     worldSeed: 1994,
@@ -216,9 +221,9 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     getHumanClub: () => findClubAcrossLeagues(get().leagues, get().humanClubId),
 
     startNewCareer: (input) => {
-      const seed = input.seed ?? 1994;
+      const seed = input.seed ?? newCareerSeed();
       const world = generateSixTierWorld(seed, input);
-      const freeAgents = generateMarketPool(createSeededRng(seed + 505), 'rookie', 12);
+      const freeAgents = world.freeAgents;
 
       set((prev) => ({
         worldSeed: seed,
@@ -748,6 +753,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         humanClubId: state.humanClubId,
         manager: state.manager,
         leagues: state.leagues,
+        freeAgents: state.freeAgents,
         rivalries: [],
         trophies: [],
         newspaperArchive: [],
@@ -767,7 +773,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,
-        freeAgents: generateMarketPool(createSeededRng(save.worldSeed + 505), 'rookie', 12),
+        freeAgents: save.freeAgents ?? generateMarketPool(createSeededRng(save.worldSeed + 505), 'rookie', 12),
         settings: save.settings,
         lastPostGameSummary: null,
       });
@@ -788,6 +794,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         humanClubId: state.humanClubId,
         manager: state.manager,
         leagues: state.leagues,
+        freeAgents: state.freeAgents,
         rivalries: [],
         trophies: [],
         newspaperArchive: [],
@@ -805,7 +812,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,
-        freeAgents: generateMarketPool(createSeededRng(save.worldSeed + 505), 'rookie', 12),
+        freeAgents: save.freeAgents ?? generateMarketPool(createSeededRng(save.worldSeed + 505), 'rookie', 12),
         settings: save.settings,
         lastPostGameSummary: null,
       });

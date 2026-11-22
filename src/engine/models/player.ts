@@ -1,3 +1,7 @@
+import type {
+  AccessoryStyle, BackdropStyle, CapStyle, EyeStyle, HairStyle, HeadShape, MouthStyle,
+  PlayerLook, PortraitTraits as PlayerPortraitTraits,
+} from '../catalog/appearance';
 import type { FieldPosition, BatsHand, ThrowsHand } from '../handedness/types';
 import type { ActiveHealthStatus } from '../health/healthEngine';
 import type { NationalityId } from '../nationalities/types';
@@ -5,60 +9,8 @@ import type { SeededRng } from '../rng/seededRng';
 
 export type CardRarity = 'rookie' | 'allstar' | 'mvp';
 
-export type HeadShape = 'round' | 'oval' | 'square' | 'chubby' | 'heart';
-
-export type HairStyle =
-  | 'spiky90s'
-  | 'flattop'
-  | 'mullet'
-  | 'pigtails'
-  | 'afro'
-  | 'pompadour'
-  | 'sideSweep'
-  | 'curlyTop'
-  | 'bob'
-  | 'mohawk';
-
-export type CapStyle = 'forward' | 'backwards' | 'visor' | 'none';
-
-export type EyeStyle = 'bright' | 'determined' | 'starry' | 'chill' | 'wide' | 'wink';
-
-export type MouthStyle = 'bigGrin' | 'smirk' | 'bubblegum' | 'tongueOut' | 'openLaugh' | 'focused';
-
-export type AccessoryStyle =
-  | 'none'
-  | 'shades90s'
-  | 'eyeBlack'
-  | 'cheekBandage'
-  | 'freckles'
-  | 'handlebarStache'
-  | 'headband'
-  | 'starEarrings';
-
-export type BackdropStyle = 'starburst' | 'stripes' | 'halftone' | 'lightning' | 'stadium';
-
-export type PlayerLook = 'male' | 'female';
-
-export interface PlayerPortraitTraits {
-  seed: number;
-  playerLook?: PlayerLook;
-  headShape: HeadShape;
-  skinTone: string;
-  skinShadow: string;
-  skinHighlight: string;
-  irisColor: string;
-  hairStyle: HairStyle;
-  hairColor: string;
-  hairHighlight: string;
-  capStyle: CapStyle;
-  eyeStyle: EyeStyle;
-  mouthStyle: MouthStyle;
-  accessory: AccessoryStyle;
-  backdropStyle: BackdropStyle;
-}
-
-export type PortraitTraits = PlayerPortraitTraits;
-
+export type * from '../catalog/appearance';
+export type { PortraitTraits as PlayerPortraitTraits } from '../catalog/appearance';
 export type PersonalityArchetype =
   | 'prankster'
   | 'clutch_captain'

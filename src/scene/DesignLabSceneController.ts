@@ -1,5 +1,9 @@
+import { pitchFlightScale } from './vfx/ballFlightVisual';
+import { batterBox } from './playback/diamondLayout';
+import { diamondPlay, type DiamondPlay, type DiamondPlayKind } from './playback/diamondPlay';
+import { renderDiamondPlay, type DiamondCast } from './playback/renderDiamondPlay';
 import * as THREE from 'three';
-import type { PitchingMotion, PortraitMood, PortraitTeamColors, PortraitTraits } from '../art/portraits/types';
+import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../art/portraits/types';
 import { STATURE_SCALE, resolveAthleteAppearance } from '../art/portraits/athleteAppearance';
 import { createPortraitTraits } from '../art/portraits/generatePortrait';
 import { SAMPLE_TEAM_PALETTES } from '../art/themes/teamPalettes';
@@ -13,11 +17,12 @@ import {
   type CameraPresetId,
 } from './camera/cameraRig';
 import { CLIP_DURATIONS, type CharacterAnimClip } from './characters/animationState';
-import { createChibiPlayerRig, type ChibiPlayerRig } from './characters/chibiBuilder';
+import { createPaintedPlayerRig, type PaintedPlayerRig } from './characters/paintedPlayer';
 import { sampleBallTrajectory, type BallVfxStyle } from './vfx/ballTrajectory';
-import { createDelivery, MOUND, sampleDeliveryFlight, signatureReleasePoint, type ShowcaseDelivery } from './vfx/showcaseDelivery';
-import { catchPoint, FIELD_CAMERA_CUT, FIELDER_START, fieldingCamera, isCatchClip, sampleFieldingPlay } from './vfx/fieldingShowcase';
+import { createDelivery, MOUND, sampleDeliveryFlight, type ShowcaseDelivery } from './vfx/showcaseDelivery';
+import { FIELD_CAMERA_CUT, FIELDER_START, fieldingCamera, isCatchClip, sampleFieldingPlay } from './vfx/fieldingShowcase';
 import { createBallparkVfxSystem } from './vfx/vfxSystem';
+
 
 export interface DesignLabSceneState {
   cameraPreset: CameraPresetId;
@@ -33,10 +38,10 @@ export class DesignLabSceneController {
   private camera: THREE.PerspectiveCamera;
   private ballpark: ReturnType<typeof createMiniBallpark>;
   private vfx: ReturnType<typeof createBallparkVfxSystem>;
-  private pitcher: ChibiPlayerRig;
-  private batter: ChibiPlayerRig;
-  private catcher: ChibiPlayerRig;
-  private fielder: ChibiPlayerRig;
+  private pitcher: PaintedPlayerRig;
+  private batter: PaintedPlayerRig;
+  private catcher: PaintedPlayerRig;
+  private fielder: PaintedPlayerRig;
 
   private container: HTMLElement;
   private resizeObserver: ResizeObserver;
@@ -47,6 +52,9 @@ export class DesignLabSceneController {
   private cameraPose: CameraPose;
   private cameraPreset: CameraPresetId = 'over_shoulder_pitcher';
   private playStartedAt = 0;
+  private infield: DiamondPlay | null = null;
+  private infielders: Pick<DiamondCast, 'SS' | '1B' | '2B' | '3B' | 'RUN'> | null = null;
+  private fieldTeam: PortraitTeamColors;
   private delivery: ShowcaseDelivery | null = null;
   private callout?: { text: string; color: string };
   private playAccent?: () => void;
@@ -60,7 +68,7 @@ export class DesignLabSceneController {
   private fielderClip: CharacterAnimClip = 'field_ready';
   private moodOverride: PortraitMood | undefined = undefined;
   private pitcherThrows: ThrowsHand = 'R';
-  private pitchingMotion: PitchingMotion;
+  private pitcherSeed: number;
   private batterSide: EffectiveBatSide = 'R';
   private readonly rivalBatterTraits = createPortraitTraits(4412);
   private readonly catcherTraits = createPortraitTraits(3105);
@@ -72,11 +80,14 @@ export class DesignLabSceneController {
     initialHeroTraits: PortraitTraits,
     initialHeroTeam: PortraitTeamColors,
     initialJersey: number,
+    initialThrows: ThrowsHand = 'R',
   ) {
     this.container = container;
+    this.pitcherThrows = initialThrows;
+    this.pitcherSeed = initialHeroTraits.seed;
+    this.fieldTeam = initialHeroTeam;
     const appearance = resolveAthleteAppearance(initialHeroTraits);
     this.stature.pitcher = STATURE_SCALE[appearance.stature];
-    this.pitchingMotion = appearance.pitchingMotion;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x4bb9ee);
@@ -86,7 +97,7 @@ export class DesignLabSceneController {
     const height = Math.max(1, container.clientHeight);
     this.viewportHeight = height;
     this.camera = new THREE.PerspectiveCamera(44, width / height, 0.2, 180);
-    this.cameraPose = getCameraPresetPose(this.cameraPreset, 0);
+    this.cameraPose = this.presetPose();
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -114,11 +125,12 @@ export class DesignLabSceneController {
     this.scene.add(this.vfx.group);
 
     // Featured Chibi Pitcher on the Mound (logicalYaw = 0 -> faces +Z toward Home Plate)
-    this.pitcher = createChibiPlayerRig(
+    this.pitcher = createPaintedPlayerRig(
       {
         traits: initialHeroTraits,
         team: initialHeroTeam,
         jerseyNumber: initialJersey,
+        throwsHand: initialThrows,
         role: 'pitcher',
       },
       0,
@@ -126,22 +138,22 @@ export class DesignLabSceneController {
     this.pitcher.root.position.copy(MOUND);
     this.scene.add(this.pitcher.root);
 
-    // Opposing Chibi Batter at Home Plate (logicalYaw = PI -> faces -Z toward Pitcher)
+    // A hitter stands across the plate and watches the mound over the lead shoulder.
     const rivalTeam = SAMPLE_TEAM_PALETTES[1];
-    this.batter = createChibiPlayerRig(
+    this.batter = createPaintedPlayerRig(
       {
         traits: this.rivalBatterTraits,
         team: rivalTeam,
         jerseyNumber: 7,
         role: 'batter',
       },
-      Math.PI,
+      batterBox('R').yaw,
     );
-    this.batter.root.position.set(-1.34, 0.04, 0.15);
+    this.batter.root.position.copy(batterBox('R').position);
     this.scene.add(this.batter.root);
 
     // Chibi Catcher behind Home Plate (logicalYaw = PI -> faces -Z toward Pitcher)
-    this.catcher = createChibiPlayerRig(
+    this.catcher = createPaintedPlayerRig(
       {
         traits: this.catcherTraits,
         team: initialHeroTeam,
@@ -154,7 +166,7 @@ export class DesignLabSceneController {
     this.scene.add(this.catcher.root);
 
     // Chibi Center-Right Fielder ready to dive or Sky-High Leap! (logicalYaw = 0 -> faces +Z toward Home)
-    this.fielder = createChibiPlayerRig(
+    this.fielder = createPaintedPlayerRig(
       {
         traits: this.fielderTraits,
         team: initialHeroTeam,
@@ -173,6 +185,31 @@ export class DesignLabSceneController {
     this.loop(this.lastTimestamp);
   }
 
+  private replayCast(): DiamondCast {
+    if (!this.infielders) {
+      const make = (seed: number, jersey: number, runner = false) => {
+        const rig = createPaintedPlayerRig({ traits: createPortraitTraits(seed), role: 'fielder', throwsHand: 'R',
+          team: runner ? SAMPLE_TEAM_PALETTES[1] : this.fieldTeam, jerseyNumber: jersey }, 0, runner);
+        this.scene.add(rig.root);
+        return rig;
+      };
+      this.infielders = { SS: make(8107, 6), '2B': make(8108, 4), '1B': make(8110, 3),
+        '3B': make(8113, 5), RUN: make(8114, 22, true) };
+    }
+    return { ...this.infielders, P: this.pitcher, BAT: this.batter };
+  }
+
+  private endInfieldReplay() {
+    if (!this.infield) return;
+    this.infield = null;
+    if (this.infielders) for (const rig of Object.values(this.infielders)) rig.root.visible = false;
+    this.fielder.root.visible = true;
+    const box = batterBox(this.batterSide);
+    this.batter.logicalYaw = box.yaw;
+    this.batter.root.position.copy(box.position);
+    this.vfx.clear();
+  }
+
   private handleResize(): void {
     const width = Math.max(1, this.container.clientWidth);
     const height = Math.max(1, this.container.clientHeight);
@@ -189,14 +226,15 @@ export class DesignLabSceneController {
 
   setCameraPreset(preset: CameraPresetId): void {
     if (preset === this.cameraPreset) return;
-    const leavingTurntable = this.cameraPreset === 'showcase_closeup';
+    this.endInfieldReplay();
+    const leavingCloseUp = this.cameraPreset === 'showcase_closeup' || this.cameraPreset === 'mound_portrait';
     this.cameraPreset = preset;
     if (preset === 'showcase_closeup') {
       this.turntableStartedAt = this.elapsedSec;
       this.turntableOffset = 0;
     }
     // A direct cut avoids traveling through the featured player at the mound.
-    if (leavingTurntable || preset === 'showcase_closeup') this.cameraPose = this.presetPose();
+    if (leavingCloseUp || preset === 'showcase_closeup' || preset === 'mound_portrait') this.cameraPose = this.presetPose();
   }
 
   nudgeTurntable(deltaRad: number): void {
@@ -211,25 +249,33 @@ export class DesignLabSceneController {
     batterSide: EffectiveBatSide = 'R',
   ): void {
     const appearance = resolveAthleteAppearance(traits);
-    this.pitchingMotion = appearance.pitchingMotion;
     const height = STATURE_SCALE[appearance.stature];
     const changedHeight = height !== this.stature.pitcher;
     this.stature.pitcher = height;
-    if (this.delivery && (changedHeight || pitcherThrows !== this.pitcherThrows || batterSide !== this.batterSide)) {
+    const changedPitcher = traits.seed !== this.pitcherSeed;
+    const changedHand = pitcherThrows !== this.pitcherThrows;
+    this.pitcherSeed = traits.seed;
+    if (this.delivery && (changedPitcher || changedHeight || changedHand || batterSide !== this.batterSide)) {
+      this.playStartedAt = this.elapsedSec;
+      this.vfx.clear();
       const style = (this.delivery.hit ?? this.delivery.pitch).style;
       this.delivery = createDelivery(style, pitcherThrows, batterSide, this.pitcherClip, this.batterClip, this.stature);
     }
+    if (this.fieldTeam !== team && this.infielders) {
+      this.endInfieldReplay();
+      for (const rig of Object.values(this.infielders)) { this.scene.remove(rig.root); rig.dispose(); }
+      this.infielders = null;
+    }
+    this.fieldTeam = team;
     this.pitcherThrows = pitcherThrows;
     this.batterSide = batterSide;
-    this.pitcher.updateAppearance({
-      traits,
-      team,
-      jerseyNumber,
-      role: 'pitcher',
-      throwsHand: pitcherThrows,
-    });
+    if (changedHand) this.cameraPose = this.presetPose();
+    const hero = { traits, team, jerseyNumber, role: 'pitcher' as const, throwsHand: pitcherThrows };
+    this.pitcher.updateAppearance(hero);
     // Position opposing batter in 3rd-base box (-X) for RHB or 1st-base box (+X) for LHB!
-    this.batter.root.position.set(batterSide === 'R' ? -1.34 : 1.34, 0.04, 0.15);
+    const box = batterBox(batterSide);
+    this.batter.logicalYaw = box.yaw;
+    this.batter.root.position.copy(box.position);
     this.batter.updateAppearance({
       traits: this.rivalBatterTraits,
       team: SAMPLE_TEAM_PALETTES[1],
@@ -269,8 +315,21 @@ export class DesignLabSceneController {
     ballStyle: BallVfxStyle | null,
     callout?: { text: string; color: string; y?: number; z?: number },
     onAccent?: () => void,
+    infield?: DiamondPlayKind,
   ): void {
+    this.endInfieldReplay();
     this.vfx.clear();
+    if (infield) {
+      this.delivery = null;
+      this.infield = diamondPlay(infield);
+      this.playAccent = onAccent;
+      this.playStartedAt = this.elapsedSec;
+      this.fielder.root.visible = false;
+      for (const [actor, rig] of Object.entries(this.replayCast())) {
+        rig.root.visible = actor !== 'RUN' || infield === 'double_play';
+      }
+      return;
+    }
     this.fielder.root.position.copy(FIELDER_START);
     this.playStartedAt = this.elapsedSec;
     this.playAccent = onAccent;
@@ -294,11 +353,19 @@ export class DesignLabSceneController {
   }
 
   private updateDelivery(play: ShowcaseDelivery, t: number, previous: number, target: CameraPose) {
-    if (this.pitchingMotion !== 'overhand' && previous < play.releaseAt && t >= play.releaseAt) {
-      play.pitch.start = signatureReleasePoint(this.pitchingMotion, play.pitcherClip, this.pitcherThrows,
-        this.stature.pitcher, this.cameraPose.position);
+    if (previous < play.releaseAt && t >= play.releaseAt) {
+      play.pitch.start = this.pitcher.releasePoint(play.pitcherClip);
     }
     const hit = play.hit;
+    if (t <= play.plateAt && !hit) {
+      play.pitch.end = this.catcher.contactAt('catch_receive', .3 * CLIP_DURATIONS.catch_receive,
+        this.catcher.root.position, this.cameraPose.position);
+    } else if (t <= play.plateAt && hit) {
+      const contact = this.batter.contactAt(this.batterClip, play.plateAt - play.swingAt,
+        this.batter.root.position, this.cameraPose.position);
+      play.pitch.end = contact;
+      hit.start = contact;
+    }
     const fieldClip = hit?.style === 'line_drive' && isCatchClip(this.fielderClip) ? this.fielderClip : null;
     const sinceHit = t - play.plateAt;
     const at = fieldClip && hit ? sampleFieldingPlay(fieldClip, this.pitcherThrows, sinceHit, hit.durationSec) : null;
@@ -312,7 +379,9 @@ export class DesignLabSceneController {
       }
       if (sinceHit >= 0 && sinceHit <= hit.durationSec + 0.05) {
         hit.apexHeight = fieldClip === 'field_dive' ? 2.35 : 3.8;
-        hit.end = catchPoint(fieldClip, this.pitcherThrows, hit.durationSec, this.cameraPose.position, STATURE_SCALE[this.fielderTraits.stature]);
+        const contact = sampleFieldingPlay(fieldClip, this.pitcherThrows, hit.durationSec, hit.durationSec);
+        hit.end = this.fielder.contactAt(fieldClip, contact.clipTime,
+          {x:contact.x, y:FIELDER_START.y, z:contact.z}, this.cameraPose.position);
       }
       if (at.caught && previous - play.plateAt < hit.durationSec) {
         this.vfx.impact(hit.end, '#FFE29D');
@@ -323,9 +392,12 @@ export class DesignLabSceneController {
     if (flight) {
       const chasing = fieldClip && flight.spec === hit;
       const progress = chasing ? 1 - Math.pow(1 - flight.progress, 1.35) : flight.progress;
+      const scale = flight.spec === play.pitch
+        ? pitchFlightScale(progress, this.cameraPreset === 'mound_portrait' ? .27 : .55)
+        : chasing ? 1 - .64 * progress : this.cameraPreset === 'mound_portrait' ? .27 : 1;
       this.vfx.ball.draw(flight.spec, progress,
         play.hit && flight.spec === play.pitch ? undefined : this.callout?.color,
-        chasing ? 1 - 0.64 * progress : 1);
+        scale);
       if (flight.spec.style === 'moonshot_hr' &&
         (this.cameraPreset === 'over_shoulder_batter' || this.cameraPreset === 'broadcast_diamond')) {
         const ahead = sampleBallTrajectory(flight.spec, flight.progress + 0.105);
@@ -374,8 +446,10 @@ export class DesignLabSceneController {
     const swinging = swing >= 0 && swing < CLIP_DURATIONS[this.batterClip];
     this.batter.updatePose(swinging ? this.batterClip : 'bat_stance', swinging ? swing : t, undefined, camera);
     const receive = t - play.plateAt;
-    const catching = !play.hit && receive >= 0 && receive < CLIP_DURATIONS.catch_receive;
-    this.catcher.updatePose(catching ? 'catch_receive' : 'field_ready', catching ? receive : t, undefined, camera, catching);
+    const receiveTime = receive + .3 * CLIP_DURATIONS.catch_receive;
+    const catching = !play.hit && receiveTime >= 0 && receiveTime < CLIP_DURATIONS.catch_receive;
+    this.catcher.updatePose(catching ? 'catch_receive' : 'field_ready', catching ? receiveTime : t,
+      undefined, camera, catching && receive >= 0);
     if (fielding) {
       this.fielder.updatePose(fielding.clip, fielding.clipTime, undefined, camera, fielding.caught);
       return;
@@ -394,9 +468,19 @@ export class DesignLabSceneController {
     this.trauma = Math.max(0, this.trauma - dt * 1.45);
     this.crowdExcitement = Math.max(0.22, this.crowdExcitement - dt * 0.25);
 
-    // Smoothly damp camera & apply screen shake first so 2.5D SVG cutouts know exact camera angle
+    // Resolve the camera before selecting front or rear artwork.
     const targetPose = this.presetPose();
     const playTime = this.elapsedSec - this.playStartedAt;
+    if (this.infield) {
+      renderDiamondPlay(this.infield, this.replayCast(), this.batterSide, playTime, previousPlayTime,
+        this.camera, this.viewportHeight, this.vfx);
+      if (previousPlayTime < this.infield.finish && playTime >= this.infield.finish) this.playAccent?.();
+      this.catcher.updatePose('field_ready', playTime, undefined, this.camera.position);
+      this.ballpark.update(this.elapsedSec, 0.5);
+      this.vfx.update(dt, this.camera);
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
     const fielding = this.delivery ? this.updateDelivery(this.delivery, playTime, previousPlayTime, targetPose) : null;
     this.cameraPose = dampCameraPose(this.cameraPose, targetPose, dt, 6.2);
     const shake = computeShakeOffset(this.trauma, this.elapsedSec);
@@ -416,7 +500,6 @@ export class DesignLabSceneController {
       this.cameraPose.lookAt.z,
     );
 
-    // Update animated 2.5D SVG players with live camera position for front/back switching!
     this.updatePlayers(playTime, fielding);
     if (this.vfx.ball.group.visible) this.vfx.ball.sizeForCamera(this.camera, this.viewportHeight);
 
@@ -434,6 +517,7 @@ export class DesignLabSceneController {
     this.batter.dispose();
     this.catcher.dispose();
     this.fielder.dispose();
+    if (this.infielders) for (const rig of Object.values(this.infielders)) rig.dispose();
     this.ballpark.dispose();
     this.vfx.dispose();
     this.renderer.dispose();

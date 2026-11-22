@@ -2,7 +2,16 @@ import * as THREE from 'three';
 import { attachComicOutline } from '../core/toonMaterials';
 import { sampleBallTrajectory, type BallTrajectorySpec } from './ballTrajectory';
 
-function baseballTexture() {
+export const HELD_BALL_RADIUS = .047;
+const FLIGHT_BALL_RADIUS = .19;
+
+/** Keep the release readable before enlarging the ball for the distant catcher. */
+export function pitchFlightScale(progress: number, distantScale: number) {
+  const travel = THREE.MathUtils.smoothstep(progress, 0, .38);
+  return THREE.MathUtils.lerp(HELD_BALL_RADIUS / FLIGHT_BALL_RADIUS, distantScale, travel);
+}
+
+export function createBaseballTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 64;
@@ -38,8 +47,8 @@ function baseballTexture() {
 // ball, even when the knuckleball changes direction between rendered frames.
 export function createBallFlightVisual() {
   const group = new THREE.Group();
-  const texture = baseballTexture();
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.19, 16, 12),
+  const texture = createBaseballTexture();
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(FLIGHT_BALL_RADIUS, 16, 12),
     new THREE.MeshBasicMaterial({ map: texture, transparent: true }));
   // From the mound the tail sits between the lens and the baseball. Paint
   // the leather over the translucent streak while still testing field depth.
@@ -72,11 +81,11 @@ export function createBallFlightVisual() {
   let lastPrimary = '';
   let lastAccent = '';
 
-  function draw(spec: BallTrajectorySpec, progress: number, primary = spec.trailColor, scale = 1) {
+  function draw(spec: BallTrajectorySpec, progress: number, primary = spec.trailColor, scale = 1, sample = sampleBallTrajectory) {
     ballScale = scale;
     ball.scale.setScalar(scale);
     group.visible = true;
-    const head = sampleBallTrajectory(spec, progress);
+    const head = sample(spec, progress);
     ball.position.set(head.x, head.y, head.z);
     ball.rotation.set(progress * 16, progress * 10, 0.5);
     const repaint = lastPrimary !== primary || lastAccent !== spec.secondaryColor;
@@ -85,7 +94,7 @@ export function createBallFlightVisual() {
     const trailLength = Math.min(progress, 0.22, 0.095 / spec.durationSec);
     for (let r = 0; r < rings; r++) {
       const u = r / (rings - 1);
-      const point = sampleBallTrajectory(spec, progress - u * trailLength);
+      const point = sample(spec, progress - u * trailLength);
       const radius = 0.14 * scale * (1 - u);
       for (let side = 0; side < sides; side++) {
         const angle = (side / sides) * Math.PI * 2;
@@ -107,7 +116,7 @@ export function createBallFlightVisual() {
     // Preserve a four-pixel radius as a fly ball recedes over the wall.
     const depth = ball.position.distanceTo(camera.position);
     const worldPerPixel = 2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / heightPx;
-    ball.scale.setScalar(Math.max(ballScale, 4 * worldPerPixel / 0.19));
+    ball.scale.setScalar(Math.max(ballScale, 4 * worldPerPixel / FLIGHT_BALL_RADIUS));
   }
 
   function dispose() {

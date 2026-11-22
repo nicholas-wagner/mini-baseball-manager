@@ -1,3 +1,6 @@
+import { createCatalogDraw } from '../catalog/playerCatalog';
+import { generateMarketPool } from '../gm/marketTiers';
+import type { Player } from '../models/player';
 import { createClub } from '../gm/rosterFactory';
 import {
   createClubWithStartingPreset,
@@ -107,8 +110,10 @@ export interface OffseasonAdvanceResult {
 export function generateSixTierWorld(
   worldSeed: number,
   humanInput: HumanClubSeedInput,
-): { humanClubId: string; leagues: Record<LeagueTierId, Club[]> } {
+): { humanClubId: string; leagues: Record<LeagueTierId, Club[]>; freeAgents: Player[] } {
+  const drawIdentity = createCatalogDraw(createSeededRng(worldSeed ^ 0x1994bace));
   const humanOpts = {
+    drawIdentity,
     id: `club-human-${worldSeed}`,
     city: humanInput.city.trim() || 'Sandlot',
     name: humanInput.clubName.trim() || 'Comets',
@@ -131,6 +136,7 @@ export function generateSixTierWorld(
     const templates = AI_CLUB_CATALOG[tier];
     const aiClubs = templates.map((tpl, clubIdx) =>
       createClub(createSeededRng(worldSeed + (tierIdx + 1) * 1000 + clubIdx * 17), {
+        drawIdentity,
         id: `club-ai-${tier}-${clubIdx + 1}`,
         city: tpl.city,
         name: tpl.name,
@@ -149,7 +155,8 @@ export function generateSixTierWorld(
     leagues[tier] = tier === 'rookie' ? [humanClub, ...aiClubs] : aiClubs;
   });
 
-  return { humanClubId: humanClub.id, leagues };
+  const freeAgents = generateMarketPool(createSeededRng(worldSeed + 505), 'rookie', 12, drawIdentity);
+  return { humanClubId: humanClub.id, leagues, freeAgents };
 }
 
 /** Generates a balanced 7-series (21-game) circle-method round-robin schedule for an 8-club tier. */

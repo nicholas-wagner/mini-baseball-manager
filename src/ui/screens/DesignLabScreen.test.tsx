@@ -33,19 +33,41 @@ it('can throw from the viewport and replay the chosen swing from the current cam
   expect(wide).toHaveAttribute('aria-pressed', 'true');
 });
 
-it('shows both faces of the catcher equipment in the rig inspector', () => {
+it('shows the selected painted pitcher and delivery without a model selector', () => {
   render(<DesignLabScreen />);
-  expect(screen.getByText('Catcher · Front')).toBeVisible();
-  expect(screen.getByText('Catcher · Back')).toBeVisible();
+  expect(screen.queryByRole('group', { name: 'Pitcher model' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/classic mini rig inspector/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/Rico Comet #24.*sidearm/i)).toBeVisible();
+  const card = screen.getByRole('article', {name:'Kiko Tanaka baseball card front'});
+  fireEvent.click(within(card).getByRole('button', {name:/send to 3d/i}));
+  expect(screen.getByText(/Kiko Tanaka #.*underhand/i)).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Throw pitch' }));
+  expect(screen.getByRole('button', {name:'Replay Blazing Comet'})).toBeVisible();
 });
 
-it('shows the selected showcase pitcher’s signature motion and plays it through Throw pitch', () => {
+it('browses permanent identities in small pages and returns to the original shelf', () => {
   render(<DesignLabScreen />);
-  const mound = () => screen.getAllByTestId('mini-player-svg-front')[0].querySelector('[data-throw]');
-  expect(screen.getByText('Sidearm · Front')).toBeVisible();
-  const kiko = screen.getByRole('article', {name:'Kiko Tanaka baseball card front'});
-  fireEvent.click(within(kiko).getByRole('button', {name:/send to 3d/i}));
-  expect(screen.getByText('Underhand · Front')).toBeVisible();
-  fireEvent.click(screen.getByRole('button', {name:'Throw pitch'}));
-  expect(mound()).toHaveAttribute('data-throw','underhand');
+  fireEvent.click(screen.getByRole('button', { name: 'Next players' }));
+  expect(screen.getByText('14–26 of 3,000')).toBeVisible();
+  const cards = screen.getByRole('region', { name: 'Player cards' });
+  expect(within(cards).getAllByRole('article')).toHaveLength(13);
+  fireEvent.click(screen.getByRole('button', { name: 'Previous players' }));
+  expect(within(cards).getByRole('article', { name: 'Kiko Tanaka baseball card front' })).toBeVisible();
+});
+
+it('keeps the painted lineup across player, palette and camera changes', () => {
+  render(<DesignLabScreen />);
+  fireEvent.click(screen.getByRole('button', { name: 'Pitcher OTS 3D' }));
+  const kiko = screen.getByRole('article', { name: 'Kiko Tanaka baseball card front' });
+  fireEvent.click(within(kiko).getByRole('button', { name: /send to 3d/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'Bayview Pelicans' }));
+  expect(screen.getByRole('button', { name: 'Pitcher OTS 3D' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('can replay a groundout, a force at second and relay to first, a pop fly, and a bunt out', () => {
+  render(<DesignLabScreen />);
+  for (const label of ['Groundout to short', '6–4–3 Double Play', 'Infield Pop Fly', 'Bunt Throwout']) {
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    expect(screen.getByRole('button', { name: 'Replay ' + label })).toBeVisible();
+  }
 });

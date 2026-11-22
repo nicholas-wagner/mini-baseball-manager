@@ -1,7 +1,13 @@
 import './designLab.css';
+import { PLAYER_CATALOG } from '../../engine/catalog/playerCatalog';
+import { createPlayer } from '../../engine/gm/rosterFactory';
+import { createSeededRng } from '../../engine/rng/seededRng';
+import { toBaseballCardPlayer } from '../utils/playerCardAdapter';
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
   Camera,
+  ChevronLeft,
+  ChevronRight,
   Dices,
   Flame,
   Globe2,
@@ -32,7 +38,6 @@ import type { CharacterAnimClip } from '../../scene/characters/animationState';
 import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
 import { BallparkCanvas, type ShowcaseTrigger } from '../components/BallparkCanvas';
 import { FlipBaseballCard, type BaseballCardPlayer } from '../components/FlipBaseballCard';
-import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { ScoreboardStrip } from '../design-system/ScoreboardStrip';
@@ -46,6 +51,7 @@ interface ActionPreset {
   fielderClip: CharacterAnimClip;
   ballStyle: BallVfxStyle | null;
   sound: SoundCue;
+  infield?: ShowcaseTrigger['infield'];
   recommendedCamera?: CameraPresetId;
   callout?: { text: string; color: string; y?: number; z?: number };
 }
@@ -74,6 +80,14 @@ const ANIMATION_ACTIONS: readonly ActionPreset[] = [
     sound: 'ui_pop',
   },
   COMET_PITCH,
+  ...([
+    ['ground_out', 'Groundout to short', 'glove_pop'], ['double_play', '6–4–3 Double Play', 'double_play_snap'],
+    ['pop_up', 'Infield Pop Fly', 'glove_pop'], ['bunt_out', 'Bunt Throwout', 'glove_pop'],
+  ] as const).map(([infield, label, sound]): ActionPreset => ({
+    id: infield, infield, label, sound, variant: 'turf', recommendedCamera: 'broadcast_diamond',
+    pitcherClip: 'pitch_windup', batterClip: infield === 'bunt_out' ? 'bat_bunt' : 'bat_swing',
+    fielderClip: 'field_ready', ballStyle: 'line_drive',
+  })),
   {
     id: 'ghost_knuckle',
     label: 'Ghost Knuckle',
@@ -197,13 +211,25 @@ const SOUNDBOARD_CUES: readonly { cue: SoundCue; label: string }[] = [
   { cue: 'cash_chime', label: 'Sim-City Cash' },
 ];
 
+const SHELF_SIZE = INITIAL_SHOWCASE_ROSTER.length;
+
+function catalogShelf(page: number): BaseballCardPlayer[] {
+  if (page === 0) return [...INITIAL_SHOWCASE_ROSTER];
+  return PLAYER_CATALOG.slice(page * SHELF_SIZE, (page + 1) * SHELF_SIZE).map(identity =>
+    toBaseballCardPlayer(createPlayer(createSeededRng(identity.traits.seed), {
+      identity, position: identity.position, tier: 'rookie',
+    })),
+  );
+}
+
 export function DesignLabScreen() {
   const cardCollection = useRef<HTMLDivElement>(null);
   const [teamIdx, setTeamIdx] = useState(0);
+  const [catalogPage, setCatalogPage] = useState(0);
   const [roster, setRoster] = useState<BaseballCardPlayer[]>([...INITIAL_SHOWCASE_ROSTER]);
   const [selectedHeroId, setSelectedHeroId] = useState<string>(INITIAL_SHOWCASE_ROSTER[0].id);
   const [mood, setMood] = useState<PortraitMood>('happy');
-  const [cameraPreset, setCameraPreset] = useState<CameraPresetId>('over_shoulder_pitcher');
+  const [cameraPreset, setCameraPreset] = useState<CameraPresetId>('mound_portrait');
   const [activeActionId, setActiveActionId] = useState<string>('idle');
   const [pitcherClip, setPitcherClip] = useState<CharacterAnimClip>('idle');
   const [batterClip, setBatterClip] = useState<CharacterAnimClip>('bat_stance');
@@ -216,11 +242,9 @@ export function DesignLabScreen() {
   const activeTeam = SAMPLE_TEAM_PALETTES[teamIdx];
   const heroPlayer = roster.find((p) => p.id === selectedHeroId) ?? roster[0];
   const pitchingMotion = resolveAthleteAppearance(heroPlayer.traits).pitchingMotion;
-  const pitcherLabel = { overhand: 'Pitcher', sidearm: 'Sidearm', underhand: 'Underhand' }[pitchingMotion];
   const heroNation = getNationalityById(heroPlayer.nationalityId);
   const heroHeritage = heroNation.heritageAbility;
   const platoon = evaluatePlatoonMatchup(opposingBatterBats, heroPlayer.throws);
-  const heroInspectorBatSide = heroPlayer.bats === 'S' ? 'L' : heroPlayer.bats;
 
   const handleTriggerHeritagePower = () => {
     setActiveActionId('heritage_power');
@@ -255,12 +279,15 @@ export function DesignLabScreen() {
     setPitcherClip(preset.pitcherClip);
     setBatterClip(preset.batterClip);
     setFielderClip(preset.fielderClip);
-    if (preset.recommendedCamera && !keepCamera) {
+    const studyingPitch = cameraPreset === 'mound_portrait' &&
+      (preset.recommendedCamera === 'over_shoulder_pitcher' || preset.id === 'practice_bullpen');
+    if (preset.recommendedCamera && !keepCamera && !studyingPitch) {
       setCameraPreset(preset.recommendedCamera);
     }
     const playAccent = () => soundEngine.play(preset.sound);
     if (!preset.ballStyle) playAccent();
     setTrigger({
+      infield: preset.infield,
       ballStyle: preset.ballStyle,
       callout: preset.callout,
       onAccent: preset.ballStyle ? playAccent : undefined,
@@ -276,12 +303,19 @@ export function DesignLabScreen() {
     else handleAction(canReplay && activePreset ? activePreset : COMET_PITCH, true);
   };
 
+  const openCatalogPage = (page: number) => {
+    const shelf = catalogShelf(page);
+    setCatalogPage(page);
+    setRoster(shelf);
+    setSelectedHeroId(shelf[0].id);
+  };
+
   const handleRollNewPlayer = (forcedNationalityId?: NationalityId) => {
     soundEngine.play('level_up');
     const nextSeed = rollSeed + 37;
     setRollSeed(nextSeed);
     const rookie = generateRandomCardPlayer(nextSeed, forcedNationalityId);
-    setRoster([rookie, ...INITIAL_SHOWCASE_ROSTER]);
+    setRoster([rookie, ...catalogShelf(catalogPage)]);
     setSelectedHeroId(rookie.id);
   };
 
@@ -311,7 +345,7 @@ export function DesignLabScreen() {
       {/* Top Hero Section: Over-the-Shoulder 3D Mini Ballpark */}
       <ComicCard
         title="Sandlot Park"
-        subtitle={`${heroPlayer.name} #${heroPlayer.jerseyNumber} · ${heroPlayer.throws}HP vs ${platoon.effectiveBatSide}HB`}
+        subtitle={`${heroPlayer.name} #${heroPlayer.jerseyNumber} · ${heroPlayer.throws}HP · ${pitchingMotion} vs ${platoon.effectiveBatSide}HB`}
         headerBg={activeTeam.secondary}
         badge={
           <ComicButton
@@ -453,90 +487,6 @@ export function DesignLabScreen() {
         </div>
       </ComicCard>
 
-      {/* Live Articulated Vector SVG Mini-Player Showcase */}
-      <ComicCard
-        title="Chibi Rig Inspector"
-        subtitle={`${heroPlayer.name} · ${activeTeam.city} ${activeTeam.name}`}
-        headerBg={activeTeam.secondary}
-      >
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5">
-          <div className="rig-study">
-            <span className="rig-caption">
-              {pitcherLabel} · Front
-            </span>
-            <MiniPlayerSvg
-              traits={heroPlayer.traits}
-              team={activeTeam}
-              jerseyNumber={heroPlayer.jerseyNumber}
-              role="pitcher"
-              facing="front"
-              throwsHand={heroPlayer.throws}
-              clip={pitcherClip}
-              moodOverride={mood === 'happy' ? undefined : mood}
-              className="rig-figure"
-            />
-          </div>
-
-          <div className="rig-study">
-            <span className="rig-caption">
-              {pitcherLabel} · Back
-            </span>
-            <MiniPlayerSvg
-              traits={heroPlayer.traits}
-              team={activeTeam}
-              jerseyNumber={heroPlayer.jerseyNumber}
-              role="pitcher"
-              facing="back"
-              throwsHand={heroPlayer.throws}
-              clip={pitcherClip}
-              moodOverride={mood === 'happy' ? undefined : mood}
-              className="rig-figure"
-            />
-          </div>
-
-          <div className="rig-study">
-            <span className="rig-caption">
-              Batter · {heroPlayer.bats === 'S' ? 'Switch' : `${heroPlayer.bats}HB`}
-            </span>
-            <MiniPlayerSvg
-              traits={heroPlayer.traits}
-              team={activeTeam}
-              jerseyNumber={heroPlayer.jerseyNumber}
-              role="batter"
-              facing="front"
-              batSide={heroInspectorBatSide}
-              clip={batterClip}
-              moodOverride={mood === 'happy' ? undefined : mood}
-              className="rig-figure"
-            />
-          </div>
-
-          <div className="rig-study">
-            <span className="rig-caption">
-              Fielder · {heroPlayer.throws}H
-            </span>
-            <MiniPlayerSvg
-              traits={heroPlayer.traits}
-              team={activeTeam}
-              jerseyNumber={heroPlayer.jerseyNumber}
-              role="fielder"
-              facing="front"
-              throwsHand={heroPlayer.throws}
-              clip={fielderClip}
-              moodOverride={mood === 'happy' ? undefined : mood}
-              className="rig-figure"
-            />
-          </div>
-          {(['front', 'back'] as const).map(facing => (
-            <div className="rig-study" key={facing}>
-              <span className="rig-caption">Catcher · {facing === 'front' ? 'Front' : 'Back'}</span>
-              <MiniPlayerSvg traits={heroPlayer.traits} team={activeTeam} jerseyNumber={heroPlayer.jerseyNumber}
-                role="catcher" facing={facing} throwsHand={heroPlayer.throws} clip="field_ready" className="rig-figure" />
-            </div>
-          ))}
-        </div>
-      </ComicCard>
-
       {/* Retro 90s Baseball Cards & Portrait Studio */}
       <ComicCard
         title="Baseball Card Studio"
@@ -555,7 +505,19 @@ export function DesignLabScreen() {
         }
       >
         <div className="space-y-4">
-          {/* 3D Flip Baseball Card Grid */}
+          <nav aria-label="Player catalog" className="flex items-center gap-3">
+            <ComicButton size="sm" variant="cream" aria-label="Previous players" disabled={catalogPage === 0}
+              onClick={() => openCatalogPage(catalogPage - 1)}>
+              <span className="flex items-center gap-1"><ChevronLeft aria-hidden="true" size={16} /><span className="hidden sm:inline">Previous</span></span>
+            </ComicButton>
+            <span aria-live="polite" className="font-heading text-sm font-bold">
+              {catalogPage * SHELF_SIZE + 1}–{Math.min((catalogPage + 1) * SHELF_SIZE, PLAYER_CATALOG.length)} of {PLAYER_CATALOG.length.toLocaleString('en-US')}
+            </span>
+            <ComicButton size="sm" variant="cream" aria-label="Next players" disabled={(catalogPage + 1) * SHELF_SIZE >= PLAYER_CATALOG.length}
+              onClick={() => openCatalogPage(catalogPage + 1)}>
+              <span className="flex items-center gap-1"><span className="hidden sm:inline">Next</span><ChevronRight aria-hidden="true" size={16} /></span>
+            </ComicButton>
+          </nav>
           <div
             ref={cardCollection}
             role="region"

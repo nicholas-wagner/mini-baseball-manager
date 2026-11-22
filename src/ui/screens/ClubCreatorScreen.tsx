@@ -8,8 +8,8 @@ import {
   type StartingRosterPreset,
 } from '../../engine/gm/rosterPresets';
 import { createSeededRng } from '../../engine/rng/seededRng';
-import { useGameStore } from '../../store/gameStore';
-import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
+import { newCareerSeed, useGameStore } from '../../store/gameStore';
+import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
@@ -32,7 +32,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const [enableInjuries, setEnableInjuries] = useState(true);
   const [enableIllnesses, setEnableIllnesses] = useState(true);
   const [paletteIndex, setPaletteIndex] = useState(0);
-  const [seedNonce, setSeedNonce] = useState(1994);
+  const [seedNonce, setSeedNonce] = useState(newCareerSeed);
 
   const palette = SAMPLE_TEAM_PALETTES[paletteIndex];
   const previewTraits = createPortraitTraits(seedNonce);
@@ -276,10 +276,10 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
 
           <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C]">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#4A5068]">
-              Home Chibi Uniform Preview
+              Home Uniform Preview
             </div>
             <div className="w-40 h-44 mx-auto my-2">
-              <MiniPlayerSvg
+              <PaintedUniformPreview
                 traits={previewTraits}
                 team={{
                   primary: palette.primary,
@@ -289,9 +289,6 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                 }}
                 jerseyNumber={24}
                 role="pitcher"
-                facing="front"
-                clip="idle"
-                animate={false}
               />
             </div>
             <div className="font-display text-sm text-[#181B2C]">

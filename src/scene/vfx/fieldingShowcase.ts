@@ -1,9 +1,6 @@
 import type { ThrowsHand } from '../../engine/handedness/types';
-import { reachedPocket } from '../../art/playerSvg/fieldingReach';
-import { evaluateMiniPlayerPose } from '../../art/playerSvg/miniPlayerPose';
 import { CLIP_DURATIONS, GLOVE_CONTACT_PHASE, type CharacterAnimClip } from '../characters/animationState';
-import type { CameraPose, Vec3 } from '../camera/cameraRig';
-import { STANDEE_HEIGHT, STANDEE_CENTER } from '../characters/standeeDimensions';
+import type { CameraPose } from '../camera/cameraRig';
 
 type CatchClip = keyof typeof GLOVE_CONTACT_PHASE;
 export const FIELDER_START = { x: 7.5, y: 0.04, z: -22.5 };
@@ -33,24 +30,6 @@ export function sampleFieldingPlay(clip: CatchClip, hand: ThrowsHand, sinceHit: 
     clipTime = Math.min(extension, sinceHit - takeoff) + Math.max(0, sinceCatch - gather);
   }
   return { x, z, clip: action, clipTime, caught: sinceCatch >= 0 };
-}
-
-// Map the SVG pocket through the very same plane size, foot offset, hop and
-// horizontal billboard yaw as the rig. This follows either hand from any shot.
-export function catchPoint(clip: CatchClip, hand: ThrowsHand, duration: number, camera: Vec3, stature = 1): Vec3 {
-  const at = sampleFieldingPlay(clip, hand, duration, duration);
-  const pose = evaluateMiniPlayerPose(clip, at.clipTime, 'fielder');
-  const dx = camera.x - at.x;
-  const dz = camera.z - at.z;
-  const yaw = Math.atan2(dx, dz);
-  const pocket = reachedPocket(pose, (dz < 0) === (hand === 'R'), stature);
-  const unit = STANDEE_HEIGHT / 260;
-  const across = (pocket.x - 120) * unit;
-  return {
-    x: at.x + across * Math.cos(yaw),
-    y: FIELDER_START.y + pose.hopWorldY + (STANDEE_CENTER + 0.5) * STANDEE_HEIGHT - pocket.y * unit,
-    z: at.z - across * Math.sin(yaw),
-  };
 }
 
 export function fieldingCamera(x: number, z: number, leap: boolean): CameraPose {

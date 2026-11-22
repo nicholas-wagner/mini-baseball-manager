@@ -96,6 +96,7 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
     expect(afterClub.economy.cash).toBeGreaterThan(beforeClub.economy.cash);
     expect(store.getState().lastPostGameSummary).toEqual(summary);
 
+    const marketIds = store.getState().freeAgents.map(player => player.id);
     await store.getState().saveCareerToSlot('slot-1');
     const json = store.getState().exportCurrentCareerJson();
 
@@ -117,8 +118,10 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
     expect(store.getState().getHumanClub()!.name).toBe('Comets');
     expect(store.getState().getHumanClub()!.wins + store.getState().getHumanClub()!.losses).toBe(1);
 
+    expect(store.getState().freeAgents.map(player => player.id)).toEqual(marketIds);
     const importedOk = store.getState().importCareerJson(json);
     expect(importedOk).toBe(true);
+    expect(store.getState().freeAgents.map(player => player.id)).toEqual(marketIds);
     expect(store.getState().getHumanClub()!.name).toBe('Comets');
   });
 

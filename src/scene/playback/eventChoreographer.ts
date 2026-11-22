@@ -1,3 +1,6 @@
+import { BASE_PATH_VERTICES } from './diamondLayout';
+export { BASE_PATH_VERTICES } from './diamondLayout';
+import { diamondPlay, selectDiamondPlay, type DiamondPlayKind } from './diamondPlay';
 import type { FieldPosition } from '../../engine/handedness/types';
 import type { AtBatOutcome, PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { BallVfxStyle } from '../../engine/vfx/types';
@@ -26,15 +29,9 @@ export const DIAMOND_DEFENDER_COORDS: readonly DefenderCoord[] = [
   { pos: 'RF', x: 15, y: 0.04, z: -27, yaw: 0 },
 ] as const;
 
-export const BASE_PATH_VERTICES: readonly Vec3[] = [
-  { x: 0, y: 0.04, z: 0 }, // Home (0)
-  { x: 9.8, y: 0.04, z: -9.8 }, // 1B (1)
-  { x: 0, y: 0.04, z: -19.6 }, // 2B (2)
-  { x: -9.8, y: 0.04, z: -9.8 }, // 3B (3)
-  { x: 0, y: 0.04, z: 0 }, // Home (4)
-] as const;
-
 export interface ChoreographedStep {
+  infield?: DiamondPlayKind;
+  leadRunnerId?: string;
   cameraPreset: CameraPresetId;
   pitcherClip: CharacterAnimClip;
   batterClip: CharacterAnimClip;
@@ -270,7 +267,9 @@ export function choreographPlayEvent(
 
   if (event.outcome && OUTCOME_PRESETS[event.outcome]) {
     const preset = OUTCOME_PRESETS[event.outcome];
+    const infield = selectDiamondPlay(event.outcome, event.battedBallType);
     return {
+      infield,
       cameraPreset: event.isClutchMoment && preset.cameraPreset === 'over_shoulder_pitcher'
         ? 'over_shoulder_batter'
         : preset.cameraPreset,
@@ -283,7 +282,7 @@ export function choreographPlayEvent(
       callout: event.specialPowerTriggered
         ? { text: event.specialPowerTriggered.calloutText, color: event.specialPowerTriggered.vfxColor }
         : preset.callout,
-      durationMs: Math.round(preset.baseDurationMs / divisor),
+      durationMs: Math.round((infield ? diamondPlay(infield).duration * 1000 : preset.baseDurationMs) / divisor),
     };
   }
 

@@ -1,3 +1,4 @@
+import type { Player } from '../engine/models/player';
 import type { Club, LeagueTierId } from '../engine/models/club';
 import type { ManagerProfile } from '../engine/models/manager';
 import { migrateSavePayload } from './migrations';
@@ -62,6 +63,7 @@ export interface SaveSlotMetadata {
 }
 
 export interface SaveFileV1 {
+  freeAgents?: Player[];
   schemaVersion: 1;
   savedAtIso: string;
   worldSeed: number;

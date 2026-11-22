@@ -57,7 +57,7 @@ import {
 import { useGameStore } from '../../store/gameStore';
 import { BallparkEconomyPanel } from '../components/BallparkEconomyPanel';
 import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
-import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
+import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
 import { UniformDesignerPanel } from '../components/UniformDesignerPanel';
 import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
 import { ComicButton } from '../design-system/ComicButton';
@@ -523,14 +523,13 @@ export function ClubHubScreen() {
                 ))}
               </select>
               <div className="w-36 h-40 mx-auto">
-                <MiniPlayerSvg
+                <PaintedUniformPreview
                   traits={selectedPlayer.traits}
                   team={club.colors}
                   jerseyNumber={selectedPlayer.jerseyNumber}
                   role={isPitcherPosition(selectedPlayer.position) ? 'pitcher' : 'batter'}
                   throwsHand={selectedPlayer.throws}
                   batSide={selectedPlayer.bats === 'L' ? 'L' : 'R'}
-                  facing="front"
                   clip={activeClip}
                 />
               </div>
