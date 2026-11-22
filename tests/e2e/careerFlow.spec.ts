@@ -19,8 +19,19 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByRole('button', { name: 'Stadium Airhorn!' })).toBeVisible();
   await page.getByRole('button', { name: /start live 3d game/i }).click();
   await expect(page.getByTestId('broadcast-hud')).toBeVisible();
+  await expect(page.getByTestId('game-weather-banner')).toBeVisible();
+  await expect(page.getByTestId('rivalry-showdown-banner')).toBeVisible();
+  await page.getByRole('button', { name: /live box score/i }).click();
+  await expect(page.getByTestId('live-box-score-modal')).toBeVisible();
+  await page.getByRole('button', { name: /close live box score/i }).click();
   await page.getByRole('button', { name: /next pitch/i }).click();
   await expect(page.getByTestId('play-by-play-ticker')).toBeVisible();
+
+  // Visit Roster -> verify Trainer's Table & 1-tap PNG Baseball Card export
+  await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('trainers-table-panel')).toBeVisible();
+  await page.getByRole('button', { name: /download 90s card/i }).click();
+  await expect(page.getByTestId('cross-train-feedback')).toContainText(/exported 90s baseball card/i);
 
   // Visit Ballpark HQ -> Stadium Progression + Economy & District + Gazette & Front Office + Derby/Global Cup/Challenges
   await page.getByRole('button', { name: /^ballpark$/i }).locator('visible=true').first().click();
@@ -73,4 +84,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /open 90s music jukebox/i }).locator('visible=true').first().click();
   await expect(page.getByTestId('music-jukebox-modal')).toBeVisible();
   await page.getByRole('button', { name: /close music jukebox/i }).click();
+
+  await page.getByRole('button', { name: /open settings and accessibility/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('settings-modal')).toBeVisible();
+  await page.getByRole('button', { name: /close settings/i }).click();
 });

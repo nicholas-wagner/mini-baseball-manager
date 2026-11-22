@@ -1,8 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FastForward, Play, RefreshCw, SkipForward, Zap } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ClipboardList,
+  CloudRain,
+  FastForward,
+  Flame,
+  Play,
+  RefreshCw,
+  SkipForward,
+  Sun,
+  Zap,
+} from 'lucide-react';
 import { bgmEngine } from '../../audio/bgmEngine';
 import { soundEngine } from '../../audio/soundEngine';
+import { getBallparkPreset } from '../../engine/ballparks/stadiumCatalog';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
+import {
+  buildRivalryShowdownPreview,
+  createCrosstownStarterRivalry,
+} from '../../engine/league/rivalryEngine';
+import { createSeededRng } from '../../engine/rng/seededRng';
+import {
+  evaluateWeatherSimulationImpact,
+  rollGameDayWeather,
+  type GameDayWeather,
+} from '../../engine/simulation/weather';
 import {
   createInGameManagerPowerTracker,
   MANAGER_POWER_CATALOG,
@@ -50,13 +71,16 @@ import {
 } from '../../engine/simulation/winProbability';
 import { choreographPlayEvent, type ChoreographedStep } from '../../scene/playback/eventChoreographer';
 import { useGameStore, type PostGameSummary } from '../../store/gameStore';
+import { useUserPreferencesStore } from '../../store/userPreferences';
 import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
 import { BroadcastHud } from '../components/BroadcastHud';
+import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { LiveGameCanvas } from '../components/LiveGameCanvas';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { ScoreboardStrip } from '../design-system/ScoreboardStrip';
+import { requestGameWakeLock, triggerHapticPulse } from '../utils/deviceFeedback';
 
 const TACTICAL_OPTIONS: readonly { id: TacticalCall; label: string }[] = [
   { id: 'normal', label: 'Normal' },
@@ -103,8 +127,36 @@ export function GameDayScreen() {
     createInGameManagerPowerTracker(),
   );
   const [modalSummary, setModalSummary] = useState<PostGameSummary | null>(null);
+  const [boxScoreOpen, setBoxScoreOpen] = useState(false);
+  const [gameWeather, setGameWeather] = useState<GameDayWeather | null>(null);
+  const hapticsEnabled = useUserPreferencesStore((s) => s.hapticsEnabled);
+  const wakeLockEnabled = useUserPreferencesStore((s) => s.wakeLockEnabled);
 
   const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? opponents[0];
+
+  const rivalryPreview = useMemo(() => {
+    if (!humanClub || !activeOpponent) return null;
+    const starterRecord = createCrosstownStarterRivalry(humanClub, activeOpponent);
+    return buildRivalryShowdownPreview(humanClub, activeOpponent, starterRecord);
+  }, [humanClub, activeOpponent]);
+
+  // Keep Android screen awake during active live 3D games when Wake Lock preference is ON
+  useEffect(() => {
+    if (!liveSession || liveSession.status !== 'in_progress' || !wakeLockEnabled) return undefined;
+    let cancelled = false;
+    let releaseFn: (() => Promise<void>) | null = null;
+    void requestGameWakeLock().then((handle) => {
+      if (cancelled) {
+        void handle.release();
+      } else {
+        releaseFn = handle.release;
+      }
+    });
+    return () => {
+      cancelled = true;
+      if (releaseFn) void releaseFn();
+    };
+  }, [liveSession?.status, wakeLockEnabled, liveSession]);
 
   const finalizeSessionIfComplete = useCallback(
     (finalState: GameSessionState, eventsList: PlayEvent[], opponentId: string) => {
@@ -145,9 +197,16 @@ export function GameDayScreen() {
     setWarmupCounts({});
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
+    setBoxScoreOpen(false);
+    const park = getBallparkPreset(session.ballparkId);
+    const rolledWeather = rollGameDayWeather(createSeededRng(seed + 41), {
+      isDome: park.factors.isDome,
+      hasNightLights: humanClub.stadium.hasNightLights,
+    });
+    setGameWeather(rolledWeather);
     setWatchMode(autoPlay ? 'live' : 'paused');
     bgmEngine.syncStadium(session.ballparkId);
-    soundEngine.play('organ_charge');
+    soundEngine.play(rolledWeather.condition === 'drizzle' ? 'rain_thunder' : 'organ_charge');
   };
 
   const applyStepResult = useCallback(
@@ -177,11 +236,22 @@ export function GameDayScreen() {
         if (emitted.some((ev) => ev.soundCue === 'organ_seventh_stretch')) {
           soundEngine.play('organ_seventh_stretch');
         }
+        if (hapticsEnabled) {
+          if (lastEvent.outcome === 'home_run') triggerHapticPulse('home_run');
+          else if (lastEvent.outcome === 'strikeout') triggerHapticPulse('strikeout');
+          else if (
+            lastEvent.outcome === 'single' ||
+            lastEvent.outcome === 'double' ||
+            lastEvent.outcome === 'triple'
+          ) {
+            triggerHapticPulse('hit');
+          }
+        }
         setRecentEvents((prev) => [...emitted.slice().reverse(), ...prev].slice(0, 12));
       }
       finalizeSessionIfComplete(nextSession, emitted, oppId);
     },
-    [finalizeSessionIfComplete, speed, warmingRelieverIds, liveSession],
+    [finalizeSessionIfComplete, speed, warmingRelieverIds, liveSession, hapticsEnabled],
   );
 
   const resolvePitchCallOption = useCallback(
@@ -421,6 +491,69 @@ export function GameDayScreen() {
         strikes={liveSession.strikes}
         outs={liveSession.outs}
       />
+
+      {/* Dynamic Weather, Park Factors & 1-Tap Live Box Score Strip */}
+      {(() => {
+        const park = getBallparkPreset(liveSession.ballparkId);
+        const weatherImpact = gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : null;
+        return (
+          <div className="space-y-2">
+            <div
+              data-testid="game-weather-banner"
+              className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2 text-xs"
+            >
+              <div className="flex flex-wrap items-center gap-2 font-extrabold text-[#181B2C]">
+                {gameWeather?.condition === 'drizzle' ? (
+                  <CloudRain className="w-4 h-4 text-[#1D3557]" />
+                ) : (
+                  <Sun className="w-4 h-4 text-[#F77F00]" />
+                )}
+                <span>🏟️ {park.name}</span>
+                <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[10px] text-[#1D3557]">
+                  {weatherImpact ? weatherImpact.hudLabel : 'Clear Ballpark Skies'}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[10px]">
+                  Park HR {park.factors.hrFactor.toFixed(2)}x
+                  {weatherImpact && weatherImpact.hrCarryMultiplier !== 1
+                    ? ` • Wind Carry ${weatherImpact.hrCarryMultiplier.toFixed(2)}x`
+                    : ''}
+                </span>
+              </div>
+              <ComicButton
+                size="sm"
+                variant="sky"
+                icon={<ClipboardList className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  setBoxScoreOpen(true);
+                  soundEngine.play('ui_pop');
+                }}
+              >
+                Live Box Score
+              </ComicButton>
+            </div>
+
+            {rivalryPreview ? (
+              <div
+                data-testid="rivalry-showdown-banner"
+                className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-gradient-to-r from-[#FF4D6D] via-[#FFC300] to-[#1D3557] text-[#181B2C] flex flex-wrap items-center justify-between gap-2 text-xs shadow-[3px_3px_0_#181B2C]"
+              >
+                <div className="flex items-center gap-1.5 font-display text-[#FFFDF7] drop-shadow-[1px_1px_0_#181B2C]">
+                  <Flame className="w-4 h-4 text-[#FFD166] shrink-0" />
+                  <span>{rivalryPreview.vsBannerTitle}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
+                  <span className="px-2 py-0.5 rounded bg-[#FFFDF7] border border-[#181B2C]">
+                    🏆 {rivalryPreview.cupName}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C]">
+                    Heat {rivalryPreview.heat}/100 • +{Math.round((rivalryPreview.modifiers.hypeGainMultiplier - 1) * 100)}% Hype
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
         <div className="space-y-3">
@@ -760,6 +893,14 @@ export function GameDayScreen() {
           </ComicCard>
         </div>
       </div>
+
+      <LiveBoxScoreModal
+        open={boxScoreOpen}
+        onClose={() => setBoxScoreOpen(false)}
+        session={liveSession}
+        awayClub={activeOpponent}
+        homeClub={humanClub}
+      />
 
       <PostGameSummaryModal
         summary={modalSummary}

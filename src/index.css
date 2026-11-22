@@ -125,3 +125,12 @@
 .chrome-frame {
   background: linear-gradient(135deg, #e8eef7 0%, #99b2cc 35%, #ffffff 55%, #7d96b3 100%);
 }
+
+html[data-reduced-motion='true'] *,
+html[data-reduced-motion='true'] *::before,
+html[data-reduced-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

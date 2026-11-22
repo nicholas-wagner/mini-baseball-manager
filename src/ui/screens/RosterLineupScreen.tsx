@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { ArrowLeftRight, Flame, Gamepad2, Save, Snowflake, Sparkles, UserPlus } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Download,
+  Flame,
+  Gamepad2,
+  Save,
+  Snowflake,
+  Sparkles,
+  UserPlus,
+} from 'lucide-react';
+import { downloadPlayerCardPng } from '../../art/export/cardExporter';
 import { FlagBadge } from '../../art/flags/FlagBadge';
 import { soundEngine } from '../../audio/soundEngine';
 import type { FieldPosition } from '../../engine/handedness/types';
@@ -38,6 +48,7 @@ import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises'
 import { useGameStore } from '../../store/gameStore';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
 import { SaveSlotsModal } from '../components/SaveSlotsModal';
+import { TrainersTablePanel } from '../components/TrainersTablePanel';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { formStateToCardMood, toBaseballCardPlayer } from '../utils/playerCardAdapter';
@@ -471,6 +482,8 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                 })}
               </div>
             </div>
+
+            <TrainersTablePanel club={humanClub} onMessage={setRosterMessage} />
           </div>
 
           <div className="mx-auto w-full max-w-[300px] space-y-3">
@@ -482,6 +495,26 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
               team={teamColors}
               mood={formStateToCardMood(inspectedPlayer.formState)}
             />
+            <ComicButton
+              size="sm"
+              variant="gold"
+              icon={<Download className="w-4 h-4" />}
+              className="w-full"
+              onClick={() => {
+                void downloadPlayerCardPng(
+                  inspectedPlayer,
+                  teamColors,
+                  `${humanClub.city} ${humanClub.name}`,
+                ).then((res) => {
+                  setRosterMessage(
+                    `Exported 90s Baseball Card: ${res.filename} (${res.format.toUpperCase()})!`,
+                  );
+                  soundEngine.play('card_flip');
+                });
+              }}
+            >
+              Download 90s Card (PNG)
+            </ComicButton>
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
               {isPitcherPosition(inspectedPlayer.position) && inspectedPlayer.pitchArsenal ? (
                 <>

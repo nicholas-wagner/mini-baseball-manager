@@ -1,3 +1,5 @@
+import { getAccessibleStatGrade } from '../../scene/core/performanceBudget';
+import { useUserPreferencesStore } from '../../store/userPreferences';
 import { getStatGrade } from './statGrade';
 
 interface StatBadgeProps {
@@ -7,8 +9,10 @@ interface StatBadgeProps {
 }
 
 export function StatBadge({ label, value, showBar = false }: StatBadgeProps) {
+  const colorblindStatSymbols = useUserPreferencesStore((s) => s.colorblindStatSymbols);
   const clamped = Math.max(0, Math.min(99, Math.round(value)));
   const meta = getStatGrade(clamped);
+  const symbolPrefix = colorblindStatSymbols ? `${getAccessibleStatGrade(clamped).symbol} ` : '';
 
   if (!showBar) {
     return (
@@ -20,6 +24,7 @@ export function StatBadge({ label, value, showBar = false }: StatBadgeProps) {
           className="px-1.5 py-0.5 rounded text-[11px] font-display leading-none border border-[#181B2C]"
           style={{ backgroundColor: meta.bg, color: meta.text }}
         >
+          {symbolPrefix}
           {meta.grade}
         </span>
         <span className="font-mono-tabular text-xs font-bold text-[#181B2C]">{clamped}</span>
@@ -36,6 +41,7 @@ export function StatBadge({ label, value, showBar = false }: StatBadgeProps) {
             className="px-1.5 py-0.5 rounded text-[10px] font-display leading-none border border-[#181B2C]"
             style={{ backgroundColor: meta.bg, color: meta.text }}
           >
+            {symbolPrefix}
             {meta.grade}
           </span>
           <span className="font-mono-tabular font-bold text-[#181B2C] w-5 text-right">

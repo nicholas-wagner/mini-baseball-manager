@@ -57,6 +57,7 @@ import {
   type WinterBallReport,
   type WinterLeagueId,
 } from '../engine/gm/winterBall';
+import { setPlayerPlayThroughStatus } from '../engine/health/healthEngine';
 import {
   athleticTrainerToStaffMember,
   teamDoctorToStaffMember,
@@ -515,4 +516,23 @@ export function runHumanFriendExhibitionDuel(
     leagues: replaceHumanClub(state.leagues, rewardedClub),
   });
   return { played: true, result: duel };
+}
+
+export function setHumanPlayerPlayThrough(
+  playerId: string,
+  playingThrough: boolean,
+): { allowed: boolean; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { allowed: false, reason: 'No active club.' };
+  const target = club.roster.find((p) => p.id === playerId);
+  if (!target) return { allowed: false, reason: 'Player not found.' };
+  const res = setPlayerPlayThroughStatus(target, playingThrough);
+  if (!res.allowed) return { allowed: false, reason: res.reason };
+  const updatedClub: Club = {
+    ...club,
+    roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+  };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updatedClub) });
+  return { allowed: true };
 }
