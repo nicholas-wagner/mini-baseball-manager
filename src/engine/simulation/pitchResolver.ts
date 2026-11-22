@@ -19,6 +19,7 @@ import { getNationalityById } from '../nationalities/pickNationality';
 import type { SeededRng } from '../rng/seededRng';
 import { evaluateVeteranSavvyEdge } from '../rpg/careerExperience';
 import { getFormStatModifiers } from '../rpg/formTracker';
+import { evaluateHeritageCombatBonuses } from '../rpg/heritageTrees';
 import { evaluatePressureAndLuckModifiers } from '../rpg/mentalAndLeverage';
 import {
   evaluatePitchMatchup,
@@ -30,6 +31,7 @@ import {
   fatigueToEndurance,
 } from '../rpg/pitcherEndurance';
 import { evaluatePitcherRoleSituation } from '../rpg/pitcherRoles';
+import { computeSkillTreeCombatBonuses } from '../rpg/skillTrees';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
 import { sampleBattedBallType } from './sabermetrics';
@@ -652,6 +654,10 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const defenderMental = evaluatePressureAndLuckModifiers(ctx.defender, ctx.leverageIndex);
   const batterSavvy = evaluateVeteranSavvyEdge(ctx.batter.careerService.experienceTier, ctx.leverageIndex);
   const pitcherSavvy = evaluateVeteranSavvyEdge(ctx.pitcher.careerService.experienceTier, ctx.leverageIndex);
+  const batterSkills = computeSkillTreeCombatBonuses(ctx.batter);
+  const pitcherSkills = computeSkillTreeCombatBonuses(ctx.pitcher);
+  const batterHeritage = evaluateHeritageCombatBonuses(ctx.batter, ctx.leverageIndex);
+  const pitcherHeritage = evaluateHeritageCombatBonuses(ctx.pitcher, ctx.leverageIndex);
   const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
   const pitcherRoleEval = evaluatePitcherRoleSituation(ctx.pitcher, {
     inning: ctx.inning,
@@ -668,14 +674,19 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     batterForm.contactDelta +
     pitchMatchup.batterContactDelta +
     batterMental.pressureRatingDelta +
-    batterSavvy.composureDelta;
+    batterSavvy.composureDelta +
+    batterSkills.battingContactDelta +
+    batterHeritage.passiveBonus +
+    batterHeritage.clutchBonus;
   const effPower =
     ctx.batter.ratings.power +
     platoon.batterPowerDelta +
     mod.powerMod +
     batterForm.powerDelta +
     pitchMatchup.batterPowerDelta +
-    batterMental.pressureRatingDelta;
+    batterMental.pressureRatingDelta +
+    batterSkills.battingPowerDelta +
+    batterHeritage.clutchBonus;
   const effEye = ctx.batter.ratings.eye + batterSavvy.eyeDelta;
   const effStuff =
     (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 +
@@ -685,6 +696,9 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitcherMental.pressureRatingDelta +
     pitcherSavvy.composureDelta +
     pitcherRoleEval.stuffDelta +
+    pitcherSkills.pitchingStuffDelta +
+    pitcherHeritage.passiveBonus +
+    pitcherHeritage.clutchBonus +
     enduranceFx.breakDrop +
     enduranceFx.mphDrop;
   const effControl =
@@ -695,6 +709,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     pitcherMental.pressureRatingDelta +
     pitcherSavvy.controlDelta +
     pitcherRoleEval.controlDelta +
+    pitcherSkills.pitchingControlDelta +
     enduranceFx.controlDrop;
 
   const luckZoneShift = pitcherMental.luckZoneProbDelta - batterMental.luckZoneProbDelta * 0.5;

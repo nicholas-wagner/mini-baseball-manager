@@ -8,6 +8,7 @@ import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
 import { DesignLabScreen } from './ui/screens/DesignLabScreen';
 import { GameDayScreen } from './ui/screens/GameDayScreen';
 import { RosterLineupScreen } from './ui/screens/RosterLineupScreen';
+import { SkillTreeScreen } from './ui/screens/SkillTreeScreen';
 
 type TabId = 'lab' | 'gameday' | 'roster' | 'skills' | 'economy' | 'trophies';
 
@@ -21,15 +22,9 @@ const NAV_ITEMS: readonly NavItem[] = [
 ];
 
 const UPCOMING_MILESTONES: Record<
-  Exclude<TabId, 'lab' | 'gameday' | 'roster'>,
+  Exclude<TabId, 'lab' | 'gameday' | 'roster' | 'skills'>,
   { title: string; milestone: string; summary: string }
 > = {
-  skills: {
-    title: 'Branching Player & Manager Skill Trees',
-    milestone: 'Milestone 3 (RPG Depth)',
-    summary:
-      'Spend Skill Points earned from games and animated practice drills to unlock Blazing Comet, Ghost Knuckle, Moonshot Bomb-Swing, Sky-High Leap, and Manager Powers.',
-  },
   economy: {
     title: 'Sim-City Ballpark Economy & Upgrades',
     milestone: 'Milestone 5',
@@ -73,6 +68,13 @@ export function App() {
         <RosterLineupScreen onPlayBall={() => setActiveTab('gameday')} />
       ) : (
         <ClubCreatorScreen onCreated={() => setActiveTab('roster')} />
+      );
+    }
+    if (activeTab === 'skills') {
+      return humanClub ? (
+        <SkillTreeScreen />
+      ) : (
+        <ClubCreatorScreen onCreated={() => setActiveTab('skills')} />
       );
     }
 

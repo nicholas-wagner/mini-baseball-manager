@@ -14,6 +14,13 @@ import type { AiArchetype, Club, LeagueTierId } from '../engine/models/club';
 import { createManagerProfile, type ManagerProfile } from '../engine/models/manager';
 import { isPitcherPosition, type Player } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
+import { unlockNextHeritageTier } from '../engine/rpg/heritageTrees';
+import {
+  respecPlayerSkills,
+  SKILL_RESPEC_CASH_FEE,
+  toggleEquippedSpecialPower,
+  unlockSkillNode,
+} from '../engine/rpg/skillTrees';
 import { crossTrainPosition } from '../engine/rpg/specialistsAndPositions';
 import {
   applyTrainingDrill,
@@ -88,6 +95,13 @@ export interface GameStoreState {
     playerId: string,
     request: TrainingDrillRequest,
   ) => { trained: boolean; reason?: string; summary: string };
+  unlockPlayerSkill: (playerId: string, nodeId: string) => { unlocked: boolean; reason?: string };
+  unlockPlayerHeritageTier: (playerId: string) => { unlocked: boolean; reason?: string };
+  togglePlayerSpecialPower: (
+    playerId: string,
+    powerId: string,
+  ) => { changed: boolean; reason?: string };
+  respecPlayerSkillTree: (playerId: string) => { refundedSp: number; reason?: string };
   signFreeAgent: (playerId: string) => { signed: boolean; reason?: string };
   releasePlayer: (playerId: string) => { released: boolean; reason?: string };
   commitCompletedGame: (opponentClubId: string, result: GameSessionResult, isHomeGame: boolean) => PostGameSummary | null;
@@ -354,6 +368,93 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         leagues: updateHumanClubInLeagues(state.leagues, nextClub),
       }));
       return { trained: true, summary: result.summary };
+    },
+
+    unlockPlayerSkill: (playerId, nodeId) => {
+      const club = get().getHumanClub();
+      if (!club) return { unlocked: false, reason: 'No active club found.' };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target) return { unlocked: false, reason: 'Player is not on your roster.' };
+
+      const res = unlockSkillNode(target, nodeId);
+      if (!res.unlocked) return { unlocked: false, reason: res.reason };
+
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+      };
+      set((state) => ({
+        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      }));
+      return { unlocked: true };
+    },
+
+    unlockPlayerHeritageTier: (playerId) => {
+      const club = get().getHumanClub();
+      if (!club) return { unlocked: false, reason: 'No active club found.' };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target) return { unlocked: false, reason: 'Player is not on your roster.' };
+
+      const res = unlockNextHeritageTier(target);
+      if (!res.unlocked) return { unlocked: false, reason: res.reason };
+
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+      };
+      set((state) => ({
+        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      }));
+      return { unlocked: true };
+    },
+
+    togglePlayerSpecialPower: (playerId, powerId) => {
+      const club = get().getHumanClub();
+      if (!club) return { changed: false, reason: 'No active club found.' };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target) return { changed: false, reason: 'Player is not on your roster.' };
+
+      const res = toggleEquippedSpecialPower(target, powerId);
+      if (!res.changed) return { changed: false, reason: res.reason };
+
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+      };
+      set((state) => ({
+        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      }));
+      return { changed: true };
+    },
+
+    respecPlayerSkillTree: (playerId) => {
+      const club = get().getHumanClub();
+      if (!club) return { refundedSp: 0, reason: 'No active club found.' };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target) return { refundedSp: 0, reason: 'Player is not on your roster.' };
+      if (target.unlockedSkillIds.length === 0) {
+        return { refundedSp: 0, reason: 'No skill tree nodes to respec.' };
+      }
+      if (club.economy.cash < SKILL_RESPEC_CASH_FEE) {
+        return {
+          refundedSp: 0,
+          reason: `Need $${SKILL_RESPEC_CASH_FEE} cash to respec.`,
+        };
+      }
+
+      const res = respecPlayerSkills(target);
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+        economy: {
+          ...club.economy,
+          cash: club.economy.cash - SKILL_RESPEC_CASH_FEE,
+        },
+      };
+      set((state) => ({
+        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      }));
+      return { refundedSp: res.refundedSp };
     },
 
     signFreeAgent: (playerId) => {

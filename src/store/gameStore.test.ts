@@ -206,4 +206,56 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
       beforeWeakRec,
     );
   });
+
+  it('unlocks branching skill nodes, unlocks 3-tier Cultural Heritage powers, toggles powers, and respecs (TASK-019, TASK-020)', () => {
+    const store = createGameStore(createSaveRepository());
+    store.getState().startNewCareer({
+      city: 'Sandlot',
+      clubName: 'Comets',
+      mascot: 'Rocket Dog',
+      monogram: 'SC',
+      primaryColor: '#E63946',
+      secondaryColor: '#1D3557',
+      accentColor: '#FFD166',
+      managerName: 'Coach Skip',
+      seed: 1994,
+    });
+
+    const club = store.getState().getHumanClub()!;
+    const target = club.roster.find((p) => p.position !== 'SP' && p.position !== 'RP')!;
+    store.setState((s) => ({
+      leagues: {
+        ...s.leagues,
+        rookie: s.leagues.rookie.map((c) =>
+          c.id === club.id
+            ? {
+                ...c,
+                roster: c.roster.map((p) =>
+                  p.id === target.id ? { ...p, skillPoints: 15 } : p,
+                ),
+              }
+            : c,
+        ),
+      },
+    }));
+
+    expect(store.getState().unlockPlayerSkill(target.id, 'b_pwr_1').unlocked).toBe(true);
+    expect(store.getState().unlockPlayerSkill(target.id, 'b_pwr_2').unlocked).toBe(true);
+    expect(store.getState().unlockPlayerSkill(target.id, 'cap_moonshot_bomb').unlocked).toBe(true);
+    expect(store.getState().unlockPlayerHeritageTier(target.id).unlocked).toBe(true);
+
+    const upgraded = store.getState().getHumanClub()!.roster.find((p) => p.id === target.id)!;
+    expect(upgraded.equippedPowerIds).toContain('moonshot_bomb');
+    expect(upgraded.heritageTierUnlocked).toBe(1);
+
+    expect(store.getState().togglePlayerSpecialPower(target.id, 'moonshot_bomb').changed).toBe(true);
+    expect(
+      store.getState().getHumanClub()!.roster.find((p) => p.id === target.id)!.equippedPowerIds,
+    ).not.toContain('moonshot_bomb');
+
+    const cashBefore = store.getState().getHumanClub()!.economy.cash;
+    const respec = store.getState().respecPlayerSkillTree(target.id);
+    expect(respec.refundedSp).toBe(6);
+    expect(store.getState().getHumanClub()!.economy.cash).toBe(cashBefore - 250);
+  });
 });
