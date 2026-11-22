@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { createToonMaterial } from '../core/toonMaterials';
+import { createClayTexture, createFloodlights, createHorizon } from './parkScenery';
+import { createToonMaterial, getToonGradientMap } from '../core/toonMaterials';
 
 export interface BallparkEnvironment {
   group: THREE.Group;
@@ -13,10 +14,14 @@ function createMowedTurfTexture(): THREE.CanvasTexture {
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    const stripeWidth = 32;
+    const stripeWidth = 128;
     for (let x = 0; x < 512; x += stripeWidth) {
       ctx.fillStyle = (x / stripeWidth) % 2 === 0 ? '#2FB356' : '#279E4B';
       ctx.fillRect(x, 0, stripeWidth, 512);
+    }
+    ctx.fillStyle = 'rgba(241, 247, 176, 0.07)';
+    for (let y = 0; y < 512; y += stripeWidth * 2) {
+      ctx.fillRect(0, y, 512, stripeWidth);
     }
     // Subtle organic grain dots
     ctx.fillStyle = 'rgba(255,255,255,0.04)';
@@ -103,21 +108,22 @@ function createScoreboardTexture(): THREE.CanvasTexture {
 
 export function createMiniBallpark(): BallparkEnvironment {
   const group = new THREE.Group();
-  const texturesToDispose: THREE.Texture[] = [];
 
+  const horizon = createHorizon();
+  group.add(horizon, createFloodlights());
   // Lush mowed turf field
   const turfTex = createMowedTurfTexture();
-  texturesToDispose.push(turfTex);
   const field = new THREE.Mesh(
     new THREE.CircleGeometry(66, 48),
-    new THREE.MeshToonMaterial({ map: turfTex, gradientMap: createToonMaterial(0xffffff).gradientMap }),
+    new THREE.MeshToonMaterial({ map: turfTex, gradientMap: getToonGradientMap() }),
   );
   field.rotation.x = -Math.PI / 2;
   field.receiveShadow = true;
   group.add(field);
 
   // Warm clay infield diamond arc
-  const dirtMat = createToonMaterial(0xd98a4e);
+  const clay = createClayTexture();
+  const dirtMat = new THREE.MeshToonMaterial({ map: clay, gradientMap: getToonGradientMap() });
   const infieldDirt = new THREE.Mesh(new THREE.CircleGeometry(15.2, 32), dirtMat);
   infieldDirt.rotation.x = -Math.PI / 2;
   infieldDirt.position.set(0, 0.015, -10.5);
@@ -125,7 +131,10 @@ export function createMiniBallpark(): BallparkEnvironment {
   group.add(infieldDirt);
 
   // Inner grass cutout so basepaths shine!
-  const innerGrass = new THREE.Mesh(new THREE.PlaneGeometry(11.6, 11.6), createToonMaterial(0x2fb356));
+  const infieldTurf = turfTex.clone();
+  infieldTurf.repeat.set(0.9, 0.9);
+  const innerGrass = new THREE.Mesh(new THREE.PlaneGeometry(11.6, 11.6),
+    new THREE.MeshToonMaterial({ map: infieldTurf, gradientMap: getToonGradientMap() }));
   innerGrass.rotation.x = -Math.PI / 2;
   innerGrass.rotation.z = Math.PI / 4;
   innerGrass.position.set(0, 0.025, -10.0);
@@ -151,7 +160,6 @@ export function createMiniBallpark(): BallparkEnvironment {
   const baseMat = createToonMaterial(0xfbf4e4);
   const baseGeo = new THREE.BoxGeometry(0.72, 0.08, 0.72);
   const basePositions: readonly [number, number][] = [
-    [0, 0],
     [9.8, -9.8],
     [0, -19.6],
     [-9.8, -9.8],
@@ -163,8 +171,41 @@ export function createMiniBallpark(): BallparkEnvironment {
     group.add(base);
   }
 
+  const plateShape = new THREE.Shape();
+  plateShape.moveTo(-0.38, 0.38);
+  plateShape.lineTo(0.38, 0.38);
+  plateShape.lineTo(0.38, 0);
+  plateShape.lineTo(0, -0.38);
+  plateShape.lineTo(-0.38, 0);
+  plateShape.closePath();
+  const plate = new THREE.Mesh(new THREE.ShapeGeometry(plateShape), baseMat);
+  plate.rotation.x = -Math.PI / 2;
+  plate.position.y = 0.05;
+  group.add(plate);
+
   // Crisp white chalk foul lines
   const chalkMat = new THREE.MeshBasicMaterial({ color: 0xfbf4e4 });
+  const boxOutline = new THREE.Shape();
+  boxOutline.moveTo(-0.64, -1.32);
+  boxOutline.lineTo(0.64, -1.32);
+  boxOutline.lineTo(0.64, 1.32);
+  boxOutline.lineTo(-0.64, 1.32);
+  boxOutline.closePath();
+  const inside = new THREE.Path();
+  inside.moveTo(-0.58, -1.26);
+  inside.lineTo(-0.58, 1.26);
+  inside.lineTo(0.58, 1.26);
+  inside.lineTo(0.58, -1.26);
+  inside.closePath();
+  boxOutline.holes.push(inside);
+  const boxGeo = new THREE.ShapeGeometry(boxOutline);
+  for (const x of [-1.18, 1.18]) {
+    const box = new THREE.Mesh(boxGeo, chalkMat);
+    box.rotation.x = -Math.PI / 2;
+    box.position.set(x, 0.04, 0);
+    group.add(box);
+  }
+
   const foulLineGeo = new THREE.PlaneGeometry(0.22, 45);
   const leftFoul = new THREE.Mesh(foulLineGeo, chalkMat);
   leftFoul.rotation.x = -Math.PI / 2;
@@ -180,6 +221,13 @@ export function createMiniBallpark(): BallparkEnvironment {
 
   // Curved iconic green outfield fence + yellow home-run cap rail
   const wallRadius = 40;
+  const track = new THREE.Mesh(
+    new THREE.RingGeometry(wallRadius - 2.2, wallRadius, 48, 1, Math.PI * 0.22, Math.PI * 0.56),
+    dirtMat,
+  );
+  track.rotation.x = -Math.PI / 2;
+  track.position.set(0, 0.025, -3);
+  group.add(track);
   const wallMat = createToonMaterial(0x1f6e43);
   const hrRailMat = createToonMaterial(0xffc300);
   const segments = 18;
@@ -219,7 +267,6 @@ export function createMiniBallpark(): BallparkEnvironment {
   ];
   for (const s of sponsors) {
     const tex = createBillboardTexture(s.title, s.sub, s.bg, s.acc);
-    texturesToDispose.push(tex);
     const board = new THREE.Mesh(
       new THREE.BoxGeometry(9.2, 2.9, 0.4),
       new THREE.MeshBasicMaterial({ map: tex }),
@@ -231,7 +278,6 @@ export function createMiniBallpark(): BallparkEnvironment {
 
   // Towering Center-Field Classic Scoreboard
   const sbTex = createScoreboardTexture();
-  texturesToDispose.push(sbTex);
   const scoreboard = new THREE.Mesh(
     new THREE.BoxGeometry(14, 7, 0.9),
     new THREE.MeshBasicMaterial({ map: sbTex }),
@@ -257,6 +303,30 @@ export function createMiniBallpark(): BallparkEnvironment {
   backstopTrim.position.set(0, 1.5, 6.8);
   group.add(backstopTrim);
 
+  const parkName = createBillboardTexture('SANDLOT PARK', 'ROOKIE SANDLOT LEAGUE', '#214c40', '#ffd166');
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.95),
+    new THREE.MeshBasicMaterial({ map: parkName }));
+  sign.position.set(0, 7.96, 13.34);
+  sign.rotation.y = Math.PI;
+  group.add(sign);
+
+  const bunting = new THREE.Group();
+  for (const [outside, inside, color] of [
+    [0.88, 0.62, 0xe5414b], [0.62, 0.38, 0xfff2d8], [0.38, 0.06, 0x263f60],
+  ] as const) {
+    const band = new THREE.Mesh(
+      new THREE.RingGeometry(inside, outside, 24, 1, Math.PI, Math.PI),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+    );
+    band.scale.set(1.4, 1, 1);
+    bunting.add(band);
+  }
+  for (const x of [-4.3, -1.65, 1.65, 4.3]) {
+    const drape = bunting.clone();
+    drape.position.set(x, 1.35, 6.51);
+    group.add(drape);
+  }
+
   // Backstop net support poles + airy translucent net screen
   const postMat = createToonMaterial(0x2d3448);
   [-5.2, -1.8, 1.8, 5.2].forEach((px) => {
@@ -267,6 +337,19 @@ export function createMiniBallpark(): BallparkEnvironment {
   const topBar = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.16, 0.16), postMat);
   topBar.position.set(0, 6.2, 6.8);
   group.add(topBar);
+
+  const netLines: number[] = [];
+  for (let x = -5.2; x < 5.21; x += 0.45) {
+    netLines.push(x, 1.5, 6.8, x, 6.2, 6.8);
+  }
+  for (let y = 1.5; y < 6.2; y += 0.45) {
+    netLines.push(-5.2, y, 6.8, 5.2, y, 6.8);
+  }
+  const netGeo = new THREE.BufferGeometry();
+  netGeo.setAttribute('position', new THREE.Float32BufferAttribute(netLines, 3));
+  group.add(new THREE.LineSegments(netGeo, new THREE.LineBasicMaterial({
+    color: 0x203c48, transparent: true, opacity: 0.16, depthWrite: false,
+  })));
 
   // Minor-league Wooden Bleachers along 1st, 3rd & Behind Home Plate + Instanced Cheering Mini Crowd!
   const benchMat = createToonMaterial(0xc9884f);
@@ -303,6 +386,29 @@ export function createMiniBallpark(): BallparkEnvironment {
   pressWindow.position.set(0, 5.65, 13.98);
   group.add(pressWindow);
 
+  // Split the press-box glazing into panes. Its roof carries home-team pennants.
+  const mullion = new THREE.BoxGeometry(0.12, 0.95, 0.12);
+  for (const x of [-3.1, -1.55, 0, 1.55, 3.1]) {
+    const bar = new THREE.Mesh(mullion, postMat);
+    bar.position.set(x, 5.65, 13.91);
+    group.add(bar);
+  }
+  const flag = new THREE.Shape();
+  flag.moveTo(0, 0);
+  flag.quadraticCurveTo(0.72, 0.08, 1.8, -0.16);
+  flag.lineTo(0, -0.75);
+  flag.closePath();
+  const pennant = new THREE.ShapeGeometry(flag);
+  for (const x of [-4.8, 4.8]) {
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 2.2, 8), postMat);
+    staff.position.set(x, 8.0, 14.1);
+    group.add(staff);
+    const fabric = new THREE.MeshBasicMaterial({ color: x < 0 ? 0xf24c56 : 0xffcc52, side: THREE.DoubleSide });
+    const banner = new THREE.Mesh(pennant, fabric);
+    banner.position.set(x, 9.05, 14.1);
+    group.add(banner);
+  }
+
   // Cute stylized 90s cartoon trees ringing the park horizon
   const trunkMat = createToonMaterial(0x8d5524);
   const leafMat = createToonMaterial(0x1e8449);
@@ -314,13 +420,19 @@ export function createMiniBallpark(): BallparkEnvironment {
     [-34, -22],
     [34, -22],
   ];
+  const canopyGeo = new THREE.IcosahedronGeometry(1, 1);
+  const leafLight = createToonMaterial(0x439a58);
   for (const [tx, tz] of treePositions) {
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 2.8, 8), trunkMat);
     trunk.position.set(tx, 1.4, tz);
     group.add(trunk);
-    const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.3, 12, 10), leafMat);
-    canopy.position.set(tx, 3.8, tz);
-    group.add(canopy);
+    const canopy = new THREE.Mesh(canopyGeo, leafMat);
+    canopy.scale.set(2.8, 1.9, 2.2);
+    canopy.position.set(tx, 3.5, tz);
+    const crown = new THREE.Mesh(canopyGeo, leafLight);
+    crown.scale.set(2.05, 2.2, 1.9);
+    crown.position.set(tx + 0.76, 4.58, tz + 0.16);
+    group.add(canopy, crown);
   }
 
   for (const side of [-1, 1]) {
@@ -349,22 +461,21 @@ export function createMiniBallpark(): BallparkEnvironment {
     }
   }
 
-  // Instanced cute bobbing chibi spectators (1 draw call for ~88 mini fans!)
-  const fanGeo = new THREE.SphereGeometry(0.42, 10, 8);
+  // Three batches for the whole grandstand. Heads and brims follow each shirt's hop.
+  const fanBall = new THREE.SphereGeometry(1, 12, 8);
   const fanMat = createToonMaterial(0xffffff);
-  const fanMesh = new THREE.InstancedMesh(fanGeo, fanMat, crowdSlots.length);
+  const shirts = new THREE.InstancedMesh(fanBall, fanMat, crowdSlots.length);
+  const heads = new THREE.InstancedMesh(fanBall, fanMat, crowdSlots.length);
+  const caps = new THREE.InstancedMesh(fanBall, fanMat, crowdSlots.length);
   const dummy = new THREE.Object3D();
-  const colorObj = new THREE.Color();
+  const color = new THREE.Color();
+  const skinTones = [0xfad0a8, 0xb77b52, 0xffddbc, 0x925d42, 0xd89a6c];
   crowdSlots.forEach((slot, i) => {
-    dummy.position.set(slot.x, slot.y, slot.z);
-    dummy.updateMatrix();
-    fanMesh.setMatrixAt(i, dummy.matrix);
-    colorObj.setHex(slot.color);
-    fanMesh.setColorAt(i, colorObj);
+    shirts.setColorAt(i, color.setHex(slot.color));
+    heads.setColorAt(i, color.setHex(skinTones[i % skinTones.length]));
+    caps.setColorAt(i, color.setHex(fanColors[(i * 3) % fanColors.length]));
   });
-  fanMesh.instanceMatrix.needsUpdate = true;
-  if (fanMesh.instanceColor) fanMesh.instanceColor.needsUpdate = true;
-  group.add(fanMesh);
+  group.add(shirts, heads, caps);
 
   // Fluffy cartoon 3D clouds drifting overhead
   const cloudMat = createToonMaterial(0xffffff);
@@ -398,12 +509,24 @@ export function createMiniBallpark(): BallparkEnvironment {
     for (let i = 0; i < crowdSlots.length; i += 1) {
       const s = crowdSlots[i];
       const hop = Math.abs(Math.sin(timeSec * bounceSpeed + s.phase)) * bounceAmp;
-      dummy.position.set(s.x, s.y + hop, s.z);
-      dummy.scale.set(1, 1 + hop * 0.45, 1);
+      const y = s.y + hop - 0.23;
+      dummy.position.set(s.x, y, s.z);
+      dummy.scale.set(0.34, 0.36, 0.25);
       dummy.updateMatrix();
-      fanMesh.setMatrixAt(i, dummy.matrix);
+      shirts.setMatrixAt(i, dummy.matrix);
+      dummy.position.y = y + 0.44;
+      dummy.scale.set(0.28, 0.29, 0.27);
+      dummy.updateMatrix();
+      heads.setMatrixAt(i, dummy.matrix);
+      dummy.position.y += 0.19;
+      dummy.position.z -= Math.sign(s.z) * 0.06;
+      dummy.scale.set(0.32, 0.15, 0.33);
+      dummy.updateMatrix();
+      caps.setMatrixAt(i, dummy.matrix);
     }
-    fanMesh.instanceMatrix.needsUpdate = true;
+    shirts.instanceMatrix.needsUpdate = true;
+    heads.instanceMatrix.needsUpdate = true;
+    caps.instanceMatrix.needsUpdate = true;
 
     clouds.forEach((cloud, idx) => {
       cloud.position.x += 0.008 * (idx % 2 === 0 ? 1 : 0.7);
@@ -412,8 +535,20 @@ export function createMiniBallpark(): BallparkEnvironment {
   };
 
   const dispose = () => {
-    texturesToDispose.forEach((t) => t.dispose());
-    fanGeo.dispose();
+    const geometry = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    group.traverse((object) => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
+        geometry.add(object.geometry);
+        for (const material of [object.material].flat()) materials.add(material);
+      }
+      if (object instanceof THREE.InstancedMesh) object.dispose();
+    });
+    geometry.forEach(g => g.dispose());
+    materials.forEach(material => {
+      if ('map' in material && material.map instanceof THREE.Texture) material.map.dispose();
+      material.dispose();
+    });
   };
 
   return { group, update, dispose };

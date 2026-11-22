@@ -30,7 +30,7 @@ const VARIANT_CLASSES: Record<ComicButtonVariant, string> = {
 };
 
 const SIZE_CLASSES: Record<ComicButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-xs min-h-[36px]',
+  sm: 'px-3 py-1.5 text-xs min-h-[44px]',
   md: 'px-4 py-2 text-sm min-h-[44px]',
   lg: 'px-5 py-3 text-base min-h-[50px]',
 };

@@ -6,6 +6,7 @@ import { createSeededRng } from '../../engine/rng/seededRng';
 import type { BaseballCardPlayer } from '../../ui/components/FlipBaseballCard';
 import { createPortraitTraits } from './generatePortrait';
 import type { CardRarity } from './types';
+export { ILLUSTRATED_PLAYER_POOL as INITIAL_SHOWCASE_ROSTER } from './illustratedPlayerPool';
 
 const NICKNAMES = [
   'The Rocket Kid',
@@ -54,90 +55,12 @@ const BIOS = [
   'Practiced bunting off a trampoline until the ball stops on a dime.',
 ] as const;
 
-export const INITIAL_SHOWCASE_ROSTER: readonly BaseballCardPlayer[] = [
-  {
-    id: 'showcase-rico',
-    name: 'Rico Comet',
-    nickname: 'The Rocket Kid',
-    position: 'SP',
-    bats: 'R',
-    throws: 'R',
-    jerseyNumber: 24,
-    nationalityId: 'USA',
-    hometown: 'Sandlot, OH',
-    overall: 92,
-    rarity: 'mvp',
-    level: 8,
-    popularity: 92,
-    traits: createPortraitTraits(1994),
-    specialPowers: ['Blazing Comet', 'Ice Veins'],
-    stats: { contact: 60, power: 68, speed: 74, pitching: 95, fielding: 81 },
-    bio: 'Throws a blazing comet fastball so hot it roasts peanuts behind home plate.',
-  },
-  {
-    id: 'showcase-kiko',
-    name: 'Kiko Tanaka',
-    nickname: 'Ghost Ball',
-    position: 'RP',
-    bats: 'L',
-    throws: 'L',
-    jerseyNumber: 51,
-    nationalityId: 'JPN',
-    hometown: 'Osaka',
-    overall: 88,
-    rarity: 'allstar',
-    level: 6,
-    popularity: 86,
-    traits: createPortraitTraits(5519),
-    specialPowers: ['Ghost Knuckle', 'Tornado Slider'],
-    stats: { contact: 58, power: 52, speed: 76, pitching: 93, fielding: 86 },
-    bio: 'Her southpaw knuckleball dances like a kitsune illusion across the strike zone.',
-  },
-  {
-    id: 'showcase-manny',
-    name: 'Manny Guerrero',
-    nickname: 'Storm Bat',
-    position: 'CF',
-    bats: 'S',
-    throws: 'R',
-    jerseyNumber: 27,
-    nationalityId: 'DOM',
-    hometown: 'San Pedro de Macorís',
-    overall: 90,
-    rarity: 'mvp',
-    level: 7,
-    popularity: 94,
-    traits: createPortraitTraits(2042),
-    specialPowers: ['Bomb-Swing', 'Sky-High Leap'],
-    stats: { contact: 86, power: 95, speed: 88, pitching: 42, fielding: 90 },
-    bio: 'Switch-hitting phenom who launches moonshots from either batter’s box.',
-  },
-  {
-    id: 'showcase-finn',
-    name: 'Finn O’Malley',
-    nickname: 'Lucky Clover',
-    position: 'SS',
-    bats: 'L',
-    throws: 'R',
-    jerseyNumber: 7,
-    nationalityId: 'IRL',
-    hometown: 'Dublin',
-    overall: 80,
-    rarity: 'rookie',
-    level: 4,
-    popularity: 79,
-    traits: createPortraitTraits(8133),
-    specialPowers: ['Ninja Bunt', 'Cannon Arm'],
-    stats: { contact: 84, power: 62, speed: 94, pitching: 48, fielding: 88 },
-    bio: 'Lefty-hitting shortstop who drops fair-line bunts guided by pure shamrock luck.',
-  },
-];
-
 export function generateRandomCardPlayer(
   seed: number,
   forcedNationalityId?: NationalityId,
 ): BaseballCardPlayer {
   const rng = createSeededRng(seed);
+  const look = createSeededRng(seed ^ 0x4c4f4f4b).chance(.25) ? 'female' : 'male';
   const identity = generatePlayerIdentity(rng, forcedNationalityId);
   const position = rng.pick(POSITIONS);
   const bats = rollBatsHand(rng);
@@ -175,7 +98,7 @@ export function generateRandomCardPlayer(
     rarity,
     level: rng.int(1, 10),
     popularity: rng.int(45, 98),
-    traits: createPortraitTraits(seed),
+    traits: createPortraitTraits(seed, look),
     specialPowers: rarity === 'rookie' ? [powerOne] : [powerOne, powerTwo],
     stats: { contact, power, speed, pitching, fielding },
     bio: rng.pick(BIOS),

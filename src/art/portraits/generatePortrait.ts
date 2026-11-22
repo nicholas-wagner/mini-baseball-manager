@@ -1,3 +1,10 @@
+import ballparkPanorama from './illustrations/ballpark.png';
+import { mangaUniform, type CardPose } from './mangaUniform';
+import { CARD_EXPRESSIONS, cardExpression, mangaFace, mangaFringe, visorSpikes } from './mangaFace';
+import { pinkSportsShades } from './faceDetails';
+import type { BatsHand, FieldPosition, ThrowsHand } from '../../engine/handedness/types';
+import { hairband, isLongCut, longHair, templeLocks } from './ponytail';
+import { resolveAthleteAppearance, type AthleteAppearance } from './athleteAppearance';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import type {
   AccessoryStyle,
@@ -5,9 +12,11 @@ import type {
   CapStyle,
   EyeStyle,
   HairStyle,
+  HairAccessory,
   HeadShape,
   MouthStyle,
   PortraitMood,
+  PlayerLook,
   PortraitTeamColors,
   PortraitTraits,
 } from './types';
@@ -81,13 +90,14 @@ const BACKDROPS: readonly BackdropStyle[] = ['starburst', 'stripes', 'halftone',
 
 const INK = '#181B2C';
 
-export function createPortraitTraits(seed: number): PortraitTraits {
+export function createPortraitTraits(seed: number, playerLook?: PlayerLook): AthleteAppearance {
   const rng = createSeededRng(seed);
   const skin = rng.pick(SKIN_TONES);
   const hair = rng.pick(HAIR_PALETTES);
 
-  return {
+  return resolveAthleteAppearance({
     seed,
+    playerLook,
     headShape: rng.pick(HEAD_SHAPES),
     skinTone: skin.base,
     skinShadow: skin.shadow,
@@ -101,88 +111,22 @@ export function createPortraitTraits(seed: number): PortraitTraits {
     mouthStyle: rng.pick(MOUTH_STYLES),
     accessory: rng.pick(ACCESSORIES),
     backdropStyle: rng.pick(BACKDROPS),
-  };
+  });
 }
 
 function renderBackdrop(
   style: BackdropStyle,
-  team: PortraitTeamColors,
   mood: PortraitMood,
-  uid: string,
 ): string {
-  const skyTop = mood === 'fired_up' ? '#FF9F1C' : mood === 'rival_glare' ? '#FF3355' : '#85E4FF';
-  const skyBottom = mood === 'fired_up' ? '#FF3B6B' : mood === 'rival_glare' ? '#4A0A1E' : '#248EFF';
+  // Different crops of the same continuous outfield keep the horizon in perspective.
+  const cameraX: Record<BackdropStyle, number> = {
+    starburst: -30, stripes: -118, halftone: -4, lightning: -93, stadium: -150,
+  };
+  const air = mood === 'rival_glare' ? '#69719F' : mood === 'fired_up' ? '#E59559' : '#F7E4BE';
+  return `<rect x="-16" y="-40" width="232" height="282" fill="#C5D8CD"/>
+  <image href="${ballparkPanorama}" x="${cameraX[style]}" y="-36" width="402" height="268"/>
+  <rect x="-16" y="-40" width="232" height="282" fill="${air}" opacity=".09"/>`;
 
-  let pattern = '';
-  if (style === 'starburst') {
-    const rays: string[] = [];
-    for (let i = 0; i < 14; i += 1) {
-      const a1 = (i * (360 / 14) * Math.PI) / 180;
-      const a2 = ((i * (360 / 14) + 12) * Math.PI) / 180;
-      const x1 = 100 + Math.cos(a1) * 165;
-      const y1 = 108 + Math.sin(a1) * 165;
-      const x2 = 100 + Math.cos(a2) * 165;
-      const y2 = 108 + Math.sin(a2) * 165;
-      rays.push(
-        `<polygon points="100,108 ${x1.toFixed(1)},${y1.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}" fill="${team.accent}" opacity="0.32" />`,
-      );
-    }
-    pattern = rays.join('');
-  } else if (style === 'stripes') {
-    pattern = `
-      <g opacity="0.26" transform="rotate(-20 100 100)">
-        <rect x="-40" y="-30" width="24" height="270" fill="#FFFFFF" />
-        <rect x="16" y="-30" width="24" height="270" fill="${team.accent}" />
-        <rect x="72" y="-30" width="24" height="270" fill="#FFFFFF" />
-        <rect x="128" y="-30" width="24" height="270" fill="${team.accent}" />
-        <rect x="184" y="-30" width="24" height="270" fill="#FFFFFF" />
-      </g>`;
-  } else if (style === 'lightning') {
-    pattern = `
-      <polygon points="30,8 66,8 44,74 72,74 20,162 40,94 14,94" fill="#FFC300" stroke="${INK}" stroke-width="2.5" opacity="0.72" />
-      <polygon points="162,14 192,14 166,80 190,80 138,164 156,98 134,98" fill="#FFFFFF" opacity="0.45" />`;
-  } else if (style === 'stadium') {
-    pattern = `
-      <path d="M0 144 Q100 120 200 144 L200 200 L0 200 Z" fill="#2FB356" stroke="${INK}" stroke-width="3.5" />
-      <path d="M0 156 Q100 134 200 156" fill="none" stroke="#279E4B" stroke-width="8" />
-      <g stroke="${INK}" stroke-width="3">
-        <line x1="28" y1="50" x2="28" y2="140" />
-        <rect x="12" y="28" width="32" height="18" rx="4" fill="#FBF4E4" />
-        <line x1="172" y1="50" x2="172" y2="140" />
-        <rect x="156" y="28" width="32" height="18" rx="4" fill="#FBF4E4" />
-      </g>
-      <circle cx="22" cy="37" r="3.5" fill="#FFD166" />
-      <circle cx="34" cy="37" r="3.5" fill="#FFD166" />
-      <circle cx="166" cy="37" r="3.5" fill="#FFD166" />
-      <circle cx="178" cy="37" r="3.5" fill="#FFD166" />`;
-  } else {
-    pattern = `
-      <pattern id="dots-${uid}" width="12" height="12" patternUnits="userSpaceOnUse">
-        <circle cx="6" cy="6" r="2.6" fill="${INK}" opacity="0.14" />
-      </pattern>
-      <rect width="200" height="200" fill="url(#dots-${uid})" />`;
-  }
-
-  const moodAura =
-    mood === 'fired_up'
-      ? `<path d="M16 196 Q38 118 24 66 Q58 98 76 38 Q100 84 126 36 Q142 96 176 66 Q158 122 184 196 Z" fill="#FFC300" stroke="#FF4D6D" stroke-width="3" opacity="0.65" />`
-      : mood === 'rival_glare'
-        ? `<path d="M10 14 L48 64 L26 66 L58 112" fill="none" stroke="#FFC300" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
-           <path d="M190 14 L152 64 L174 66 L142 112" fill="none" stroke="#FFC300" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />`
-        : '';
-
-  return `
-    <defs>
-      <linearGradient id="bg-${uid}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${skyTop}" />
-        <stop offset="100%" stop-color="${skyBottom}" />
-      </linearGradient>
-    </defs>
-    <rect width="200" height="200" fill="url(#bg-${uid})" />
-    <circle cx="100" cy="104" r="76" fill="#FFFFFF" opacity="0.16" />
-    ${pattern}
-    ${moodAura}
-  `;
 }
 
 export function renderSculptedHeadParts(shape: HeadShape): {
@@ -235,26 +179,20 @@ export function renderSculptedHeadParts(shape: HeadShape): {
   }
 }
 
-export function renderBackHairSvg(style: HairStyle, color: string, highlight: string): string {
+export function renderBackHairSvg(style: HairStyle, color: string, highlight: string, band = '#FFBF54', trim: HairAccessory = 'tie'): string {
+  if (isLongCut(style)) return longHair(style, color, highlight, band, trim);
   switch (style) {
     case 'mullet':
       return `
-        <path d="M46 96 C34 122 34 152 44 170 L64 162 L58 172 L142 172 L136 162 L156 170 C166 152 166 122 154 96 Z" fill="${color}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" />
+        <path d="M46 96 C34 122 34 152 44 170 L59 161 L58 171 Q68 167 76 150 Q99 137 123 150 Q131 166 142 172 L136 162 L156 170 C166 152 166 122 154 96 Z" fill="${color}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" />
         <path d="M46 132 Q54 150 49 164 M154 132 Q146 150 151 164" fill="none" stroke="${highlight}" stroke-width="3.5" stroke-linecap="round" />`;
-    case 'pigtails':
-      return `
-        <path d="M48 98 C24 98 18 132 32 150 C42 142 46 132 52 120 Z" fill="${color}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" />
-        <path d="M152 98 C176 98 182 132 168 150 C158 142 154 132 148 120 Z" fill="${color}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" />
-        <path d="M30 116 Q26 130 33 140 M170 116 Q174 130 167 140" fill="none" stroke="${highlight}" stroke-width="3.5" stroke-linecap="round" />
-        <circle cx="51" cy="100" r="7.5" fill="#FF4D6D" stroke="${INK}" stroke-width="3.5" />
-        <circle cx="149" cy="100" r="7.5" fill="#FF4D6D" stroke="${INK}" stroke-width="3.5" />`;
     case 'afro':
       return `
         <path d="M36 96 C26 70 44 36 72 34 C88 20 112 20 128 34 C156 36 174 70 164 96 C172 118 158 140 142 140 L58 140 C42 140 28 118 36 96 Z" fill="${color}" stroke="${INK}" stroke-width="4.8" stroke-linejoin="round" />
         <path d="M62 46 Q82 34 104 40 M122 44 Q142 50 148 68" fill="none" stroke="${highlight}" stroke-width="4" stroke-linecap="round" opacity="0.75" />`;
     case 'bob':
       return `
-        <path d="M44 82 C38 118 42 148 64 158 L136 158 C158 148 162 118 156 82 Z" fill="${color}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" />`;
+        <path d="M44 82 C38 118 42 148 64 158 Q77 159 81 145 Q101 140 120 145 Q125 156 136 158 C158 148 162 118 156 82 Z" fill="${color}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" />`;
     default:
       return '';
   }
@@ -267,10 +205,22 @@ export function renderFrontHairSvg(
   capStyle: CapStyle,
 ): string {
   if (capStyle === 'forward' || capStyle === 'backwards') {
+    if (isLongCut(style) || style === 'sideSweep' || style === 'bob') {
+      return `<path d="M50 73 Q101 56 151 74 L151 86 L144 101 L141 84 Q126 93 115 92 L120 84 Q98 96 87 96 L93 86 Q74 96 54 99 L59 87 L49 91Z" fill="${color}" stroke="${INK}" stroke-width="3.6" stroke-linejoin="round"/>
+        <path d="M61 89 Q79 85 89 77 M124 84 Q135 82 142 77" fill="none" stroke="${highlight}" stroke-width="2.5" stroke-linecap="round"/>`;
+    }
     if (style === 'spiky90s') {
       return `
         <path d="M51 78 L58 95 L70 81 L84 97 L98 81 L114 96 L128 81 L142 94 L149 78 L146 68 L54 68 Z" fill="${color}" stroke="${INK}" stroke-width="3.8" stroke-linejoin="round" />
         <path d="M64 82 L70 76 L78 84 M110 82 L118 76 L124 84" fill="none" stroke="${highlight}" stroke-width="2.5" stroke-linecap="round" />`;
+    }
+    if (style === 'curlyTop' || style === 'afro') {
+      return `<path d="M48 74 Q101 57 153 76 L151 90 Q147 101 141 91 Q135 99 129 89 Q122 96 117 87 Q110 94 103 86 Q93 95 88 87 Q80 97 74 89 Q64 101 61 90 Q51 99 48 91Z" fill="${color}" stroke="${INK}" stroke-width="3.6"/>
+        <path d="M55 86 q5 -5 9 -2 M73 84 q5 -5 9 -3 M131 85 q5 -5 10 0" fill="none" stroke="${highlight}" stroke-width="2.5"/>`;
+    }
+    if (style === 'flattop' || style === 'pompadour') {
+      return `<path d="M49 75 Q101 66 151 76 L150 98 L143 101 L140 80 Q99 77 60 84 L56 103 L50 100Z" fill="${color}" stroke="${INK}" stroke-width="3.2"/>
+        <path d="M51 90 l9 -5 M141 84 l8 4" stroke="${highlight}" stroke-width="2.7"/>`;
     }
     return `
       <path d="M51 80 C66 93 82 86 95 79 C110 92 130 91 149 80 L147 68 L53 68 Z" fill="${color}" stroke="${INK}" stroke-width="3.8" stroke-linejoin="round" />
@@ -278,6 +228,13 @@ export function renderFrontHairSvg(
   }
 
   switch (style) {
+    case 'waves':
+    case 'pigtails':
+    case 'braid':
+    case 'ponytail':
+      return `<path d="M47 93 Q40 80 46 65 Q52 43 76 40 L71 33 Q90 32 101 39 Q123 33 144 50 Q159 64 153 91 L145 102 L143 82 Q124 88 115 84 L123 77 Q101 88 85 90 L92 80 Q72 93 51 95Z" fill="${color}" stroke="${INK}" stroke-width="4.4" stroke-linejoin="round"/>
+        <path d="M56 67 Q78 42 108 45 Q85 48 67 65Z M112 46 Q137 46 146 67 Q131 54 117 54Z" fill="${highlight}"/>
+        <path d="M57 84 Q85 77 99 64 M123 74 Q134 71 140 64" fill="none" stroke="${highlight}" stroke-width="2.9" stroke-linecap="round"/>`;
     case 'spiky90s':
       return `
         <path d="M48 92 L36 66 L60 70 L66 36 L88 60 L104 28 L120 58 L146 38 L142 68 L164 64 L150 92 C126 76 74 76 48 92 Z" fill="${color}" stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" />
@@ -311,51 +268,22 @@ export function renderFrontHairSvg(
 
 export function renderCapSvg(capStyle: CapStyle, team: PortraitTeamColors): string {
   if (capStyle === 'none') return '';
-
-  if (capStyle === 'visor') {
-    return `
-      <g>
-        <path d="M48 74 Q100 58 152 74 L149 86 Q100 72 51 86 Z" fill="${team.primary}" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
-        <!-- 90s curved brim with classic green underbrim -->
-        <path d="M46 80 Q106 62 166 80 Q124 96 46 80 Z" fill="#1E7A44" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
-        <path d="M46 78 Q106 60 166 78 Q118 89 46 78 Z" fill="${team.secondary}" stroke="${INK}" stroke-width="3.8" stroke-linejoin="round" />
-      </g>`;
-  }
-
-  if (capStyle === 'backwards') {
-    return `
-      <g>
-        <!-- Backwards bill sticking out right -->
-        <path d="M138 69 L180 76 C182 84 174 90 166 90 L136 84 Z" fill="${team.secondary}" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
-        <path d="M142 82 L172 87" stroke="#1E7A44" stroke-width="3.5" stroke-linecap="round" />
-        <!-- 6-panel crown -->
-        <path d="M48 80 C50 26 150 26 152 80 Q100 72 48 80 Z" fill="${team.primary}" stroke="${INK}" stroke-width="4.6" stroke-linejoin="round" />
-        <path d="M100 35 L100 64 M74 41 Q82 58 78 76 M126 41 Q118 58 122 76" fill="none" stroke="${INK}" stroke-width="2" opacity="0.35" />
-        <!-- Snapback cutout + strap -->
-        <path d="M82 77 C82 62 118 62 118 77 Z" fill="#2A1E17" stroke="${INK}" stroke-width="3.5" />
-        <rect x="82" y="72" width="36" height="6" rx="2" fill="${team.accent}" stroke="${INK}" stroke-width="2.5" />
-        <circle cx="100" cy="35" r="5.5" fill="${team.accent}" stroke="${INK}" stroke-width="3" />
-      </g>`;
-  }
-
-  // Classic Forward 90s Pro Ballcap with 6-panel stitching, raised monogram patch & green underbrim!
-  return `
-    <g>
-      <!-- Crown -->
-      <path d="M48 79 C50 24 150 24 152 79 Z" fill="${team.primary}" stroke="${INK}" stroke-width="4.8" stroke-linejoin="round" />
-      <!-- Crown cel highlight & panel seams -->
-      <path d="M62 56 C68 38 84 32 96 32" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.28" />
-      <path d="M74 37 Q70 56 68 74 M126 37 Q130 56 132 74" fill="none" stroke="${INK}" stroke-width="2" opacity="0.3" />
-      <!-- Top squatchee button -->
-      <circle cx="100" cy="32" r="5.5" fill="${team.accent}" stroke="${INK}" stroke-width="3.2" />
-      <!-- Embroidered 3D Team Patch -->
-      <rect x="83" y="42" width="34" height="24" rx="7" fill="${team.accent}" stroke="${INK}" stroke-width="3.5" />
-      <rect x="86" y="45" width="28" height="18" rx="5" fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity="0.65" />
-      <text x="100" y="59" text-anchor="middle" font-family="Bungee, Fredoka, sans-serif" font-size="13" font-weight="900" fill="${INK}">${team.monogram.slice(0, 2)}</text>
-      <!-- Classic 90s Green Underbrim + Curved Top Brim -->
-      <path d="M42 79 Q104 58 170 77 Q122 96 42 79 Z" fill="#1E7A44" stroke="${INK}" stroke-width="4.4" stroke-linejoin="round" />
-      <path d="M42 77 Q104 55 170 75 Q118 88 42 77 Z" fill="${team.secondary}" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
-    </g>`;
+  const reverse = capStyle === 'backwards';
+  const crown = capStyle === 'visor' ? '' : `
+    <path d="M49 75 Q47 61 55 47 Q67 28 99 26 Q131 23 148 50 Q156 64 151 81 Q112 72 85 76Z" fill="${team.primary}" stroke="${INK}" stroke-width="3.1"/>
+    <path d="M100 28 Q73 34 61 53 L57 64 Q72 51 89 47 L83 52 Q104 45 119 45Z" fill="#FFF" opacity=".27"/>
+    <path d="M125 35 Q142 50 140 71 L151 79 Q156 56 141 43Z" fill="${team.secondary}" opacity=".76"/>
+    <path d="M99 28 Q82 43 80 68 M106 28 Q128 40 132 71" fill="none" stroke="${INK}" stroke-width="1.65" opacity=".65"/>
+    <ellipse cx="102" cy="26" rx="5" ry="2.6" fill="${team.secondary}" stroke="${INK}" stroke-width="1.8"/>
+    ${reverse ? '' : `<path d="M78 44 L89 40 L95 48 L84 60 L76 55Z" fill="${team.secondary}" stroke="#FFE9BD" stroke-width="1.5"/><path d="M80 52 l7 -8 -2 6 5 -2 -8 9 2 -6Z" fill="${team.accent}"/>`}`;
+  return `<g stroke-linejoin="round" stroke-linecap="round">
+    ${reverse ? `<path d="M137 63 Q163 63 178 72 Q179 79 160 82 L141 77Z" fill="${team.secondary}" stroke="${INK}" stroke-width="3"/>` : ''}
+    ${crown}
+    <path d="M49 71 Q92 59 152 72 L151 83 Q104 72 49 83Z" fill="${team.primary}" stroke="${INK}" stroke-width="2.8"/>
+    ${reverse ? `<path d="M67 76 Q69 62 91 65 Q99 66 99 73Z" fill="${INK}"/><path d="M68 77 L99 72" stroke="${team.accent}" stroke-width="3"/>` :
+      `<path d="M52 70 Q79 62 107 63 L128 71 Q91 72 54 84 Q28 93 14 89 Q22 81 52 70Z" fill="${team.secondary}" stroke="${INK}" stroke-width="3.2"/>
+       <path d="M18 87 Q47 76 70 72 Q96 67 115 69" fill="none" stroke="#B9DEDF" stroke-width="1.8" opacity=".85"/>`}
+  </g>`;
 }
 
 export function renderDetailedEyesSvg(
@@ -363,15 +291,16 @@ export function renderDetailedEyesSvg(
   irisColor: string,
   mood: PortraitMood,
   blink = false,
+  playerLook?: PlayerLook,
 ): string {
   const angryBrows =
     mood === 'rival_glare' || mood === 'fired_up' || mood === 'determined' || eyeStyle === 'determined';
 
-  const brows = angryBrows
-    ? `<path d="M63 87 L92 95 L90 99 L62 92 Z" fill="${INK}" />
-       <path d="M137 87 L108 95 L110 99 L138 92 Z" fill="${INK}" />`
-    : `<path d="M65 90 Q79 83 91 90" fill="none" stroke="${INK}" stroke-width="4.5" stroke-linecap="round" />
-       <path d="M109 90 Q121 83 135 90" fill="none" stroke="${INK}" stroke-width="4.5" stroke-linecap="round" />`;
+  const feminine = playerLook === 'female';
+  const browPath = angryBrows ? 'M64 88 L90 97 M110 97 L136 88'
+    : feminine ? 'M65 91 Q78 82 91 90 M109 90 Q122 82 135 91'
+      : 'M64 91 L76 86 L91 89 M109 89 L123 86 L136 90';
+  const brows = `<path d="${browPath}" fill="none" stroke="${INK}" stroke-width="${feminine ? 3.1 : 5.2}" stroke-linejoin="round" stroke-linecap="round"/>`;
 
   if (blink) {
     return `
@@ -398,8 +327,8 @@ export function renderDetailedEyesSvg(
       return `<path d="M${cx - 11} ${cy + 2} Q${cx} ${cy - 9} ${cx + 11} ${cy + 2}" fill="none" stroke="${INK}" stroke-width="4.8" stroke-linecap="round" />`;
     }
 
-    const rx = eyeStyle === 'wide' ? 11.5 : 10.5;
-    const ry = eyeStyle === 'chill' ? 8.5 : eyeStyle === 'wide' ? 13 : 11.5;
+    const rx = (eyeStyle === 'wide' ? 11.5 : 10.5) + (feminine ? 1.6 : 0);
+    const ry = (eyeStyle === 'chill' ? 8.5 : eyeStyle === 'wide' ? 13 : 11.5) + (feminine ? 1.8 : -0.5);
 
     const starSparkle =
       eyeStyle === 'starry' || mood === 'fired_up'
@@ -414,10 +343,12 @@ export function renderDetailedEyesSvg(
         <!-- Subtle top lid shadow -->
         <path d="M${cx - rx + 1} ${cy - 3} Q${cx} ${cy - ry + 2} ${cx + rx - 1} ${cy - 3}" fill="#C7D6E8" opacity="0.55" />
         <!-- Colored Iris & Pupil -->
-        <ellipse cx="${cx + 0.8}" cy="${cy + 0.5}" rx="6.6" ry="7.6" fill="${irisColor}" />
+        <ellipse cx="${cx + 0.8}" cy="${cy + 0.5}" rx="${feminine ? 8.3 : 6.6}" ry="${feminine ? 9.4 : 7.6}" fill="${irisColor}" />
         <ellipse cx="${cx + 0.8}" cy="${cy + 0.8}" rx="4.1" ry="4.9" fill="${INK}" />
         <!-- Glossy 90s Catchlights -->
+        <path d="M${cx - 4.5} ${cy + 5.4} Q${cx} ${cy + 9.2} ${cx + 5.3} ${cy + 5.6}" fill="none" stroke="#B3EAED" stroke-width="1.8" opacity=".8"/>
         ${starSparkle}
+        ${playerLook === 'female' ? `<path d="M${cx + (isRight ? rx : -rx)} ${cy - 3} l${isRight ? 5 : -5} -6 l${isRight ? -1 : 1} 7Z" fill="${INK}"/>` : ''}
         <!-- Chunky upper comic lash crease -->
         <path d="M${cx - rx - 1} ${cy - 2} Q${cx} ${cy - ry - 2.5} ${cx + rx + 1} ${cy - 1.5}" fill="none" stroke="${INK}" stroke-width="4.4" stroke-linecap="round" />
       </g>`;
@@ -485,6 +416,8 @@ export function renderDetailedMouthSvg(mouthStyle: MouthStyle, mood: PortraitMoo
 
 export function renderAccessorySvg(accessory: AccessoryStyle, team: PortraitTeamColors): string {
   switch (accessory) {
+    case 'pinkShades':
+      return pinkSportsShades;
     case 'shades90s':
       return `
         <g>
@@ -532,62 +465,72 @@ export function renderAccessorySvg(accessory: AccessoryStyle, team: PortraitTeam
   }
 }
 
+function raisedMask(team: PortraitTeamColors) {
+  const cage = 'M46 64 L49 46 Q68 22 104 21 Q135 20 151 43 L155 62 Q108 83 46 64Z M50 48 Q97 61 151 44 M63 35 Q86 40 110 36 L126 31 M73 30 L69 51 L72 68 M129 31 L134 48 L130 68';
+  return `<g data-gear="raised-mask" stroke-linejoin="round">
+    <path d="M51 81 Q44 27 98 24 Q151 18 152 78 L142 90 Q97 74 54 91Z" fill="${team.primary}" stroke="${INK}" stroke-width="4.5"/>
+    <path d="M53 63 Q105 78 150 60 L150 77 Q99 91 52 79Z" fill="${team.secondary}" stroke="${INK}" stroke-width="3.6"/>
+    <path d="${cage}" fill="none" stroke="${INK}" stroke-width="6.5"/>
+    <path d="${cage}" fill="none" stroke="#C3D5D8" stroke-width="2.6"/>
+    <path d="M82 22 Q101 13 120 20 L119 29 Q99 35 83 31Z" fill="${team.secondary}" stroke="${INK}" stroke-width="3"/>
+    <path d="M91 25 Q102 21 112 23" fill="none" stroke="${team.accent}" stroke-width="2.5"/>
+  </g>`;
+}
+
 export function renderPortraitSvgString(
-  traits: PortraitTraits,
+  input: PortraitTraits,
   team: PortraitTeamColors,
   mood: PortraitMood = 'happy',
+  instanceId = '',
+  catcher = false,
+  player?: { throws: ThrowsHand; bats: BatsHand; jerseyNumber?: number; position?: FieldPosition },
 ): string {
-  const uid = `p${Math.abs(traits.seed)}`;
-  const head = renderSculptedHeadParts(traits.headShape);
-
-  const sweatDrop =
-    mood === 'sweating'
-      ? `<path d="M146 74 C154 88 154 98 146 101 C138 98 138 88 146 74 Z" fill="#4CC3FF" stroke="${INK}" stroke-width="3.2" />
-         <circle cx="144" cy="93" r="2.2" fill="#FFFFFF" />`
-      : '';
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Retro 90s player portrait">
-  ${renderBackdrop(traits.backdropStyle, team, mood, uid)}
-  <!-- Piped 90s Raglan Baseball Jersey & Undershirt -->
-  <path d="M28 204 C34 158 64 148 100 148 C136 148 166 158 172 204 Z" fill="#FBF4E4" stroke="${INK}" stroke-width="4.8" />
-  <path d="M28 204 C33 166 52 154 74 151 L62 204 Z" fill="${team.primary}" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
-  <path d="M172 204 C167 166 148 154 126 151 L138 204 Z" fill="${team.primary}" stroke="${INK}" stroke-width="4.2" stroke-linejoin="round" />
-  <!-- Undershirt V-neck -->
-  <polygon points="81,150 100,177 119,150" fill="${team.secondary}" stroke="${INK}" stroke-width="4" stroke-linejoin="round" />
-  <!-- Jersey center piping & buttons -->
-  <path d="M77 151 L96 180 L96 204 M123 151 L104 180 L104 204" fill="none" stroke="${team.accent}" stroke-width="3" />
-  <circle cx="100" cy="187" r="2.5" fill="${INK}" />
-  <circle cx="100" cy="196" r="2.5" fill="${INK}" />
-  <!-- Neck with cast chin shadow -->
-  <rect x="87" y="136" width="26" height="22" rx="9" fill="${traits.skinTone}" stroke="${INK}" stroke-width="4.2" />
-  <path d="M88 138 Q100 150 112 138 L112 146 Q100 154 88 146 Z" fill="${traits.skinShadow}" />
-  <!-- Back Hair -->
-  ${renderBackHairSvg(traits.hairStyle, traits.hairColor, traits.hairHighlight)}
-  <!-- Sculpted Ears with Inner Tragus Curve -->
-  <g>
-    <circle cx="49" cy="108" r="11.5" fill="${traits.skinTone}" stroke="${INK}" stroke-width="4.4" />
-    <path d="M46 104 Q52 108 47 113" fill="none" stroke="${traits.skinShadow}" stroke-width="3" stroke-linecap="round" />
-    <circle cx="151" cy="108" r="11.5" fill="${traits.skinTone}" stroke="${INK}" stroke-width="4.4" />
-    <path d="M154 104 Q148 108 153 113" fill="none" stroke="${traits.skinShadow}" stroke-width="3" stroke-linecap="round" />
-  </g>
-  <!-- Sculpted Head Base + Cel Shadow + Rim Highlight -->
-  <path d="${head.silhouette}" fill="${traits.skinTone}" stroke="${INK}" stroke-width="4.8" stroke-linejoin="round" />
-  <path d="${head.celShadow}" fill="${traits.skinShadow}" opacity="0.55" />
-  <path d="${head.rimHighlight}" fill="none" stroke="${traits.skinHighlight}" stroke-width="4" stroke-linecap="round" opacity="0.8" />
-  <!-- Cute Cheek Blush -->
-  <ellipse cx="66" cy="119" rx="9.5" ry="5" fill="#FF6B95" opacity="0.42" />
-  <ellipse cx="134" cy="119" rx="9.5" ry="5" fill="#FF6B95" opacity="0.42" />
-  <!-- Sculpted Cartoon Nose & Bridge Highlight -->
-  <path d="M97 110 C105 114 105 120 96 121" fill="${traits.skinShadow}" stroke="${INK}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
-  <circle cx="99" cy="114" r="1.8" fill="${traits.skinHighlight}" />
-  <!-- Layered Eyes & Mouth -->
-  ${renderDetailedEyesSvg(traits.eyeStyle, traits.irisColor, mood)}
-  ${renderDetailedMouthSvg(traits.mouthStyle, mood)}
-  <!-- Sculpted Front Hair & 6-Panel 90s Cap -->
-  ${renderFrontHairSvg(traits.hairStyle, traits.hairColor, traits.hairHighlight, traits.capStyle)}
-  ${renderCapSvg(traits.capStyle, team)}
-  <!-- Accessories & Mood FX -->
-  ${renderAccessorySvg(traits.accessory, team)}
-  ${sweatDrop}
-</svg>`;
+  const traits = resolveAthleteAppearance(input);
+  const rng = createSeededRng(traits.seed ^ 0x4d414e47);
+  const emotion = cardExpression(mood, rng.pick(CARD_EXPRESSIONS));
+  const pitching = player?.position === 'SP' || player?.position === 'RP';
+  const pose: CardPose = catcher ? 'glove' : pitching ? 'windup' : rng.pick(['bat', 'glove', 'rally', 'ready'] as const);
+  const flipped = pose === 'bat' ? player?.bats === 'L' : player?.throws === 'L';
+  const tilt = emotion === 'playful' || emotion === 'dreamy' ? -8 : emotion === 'rival' || emotion === 'intense' ? 5 : -2;
+  const lean = { bat: -13, glove: 7, ready: -4, rally: 8, windup: -3 }[pose];
+  const head = `translate(99 72) rotate(${tilt}) scale(.53 .54) translate(-92 -158)`;
+  const uid = `p${traits.seed}-${instanceId}`;
+  const kit = mangaUniform(traits, team, pose, catcher, uid, flipped, player?.jerseyNumber);
+  const flow = { ponytail: 'translate(153 87) rotate(-23) scale(1.16 1.65) translate(-153 -87)',
+    braid: 'translate(152 84) rotate(-12) scale(1.04 1.64) translate(-152 -84)',
+    pigtails: 'translate(100 90) scale(1.05 1.45) translate(-100 -90)',
+    waves: 'translate(100 79) scale(1.05 1.31) translate(-100 -79)' };
+  const hairFlow = flow[traits.hairStyle as keyof typeof flow] ?? '';
+  const capStyle = catcher ? 'forward' : traits.capStyle;
+  const accessory = traits.accessory === 'handlebarStache' || traits.accessory === 'headband' ||
+    (traits.glasses !== 'none' && (traits.accessory === 'shades90s' || traits.accessory === 'pinkShades')) ? '' : renderAccessorySvg(traits.accessory, team);
+  const lively = emotion === 'playful' || emotion === 'delighted';
+  const printMarks = lively ? `<path d="M41 52 Q45 52 47 44 Q48 52 54 52 Q49 53 47 60 Q46 54 41 52Z M153 39 l2 -5 1 4 5 2 -5 1 -2 5 -1 -5 -4 -1Z" fill="#FFF9D8" stroke="${team.secondary}" stroke-width=".85"/>`
+    : emotion === 'intense' || emotion === 'rival' ? `<path d="M8 47 l46 22 -43 -16Z M9 72 l34 8 -34 -4Z M191 26 l-39 38 36 -31Z M188 103 l-31 5 31 -1Z" fill="${team.secondary}" opacity=".72"/>` : '';
+  const framing: Record<CardPose, string> = {
+    bat: '10 -3 162 202.5', glove: '25 -4 150 187.5', ready: '17 -5 166 207.5',
+    rally: '17 -5 166 207.5', windup: traits.pitchingMotion === 'sidearm' ? '0 -35 200 250' : '8 -14 184 230',
+  };
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${framing[pose]}" role="img" aria-label="Manga baseball card portrait">
+    ${renderBackdrop(traits.backdropStyle, mood)}
+    ${printMarks}
+    <g data-card-pose="${pose}" data-expression="${emotion}" transform="${flipped ? 'translate(200 0) scale(-1 1)' : ''}">
+      <g transform="rotate(${lean} 100 145)" stroke-linejoin="round" stroke-linecap="round">
+        ${kit.far}
+        <g data-part="back-hair" transform="${head}"><g transform="${hairFlow}">${renderBackHairSvg(traits.hairStyle, traits.hairColor, traits.hairHighlight, team.accent, traits.hairAccessory)}</g></g>
+        ${kit.body}
+        <g transform="${head}">
+          ${mangaFace(traits, emotion, uid)}
+          ${traits.hairStyle === 'spiky90s' && (capStyle === 'visor' || capStyle === 'none')
+            ? visorSpikes(traits) : renderFrontHairSvg(traits.hairStyle, traits.hairColor, traits.hairHighlight, capStyle)}
+          ${mangaFringe(traits)}
+          ${templeLocks(traits.hairStyle, traits.hairColor, traits.hairHighlight)}
+          ${traits.hairAccessory === 'headband' ? hairband(team.accent) : ''}
+          ${catcher ? raisedMask(team) : renderCapSvg(capStyle, team)}
+          ${accessory}
+        </g>
+        ${kit.near}
+      </g>
+    </g>
+  </svg>`;
 }

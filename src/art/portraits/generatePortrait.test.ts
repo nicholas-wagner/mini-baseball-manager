@@ -51,3 +51,37 @@ describe('Retro 90s Procedural Portrait Generator', () => {
     expect(sweatSvg).toContain('#4CC3FF');
   });
 });
+
+it.each(['bob', 'mullet'] as const)('keeps the neck in front of the %s at the jersey opening', hairStyle => {
+  const traits = { ...createPortraitTraits(88), hairStyle };
+  const svg = new DOMParser().parseFromString(renderPortraitSvgString(traits, SAMPLE_TEAM_PALETTES[0], 'happy'), 'image/svg+xml');
+  const neck = svg.querySelector('[data-part="neck"]')!;
+  const hair = svg.querySelector('[data-part="back-hair"]')!;
+  expect(hair.compareDocumentPosition(neck) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it('includes both player looks in seeded art and preserves coloring when choosing a look', () => {
+  expect(new Set(Array.from({ length: 48 }, (_, seed) => createPortraitTraits(seed).playerLook))).toEqual(new Set(['male', 'female']));
+  const male = createPortraitTraits(1994, 'male');
+  const female = createPortraitTraits(1994, 'female');
+  expect([male.skinTone, male.hairColor, male.irisColor]).toEqual([female.skinTone, female.hairColor, female.irisColor]);
+  expect(renderPortraitSvgString(male, SAMPLE_TEAM_PALETTES[0], 'happy'))
+    .not.toBe(renderPortraitSvgString(female, SAMPLE_TEAM_PALETTES[0], 'happy'));
+});
+
+it('prints reproducible manga poses and expressions and honors an explicit game mood', () => {
+  const team = SAMPLE_TEAM_PALETTES[0];
+  const poses = new Set();
+  const expressions = new Set();
+  for (let seed = 0; seed < 60; seed++) {
+    const traits = createPortraitTraits(seed);
+    const art = renderPortraitSvgString(traits, team);
+    const panel = new DOMParser().parseFromString(art, 'image/svg+xml').querySelector('[data-card-pose]')!;
+    poses.add(panel.getAttribute('data-card-pose'));
+    expressions.add(panel.getAttribute('data-expression'));
+    expect(renderPortraitSvgString(traits, team)).toBe(art);
+  }
+  expect(poses.size).toBeGreaterThanOrEqual(3);
+  expect(expressions.size).toBeGreaterThanOrEqual(5);
+  expect(renderPortraitSvgString(createPortraitTraits(3), team, 'rival_glare')).toContain('data-expression="rival"');
+});

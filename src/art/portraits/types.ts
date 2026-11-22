@@ -14,6 +14,9 @@ export type HairStyle =
   | 'spiky90s'
   | 'flattop'
   | 'mullet'
+  | 'braid'
+  | 'waves'
+  | 'ponytail'
   | 'pigtails'
   | 'afro'
   | 'pompadour'
@@ -31,6 +34,7 @@ export type MouthStyle = 'bigGrin' | 'smirk' | 'bubblegum' | 'tongueOut' | 'open
 export type AccessoryStyle =
   | 'none'
   | 'shades90s'
+  | 'pinkShades'
   | 'eyeBlack'
   | 'cheekBandage'
   | 'freckles'
@@ -40,7 +44,31 @@ export type AccessoryStyle =
 
 export type BackdropStyle = 'starburst' | 'stripes' | 'halftone' | 'lightning' | 'stadium';
 
+export type PlayerLook = 'male' | 'female';
+
+export type FacialHair = 'none' | 'stubble' | 'chevron' | 'handlebar' | 'goatee' | 'shortBeard' | 'longBeard';
+export type HairAccessory = 'none' | 'tie' | 'headband' | 'scrunchie' | 'ribbon';
+export type Glasses = 'none' | 'round' | 'square';
+export type UniformBottoms = 'pants' | 'shorts' | 'skirt';
+export type SkirtLiner = 'shorts' | 'briefs';
+export type Stature = 'short' | 'medium' | 'tall';
+export type AthleticBuild = 'lean' | 'balanced' | 'power';
+export type JerseyFit = 'standard' | 'AA' | 'A' | 'B' | 'C' | 'D' | 'DD';
+export type PitchingMotion = 'overhand' | 'sidearm' | 'underhand';
+
 export interface PortraitTraits {
+  pitchingMotion?: PitchingMotion;
+  skirtLiner?: SkirtLiner;
+  croppedJersey?: boolean;
+  openCollar?: boolean;
+  jerseyFit?: JerseyFit;
+  bottoms?: UniformBottoms;
+  stature?: Stature;
+  build?: AthleticBuild;
+  facialHair?: FacialHair;
+  hairAccessory?: HairAccessory;
+  glasses?: Glasses;
+  playerLook?: PlayerLook;
   seed: number;
   headShape: HeadShape;
   skinTone: string;

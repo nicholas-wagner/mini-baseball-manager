@@ -7,7 +7,8 @@ import { DesignLabSceneController } from '../../scene/DesignLabSceneController';
 import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
 
 export interface ShowcaseTrigger {
-  nonce: number;
+  nonce?: number;
+  onAccent?: () => void;
   ballStyle: BallVfxStyle | null;
   callout?: { text: string; color: string; y?: number; z?: number };
 }
@@ -94,7 +95,11 @@ export function BallparkCanvas({
 
   useEffect(() => {
     if (!trigger) return;
-    controllerRef.current?.triggerShowcaseAction(trigger.ballStyle, trigger.callout);
+    if (controllerRef.current) {
+      controllerRef.current.triggerShowcaseAction(trigger.ballStyle, trigger.callout, trigger.onAccent);
+    } else {
+      trigger.onAccent?.();
+    }
   }, [trigger]);
 
   useEffect(() => {

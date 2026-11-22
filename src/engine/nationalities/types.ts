@@ -11,7 +11,21 @@ export type NationalityId =
   | 'BRA'
   | 'ARG'
   | 'AUS'
-  | 'IRL';
+  | 'IRL'
+  | 'ITA'
+  | 'NED'
+  | 'TPE'
+  | 'CUB'
+  | 'VEN'
+  | 'CHN'
+  | 'PAN'
+  | 'COL'
+  | 'ISR'
+  | 'CZE'
+  | 'GBR'
+  | 'NCA'
+  | 'RSA'
+  | 'ESP';
 
 export interface HeritageAbilitySpec {
   id: string;

@@ -10,8 +10,7 @@ import {
 } from './heritageTrees';
 
 describe('3-Tier Cultural Heritage Skill Branches (TASK-020)', () => {
-  it('provides a complete 3-tier Myth/Animal progression branch for all 11 global nationalities', () => {
-    expect(NATIONALITIES_CATALOG.length).toBe(11);
+  it('provides a complete 3-tier Myth/Animal progression branch for every national team', () => {
     for (const nation of NATIONALITIES_CATALOG) {
       const branch = getHeritageBranch(nation.id);
       expect(branch.nationalityId).toBe(nation.id);

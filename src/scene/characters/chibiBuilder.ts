@@ -7,7 +7,9 @@ import {
 import { renderMiniPlayerSvgString } from '../../art/playerSvg/renderMiniPlayerSvg';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../../art/portraits/types';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
-import { CLIP_DURATIONS, type CharacterAnimClip } from './animationState';
+import { CLIP_DURATIONS, GLOVE_CONTACT_PHASE, PITCH_RELEASE_PHASE, type CharacterAnimClip } from './animationState';
+
+import { STANDEE_HEIGHT, STANDEE_CENTER } from './standeeDimensions';
 
 export type ChibiRole = MiniPlayerRole;
 
@@ -28,6 +30,7 @@ export interface ChibiPlayerRig {
     timeSec: number,
     moodOverride?: PortraitMood,
     cameraWorldPos?: THREE.Vector3,
+    caughtBall?: boolean,
   ) => void;
   updateAppearance: (options: ChibiRigOptions) => void;
   dispose: () => void;
@@ -89,10 +92,10 @@ export function createChibiPlayerRig(
   const billboardPivot = new THREE.Group();
   root.add(billboardPivot);
 
-  const planeHeight = 2.05;
+  const planeHeight = STANDEE_HEIGHT;
   const planeWidth = planeHeight * (240 / 260);
   const planeGeo = new THREE.PlaneGeometry(planeWidth, planeHeight);
-  planeGeo.translate(0, planeHeight * 0.45, 0);
+  planeGeo.translate(0, planeHeight * STANDEE_CENTER, 0);
 
   // Subtle 2.5D Standee Rim Drop-Edge (tucked cleanly right behind/below the ink outline!)
   const rimBackingMat = new THREE.MeshBasicMaterial({
@@ -130,12 +133,14 @@ export function createChibiPlayerRig(
 
   let lastDrawnKey = '';
   let appearanceNonce = 0;
+  const artKey = (opts: ChibiRigOptions) => JSON.stringify([opts.traits, opts.team]);
+  let appearanceKey = artKey(initial);
 
   const prewarmIdle = (opts: ChibiRigOptions, nonce: number) => {
     const th = opts.throwsHand ?? 'R';
     const bs = opts.batSide ?? 'R';
     for (const facing of ['front', 'back'] as const) {
-      const key = `v4:${nonce}:${opts.traits.seed}:${opts.team.primary}:${opts.jerseyNumber}:${opts.role}:${th}:${bs}:${facing}:idle:default:0`;
+      const key = `v4:${nonce}:${appearanceKey}:${opts.jerseyNumber}:${opts.role}:${th}:${bs}:${facing}:idle:default:0`;
       const pose = evaluateMiniPlayerPose('idle', 0, opts.role);
       getOrDecodeSvgFrame(key, () =>
         renderMiniPlayerSvgString(
@@ -162,6 +167,7 @@ export function createChibiPlayerRig(
     logicalYaw,
     updateAppearance: (options: ChibiRigOptions) => {
       currentOptions = options;
+      appearanceKey = artKey(options);
       appearanceNonce += 1;
       lastDrawnKey = '';
       prewarmIdle(options, appearanceNonce);
@@ -171,6 +177,7 @@ export function createChibiPlayerRig(
       timeSec: number,
       moodOverride?: PortraitMood,
       cameraWorldPos?: THREE.Vector3,
+      caughtBall = false,
     ) => {
       let facing: MiniPlayerFacing = 'front';
       if (cameraWorldPos) {
@@ -191,10 +198,8 @@ export function createChibiPlayerRig(
       groundShadow.scale.setScalar(smoothPose.shadowScale);
 
       const duration = CLIP_DURATIONS[clip];
-      const cycle = ((timeSec % duration) + duration) % duration;
-      const frameIdx = Math.floor((cycle / duration) * FRAME_STEPS) % FRAME_STEPS;
-      const quantizedTime = (frameIdx / FRAME_STEPS) * duration;
-      const quantizedPose = evaluateMiniPlayerPose(clip, quantizedTime, currentOptions.role);
+      const cycle = timeSec % duration;
+      const frameIdx = (Math.floor((cycle / duration) * FRAME_STEPS + 1e-8) + FRAME_STEPS) % FRAME_STEPS;
 
       auraRing.visible = smoothPose.auraIntensity > 0.04;
       if (auraRing.visible) {
@@ -203,37 +208,51 @@ export function createChibiPlayerRig(
         auraRing.scale.setScalar(1 + Math.sin(timeSec * 12) * 0.1 + smoothPose.auraIntensity * 0.24);
       }
 
-      const moodKey = moodOverride ?? 'default';
+      const moodKey = (moodOverride ?? 'default') + (caughtBall ? ':caught' : '');
       const th = currentOptions.throwsHand ?? 'R';
       const bs = currentOptions.batSide ?? 'R';
-      const key = `v4:${appearanceNonce}:${currentOptions.traits.seed}:${currentOptions.team.primary}:${currentOptions.jerseyNumber}:${currentOptions.role}:${th}:${bs}:${facing}:${clip}:${moodKey}:${frameIdx}`;
+      const sequence = `v4:${appearanceNonce}:${appearanceKey}:${currentOptions.jerseyNumber}:${currentOptions.role}:${th}:${bs}:${facing}:${clip}:${moodKey}`;
+      const key = `${sequence}:${frameIdx}`;
 
       if (key === lastDrawnKey) return;
 
-      const readyImg = getOrDecodeSvgFrame(key, () =>
+      let drawnKey = key;
+      const decodeFrame = (idx: number, possession = caughtBall) => getOrDecodeSvgFrame(
+        `${sequence}${possession && !caughtBall ? ':caught' : ''}:${idx}`, () =>
         renderMiniPlayerSvgString(
-          {
-            traits: currentOptions.traits,
-            team: currentOptions.team,
-            jerseyNumber: currentOptions.jerseyNumber,
-            role: currentOptions.role,
-            facing,
-            throwsHand: th,
-            batSide: bs,
-            moodOverride,
-            includeGroundShadow: false,
-          },
-          quantizedPose,
+          { ...currentOptions, facing, moodOverride, caughtBall: possession, includeGroundShadow: false },
+          evaluateMiniPlayerPose(clip, (idx / FRAME_STEPS) * duration, currentOptions.role),
         ),
       );
+      let readyImg = decodeFrame(frameIdx);
+      if (smoothPose.pitchPhase !== undefined && smoothPose.holdingBall) {
+        decodeFrame(PITCH_RELEASE_PHASE * FRAME_STEPS);
+      }
+      // The leather receives the ball on the contact frame, even on the
+      // first replay when the secured version has never been drawn.
+      if (!caughtBall && (clip === 'field_dive' || clip === 'field_high_jump')) {
+        decodeFrame(GLOVE_CONTACT_PHASE[clip] * FRAME_STEPS, true);
+      }
+      // Decode one step ahead while this pose is on screen; the contact
+      // silhouette then appears on the same frame as the ball changes direction.
+      decodeFrame((frameIdx + 1) % FRAME_STEPS);
+
+      // A cold clip can advance before its SVG finishes decoding on mobile.
+      // Draw the latest available pose from this appearance and camera angle.
+      for (let prev = frameIdx - 1; !readyImg && prev >= 0; prev--) {
+        drawnKey = `${sequence}:${prev}`;
+        if (drawnKey === lastDrawnKey) return;
+        const candidate = svgFrameCache.get(drawnKey);
+        if (candidate?.complete && candidate.naturalWidth > 0) readyImg = candidate;
+      }
 
       if (readyImg && ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(readyImg, 0, 0, canvas.width, canvas.height);
         spriteTex.needsUpdate = true;
-        lastDrawnKey = key;
+        lastDrawnKey = drawnKey;
       } else if (!lastDrawnKey && ctx) {
-        const fallbackKey = `v4:${appearanceNonce}:${currentOptions.traits.seed}:${currentOptions.team.primary}:${currentOptions.jerseyNumber}:${currentOptions.role}:${th}:${bs}:${facing}:idle:default:0`;
+        const fallbackKey = `v4:${appearanceNonce}:${appearanceKey}:${currentOptions.jerseyNumber}:${currentOptions.role}:${th}:${bs}:${facing}:idle:default:0`;
         const fallbackImg = svgFrameCache.get(fallbackKey);
         if (fallbackImg && fallbackImg.complete && fallbackImg.naturalWidth > 0) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);

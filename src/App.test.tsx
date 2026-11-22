@@ -26,13 +26,14 @@ describe('Mini Baseball Manager — Milestone 1 Design Lab Integration', () => {
     await user.click(cometBtn);
     expect(cometBtn).toHaveAttribute('aria-pressed', 'true');
 
-    // Roll a weighted random procedural 90s player card + scout an Ireland player
+    // Roll a preview, then replace it with an Australian prospect.
     const beforeCards = screen.getAllByRole('article', { name: /baseball card front/i }).length;
     await user.click(screen.getByRole('button', { name: /roll weighted player/i }));
     const afterCards = screen.getAllByRole('article', { name: /baseball card front/i }).length;
-    expect(afterCards).toBe(beforeCards);
+    expect(afterCards).toBe(beforeCards + 1);
 
-    await user.click(screen.getByRole('button', { name: /aus.*5%/i }));
+    await user.click(screen.getByRole('button', { name: /aus.*3%/i }));
+    expect(screen.getAllByRole('article', { name: /baseball card front/i })).toHaveLength(afterCards);
     expect(screen.getAllByText(/kangaroo bounce/i).length).toBeGreaterThanOrEqual(1);
 
     // Switch opposing batter to Switch Hitter and verify platoon matchup indicator updates

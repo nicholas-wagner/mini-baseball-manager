@@ -6,6 +6,11 @@ interface FlagBadgeProps {
   size?: 'sm' | 'md';
 }
 
+function star(x: number, y: number, radius: number, color: string, rotation = 0) {
+  return <path key={x + ',' + y} transform={`translate(${x} ${y}) rotate(${rotation}) scale(${radius})`}
+    d="M0 -1 .225 -.31 .951 -.31 .364 .118 .588 .809 0 .382 -.588 .809 -.364 .118 -.951 -.31 -.225 -.31Z" fill={color} />;
+}
+
 function renderFlagArt(id: NationalityId) {
   switch (id) {
     case 'USA':
@@ -125,6 +130,145 @@ function renderFlagArt(id: NationalityId) {
           <circle cx="30.5" cy="11" r="1.4" fill="#FFFFFF" />
           <circle cx="25" cy="12.5" r="1.4" fill="#FFFFFF" />
           <circle cx="27.5" cy="18.5" r="1.6" fill="#FFFFFF" />
+        </>
+      );
+    case 'ITA':
+      return (
+        <>
+          <path fill="#009246" d="M0 0h12v24H0z" />
+          <path fill="#fff" d="M12 0h12v24H12z" />
+          <path fill="#ce2b37" d="M24 0h12v24H24z" />
+        </>
+      );
+    case 'NED':
+      return (
+        <>
+          <rect width="36" height="24" fill="#fff" />
+          <path fill="#ae1c28" d="M0 0h36v8H0z" />
+          <path fill="#21468b" d="M0 16h36v8H0z" />
+        </>
+      );
+    case 'TPE': {
+      const blossom = 'M13 8c-1-7 11-7 10 0 7-2 9 7 3 9 1 6-5 8-8 3-4 5-10 3-8-3-6-3-4-10 3-9Z';
+      return (
+        <>
+          <rect width="36" height="24" fill="#fff" />
+          <path d={blossom} fill="#fff" stroke="#183e87" strokeWidth="2.1" />
+          <path d={blossom} fill="none" stroke="#d83347" strokeWidth=".8" transform="translate(1.8 1.2) scale(.9)" />
+          <circle cx="18" cy="10" r="3" fill="#183e87" />
+          {star(18, 10, 2, 'white')}
+          <g fill="none" strokeWidth=".65">
+            <circle cx="15" cy="15" r="1.35" stroke="#267aae" />
+            <circle cx="18" cy="15" r="1.35" stroke="#181b2c" />
+            <circle cx="21" cy="15" r="1.35" stroke="#d83347" />
+            <circle cx="16.5" cy="16.4" r="1.35" stroke="#d29c18" />
+            <circle cx="19.5" cy="16.4" r="1.35" stroke="#25834a" />
+          </g>
+        </>
+      );
+    }
+    case 'CUB':
+      return (
+        <>
+          <rect width="36" height="24" fill="#fff" />
+          <path d="M0 2.4h36M0 12h36M0 21.6h36" stroke="#002a8f" strokeWidth="4.8" />
+          <path d="M0 0l20 12L0 24Z" fill="#cf142b" />
+          {star(6.6, 12, 3.5, 'white')}
+        </>
+      );
+    case 'VEN':
+      return (
+        <>
+          <rect width="36" height="24" fill="#003893" />
+          <path fill="#ffcc00" d="M0 0h36v8H0z" />
+          <path fill="#cf142b" d="M0 16h36v8H0z" />
+          {[[8,14],[10.5,12],[13.3,10.8],[16.4,10.2],[19.6,10.2],[22.7,10.8],[25.5,12],[28,14]].map(([x, y]) => star(x, y, 1.2, 'white'))}
+        </>
+      );
+    case 'CHN':
+      return (
+        <>
+          <rect width="36" height="24" fill="#de2910" />
+          {star(6, 6, 3.6, '#ffde00')}
+          {star(12, 2.4, 1.25, '#ffde00', 23)}
+          {star(14.4, 4.8, 1.25, '#ffde00', 44)}
+          {star(14.4, 8.4, 1.25, '#ffde00', 15)}
+          {star(12, 10.8, 1.25, '#ffde00', 38)}
+        </>
+      );
+    case 'PAN':
+      return (
+        <>
+          <rect width="36" height="24" fill="#fff" />
+          <path fill="#d21034" d="M18 0h18v12H18z" />
+          <path fill="#005293" d="M0 12h18v12H0z" />
+          {star(9, 6, 4, '#005293')}
+          {star(27, 18, 4, '#d21034')}
+        </>
+      );
+    case 'COL':
+      return (
+        <>
+          <rect width="36" height="24" fill="#fcd116" />
+          <path fill="#003893" d="M0 12h36v6H0z" />
+          <path fill="#ce1126" d="M0 18h36v6H0z" />
+        </>
+      );
+    case 'ISR':
+      return (
+        <>
+          <rect width="36" height="24" fill="#fff" />
+          <path d="M0 3h36M0 21h36" stroke="#0038b8" strokeWidth="2.6" />
+          <path d="m18 6 5.2 9h-10.4z m0 12-5.2-9h10.4z" fill="none" stroke="#0038b8" strokeWidth="1.1" />
+        </>
+      );
+    case 'CZE':
+      return (
+        <>
+          <rect width="36" height="24" fill="#fff" />
+          <path d="M0 12h36v12H0z" fill="#d7141a" />
+          <path d="m0 0 18 12L0 24z" fill="#11457e" />
+        </>
+      );
+    case 'GBR':
+      return (
+        <>
+          <rect width="36" height="24" fill="#012169" />
+          <path d="m0 0 36 24m0-24L0 24" stroke="#fff" strokeWidth="5" />
+          <path d="m0 0 17 12m2 0 17 12M36 0 19 10M0 24l17-10" fill="none" stroke="#c8102e" strokeWidth="1.6" />
+          <path d="M18 0v24M0 12h36" stroke="#fff" strokeWidth="8" />
+          <path d="M18 0v24M0 12h36" stroke="#c8102e" strokeWidth="4.6" />
+        </>
+      );
+    case 'NCA':
+      return (
+        <>
+          <rect width="36" height="24" fill="#0067a5" />
+          <path d="M0 8h36v8H0z" fill="#fff" />
+          <circle cx="18" cy="12" r="3.4" fill="none" stroke="#c19d48" strokeWidth=".6" />
+          <path d="m18 9.5 2.6 4.4h-5.2z" fill="#b2daed" stroke="#bc9447" strokeWidth=".55" />
+          <path d="m16 13.5 1.3-1.5.8.6.8-1 1.2 1.9z" fill="#2e8b57" />
+        </>
+      );
+    case 'RSA':
+      return (
+        <>
+          <rect width="36" height="24" fill="#de3831" />
+          <path fill="#002395" d="M0 12h36v12H0z" />
+          <path d="m-2-1 18 13L-2 25m18-13h21" fill="none" stroke="#fff" strokeWidth="8" />
+          <path d="m-2-1 18 13L-2 25m18-13h21" fill="none" stroke="#007749" strokeWidth="5.4" />
+          <path d="m-1 3.1 12.5 8.9L-1 20.9z" fill="#000" stroke="#ffb81c" strokeWidth="1.6" />
+        </>
+      );
+    case 'ESP':
+      return (
+        <>
+          <rect width="36" height="24" fill="#aa151b" />
+          <path fill="#f1bf00" d="M0 6h36v12H0z" />
+          <path d="M8.5 10h5v3.8q-2.5 3-5 0z" fill="#b2252e" />
+          <path d="M9 11h2v1.7H9zm2.2 1.9h1.7v1.5h-1.7z" fill="#efd588" />
+          <path d="m8.8 8.3 1.1.6 1.1-1.2 1.1 1.2 1.2-.6-.5 1.3H9.3z" fill="#a22b2f" />
+          <path d="M7.3 10v4.6m7.5-4.6v4.6" stroke="#f6e5be" strokeWidth="1" />
         </>
       );
     case 'IRL':

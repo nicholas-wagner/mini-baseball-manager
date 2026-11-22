@@ -97,6 +97,8 @@ export const BALL_TRAJECTORY_PRESETS: Record<BallVfxStyle, BallTrajectorySpec> =
 
 export function sampleBallTrajectory(spec: BallTrajectorySpec, progress01: number): Vec3 {
   const t = Math.max(0, Math.min(1, progress01));
+  if (t === 0) return { ...spec.start };
+  if (t === 1) return { ...spec.end };
   let x = spec.start.x + (spec.end.x - spec.start.x) * t;
   const z = spec.start.z + (spec.end.z - spec.start.z) * t;
 

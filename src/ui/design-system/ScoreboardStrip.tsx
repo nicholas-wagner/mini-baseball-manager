@@ -19,7 +19,7 @@ function LedDots({ count, max, activeColor }: { count: number; max: number; acti
       {Array.from({ length: max }, (_, idx) => (
         <span
           key={idx}
-          className="w-2.5 h-2.5 rounded-full border border-[#0B1E16]"
+          className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-[#0B1E16]"
           style={{
             backgroundColor: idx < count ? activeColor : '#0E291E',
             boxShadow: idx < count ? `0 0 6px ${activeColor}` : 'none',
@@ -48,7 +48,7 @@ export function ScoreboardStrip({
     <div
       role="region"
       aria-label="Live Baseball Scoreboard"
-      className="bg-[#1B4332] text-[#FBF4E4] border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] rounded-2xl px-3 py-2 flex flex-wrap items-center justify-between gap-2"
+      className="bg-[#1B4332] text-[#FBF4E4] border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] rounded-2xl px-2 sm:px-3 py-2 flex flex-wrap items-center justify-between gap-2"
     >
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1.5 bg-[#122D21] px-2.5 py-1 rounded-xl border-2 border-[#0B1E16]">
@@ -76,12 +76,12 @@ export function ScoreboardStrip({
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
         <div className="px-2.5 py-1 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] font-mono-tabular text-xs font-bold text-[#FFD166]">
           {half === 'TOP' ? '▲' : '▼'} {inning}
         </div>
 
-        <div className="flex items-center gap-2.5 text-[10px] font-extrabold tracking-wider text-[#B8DEC9]">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 text-[10px] font-extrabold tracking-wider text-[#B8DEC9]">
           <span className="flex items-center gap-1" aria-label={`Balls ${balls}`}>
             B <LedDots count={balls} max={3} activeColor="#2FB356" />
           </span>

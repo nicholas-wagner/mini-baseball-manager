@@ -31,15 +31,15 @@ export function ComicCard({
     >
       {title ? (
         <header
-          className="px-4 py-2.5 border-b-[3px] border-[#181B2C] flex items-center justify-between gap-3"
+          className="px-4 py-2.5 border-b-[3px] border-[#181B2C] flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
           style={{ backgroundColor: headerBg }}
         >
           <div className="min-w-0">
-            <h2 className="font-display text-sm sm:text-base tracking-wide text-[#FBF4E4] truncate">
+            <h2 className="font-display text-sm sm:text-base tracking-wide text-[#FBF4E4] leading-tight">
               {title}
             </h2>
             {subtitle ? (
-              <p className="text-[11px] font-bold text-[#FFD166] truncate">{subtitle}</p>
+              <p className="text-[11px] font-bold text-[#FFD166] mt-1 leading-tight">{subtitle}</p>
             ) : null}
           </div>
           {badge ? <div className="shrink-0">{badge}</div> : null}

@@ -97,7 +97,7 @@ export function AppShell({
             type="button"
             onClick={onToggleMute}
             aria-label={muted ? 'Unmute audio' : 'Mute audio'}
-            className="w-10 h-10 rounded-xl bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] shadow-[2px_2px_0_#181B2C] flex items-center justify-center shrink-0"
+            className="w-11 h-11 rounded-xl bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] shadow-[2px_2px_0_#181B2C] flex items-center justify-center shrink-0"
           >
             {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>

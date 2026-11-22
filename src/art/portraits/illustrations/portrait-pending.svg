@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 250">
+  <rect width="200" height="250" fill="#f5efdf"/>
+  <path d="m100 38 64 64-64 64-64-64z" fill="#e3e7db" stroke="#afbaab" stroke-width="1.5"/>
+  <circle cx="102" cy="105" r="35" fill="#afbaab"/>
+  <g transform="rotate(-25 100 101)" stroke-linecap="round">
+    <circle cx="100" cy="101" r="35" fill="#fffaf0" stroke="#34483f" stroke-width="2"/>
+    <path d="M78 74q25 27 0 54m44-54q-25 27 0 54" fill="none" stroke="#a55950" stroke-width="1.5"/>
+    <path d="m80 81 5-1m-2 8 5-1m-2 9 5-1m-4 9h5m-7 7 5 1m-8 5 5 2m-8 4 4 2
+             m33-47 4 2m-8 5 5 1m-8 6 5 1m-7 7h5m-5 8 5-1m-3 8 5-1m-2 8 5-2"
+          fill="none" stroke="#a55950" stroke-width="2"/>
+  </g>
+  <text x="100" y="190" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12"
+        font-weight="750" letter-spacing="1.4" fill="#34483f">PORTRAIT PENDING</text>
+</svg>

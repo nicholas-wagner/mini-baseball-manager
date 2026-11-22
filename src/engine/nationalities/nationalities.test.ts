@@ -10,26 +10,17 @@ import {
 import type { NationalityId } from './types';
 
 describe('Global Nationalities & Cultural Heritage System', () => {
-  it('defines all 11 requested nationalities summing to exactly 100% weight', () => {
-    expect(NATIONALITIES_CATALOG).toHaveLength(11);
+  it('allocates all 100 percentage points across the WBC field and the two legacy entries', () => {
+    const expected: Record<NationalityId, number> = {
+      USA: 50, CAN: 3, JPN: 3, KOR: 3, MEX: 3, DOM: 3, PRI: 3, AUS: 3,
+      ITA: 3, NED: 3, TPE: 3, CUB: 3, VEN: 3, CHN: 2.5, PAN: 2,
+      COL: 1.5, ISR: 1.5, BRA: 1, CZE: 1, GBR: 1, NCA: 1, RSA: 1,
+      ESP: 0.5, ARG: 0.5, IRL: 0.5,
+    };
+    expect(Object.fromEntries(NATIONALITIES_CATALOG.map((n) => [n.id, n.weight]))).toEqual(expected);
     expect(getTotalNationalityWeight()).toBe(100);
-    expect(getNationalityById('USA').weight).toBe(50);
-
-    const internationalIds: NationalityId[] = [
-      'CAN',
-      'JPN',
-      'KOR',
-      'MEX',
-      'DOM',
-      'PRI',
-      'BRA',
-      'ARG',
-      'AUS',
-      'IRL',
-    ];
-    for (const id of internationalIds) {
-      const spec = getNationalityById(id);
-      expect(spec.weight).toBe(5);
+    for (const spec of NATIONALITIES_CATALOG) {
+      expect(getNationalityById(spec.id)).toBe(spec);
       expect(spec.firstNames.length).toBeGreaterThanOrEqual(6);
       expect(spec.lastNames.length).toBeGreaterThanOrEqual(6);
       expect(spec.hometowns.length).toBeGreaterThanOrEqual(4);
@@ -38,25 +29,15 @@ describe('Global Nationalities & Cultural Heritage System', () => {
     }
   });
 
-  it('matches the 50% USA and 5% international distribution across 10,000 seeded rolls', () => {
+  it('allocates exactly the promised number of half-percent slots to each nationality', () => {
     const rng = createSeededRng(199409);
-    const counts: Record<string, number> = {};
-    const sampleSize = 10_000;
-
-    for (let i = 0; i < sampleSize; i += 1) {
-      const nat = rollNationality(rng);
-      counts[nat.id] = (counts[nat.id] ?? 0) + 1;
+    const counts = new Map<NationalityId, number>();
+    for (let slot = 0; slot < 200; slot++) {
+      const nat = rollNationality({ ...rng, next: () => (slot + 0.5) / 200 });
+      counts.set(nat.id, (counts.get(nat.id) ?? 0) + 1);
     }
-
-    const usaShare = (counts.USA ?? 0) / sampleSize;
-    expect(usaShare).toBeGreaterThan(0.48);
-    expect(usaShare).toBeLessThan(0.52);
-
     for (const spec of NATIONALITIES_CATALOG) {
-      if (spec.id === 'USA') continue;
-      const share = (counts[spec.id] ?? 0) / sampleSize;
-      expect(share).toBeGreaterThan(0.038);
-      expect(share).toBeLessThan(0.062);
+      expect(counts.get(spec.id)).toBe(spec.weight * 2);
     }
   });
 

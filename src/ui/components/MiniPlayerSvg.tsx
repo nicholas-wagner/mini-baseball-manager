@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../../art/portraits/types';
 import {
   evaluateMiniPlayerPose,
@@ -36,6 +36,7 @@ export function MiniPlayerSvg({
   animate = true,
   className = 'w-full h-full',
 }: MiniPlayerSvgProps) {
+  const instanceId = useId();
   const [timeSec, setTimeSec] = useState(0);
 
   useEffect(() => {
@@ -55,10 +56,10 @@ export function MiniPlayerSvg({
   const svgMarkup = useMemo(() => {
     const pose = evaluateMiniPlayerPose(clip, timeSec, role);
     return renderMiniPlayerSvgString(
-      { traits, team, jerseyNumber, role, facing, throwsHand, batSide, moodOverride },
+      { traits, team, jerseyNumber, role, facing, throwsHand, batSide, moodOverride, instanceId },
       pose,
     );
-  }, [traits, team, jerseyNumber, role, facing, throwsHand, batSide, clip, moodOverride, timeSec]);
+  }, [traits, team, jerseyNumber, role, facing, throwsHand, batSide, clip, moodOverride, timeSec, instanceId]);
 
   return (
     <div

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import './designLab.css';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
   Camera,
   Dices,
@@ -6,12 +7,14 @@ import {
   Globe2,
   Music,
   Palette,
+  Play,
   RotateCcw,
   RotateCw,
   Sparkles,
   Zap,
 } from 'lucide-react';
 import { FlagBadge } from '../../art/flags/FlagBadge';
+import { resolveAthleteAppearance } from '../../art/portraits/athleteAppearance';
 import {
   generateRandomCardPlayer,
   INITIAL_SHOWCASE_ROSTER,
@@ -47,6 +50,18 @@ interface ActionPreset {
   callout?: { text: string; color: string; y?: number; z?: number };
 }
 
+const COMET_PITCH: ActionPreset = {
+  id: 'blazing_comet',
+  label: 'Blazing Comet',
+  variant: 'coral',
+  pitcherClip: 'pitch_super',
+  batterClip: 'bat_swing',
+  fielderClip: 'field_ready',
+  ballStyle: 'blazing_comet',
+  sound: 'comet_pitch',
+  recommendedCamera: 'over_shoulder_pitcher',
+};
+
 const ANIMATION_ACTIONS: readonly ActionPreset[] = [
   {
     id: 'idle',
@@ -58,17 +73,7 @@ const ANIMATION_ACTIONS: readonly ActionPreset[] = [
     ballStyle: null,
     sound: 'ui_pop',
   },
-  {
-    id: 'blazing_comet',
-    label: 'Blazing Comet',
-    variant: 'coral',
-    pitcherClip: 'pitch_super',
-    batterClip: 'bat_swing',
-    fielderClip: 'field_ready',
-    ballStyle: 'blazing_comet',
-    sound: 'comet_pitch',
-    recommendedCamera: 'over_shoulder_pitcher',
-  },
+  COMET_PITCH,
   {
     id: 'ghost_knuckle',
     label: 'Ghost Knuckle',
@@ -193,6 +198,7 @@ const SOUNDBOARD_CUES: readonly { cue: SoundCue; label: string }[] = [
 ];
 
 export function DesignLabScreen() {
+  const cardCollection = useRef<HTMLDivElement>(null);
   const [teamIdx, setTeamIdx] = useState(0);
   const [roster, setRoster] = useState<BaseballCardPlayer[]>([...INITIAL_SHOWCASE_ROSTER]);
   const [selectedHeroId, setSelectedHeroId] = useState<string>(INITIAL_SHOWCASE_ROSTER[0].id);
@@ -209,6 +215,8 @@ export function DesignLabScreen() {
 
   const activeTeam = SAMPLE_TEAM_PALETTES[teamIdx];
   const heroPlayer = roster.find((p) => p.id === selectedHeroId) ?? roster[0];
+  const pitchingMotion = resolveAthleteAppearance(heroPlayer.traits).pitchingMotion;
+  const pitcherLabel = { overhand: 'Pitcher', sidearm: 'Sidearm', underhand: 'Underhand' }[pitchingMotion];
   const heroNation = getNationalityById(heroPlayer.nationalityId);
   const heroHeritage = heroNation.heritageAbility;
   const platoon = evaluatePlatoonMatchup(opposingBatterBats, heroPlayer.throws);
@@ -221,7 +229,7 @@ export function DesignLabScreen() {
     setFielderClip(
       heroHeritage.category === 'fielding' ? 'field_high_jump' : 'field_run',
     );
-    soundEngine.play(
+    const playAccent = () => soundEngine.play(
       heroHeritage.category === 'luck'
         ? 'cash_chime'
         : heroHeritage.category === 'fielding'
@@ -231,7 +239,7 @@ export function DesignLabScreen() {
             : 'comet_pitch',
     );
     setTrigger({
-      nonce: Date.now() + Math.random(),
+      onAccent: playAccent,
       ballStyle: heroHeritage.ballStyle,
       callout: {
         text: heroHeritage.calloutText,
@@ -242,22 +250,30 @@ export function DesignLabScreen() {
     });
   };
 
-  const handleAction = (preset: ActionPreset) => {
+  const handleAction = (preset: ActionPreset, keepCamera = false) => {
     setActiveActionId(preset.id);
     setPitcherClip(preset.pitcherClip);
     setBatterClip(preset.batterClip);
     setFielderClip(preset.fielderClip);
-    if (preset.recommendedCamera) {
+    if (preset.recommendedCamera && !keepCamera) {
       setCameraPreset(preset.recommendedCamera);
     }
-    soundEngine.play(preset.sound);
-    if (preset.ballStyle || preset.callout) {
-      setTrigger({
-        nonce: Date.now() + Math.random(),
-        ballStyle: preset.ballStyle,
-        callout: preset.callout,
-      });
-    }
+    const playAccent = () => soundEngine.play(preset.sound);
+    if (!preset.ballStyle) playAccent();
+    setTrigger({
+      ballStyle: preset.ballStyle,
+      callout: preset.callout,
+      onAccent: preset.ballStyle ? playAccent : undefined,
+    });
+  };
+
+  const activePreset = ANIMATION_ACTIONS.find(action => action.id === activeActionId);
+  const heritageSelected = activeActionId === 'heritage_power';
+  const replayLabel = heritageSelected ? heroHeritage.name : activePreset?.label;
+  const canReplay = activeActionId !== 'idle';
+  const throwOrReplay = () => {
+    if (heritageSelected) handleTriggerHeritagePower();
+    else handleAction(canReplay && activePreset ? activePreset : COMET_PITCH, true);
   };
 
   const handleRollNewPlayer = (forcedNationalityId?: NationalityId) => {
@@ -265,9 +281,14 @@ export function DesignLabScreen() {
     const nextSeed = rollSeed + 37;
     setRollSeed(nextSeed);
     const rookie = generateRandomCardPlayer(nextSeed, forcedNationalityId);
-    setRoster((prev) => [rookie, ...prev.slice(0, 3)]);
+    setRoster([rookie, ...INITIAL_SHOWCASE_ROSTER]);
     setSelectedHeroId(rookie.id);
   };
+
+  // Reset after the new first card mounts so native scroll snapping targets the rookie.
+  useLayoutEffect(() => {
+    if (cardCollection.current) cardCollection.current.scrollLeft = 0;
+  }, [roster]);
 
   return (
     <div className="space-y-5">
@@ -289,13 +310,19 @@ export function DesignLabScreen() {
 
       {/* Top Hero Section: Over-the-Shoulder 3D Mini Ballpark */}
       <ComicCard
-        title="Over-the-Shoulder 3D Ballpark & Chibi Lab"
-        subtitle={`On the Mound: ${heroPlayer.name} (#${heroPlayer.jerseyNumber} • ${heroPlayer.throws}HP) vs ${opposingBatterBats === 'S' ? `Switch (${platoon.effectiveBatSide}HB)` : `${opposingBatterBats}HB`} • ${platoon.label}`}
+        title="Sandlot Park"
+        subtitle={`${heroPlayer.name} #${heroPlayer.jerseyNumber} · ${heroPlayer.throws}HP vs ${platoon.effectiveBatSide}HB`}
         headerBg={activeTeam.secondary}
         badge={
-          <span className="px-2.5 py-1 rounded-full bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C] font-display text-[11px]">
-            {heroPlayer.throws}HP VS {platoon.effectiveBatSide}HB
-          </span>
+          <ComicButton
+            size="sm"
+            variant="gold"
+            aria-label={canReplay ? `Replay ${replayLabel}` : 'Throw pitch'}
+            icon={canReplay ? <RotateCcw size={15} /> : <Play size={15} />}
+            onClick={throwOrReplay}
+          >
+            {canReplay ? 'Replay' : 'Throw pitch'}
+          </ComicButton>
         }
       >
         <div className="space-y-4">
@@ -317,8 +344,8 @@ export function DesignLabScreen() {
           {/* Live Platoon Matchup & Batter Handedness Switcher */}
           <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-heading font-bold text-xs uppercase tracking-wider text-[#181B2C]">
-                Opposing Batter:
+              <span className="w-full sm:w-auto font-heading font-bold text-xs uppercase tracking-wider text-[#181B2C]">
+                Opposing batter
               </span>
               {(['R', 'L', 'S'] as const).map((hand) => (
                 <ComicButton
@@ -428,19 +455,14 @@ export function DesignLabScreen() {
 
       {/* Live Articulated Vector SVG Mini-Player Showcase */}
       <ComicCard
-        title="Articulated Mini-Player SVG Rig Inspector"
-        subtitle={`Pure Vector SVG Characters (${heroPlayer.name}) • Live Multi-Angle & Gear Variants`}
-        headerBg={activeTeam.primary}
-        badge={
-          <span className="px-2.5 py-1 rounded-full bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] font-display text-[11px]">
-            100% VECTOR SVG
-          </span>
-        }
+        title="Chibi Rig Inspector"
+        subtitle={`${heroPlayer.name} · ${activeTeam.city} ${activeTeam.name}`}
+        headerBg={activeTeam.secondary}
       >
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
-            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              PITCHER ({heroPlayer.throws}HP) • FRONT
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="rig-study">
+            <span className="rig-caption">
+              {pitcherLabel} · Front
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -451,13 +473,13 @@ export function DesignLabScreen() {
               throwsHand={heroPlayer.throws}
               clip={pitcherClip}
               moodOverride={mood === 'happy' ? undefined : mood}
-              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+              className="rig-figure"
             />
           </div>
 
-          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
-            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              PITCHER ({heroPlayer.throws}HP) • BACK (#{heroPlayer.jerseyNumber})
+          <div className="rig-study">
+            <span className="rig-caption">
+              {pitcherLabel} · Back
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -468,13 +490,13 @@ export function DesignLabScreen() {
               throwsHand={heroPlayer.throws}
               clip={pitcherClip}
               moodOverride={mood === 'happy' ? undefined : mood}
-              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+              className="rig-figure"
             />
           </div>
 
-          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
-            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              BATTER ({heroPlayer.bats === 'S' ? 'SWITCH' : `${heroPlayer.bats}HB`}) • HELMET &amp; BAT
+          <div className="rig-study">
+            <span className="rig-caption">
+              Batter · {heroPlayer.bats === 'S' ? 'Switch' : `${heroPlayer.bats}HB`}
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -485,13 +507,13 @@ export function DesignLabScreen() {
               batSide={heroInspectorBatSide}
               clip={batterClip}
               moodOverride={mood === 'happy' ? undefined : mood}
-              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+              className="rig-figure"
             />
           </div>
 
-          <div className="bg-turf-stripes rounded-2xl border-[2.5px] border-[#181B2C] p-3 flex flex-col items-center">
-            <span className="px-2 py-0.5 rounded-md bg-[#181B2C] text-[#FFD166] font-display text-[10px] tracking-wider">
-              FIELDER ({heroPlayer.throws}H) • LEAP / DIVE
+          <div className="rig-study">
+            <span className="rig-caption">
+              Fielder · {heroPlayer.throws}H
             </span>
             <MiniPlayerSvg
               traits={heroPlayer.traits}
@@ -502,16 +524,23 @@ export function DesignLabScreen() {
               throwsHand={heroPlayer.throws}
               clip={fielderClip}
               moodOverride={mood === 'happy' ? undefined : mood}
-              className="w-36 h-44 sm:w-44 sm:h-52 mt-1"
+              className="rig-figure"
             />
           </div>
+          {(['front', 'back'] as const).map(facing => (
+            <div className="rig-study" key={facing}>
+              <span className="rig-caption">Catcher · {facing === 'front' ? 'Front' : 'Back'}</span>
+              <MiniPlayerSvg traits={heroPlayer.traits} team={activeTeam} jerseyNumber={heroPlayer.jerseyNumber}
+                role="catcher" facing={facing} throwsHand={heroPlayer.throws} clip="field_ready" className="rig-figure" />
+            </div>
+          ))}
         </div>
       </ComicCard>
 
       {/* Retro 90s Baseball Cards & Portrait Studio */}
       <ComicCard
-        title="Retro 90s Baseball Card & Portrait Studio"
-        subtitle="Tap 'Stats' on any card for a 3D flip • Tap 'Send to 3D' to put that chibi player on the mound!"
+        title="Baseball Card Studio"
+        subtitle="Flip a card for stats or send a player to the mound."
         headerBg="#1B4332"
         halftone
         badge={
@@ -526,12 +555,33 @@ export function DesignLabScreen() {
         }
       >
         <div className="space-y-4">
-          {/* Global Scouting & Cultural Heritage Abilities Strip (50% USA • 5% × 10 Nations) */}
+          {/* 3D Flip Baseball Card Grid */}
+          <div
+            ref={cardCollection}
+            role="region"
+            aria-label="Player cards"
+            className="card-collection grid sm:grid-cols-2 xl:grid-cols-4 gap-5 pt-1"
+          >
+            {roster.map((player) => (
+              <FlipBaseballCard
+                key={player.id}
+                player={player}
+                team={activeTeam}
+                mood={mood}
+                selected={player.id === heroPlayer.id}
+                onSelect={() => {
+                  soundEngine.play('ui_pop');
+                  setSelectedHeroId(player.id);
+                }}
+              />
+            ))}
+          </div>
+
           <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl p-3 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 font-heading font-bold text-xs uppercase tracking-wider text-[#181B2C]">
                 <Globe2 className="w-4 h-4 text-[#7209B7]" />
-                Global Scouting &amp; Cultural Heritage Powers (50% USA • 5% × 10 Nations)
+                Global Scouting · {NATIONALITIES_CATALOG.length} national teams
               </span>
               <span className="text-[11px] font-extrabold text-[#7209B7]">
                 Active: ★ {heroHeritage.name} — {heroHeritage.mythOrAnimal}
@@ -545,7 +595,7 @@ export function DesignLabScreen() {
                   title={`${nat.name} (${nat.weight}%) — ${nat.heritageAbility.name} (${nat.heritageAbility.mythOrAnimal})`}
                   onClick={() => handleRollNewPlayer(nat.id)}
                   className={[
-                    'px-2 py-1 rounded-xl border-2 border-[#181B2C] font-heading font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-transform hover:-translate-y-0.5',
+                    'min-h-11 px-2 py-1 rounded-xl border-2 border-[#181B2C] font-heading font-bold text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-transform hover:-translate-y-0.5',
                     heroPlayer.nationalityId === nat.id
                       ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
                       : 'bg-[#FBF4E4] text-[#181B2C]',
@@ -566,7 +616,7 @@ export function DesignLabScreen() {
             <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl p-3 space-y-2">
               <div className="inline-flex items-center gap-1.5 font-heading font-bold text-xs uppercase tracking-wider text-[#181B2C]">
                 <Palette className="w-4 h-4" />
-                Club Uniform Palette (Syncs 2D + 3D)
+                Club uniform
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {SAMPLE_TEAM_PALETTES.map((palette, idx) => (
@@ -578,7 +628,7 @@ export function DesignLabScreen() {
                       setTeamIdx(idx);
                     }}
                     className={[
-                      'px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] font-heading font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer transition-transform',
+                      'min-h-11 px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] font-heading font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer transition-transform',
                       teamIdx === idx
                         ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
                         : 'bg-[#FBF4E4] text-[#181B2C]',
@@ -597,7 +647,7 @@ export function DesignLabScreen() {
             <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl p-3 space-y-2">
               <div className="inline-flex items-center gap-1.5 font-heading font-bold text-xs uppercase tracking-wider text-[#181B2C]">
                 <Flame className="w-4 h-4 text-[#FF4D6D]" />
-                Player Expression / Mood (Syncs 2D + 3D)
+                Field expression
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {MOOD_OPTIONS.map((m) => (
@@ -618,29 +668,12 @@ export function DesignLabScreen() {
             </div>
           </div>
 
-          {/* 3D Flip Baseball Card Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 pt-1">
-            {roster.map((player) => (
-              <FlipBaseballCard
-                key={player.id}
-                player={player}
-                team={activeTeam}
-                mood={mood}
-                selected={player.id === heroPlayer.id}
-                onSelect={() => {
-                  soundEngine.play('ui_pop');
-                  setSelectedHeroId(player.id);
-                }}
-              />
-            ))}
-          </div>
         </div>
       </ComicCard>
 
       {/* Built-in Procedural 90s Synth & Ballpark Organ Soundboard */}
       <ComicCard
-        title="Procedural 90s Synth SFX & Ballpark Organ"
-        subtitle="100% Web Audio API — works offline with zero audio asset downloads"
+        title="Ballpark Soundboard"
         headerBg="#7209B7"
         badge={<Sparkles className="w-5 h-5 text-[#FFC300]" />}
       >

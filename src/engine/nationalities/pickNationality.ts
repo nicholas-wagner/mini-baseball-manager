@@ -12,10 +12,7 @@ export function getTotalNationalityWeight(
   return catalog.reduce((sum, item) => sum + item.weight, 0);
 }
 
-/**
- * Deterministic weighted selector honoring exact nationality percentages
- * (50% USA + 5% each across the 10 international baseball nations).
- */
+/** A single seeded draw selects a nationality by its share of the total weight. */
 export function rollNationality(
   rng: SeededRng,
   catalog: readonly NationalitySpec[] = NATIONALITIES_CATALOG,

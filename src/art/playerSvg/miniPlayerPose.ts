@@ -1,5 +1,5 @@
 import type { PortraitMood } from '../portraits/types';
-import { CLIP_DURATIONS, type CharacterAnimClip } from '../../scene/characters/animationState';
+import { CLIP_DURATIONS, PITCH_RELEASE_PHASE, type CharacterAnimClip } from '../../scene/characters/animationState';
 
 export type MiniPlayerRole = 'pitcher' | 'batter' | 'fielder' | 'catcher';
 export type MiniPlayerFacing = 'front' | 'back';
@@ -10,6 +10,17 @@ export interface JointTransform2D {
   rotDeg: number;
   sx?: number;
   sy?: number;
+}
+
+// Apply the standee SVG's foot-anchored scale and animated root in draw order.
+export function rigPointAtFeet(x: number, y: number, root: JointTransform2D, stature: number) {
+  const rad = root.rotDeg * Math.PI / 180;
+  const dx = (x - 120) * (root.sx ?? 1);
+  const dy = (y - 232) * stature * (root.sy ?? 1);
+  return {
+    x: 120 + root.tx + dx * Math.cos(rad) - dy * Math.sin(rad),
+    y: 232 + root.ty + dx * Math.sin(rad) + dy * Math.cos(rad),
+  };
 }
 
 export interface MiniPlayerRigPose {
@@ -26,6 +37,9 @@ export interface MiniPlayerRigPose {
   auraColor: string;
   sweatVisible: boolean;
   blink: boolean;
+  holdingBall: boolean;
+  pitchPhase?: number;
+  reach?: { out: number; up: number };
   expression: PortraitMood;
   shadowScale: number;
   hopWorldY: number;
@@ -51,7 +65,8 @@ export function evaluateMiniPlayerPose(
   role: MiniPlayerRole = 'pitcher',
 ): MiniPlayerRigPose {
   const duration = CLIP_DURATIONS[clip];
-  const cycle = ((timeSec % duration) + duration) % duration;
+  const remainder = timeSec % duration;
+  const cycle = remainder < 0 ? remainder + duration : remainder;
   const phase = cycle / duration;
   const tau = phase * Math.PI * 2;
   const blink = (timeSec % 3.4) > 3.24;
@@ -70,20 +85,25 @@ export function evaluateMiniPlayerPose(
     auraColor: '#FFC300',
     sweatVisible: false,
     blink,
+    holdingBall: role === 'pitcher',
     expression: 'happy',
     shadowScale: 1,
     hopWorldY: 0,
     tiltWorldZ: 0,
   };
 
-  if (role === 'catcher' && clip === 'field_ready') {
-    const bob = Math.sin(tau) * 2.5;
-    pose.root = { tx: 0, ty: 12 + bob, rotDeg: 0, sx: 1.07, sy: 0.91 };
-    pose.head = { tx: 0, ty: 2 + bob * 0.4, rotDeg: -2 };
-    pose.backLeg = { tx: -5, ty: -6, rotDeg: 24 };
-    pose.frontLeg = { tx: 6, ty: -6, rotDeg: -24 };
-    pose.backArm = { tx: -4, ty: 3, rotDeg: 22 };
-    pose.frontArm = { tx: 4, ty: 3, rotDeg: -18 };
+  if (role === 'catcher' && (clip === 'field_ready' || clip === 'catch_receive')) {
+    // Sink the hips between wide, folded knees. Keep the mask round and
+    // present the pocket toward the plate. On receipt the mitt gives back.
+    const recoil = clip === 'catch_receive' ? Math.sin(phase * Math.PI) : 0;
+    const bob = Math.sin(tau) * 1.1;
+    pose.root = { tx: 0, ty: 13, rotDeg: 0, sx: 1, sy: 0.86 };
+    pose.torso = { tx: 0, ty: 7 + bob, rotDeg: 0 };
+    pose.head = { tx: 1, ty: 11 + bob + 4 * recoil, rotDeg: -3 + 4 * recoil, sy: 1.1 };
+    pose.backLeg = { tx: 10, ty: 6, rotDeg: -24, sy: 0.85 };
+    pose.frontLeg = { tx: -10, ty: 6, rotDeg: 24, sy: 0.85 };
+    pose.backArm = { tx: -6 + 5 * recoil, ty: 3 + 9 * recoil, rotDeg: -18 + 18 * recoil };
+    pose.frontArm = { tx: 8, ty: 12, rotDeg: -16 };
     pose.expression = 'determined';
     return pose;
   }
@@ -125,6 +145,8 @@ export function evaluateMiniPlayerPose(
     case 'pitch_super':
     case 'practice_bullpen': {
       const isSuper = clip === 'pitch_super';
+      pose.holdingBall = role === 'pitcher' && cycle < duration * PITCH_RELEASE_PHASE;
+      if (role === 'pitcher') pose.pitchPhase = phase;
       pose.sweatVisible = clip === 'practice_bullpen';
       pose.auraColor = '#FF4D6D';
       pose.expression = isSuper ? 'fired_up' : 'determined';
@@ -195,7 +217,7 @@ export function evaluateMiniPlayerPose(
         };
         pose.head = { tx: -3 * t, ty: 3 * t, rotDeg: -6 * t };
         pose.frontArm = { tx: 8 * t, ty: -8 * t, rotDeg: -22 * t };
-        pose.batRotDeg = 24 + 24 * t;
+        pose.batRotDeg = 24 - 42 * t - pose.frontArm.rotDeg;
         pose.auraIntensity = isBomb ? t : 0;
       } else if (phase < 0.58) {
         const raw = (phase - 0.32) / 0.26;
@@ -208,8 +230,11 @@ export function evaluateMiniPlayerPose(
           sy: 1 + 0.14 * Math.sin(raw * Math.PI),
         };
         pose.head = { tx: -4 * t, ty: -2 * t, rotDeg: 8 * t };
-        pose.frontArm = { tx: 8 - 46 * t, ty: -8 + 8 * t, rotDeg: -22 + 92 * t };
-        pose.batRotDeg = 48 - 152 * t;
+        pose.frontArm = { tx: 8 + 8 * t, ty: -8 + 6 * t, rotDeg: -22 + 26 * t };
+        // Set the combined shoulder + barrel angle. Contact is halfway
+        // through this beat, when the barrel extends over home plate.
+        const barrel = -18 + 105 * smoothstep(raw * 2) + 48 * smoothstep(raw * 2 - 1);
+        pose.batRotDeg = barrel - pose.frontArm.rotDeg;
         pose.backLeg.rotDeg = -22 * t;
         pose.frontLeg.rotDeg = 24 * t;
         pose.swingSmearOpacity = Math.sin(raw * Math.PI);
@@ -218,8 +243,8 @@ export function evaluateMiniPlayerPose(
       } else {
         const t = smoothstep((phase - 0.58) / 0.42);
         pose.root = { tx: -12 * (1 - t), ty: 0, rotDeg: -14 * (1 - t), sx: 1, sy: 1 };
-        pose.frontArm = { tx: -38 * (1 - t) + 4 * t, ty: -4 * t, rotDeg: 70 * (1 - t) - 10 * t };
-        pose.batRotDeg = -104 * (1 - t) + 24 * t;
+        pose.frontArm = { tx: 16 - 12 * t, ty: -2 - 2 * t, rotDeg: 4 - 14 * t };
+        pose.batRotDeg = 135 - 111 * t - pose.frontArm.rotDeg;
         pose.auraIntensity = isBomb ? 1 - t : 0;
         if (isBomb && t > 0.2) pose.expression = 'happy';
       }
@@ -231,8 +256,8 @@ export function evaluateMiniPlayerPose(
       pose.root = { tx: -5 * t, ty: 10 * t, rotDeg: -6 * t, sx: 1 + 0.07 * t, sy: 1 - 0.08 * t };
       pose.backLeg = { tx: -4 * t, ty: -5 * t, rotDeg: 20 * t };
       pose.frontLeg = { tx: 5 * t, ty: -5 * t, rotDeg: -20 * t };
-      pose.frontArm = { tx: -28 * t, ty: 2 * t, rotDeg: 28 * t };
-      pose.batRotDeg = 24 - 110 * t;
+      pose.frontArm = { tx: 6 * t, ty: 2 * t, rotDeg: 18 * t };
+      pose.batRotDeg = 24 + 66 * t - pose.frontArm.rotDeg;
       pose.auraColor = '#00E5FF';
       pose.auraIntensity = 0.75 * t;
       pose.expression = 'determined';
@@ -270,25 +295,27 @@ export function evaluateMiniPlayerPose(
     case 'field_dive': {
       const arc = Math.sin(phase * Math.PI);
       pose.root = {
-        tx: -30 * arc,
-        ty: -18 * arc,
-        rotDeg: -64 * arc,
+        tx: -48 * arc,
+        ty: -12 * arc,
+        rotDeg: 54 * arc,
         sx: 1 - 0.08 * arc,
-        sy: 1 + 0.14 * arc,
+        sy: 1 - 0.12 * arc,
       };
-      pose.backArm = { tx: -8 * arc, ty: -16 * arc, rotDeg: 112 * arc };
+      pose.reach = { out: 32 * arc, up: 58 * arc };
+      pose.head = { tx: -8 * arc, ty: 4 * arc, rotDeg: -19 * arc };
       pose.frontArm = { tx: 6 * arc, ty: 4 * arc, rotDeg: -34 * arc };
       pose.backLeg.rotDeg = -20 * arc;
       pose.frontLeg.rotDeg = 18 * arc;
       pose.shadowScale = 1 - 0.35 * arc;
       pose.hopWorldY = 0.45 * arc;
       pose.auraColor = '#00E5FF';
-      pose.auraIntensity = 0.65 * arc;
-      pose.expression = 'shocked';
+      pose.auraIntensity = 0;
+      pose.expression = 'determined';
       break;
     }
 
     case 'field_high_jump': {
+      pose.reach = { out: 0, up: 0 };
       pose.auraColor = '#00E5FF';
       if (phase < 0.22) {
         const t = smoothstep(phase / 0.22);
@@ -299,13 +326,13 @@ export function evaluateMiniPlayerPose(
         const air = Math.sin(((phase - 0.22) / 0.78) * Math.PI);
         pose.root = {
           tx: 0,
-          ty: -42 * air,
-          rotDeg: -8 * air,
+          ty: -7 * air,
+          rotDeg: 4 * air,
           sx: 1 - 0.1 * air,
-          sy: 1 + 0.15 * air,
+          sy: 1 + 0.04 * air,
         };
         pose.head.ty = -4 * air;
-        pose.backArm = { tx: -4, ty: -18 * air, rotDeg: 136 * air };
+        pose.reach = { out: 35 * air, up: 74 * air };
         pose.frontArm = { tx: 4, ty: 5 * air, rotDeg: -28 * air };
         pose.backLeg.rotDeg = 22 * air;
         pose.frontLeg.rotDeg = -18 * air;

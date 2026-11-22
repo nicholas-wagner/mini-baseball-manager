@@ -8,6 +8,7 @@ export type CharacterAnimClip =
   | 'bat_swing'
   | 'bat_bunt'
   | 'bat_bomb'
+  | 'catch_receive'
   | 'field_ready'
   | 'field_run'
   | 'field_dive'
@@ -40,6 +41,10 @@ export interface CharacterPose {
   sweatVisible: boolean;
 }
 
+// Release on an exact pose in the standee's 16-frame animation cycle.
+export const PITCH_RELEASE_PHASE = 9 / 16;
+export const GLOVE_CONTACT_PHASE = { field_dive: 8 / 16, field_high_jump: 10 / 16 } as const;
+
 export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   idle: 2.0,
   pitch_windup: 1.35,
@@ -49,6 +54,7 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   bat_bunt: 0.9,
   bat_bomb: 1.55,
   field_ready: 1.6,
+  catch_receive: 0.42,
   field_run: 0.52,
   field_dive: 1.15,
   field_high_jump: 1.2,
@@ -233,6 +239,7 @@ export function evaluateCharacterPose(clip: CharacterAnimClip, timeSec: number):
       break;
     }
 
+    case 'catch_receive':
     case 'field_ready': {
       const hop = Math.abs(Math.sin(tau)) * 0.06;
       pose.bodyOffset.y = -0.08 + hop;

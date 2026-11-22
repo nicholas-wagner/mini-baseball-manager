@@ -1,16 +1,7 @@
 import * as THREE from 'three';
-import { attachComicOutline, createToonMaterial } from '../core/toonMaterials';
-import {
-  BALL_TRAJECTORY_PRESETS,
-  sampleBallTrajectory,
-  type BallTrajectorySpec,
-  type BallVfxStyle,
-} from './ballTrajectory';
-
-interface ActiveBallFlight {
-  spec: BallTrajectorySpec;
-  elapsed: number;
-}
+import { createBallFlightVisual } from './ballFlightVisual';
+import { BALL_TRAJECTORY_PRESETS, type BallTrajectorySpec, type BallVfxStyle } from './ballTrajectory';
+import type { Vec3 } from '../camera/cameraRig';
 
 interface ActiveCallout {
   sprite: THREE.Sprite;
@@ -18,16 +9,17 @@ interface ActiveCallout {
   elapsed: number;
   duration: number;
   startY: number;
+  inCorner: boolean;
 }
 
 export interface BallparkVfxSystem {
   group: THREE.Group;
-  launchBall: (
-    style: BallVfxStyle,
-    calloutOverride?: { text: string; color?: string },
-  ) => { cameraShake: number };
-  spawnComicCallout: (text: string, pos: { x: number; y: number; z: number }, bgColor?: string) => void;
-  update: (dtSec: number) => void;
+  launchBall: (style: BallVfxStyle, callout?: { text: string; color?: string }) => { cameraShake: number };
+  ball: ReturnType<typeof createBallFlightVisual>;
+  impact: (position: Vec3, color: string) => void;
+  clear: () => void;
+  spawnComicCallout: (text: string, pos: Vec3, bgColor?: string, inCorner?: boolean) => void;
+  update: (dtSec: number, camera?: THREE.PerspectiveCamera) => void;
   dispose: () => void;
 }
 
@@ -64,9 +56,9 @@ function createComicCalloutTexture(text: string, bgColor: string): THREE.CanvasT
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 11;
     ctx.strokeStyle = '#181B2C';
-    ctx.strokeText(text, 256, 98);
+    ctx.strokeText(text, 256, 98, 453);
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(text, 256, 98);
+    ctx.fillText(text, 256, 98, 453);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -76,38 +68,37 @@ function createComicCalloutTexture(text: string, bgColor: string): THREE.CanvasT
 export function createBallparkVfxSystem(): BallparkVfxSystem {
   const group = new THREE.Group();
 
-  // Active 3D baseball
-  const ballMat = createToonMaterial(0xfbf4e4);
-  const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 12), ballMat);
-  attachComicOutline(ballMesh, 1.18);
-  ballMesh.visible = false;
-  group.add(ballMesh);
-
-  // Stylized cartoon bead trail (16 glowing trail orbs following behind the ball!)
-  const trailCount = 16;
-  const trailMeshes: THREE.Mesh[] = [];
-  const trailMaterials: THREE.MeshBasicMaterial[] = [];
-  const trailGeo = new THREE.SphereGeometry(0.17, 10, 8);
-  for (let i = 0; i < trailCount; i += 1) {
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffc300,
-      transparent: true,
-      opacity: 0,
-    });
-    const m = new THREE.Mesh(trailGeo, mat);
-    m.visible = false;
-    trailMaterials.push(mat);
-    trailMeshes.push(m);
-    group.add(m);
+  const ball = createBallFlightVisual();
+  const rays: number[] = [];
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * Math.PI * 2;
+    const tip = i % 2 ? 0.53 : 0.72;
+    rays.push(0.2 * Math.cos(angle - 0.14), 0.2 * Math.sin(angle - 0.14), 0,
+      tip * Math.cos(angle), tip * Math.sin(angle), 0,
+      0.2 * Math.cos(angle + 0.14), 0.2 * Math.sin(angle + 0.14), 0);
   }
-
-  let activeFlight: ActiveBallFlight | null = null;
+  const flareGeo = new THREE.BufferGeometry();
+  flareGeo.setAttribute('position', new THREE.Float32BufferAttribute(rays, 3));
+  const flare = new THREE.Mesh(flareGeo, new THREE.MeshBasicMaterial({
+    transparent: true, side: THREE.DoubleSide, depthWrite: false, depthTest: false,
+  }));
+  flare.visible = false;
+  flare.renderOrder = 10;
+  let flareAge = 0;
+  const impact = (pos: Vec3, color: string) => {
+    flare.position.set(pos.x, pos.y, pos.z);
+    flare.material.color.set(color);
+    flare.visible = true;
+    flareAge = 0;
+  };
+  group.add(ball.group, flare);
   const callouts: ActiveCallout[] = [];
 
   const spawnComicCallout = (
     text: string,
     pos: { x: number; y: number; z: number },
     bgColor = '#FFC300',
+    inCorner = false,
   ) => {
     const texture = createComicCalloutTexture(text, bgColor);
     const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
@@ -116,72 +107,36 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     sprite.scale.set(0.01, 0.01, 1);
     sprite.renderOrder = 20;
     group.add(sprite);
-    callouts.push({ sprite, texture, elapsed: 0, duration: 1.35, startY: pos.y });
+    callouts.push({ sprite, texture, elapsed: 0, duration: 1.35, startY: pos.y, inCorner });
   };
 
-  const launchBall = (
-    style: BallVfxStyle,
-    calloutOverride?: { text: string; color?: string },
-  ): { cameraShake: number } => {
+  let immediate: { spec: BallTrajectorySpec; elapsed: number; color?: string } | null = null;
+  const launchBall: BallparkVfxSystem['launchBall'] = (style, override) => {
     const spec = BALL_TRAJECTORY_PRESETS[style];
-    activeFlight = { spec, elapsed: 0 };
-    ballMesh.visible = true;
-
-    trailMaterials.forEach((mat, idx) => {
-      mat.color.set(
-        idx % 2 === 0 ? (calloutOverride?.color ?? spec.trailColor) : spec.secondaryColor,
-      );
-    });
-
-    const calloutPos =
-      style === 'moonshot_hr' || style === 'line_drive' || style === 'ninja_bunt'
-        ? { x: 0, y: 2.6, z: -1.5 }
-        : { x: 0.4, y: 2.6, z: -8.5 };
-    spawnComicCallout(
-      calloutOverride?.text ?? spec.calloutText,
-      calloutPos,
-      calloutOverride?.color ?? spec.trailColor,
-    );
-
+    immediate = { spec, elapsed: 0, color: override?.color };
+    ball.draw(spec, 0, override?.color);
+    const position = { x: spec.start.x, y: 2.6, z: spec.start.z + (spec.start.z < -5 ? 1.3 : -1.5) };
+    spawnComicCallout(override?.text ?? spec.calloutText, position, override?.color ?? spec.trailColor);
     return { cameraShake: spec.cameraShake };
   };
 
-  const update = (dtSec: number) => {
-    if (activeFlight) {
-      activeFlight.elapsed += dtSec;
-      const progress = activeFlight.elapsed / activeFlight.spec.durationSec;
-
-      if (progress >= 1.15) {
-        activeFlight = null;
-        ballMesh.visible = false;
-        trailMeshes.forEach((m) => {
-          m.visible = false;
-        });
-      } else {
-        const clampedP = Math.min(1, progress);
-        const pos = sampleBallTrajectory(activeFlight.spec, clampedP);
-        ballMesh.position.set(pos.x, pos.y, pos.z);
-        ballMesh.rotation.x += dtSec * 18;
-        ballMesh.rotation.z += dtSec * 12;
-
-        // Update trailing energy beads
-        for (let i = 0; i < trailCount; i += 1) {
-          const lag = (i + 1) * 0.028;
-          const sampleT = clampedP - lag;
-          const mesh = trailMeshes[i];
-          const mat = trailMaterials[i];
-          if (sampleT < 0 || progress > 1) {
-            mesh.visible = false;
-          } else {
-            mesh.visible = true;
-            const tp = sampleBallTrajectory(activeFlight.spec, sampleT);
-            mesh.position.set(tp.x, tp.y, tp.z);
-            const fade = 1 - i / trailCount;
-            mesh.scale.setScalar(0.35 + fade * 0.95);
-            mat.opacity = fade * 0.78;
-          }
-        }
+  const update = (dtSec: number, camera?: THREE.PerspectiveCamera) => {
+    if (immediate) {
+      immediate.elapsed += dtSec;
+      const progress = immediate.elapsed / immediate.spec.durationSec;
+      if (progress < 1.15) ball.draw(immediate.spec, Math.min(1, progress), immediate.color);
+      else {
+        immediate = null;
+        ball.group.visible = false;
       }
+    }
+    if (flare.visible) {
+      flareAge += dtSec;
+      const t = flareAge / 0.24;
+      if (camera) flare.quaternion.copy(camera.quaternion);
+      flare.scale.setScalar(0.45 + t);
+      flare.material.opacity = Math.max(0, 1 - t);
+      flare.visible = t < 1;
     }
 
     for (let i = callouts.length - 1; i >= 0; i -= 1) {
@@ -196,21 +151,40 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
       } else {
         // Elastic comic pop-in + gentle upward drift
         const pop = t < 0.18 ? (t / 0.18) * 1.18 : 1.18 - Math.min(0.18, (t - 0.18) * 0.9);
-        c.sprite.scale.set(4.1 * pop, 1.55 * pop, 1);
-        c.sprite.position.y = c.startY + t * 1.35;
+        if (c.inCorner && camera) {
+          // Keep the play name inside the frame and clear of the pitch lane.
+          const depth = 3;
+          const height = 2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+          const width = height * camera.aspect;
+          const labelWidth = Math.min(width * 0.36, height * 0.52);
+          c.sprite.scale.set(labelWidth * pop, labelWidth * pop * 0.375, 1);
+          c.sprite.position.set(width / 2 - labelWidth * 0.63, height / 2 - labelWidth * 0.26, -depth)
+            .applyQuaternion(camera.quaternion).add(camera.position);
+        } else {
+          c.sprite.scale.set(4.1 * pop, 1.55 * pop, 1);
+          c.sprite.position.y = c.startY + t * 1.35;
+        }
         c.sprite.material.opacity = t > 0.72 ? (1 - t) / 0.28 : 1;
       }
     }
   };
 
-  const dispose = () => {
-    trailGeo.dispose();
-    trailMaterials.forEach((m) => m.dispose());
-    callouts.forEach((c) => {
+  const clear = () => {
+    immediate = null;
+    ball.group.visible = false;
+    flare.visible = false;
+    for (const c of callouts.splice(0)) {
+      group.remove(c.sprite);
       c.sprite.material.dispose();
       c.texture.dispose();
-    });
+    }
   };
 
-  return { group, launchBall, spawnComicCallout, update, dispose };
+  const dispose = () => {
+    clear();
+    ball.dispose();
+    flareGeo.dispose();
+    flare.material.dispose();
+  };
+  return { group, ball, launchBall, impact, clear, spawnComicCallout, update, dispose };
 }
