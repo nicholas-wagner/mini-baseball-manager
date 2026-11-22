@@ -16,6 +16,7 @@ import {
   evaluatePositionAssignment,
   getEligiblePositions,
 } from '../../engine/rpg/specialistsAndPositions';
+import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises';
 import { useGameStore } from '../../store/gameStore';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
 import { SaveSlotsModal } from '../components/SaveSlotsModal';
@@ -65,6 +66,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const autoOptimizeHumanLineup = useGameStore((s) => s.autoOptimizeHumanLineup);
   const swapRotationOrder = useGameStore((s) => s.swapRotationOrder);
   const crossTrainPlayerPosition = useGameStore((s) => s.crossTrainPlayerPosition);
+  const runCompromiseTrainingDrill = useGameStore((s) => s.runCompromiseTrainingDrill);
   const signFreeAgent = useGameStore((s) => s.signFreeAgent);
   const releasePlayer = useGameStore((s) => s.releasePlayer);
 
@@ -142,6 +144,16 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
       );
     } else {
       setRosterMessage(res.reason ?? 'Unable to cross-train that position.');
+    }
+  };
+
+  const handleCompromiseDrill = (request: TrainingDrillRequest) => {
+    const res = runCompromiseTrainingDrill(inspectedPlayer.id, request);
+    if (res.trained) {
+      soundEngine.play('level_up');
+      setRosterMessage(`${inspectedPlayer.name}: ${res.summary}`);
+    } else {
+      setRosterMessage(res.reason ?? 'Unable to run training drill.');
     }
   };
 
@@ -514,6 +526,84 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                     </ComicButton>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
+                <span>Compromise Training Lab</span>
+                <span className="text-[#4A5068]">Fatigue {inspectedPlayer.fatigue}/100</span>
+              </div>
+              <div className="text-[10px] font-bold text-[#4A5068]">
+                Every drill trades one edge for another inside player stat caps.
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {isPitcherPosition(inspectedPlayer.position) && inspectedPlayer.pitchArsenal ? (
+                  <>
+                    <ComicButton
+                      size="sm"
+                      variant="sky"
+                      onClick={() =>
+                        handleCompromiseDrill({
+                          drillId: 'bullpen_pitch_lab_polish',
+                          targetPitch: inspectedPlayer.pitchArsenal!.weakestPitch,
+                        })
+                      }
+                    >
+                      Pitch Lab (+{PITCH_TYPE_SHORT_LABELS[inspectedPlayer.pitchArsenal.weakestPitch]} / -Rust)
+                    </ComicButton>
+                    <ComicButton
+                      size="sm"
+                      variant="cream"
+                      onClick={() => handleCompromiseDrill({ drillId: 'velocity_conditioning' })}
+                    >
+                      Velo Drill (+VEL / -CTL)
+                    </ComicButton>
+                    <ComicButton
+                      size="sm"
+                      variant="cream"
+                      onClick={() => handleCompromiseDrill({ drillId: 'command_pinpoint' })}
+                    >
+                      Control Drill (+CTL / -VEL)
+                    </ComicButton>
+                  </>
+                ) : (
+                  <>
+                    <ComicButton
+                      size="sm"
+                      variant="sky"
+                      onClick={() =>
+                        handleCompromiseDrill({
+                          drillId: 'batter_pitch_recognition',
+                          targetPitch: inspectedPlayer.batterPitchProfile.weakPitch,
+                        })
+                      }
+                    >
+                      Pitch Timing (+{PITCH_TYPE_SHORT_LABELS[inspectedPlayer.batterPitchProfile.weakPitch]} / -Drift)
+                    </ComicButton>
+                    <ComicButton
+                      size="sm"
+                      variant="cream"
+                      onClick={() => handleCompromiseDrill({ drillId: 'power_launch_cage' })}
+                    >
+                      Power Cage (+PWR / -CON)
+                    </ComicButton>
+                    <ComicButton
+                      size="sm"
+                      variant="cream"
+                      onClick={() => handleCompromiseDrill({ drillId: 'contact_choke_up' })}
+                    >
+                      Contact Cage (+CON / -PWR)
+                    </ComicButton>
+                    <ComicButton
+                      size="sm"
+                      variant="cream"
+                      onClick={() => handleCompromiseDrill({ drillId: 'speed_sprint_track' })}
+                    >
+                      Speed Track (+SPD / -PWR)
+                    </ComicButton>
+                  </>
+                )}
               </div>
             </div>
           </div>

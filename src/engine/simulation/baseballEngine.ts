@@ -3,6 +3,15 @@ import type { PlayEvent, TacticalCall } from '../models/playEvent';
 import { createEmptySeasonStats, type PitchType, type PlayerSeasonStats } from '../models/player';
 import { createSeededRng } from '../rng/seededRng';
 import {
+  canTriggerSpecialAbility,
+  cloneAbilityCooldownState,
+  createInitialAbilityCooldownState,
+  recordSpecialAbilityUse,
+  tickAbilityCooldownsOnPitch,
+  tickAbilityCooldownsOnPlateAppearance,
+  type TeamSideKey,
+} from '../rpg/abilityCooldowns';
+import {
   advanceHitRunners,
   advanceWalkRunners,
   createEmptyBoxScore,
@@ -46,6 +55,7 @@ export function createGameSession(
     strikes: 0,
     bases: [null, null, null],
     atBatPitchHistory: [],
+    abilityCooldowns: createInitialAbilityCooldownState(),
     away,
     home,
     eventSeq: 0,
@@ -272,6 +282,55 @@ function applyRunnerMovementForPlateOutcome(
   }
 }
 
+function applyPostPlateHypeAndCooldowns(
+  state: GameSessionState,
+  res: PitchResolution,
+  batterId: string,
+  pitcherId: string,
+): void {
+  const batting = getBattingSide(state);
+  const fielding = getFieldingSide(state);
+  const battingKey: TeamSideKey = state.half === 'TOP' ? 'away' : 'home';
+  const fieldingKey: TeamSideKey = state.half === 'TOP' ? 'home' : 'away';
+
+  state.abilityCooldowns = tickAbilityCooldownsOnPlateAppearance(
+    state.abilityCooldowns,
+    battingKey,
+    pitcherId,
+  );
+
+  if (res.specialPowerTriggered?.actor === 'batter') {
+    const used = recordSpecialAbilityUse(
+      state.abilityCooldowns,
+      battingKey,
+      { id: batterId },
+      'batter',
+      batting.hypeGauge,
+      0,
+    );
+    state.abilityCooldowns = used.nextState;
+    batting.hypeGauge = used.nextHype;
+    return;
+  }
+  if (res.specialPowerTriggered?.actor === 'pitcher') {
+    const used = recordSpecialAbilityUse(
+      state.abilityCooldowns,
+      fieldingKey,
+      { id: pitcherId },
+      'pitcher',
+      fielding.hypeGauge,
+      fielding.pitcherFatigue,
+    );
+    state.abilityCooldowns = used.nextState;
+    fielding.hypeGauge = used.nextHype;
+    fielding.pitcherFatigue = used.nextFatigue;
+    return;
+  }
+
+  batting.hypeGauge = Math.min(100, batting.hypeGauge + (res.totalBases ? 16 : 6));
+  fielding.hypeGauge = Math.min(100, fielding.hypeGauge + (res.outsAdded > 0 ? 14 : 4));
+}
+
 function applyPlateComplete(
   state: GameSessionState,
   res: PitchResolution,
@@ -280,7 +339,6 @@ function applyPlateComplete(
 ): PlayEvent {
   const outsBefore = state.outs;
   const batting = getBattingSide(state);
-  const fielding = getFieldingSide(state);
   const batterLine = getBatterLines(state)[batterId];
   const pitcherLine = getPitcherLines(state)[pitcherId];
 
@@ -291,13 +349,7 @@ function applyPlateComplete(
   state.atBatPitchHistory = [];
   batting.lineupIndex = (batting.lineupIndex + 1) % batting.lineup.length;
 
-  if (res.specialPowerTriggered) {
-    if (res.specialPowerTriggered.actor === 'batter') batting.hypeGauge = 15;
-    else fielding.hypeGauge = 15;
-  } else {
-    batting.hypeGauge = Math.min(100, batting.hypeGauge + (res.totalBases ? 16 : 6));
-    fielding.hypeGauge = Math.min(100, fielding.hypeGauge + (res.outsAdded > 0 ? 14 : 4));
-  }
+  applyPostPlateHypeAndCooldowns(state, res, batterId, pitcherId);
 
   const eventType =
     res.outcome === 'walk' || res.outcome === 'strikeout' ? 'pitch_thrown' : 'ball_in_play';
@@ -493,6 +545,7 @@ function cloneSessionForStep(session: GameSessionState): GameSessionState {
     stepCounter: session.stepCounter + 1,
     bases: [...session.bases] as BaseState,
     atBatPitchHistory: [...session.atBatPitchHistory],
+    abilityCooldowns: cloneAbilityCooldownState(session.abilityCooldowns),
     away: { ...session.away },
     home: { ...session.home },
     boxScore: cloneBoxScore(session.boxScore),
@@ -531,6 +584,31 @@ function dispatchPitchResolution(
   return applyPlateComplete(next, resolution, batterId, pitcherId);
 }
 
+function getSpecialReadinessForStep(
+  state: GameSessionState,
+  batter: Pick<ReturnType<typeof getCurrentBatter>, 'id' | 'position' | 'level'>,
+  pitcher: Pick<ReturnType<typeof getCurrentPitcher>, 'id' | 'position' | 'level'>,
+): { canBatterTriggerSpecial: boolean; canPitcherTriggerSpecial: boolean } {
+  const battingKey: TeamSideKey = state.half === 'TOP' ? 'away' : 'home';
+  const fieldingKey: TeamSideKey = state.half === 'TOP' ? 'home' : 'away';
+  return {
+    canBatterTriggerSpecial: canTriggerSpecialAbility(
+      state.abilityCooldowns,
+      battingKey,
+      batter,
+      'batter',
+      state[battingKey].hypeGauge,
+    ).allowed,
+    canPitcherTriggerSpecial: canTriggerSpecialAbility(
+      state.abilityCooldowns,
+      fieldingKey,
+      pitcher,
+      'pitcher',
+      state[fieldingKey].hypeGauge,
+    ).allowed,
+  };
+}
+
 /** Advances the deterministic baseball simulation by one pitch or tactical action. */
 export function stepPitch(
   session: GameSessionState,
@@ -556,8 +634,10 @@ export function stepPitch(
   if (tacticalCall !== 'steal' && tacticalCall !== 'intentional_walk') {
     getPitcherLines(next)[pitcher.id].pitchesThrown += 1;
     fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + 1.45);
+    next.abilityCooldowns = tickAbilityCooldownsOnPitch(next.abilityCooldowns, pitcher.id);
   }
 
+  const readiness = getSpecialReadinessForStep(next, batter, pitcher);
   const defenderPos = rng.pick(['SS', '2B', 'CF', 'LF', 'RF'] as const);
   const resolution = resolveSinglePitch({
     rng,
@@ -574,6 +654,8 @@ export function stepPitch(
     pitcherFatigue: fielding.pitcherFatigue,
     battingHype: batting.hypeGauge,
     fieldingHype: fielding.hypeGauge,
+    canBatterTriggerSpecial: readiness.canBatterTriggerSpecial,
+    canPitcherTriggerSpecial: readiness.canPitcherTriggerSpecial,
     tacticalCall,
     atBatPitchHistory: next.atBatPitchHistory,
     requestedPitchType: options?.requestedPitchType,

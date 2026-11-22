@@ -400,4 +400,40 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
 
     expect(runMatchupHits('favorite')).toBeGreaterThan(runMatchupHits('weak'));
   });
+
+  it('enforces limited-use special ability charge caps and Hype drain across full games (TASK-056)', () => {
+    const away = createClub(createSeededRng(920), AWAY_OPTS);
+    const home = createClub(createSeededRng(921), HOME_OPTS);
+
+    const allPlayers = new Map([...away.roster, ...home.roster].map((p) => [p.id, p]));
+    let totalSpecialsAcrossGames = 0;
+
+    for (let seed = 1000; seed < 1012; seed += 1) {
+      const full = simFullGame(away, home, seed);
+      const usesByActor = new Map<string, number>();
+
+      for (const ev of full.events) {
+        if (!ev.specialPowerTriggered) continue;
+        totalSpecialsAcrossGames += 1;
+        const actorId =
+          ev.specialPowerTriggered.actor === 'batter' ? ev.batterId : ev.pitcherId;
+        if (!actorId) continue;
+        const count = (usesByActor.get(actorId) ?? 0) + 1;
+        usesByActor.set(actorId, count);
+
+        const player = allPlayers.get(actorId)!;
+        const maxAllowed =
+          ev.specialPowerTriggered.actor === 'pitcher'
+            ? player.position === 'SP'
+              ? 2
+              : 1
+            : player.level >= 12
+              ? 2
+              : 1;
+        expect(count).toBeLessThanOrEqual(maxAllowed);
+      }
+    }
+
+    expect(totalSpecialsAcrossGames).toBeGreaterThan(0);
+  });
 });

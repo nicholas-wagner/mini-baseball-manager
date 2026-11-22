@@ -59,6 +59,10 @@ describe('RosterLineupScreen (TASK-015)', () => {
       await user.click(crossTrainBtn);
       expect(screen.getByTestId('cross-train-feedback')).toBeInTheDocument();
 
+      // Run a Compromise Training Lab drill on the inspected hitter
+      await user.click(screen.getByRole('button', { name: /power cage/i }));
+      expect(screen.getByTestId('cross-train-feedback').textContent).toMatch(/compromise/i);
+
       // Sign a Rookie or Affordable Free Agent from the wire (18/20 -> 19/20)
       const signButtons = screen.getAllByRole('button', { name: /^sign$/i });
       expect(signButtons.length).toBeGreaterThanOrEqual(1);

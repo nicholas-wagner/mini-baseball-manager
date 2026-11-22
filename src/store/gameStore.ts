@@ -15,6 +15,10 @@ import { createManagerProfile, type ManagerProfile } from '../engine/models/mana
 import { isPitcherPosition, type Player } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
 import { crossTrainPosition } from '../engine/rpg/specialistsAndPositions';
+import {
+  applyTrainingDrill,
+  type TrainingDrillRequest,
+} from '../engine/rpg/trainingCompromises';
 import { simFullGame } from '../engine/simulation/baseballEngine';
 import type { GameSessionResult } from '../engine/simulation/gameState';
 import {
@@ -80,6 +84,10 @@ export interface GameStoreState {
     playerId: string,
     targetPos: FieldPosition,
   ) => { trained: boolean; reason?: string; deltaGain?: number; rustApplied?: number };
+  runCompromiseTrainingDrill: (
+    playerId: string,
+    request: TrainingDrillRequest,
+  ) => { trained: boolean; reason?: string; summary: string };
   signFreeAgent: (playerId: string) => { signed: boolean; reason?: string };
   releasePlayer: (playerId: string) => { released: boolean; reason?: string };
   commitCompletedGame: (opponentClubId: string, result: GameSessionResult, isHomeGame: boolean) => PostGameSummary | null;
@@ -317,6 +325,35 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         deltaGain: result.deltaGain,
         rustApplied: result.rustApplied,
       };
+    },
+
+    runCompromiseTrainingDrill: (playerId, request) => {
+      const club = get().getHumanClub();
+      if (!club) return { trained: false, reason: 'No active club found.', summary: 'No active club found.' };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target) {
+        return { trained: false, reason: 'Player is not on your roster.', summary: 'Player is not on your roster.' };
+      }
+
+      const nonce = get().rosterActionNonce;
+      const result = applyTrainingDrill(
+        createSeededRng(get().worldSeed + nonce * 131),
+        target,
+        request,
+      );
+      if (!result.trained) {
+        return { trained: false, reason: result.reason, summary: result.summary };
+      }
+
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? result.player : p)),
+      };
+      set((state) => ({
+        rosterActionNonce: state.rosterActionNonce + 1,
+        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      }));
+      return { trained: true, summary: result.summary };
     },
 
     signFreeAgent: (playerId) => {

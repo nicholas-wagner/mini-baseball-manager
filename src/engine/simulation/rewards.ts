@@ -3,6 +3,7 @@ import type { ManagerProfile } from '../models/manager';
 import { isPitcherPosition, type Player, type PlayerSeasonStats } from '../models/player';
 import { updatePlayerFormAfterGame } from '../rpg/formTracker';
 import { evolveSpecialistArchetype } from '../rpg/specialistsAndPositions';
+import { enforceRatingBudget } from '../rpg/trainingCompromises';
 import { applyGameStatDeltasToClub } from './baseballEngine';
 import type {
   BatterBoxLine,
@@ -178,20 +179,20 @@ export function calculatePostGameRewards(
 function nudgeRatingsWithinCaps(player: Player): Player['ratings'] {
   const r = player.ratings;
   const c = player.statCaps;
-  if (isPitcherPosition(player.position)) {
-    return {
-      ...r,
-      velocity: Math.min(c.velocity, r.velocity + 1),
-      movement: Math.min(c.movement, r.movement + 1),
-      control: Math.min(c.control, r.control + 1),
-    };
-  }
-  return {
-    ...r,
-    contact: Math.min(c.contact, r.contact + 1),
-    power: Math.min(c.power, r.power + 1),
-    fielding: Math.min(c.fielding, r.fielding + 1),
-  };
+  const bumped = isPitcherPosition(player.position)
+    ? {
+        ...r,
+        velocity: Math.min(c.velocity, r.velocity + 1),
+        movement: Math.min(c.movement, r.movement + 1),
+        control: Math.min(c.control, r.control + 1),
+      }
+    : {
+        ...r,
+        contact: Math.min(c.contact, r.contact + 1),
+        power: Math.min(c.power, r.power + 1),
+        fielding: Math.min(c.fielding, r.fielding + 1),
+      };
+  return enforceRatingBudget(bumped, player.position, player.totalRatingBudget);
 }
 
 function applyPlayerXpAndLevelUps(player: Player, gainedXp: number): Player {

@@ -189,5 +189,21 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
       .roster.find((p) => p.id === targetHitter.id)!;
     expect(updatedHitter.positionProficiency[altPos]!).toBeGreaterThanOrEqual(45);
     expect(updatedHitter.positionProficiency[updatedHitter.favoritePosition]!).toBeLessThan(favBefore);
+
+    // Compromise training drill updates batter pitch recognition with timing drift
+    const weakPitch = updatedHitter.batterPitchProfile.weakPitch;
+    const beforeWeakRec = updatedHitter.batterPitchProfile.pitchRecognition[weakPitch] ?? -12;
+    const drillRes = store.getState().runCompromiseTrainingDrill(updatedHitter.id, {
+      drillId: 'batter_pitch_recognition',
+      targetPitch: weakPitch,
+    });
+    expect(drillRes.trained).toBe(true);
+    const afterDrillHitter = store
+      .getState()
+      .getHumanClub()!
+      .roster.find((p) => p.id === updatedHitter.id)!;
+    expect(afterDrillHitter.batterPitchProfile.pitchRecognition[weakPitch]!).toBeGreaterThan(
+      beforeWeakRec,
+    );
   });
 });

@@ -5,6 +5,10 @@ import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import { PITCH_TYPE_SHORT_LABELS, type PitchType } from '../../engine/models/player';
 import {
+  canTriggerSpecialAbility,
+  SPECIAL_ABILITY_HYPE_COST,
+} from '../../engine/rpg/abilityCooldowns';
+import {
   buildPlayerStatDeltas,
   createGameSession,
   manualSwapPitcher,
@@ -274,6 +278,24 @@ export function GameDayScreen() {
   const currentBatter = getCurrentBatter(liveSession);
   const currentPitcher = getCurrentPitcher(liveSession);
   const platoon = evaluatePlatoonMatchup(currentBatter.bats, currentPitcher.throws);
+  const battingSideKey = liveSession.half === 'TOP' ? 'away' : 'home';
+  const fieldingSideKey = liveSession.half === 'TOP' ? 'home' : 'away';
+  const battingHype = liveSession[battingSideKey].hypeGauge;
+  const fieldingHype = liveSession[fieldingSideKey].hypeGauge;
+  const batterSpecial = canTriggerSpecialAbility(
+    liveSession.abilityCooldowns,
+    battingSideKey,
+    currentBatter,
+    'batter',
+    battingHype,
+  );
+  const pitcherSpecial = canTriggerSpecialAbility(
+    liveSession.abilityCooldowns,
+    fieldingSideKey,
+    currentPitcher,
+    'pitcher',
+    fieldingHype,
+  );
   const availableRelievers = liveSession.home.bullpenIds.filter(
     (id) => !liveSession.home.usedPitcherIds.includes(id),
   );
@@ -338,6 +360,17 @@ export function GameDayScreen() {
                     {PITCH_TYPE_SHORT_LABELS[currentPitcher.pitchArsenal.favoritePitch]}
                   </span>
                 ) : null}
+                <span
+                  data-testid="special-ability-hud"
+                  className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]"
+                >
+                  ⚡ Hype {fieldingHype}/{SPECIAL_ABILITY_HYPE_COST} • Pitcher {pitcherSpecial.chargesLeft}/
+                  {pitcherSpecial.maxCharges}
+                  {pitcherSpecial.cooldownRemaining > 0
+                    ? ` (CD ${pitcherSpecial.cooldownRemaining})`
+                    : ''}{' '}
+                  • Batter {batterSpecial.chargesLeft}/{batterSpecial.maxCharges}
+                </span>
               </div>
 
               {liveSession.half === 'TOP' && currentPitcher.pitchArsenal ? (

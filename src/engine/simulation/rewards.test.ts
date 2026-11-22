@@ -126,5 +126,27 @@ describe('Post-Game MVP & Rewards Engine', () => {
 
     const after = applyPostGameProgression(modHome, createManagerProfile({ name: 'Skip', avatarSeed: 1 }), rewards, result.playerStatDeltas, true);
     expect(after.club.roster[0].ratings.contact).toBe(rookie.statCaps.contact);
+
+    // Total rating budget cap also prevents unbounded passive level-up inflation
+    const cappedTotal =
+      rookie.ratings.contact +
+      rookie.ratings.power +
+      rookie.ratings.eye +
+      rookie.ratings.bunt +
+      rookie.ratings.speed +
+      rookie.ratings.fielding +
+      rookie.ratings.arm;
+    const tightBudgetRookie = { ...rookie, totalRatingBudget: cappedTotal };
+    const tightHome = { ...modHome, roster: [tightBudgetRookie, ...modHome.roster.slice(1)] };
+    const afterTight = applyPostGameProgression(
+      tightHome,
+      createManagerProfile({ name: 'Skip', avatarSeed: 1 }),
+      rewards,
+      result.playerStatDeltas,
+      true,
+    );
+    const r = afterTight.club.roster[0].ratings;
+    const afterSum = r.contact + r.power + r.eye + r.bunt + r.speed + r.fielding + r.arm;
+    expect(afterSum).toBeLessThanOrEqual(tightBudgetRookie.totalRatingBudget);
   });
 });

@@ -2,6 +2,10 @@ import type { FieldPosition } from '../handedness/types';
 import type { Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
 import type { Player, PitchType, PlayerSeasonStats } from '../models/player';
+import {
+  SPECIAL_ABILITY_HYPE_COST,
+  type AbilityCooldownState,
+} from '../rpg/abilityCooldowns';
 
 export type HalfInning = 'TOP' | 'BOT';
 
@@ -74,6 +78,7 @@ export interface GameSessionState {
   strikes: number;
   bases: BaseState;
   atBatPitchHistory: PitchType[];
+  abilityCooldowns: AbilityCooldownState;
   away: TeamGameSide;
   home: TeamGameSide;
   eventSeq: number;
@@ -203,7 +208,9 @@ export function getDefenderAtPosition(
 export function isClutchSituation(state: GameSessionState): boolean {
   const hasRisp = state.bases[1] !== null || state.bases[2] !== null;
   const closeLate = state.inning >= 7 && Math.abs(state.away.score - state.home.score) <= 2;
-  const powerReady = state.away.hypeGauge >= 100 || state.home.hypeGauge >= 100;
+  const powerReady =
+    state.away.hypeGauge >= SPECIAL_ABILITY_HYPE_COST ||
+    state.home.hypeGauge >= SPECIAL_ABILITY_HYPE_COST;
   return hasRisp || closeLate || powerReady;
 }
 

@@ -32,7 +32,8 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       expect(screen.getByRole('region', { name: /live baseball scoreboard/i })).toBeInTheDocument();
       expect(screen.getByTestId('live-game-3d-canvas')).toBeInTheDocument();
 
-      // Home SP pitches in TOP 1 with 4-5 selectable pitches + Auto Pitch
+      // Home SP pitches in TOP 1 with 4-5 selectable pitches + Auto Pitch + Special Ability Charge HUD
+      expect(screen.getByTestId('special-ability-hud').textContent).toMatch(/pitcher 2\/2/i);
       const spPitchButtons = screen.getAllByRole('button', { name: /^pitch /i });
       expect(spPitchButtons.length).toBeGreaterThanOrEqual(4);
       expect(spPitchButtons.length).toBeLessThanOrEqual(5);

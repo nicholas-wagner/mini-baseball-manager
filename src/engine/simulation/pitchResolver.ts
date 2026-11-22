@@ -355,6 +355,8 @@ export interface PitchResolverContext {
   pitcherFatigue: number;
   battingHype: number;
   fieldingHype: number;
+  canBatterTriggerSpecial: boolean;
+  canPitcherTriggerSpecial: boolean;
   tacticalCall: TacticalCall;
   atBatPitchHistory: readonly PitchType[];
   requestedPitchType?: PitchType;
@@ -374,7 +376,7 @@ function resolveContactResult(
   );
   if (ctx.rng.chance(hitProb)) {
     const hit = resolveHitType(ctx.rng, ctx.batter, effPower, ctx.defender);
-    if (ctx.battingHype >= 100) {
+    if (ctx.canBatterTriggerSpecial) {
       hit.specialPowerTriggered = buildHeritagePowerTrigger(ctx.batter, 'batter');
     }
     return hit;
@@ -429,7 +431,7 @@ function evaluateSwingResult(
 
   if (!ctx.rng.chance(contactProb)) {
     const whiff = resolveSwingingStrikeOrOut(ctx.strikes, ctx.batter.name);
-    if (whiff.outcome === 'strikeout' && ctx.fieldingHype >= 100) {
+    if (whiff.outcome === 'strikeout' && ctx.canPitcherTriggerSpecial) {
       whiff.specialPowerTriggered = buildHeritagePowerTrigger(ctx.pitcher, 'pitcher');
     }
     return whiff;
