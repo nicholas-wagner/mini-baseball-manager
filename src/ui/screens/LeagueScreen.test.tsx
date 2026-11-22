@@ -30,7 +30,7 @@ describe('LeagueScreen — 6-Tier Pyramid & Full Offseason HQ (TASK-024, TASK-06
 
       // Switch to Mini Major League tier and verify its clubs render
       await user.click(screen.getByRole('button', { name: /mini major league/i }));
-      expect(screen.getByText(/empire monarchs/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/empire monarchs/i).length).toBeGreaterThanOrEqual(1);
 
       // Simulate 1 three-game series from UI button
       await user.click(screen.getByRole('button', { name: /sim next 3-game series/i }));

@@ -7,13 +7,23 @@ import {
   type StadiumUpgradeId,
 } from '../engine/ballparks/stadiumProgression';
 import {
+  applyUniformToClub,
+  type UniformCustomization,
+} from '../engine/customization/uniformDesigner';
+import {
   buildDistrictBuilding,
+  evaluateDistrictBonuses,
   type DistrictBuildingId,
 } from '../engine/economy/districtBuilder';
 import {
   signParodySponsor,
   signTvContract,
 } from '../engine/economy/sponsorsTv';
+import {
+  applyExhibitionDuelRewards,
+  runFriendExhibitionDuel,
+  type ExhibitionDuelResult,
+} from '../engine/events/exhibitionDuel';
 import {
   applySurpriseEventChoice,
   type SurpriseEventCard,
@@ -26,15 +36,22 @@ import {
   type TimeCapsuleContext,
 } from '../engine/events/timeCapsuleChallenges';
 import {
+  callUpAcademyProspect,
+  runAcademyPassiveDevelopment,
+  stashProspectInAcademy,
+} from '../engine/gm/academy';
+import {
   evaluateClubStaffBonuses,
   fireStaffMember,
   hireStaffMember,
   runOffseasonCoachingClinic,
 } from '../engine/gm/coaches';
+import { createPlayer } from '../engine/gm/rosterFactory';
 import {
   executeTradeProposal,
   type TradeProposal,
 } from '../engine/gm/tradeEngine';
+import type { GameLengthInnings } from '../engine/models/player';
 import {
   runWinterBallAssignment,
   type WinterBallReport,
@@ -382,4 +399,120 @@ export function unequipHumanPlayerRelic(playerId: string, relicId: string): void
     ),
   };
   useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updatedClub) });
+}
+
+export function applyHumanUniformCustomization(
+  config: UniformCustomization,
+): { applied: boolean; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { applied: false, reason: 'No active club.' };
+  const updated = applyUniformToClub(club, config);
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updated) });
+  return { applied: true };
+}
+
+const ACADEMY_SCOUT_COST = 900;
+
+export function scoutAndStashHumanAcademyProspect(): {
+  stashed: boolean;
+  reason?: string;
+  prospectName?: string;
+} {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { stashed: false, reason: 'No active club.' };
+  if (club.economy.cash < ACADEMY_SCOUT_COST) {
+    return {
+      stashed: false,
+      reason: `Need $${ACADEMY_SCOUT_COST.toLocaleString()} scouting budget to sign a Youth Academy prospect.`,
+    };
+  }
+  const rng = createSeededRng(state.worldSeed + state.rosterActionNonce * 733 + 19);
+  const positions = ['SS', 'CF', 'SP', 'RP', 'C', '3B', 'RF', '2B', '1B', 'LF'] as const;
+  const rawProspect = createPlayer(rng, {
+    position: rng.pick(positions),
+    tier: club.leagueTier,
+    marketTier: 'rookie',
+  });
+  const youthProspect = {
+    ...rawProspect,
+    age: rng.int(18, 20),
+    contract: {
+      ...rawProspect.contract,
+      salaryPerSeason: Math.min(rawProspect.contract.salaryPerSeason, 500),
+      yearsRemaining: 3,
+    },
+  };
+  const res = stashProspectInAcademy(club, youthProspect);
+  if (!res.stashed) return { stashed: false, reason: res.reason };
+  const chargedClub: Club = {
+    ...res.club,
+    economy: {
+      ...res.club.economy,
+      cash: res.club.economy.cash - ACADEMY_SCOUT_COST,
+    },
+  };
+  useGameStore.setState({
+    rosterActionNonce: state.rosterActionNonce + 1,
+    leagues: replaceHumanClub(state.leagues, chargedClub),
+  });
+  return { stashed: true, prospectName: youthProspect.name };
+}
+
+export function runHumanAcademyTrainingCamp(): {
+  developedCount: number;
+  summary: string;
+} {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { developedCount: 0, summary: 'No active club.' };
+  const district = evaluateDistrictBonuses(club.stadium.districtTiles);
+  const rng = createSeededRng(state.worldSeed + state.rosterActionNonce * 617 + 7);
+  const res = runAcademyPassiveDevelopment(rng, club, district.trainingBonus);
+  if (res.developedCount === 0) {
+    return { developedCount: 0, summary: 'Scout at least 1 Youth Prospect into your Academy first!' };
+  }
+  useGameStore.setState({
+    rosterActionNonce: state.rosterActionNonce + 1,
+    leagues: replaceHumanClub(state.leagues, res.club),
+  });
+  return {
+    developedCount: res.developedCount,
+    summary: `Academy Camp boosted ${res.developedCount} farm prospect(s) with XP & tool polish!`,
+  };
+}
+
+export function callUpHumanAcademyProspect(prospectId: string): {
+  calledUp: boolean;
+  reason?: string;
+  debutBoostBanner?: string;
+} {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { calledUp: false, reason: 'No active club.' };
+  const res = callUpAcademyProspect(club, prospectId);
+  if (!res.calledUp) return { calledUp: false, reason: res.reason };
+  useGameStore.setState({
+    rosterActionNonce: state.rosterActionNonce + 1,
+    leagues: replaceHumanClub(state.leagues, res.club),
+  });
+  return { calledUp: true, debutBoostBanner: res.debutBoostBanner };
+}
+
+export function runHumanFriendExhibitionDuel(
+  challengerClub: Club,
+  innings: GameLengthInnings = 5,
+): { played: boolean; result?: ExhibitionDuelResult; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { played: false, reason: 'No active club.' };
+  const seed = state.worldSeed + state.rosterActionNonce * 941 + 88;
+  const duel = runFriendExhibitionDuel(club, challengerClub, { innings, seed });
+  const rewardedClub = applyExhibitionDuelRewards(club, duel);
+  useGameStore.setState({
+    rosterActionNonce: state.rosterActionNonce + 1,
+    leagues: replaceHumanClub(state.leagues, rewardedClub),
+  });
+  return { played: true, result: duel };
 }

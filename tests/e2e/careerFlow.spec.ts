@@ -30,6 +30,11 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('ballpark-economy-panel')).toBeVisible();
   await page.getByRole('button', { name: /sign turbo fizz soda/i }).click();
 
+  await page.getByRole('button', { name: /uniform studio/i }).click();
+  await expect(page.getByTestId('uniform-designer-panel')).toBeVisible();
+  await page.getByRole('button', { name: /vintage pinstripes/i }).click();
+  await page.getByRole('button', { name: /apply custom uniform/i }).click();
+
   await page.getByRole('button', { name: /gazette & front office/i }).click();
   await expect(page.getByTestId('front-office-gazette-panel')).toBeVisible();
   await page.getByRole('button', { name: /draw 90s surprise card/i }).click();
@@ -41,8 +46,15 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByText(/derby champ:/i)).toBeVisible();
   await page.getByRole('button', { name: /run global chibi cup/i }).click();
   await expect(page.getByTestId('global-cup-result')).toBeVisible();
+  await page.getByRole('button', { name: /load 1994 cyber sluggers code/i }).click();
+  await page.getByRole('button', { name: /play boss exhibition duel/i }).click();
+  await expect(page.getByTestId('exhibition-duel-result')).toBeVisible();
   await page.getByRole('button', { name: /generate club export code/i }).click();
   await expect(page.locator('#club-export-code')).toHaveValue(/^MBM1:/);
+
+  // Visit League tab and confirm Season Awards & Club Hall of Fame Ballot render
+  await page.getByRole('button', { name: /^league$/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('awards-and-hof-panel')).toBeVisible();
 
   // Open Coach Pops' Guide, Story & Origins CYOA, and 4 Auto-Save Slots
   await page.getByRole('button', { name: /open dugout guide/i }).locator('visible=true').first().click();

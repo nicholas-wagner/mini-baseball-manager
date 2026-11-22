@@ -39,11 +39,43 @@ export interface LineupSlot {
   defensivePosition: DefensiveLineupPosition;
 }
 
+export type JerseyPatternId =
+  | 'classic_solid'
+  | 'vintage_pinstripes'
+  | 'raglan_sleeves'
+  | 'neon_90s_gradient'
+  | 'racing_chest_stripe'
+  | 'retro_vest';
+
+export type StirrupStyleId =
+  | 'classic_solid'
+  | 'double_stripe'
+  | 'high_neon_90s'
+  | 'candy_cane';
+
+export type CapStyleId =
+  | 'classic_crown'
+  | 'two_tone_panel'
+  | 'trucker_bill'
+  | 'throwback_pillbox';
+
+export type CrestEmblemId =
+  | 'baseball_diamond'
+  | 'lightning_bolt'
+  | 'comet_star'
+  | 'crown_shield'
+  | 'crossed_bats'
+  | 'rocket_paw';
+
 export interface ClubColors {
   primary: string;
   secondary: string;
   accent: string;
   monogram: string;
+  jerseyPattern?: JerseyPatternId;
+  stirrupStyle?: StirrupStyleId;
+  capStyle?: CapStyleId;
+  crestEmblem?: CrestEmblemId;
 }
 
 export interface DistrictTile {

@@ -22,12 +22,14 @@ import {
 } from '../../engine/models/player';
 import { formatRate3 } from '../../engine/simulation/sabermetrics';
 import { useGameStore } from '../../store/gameStore';
+import { AwardsAndHofPanel } from '../components/AwardsAndHofPanel';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
 export function LeagueScreen() {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
+  const manager = useGameStore((s) => s.manager);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const lastOffseasonTransitions = useGameStore((s) => s.lastOffseasonTransitions);
@@ -419,6 +421,14 @@ export function LeagueScreen() {
               )}
             </div>
           </div>
+          {/* Live Tier Season Awards & Club Hall of Fame Ballot */}
+          <AwardsAndHofPanel
+            tierClubs={tierClubs}
+            humanClub={humanClub}
+            seasonNumber={seasonNumber}
+            activeTier={activeTier}
+            managerName={manager?.name ?? 'Skipper'}
+          />
         </div>
       </ComicCard>
     </div>

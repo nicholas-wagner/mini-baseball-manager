@@ -15,14 +15,20 @@ import {
   WINTER_LEAGUE_DESTINATIONS,
   type WinterLeagueId,
 } from '../../engine/gm/winterBall';
-import type { Club } from '../../engine/models/club';
+import {
+  MAX_ACADEMY_ROSTER_SIZE,
+  type Club,
+} from '../../engine/models/club';
 import { computePlayerOverall } from '../../engine/models/player';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import {
+  callUpHumanAcademyProspect,
   executeHumanTradeWithRival,
   resolveHumanSurpriseEvent,
   retireHumanPlayerJersey,
+  runHumanAcademyTrainingCamp,
   runHumanWinterBall,
+  scoutAndStashHumanAcademyProspect,
 } from '../../store/clubHubActions';
 import { ComicButton } from '../design-system/ComicButton';
 
@@ -428,6 +434,90 @@ export function FrontOfficeGazettePanel({
             </div>
           ) : null}
         </div>
+      </div>
+
+      {/* 6-Slot Prospect Farm Academy & Rookie Debut Call-Ups */}
+      <div
+        data-testid="prospect-academy-panel"
+        className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2.5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-display text-sm text-[#181B2C]">
+              🎓 Prospect Farm Academy ({club.academyProspects.length}/{MAX_ACADEMY_ROSTER_SIZE} Slots)
+            </div>
+            <div className="text-xs font-bold text-[#4A5068]">
+              Stash teenage prospects outside the 20-man cap, train them at camp, and trigger a 🔥 Rookie Debut!
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ComicButton
+              size="sm"
+              variant="gold"
+              onClick={() => {
+                const res = scoutAndStashHumanAcademyProspect();
+                onNotice(
+                  res.stashed
+                    ? `Signed youth prospect ${res.prospectName} to the Farm Academy!`
+                    : (res.reason ?? 'Could not sign prospect.'),
+                );
+                soundEngine.play(res.stashed ? 'cash_chime' : 'ui_pop');
+              }}
+            >
+              Scout Youth Prospect ($900)
+            </ComicButton>
+            <ComicButton
+              size="sm"
+              variant="sky"
+              onClick={() => {
+                const res = runHumanAcademyTrainingCamp();
+                onNotice(res.summary);
+                soundEngine.play(res.developedCount > 0 ? 'level_up' : 'ui_pop');
+              }}
+            >
+              Run Academy Camp
+            </ComicButton>
+          </div>
+        </div>
+
+        {club.academyProspects.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {club.academyProspects.map((prospect) => (
+              <div
+                key={prospect.id}
+                className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] flex flex-col justify-between gap-2"
+              >
+                <div>
+                  <div className="font-display text-xs text-[#181B2C]">
+                    {prospect.position} — {prospect.name}
+                  </div>
+                  <div className="text-[11px] font-bold text-[#4A5068]">
+                    Age {prospect.age} • OVR {computePlayerOverall(prospect)} • XP {prospect.xp}
+                  </div>
+                </div>
+                <ComicButton
+                  size="sm"
+                  variant="turf"
+                  onClick={() => {
+                    const res = callUpHumanAcademyProspect(prospect.id);
+                    onNotice(
+                      res.calledUp
+                        ? (res.debutBoostBanner ?? `Called up ${prospect.name}!`)
+                        : (res.reason ?? 'Cannot call up prospect.'),
+                    );
+                    soundEngine.play(res.calledUp ? 'trophy_fanfare' : 'ui_pop');
+                  }}
+                >
+                  Call Up Debut
+                </ComicButton>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs font-bold text-[#4A5068]">
+            Your Farm Academy is empty — scout a young prospect to develop future franchise stars!
+          </p>
+        )}
       </div>
     </div>
   );

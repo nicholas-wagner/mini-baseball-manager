@@ -1,6 +1,12 @@
-import { useState } from 'react';
-import { Globe, History, Share2, Trophy } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Globe, History, Share2, Swords, Trophy } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
+import {
+  buildGuestBossClub,
+  GUEST_BOSS_PRESETS,
+  type ExhibitionDuelResult,
+  type GuestBossPresetId,
+} from '../../engine/events/exhibitionDuel';
 import {
   evaluateTimeCapsuleChallenges,
   type TimeCapsuleChallengeId,
@@ -9,11 +15,13 @@ import { evaluateUnlockablesProgress } from '../../engine/events/unlockables';
 import { runGlobalChibiCup, type GlobalCupResult } from '../../engine/league/globalCup';
 import { runHomeRunDerby, type HomeRunDerbyResult } from '../../engine/league/homeRunDerby';
 import type { Club, LeagueTierId } from '../../engine/models/club';
+import type { GameLengthInnings } from '../../engine/models/player';
 import { createSeededRng } from '../../engine/rng/seededRng';
-import { encodeClubExportCode } from '../../store/clubCode';
+import { decodeClubExportCode, encodeClubExportCode } from '../../store/clubCode';
 import {
   claimHumanTimeCapsuleReward,
   launchHumanJuneMiracleScenario,
+  runHumanFriendExhibitionDuel,
 } from '../../store/clubHubActions';
 import { ComicButton } from '../design-system/ComicButton';
 
@@ -35,7 +43,24 @@ export function WorldSpectaclesPanel({
   const [derbyResult, setDerbyResult] = useState<HomeRunDerbyResult | null>(null);
   const [globalCupResult, setGlobalCupResult] = useState<GlobalCupResult | null>(null);
   const [exportCode, setExportCode] = useState<string>('');
+  const [challengerCodeInput, setChallengerCodeInput] = useState<string>('');
+  const [duelInnings, setDuelInnings] = useState<GameLengthInnings>(5);
+  const [duelResult, setDuelResult] = useState<ExhibitionDuelResult | null>(null);
   const [claimedChallengeIds, setClaimedChallengeIds] = useState<TimeCapsuleChallengeId[]>([]);
+
+  const decodedChallenger = useMemo(() => {
+    if (!challengerCodeInput.trim()) return null;
+    return decodeClubExportCode(challengerCodeInput);
+  }, [challengerCodeInput]);
+
+  const handleLoadBossCode = (presetId: GuestBossPresetId) => {
+    const boss = buildGuestBossClub(presetId, club.leagueTier, worldSeed + seasonNumber * 409);
+    const code = encodeClubExportCode(boss);
+    setChallengerCodeInput(code);
+    setDuelResult(null);
+    onNotice(`Loaded ${boss.city} ${boss.name} MBM1 Boss Code — ready for Exhibition Duel!`);
+    soundEngine.play('ui_pop');
+  };
 
   const challengeSummary = evaluateTimeCapsuleChallenges(club, {
     wonHomeRunDerby: Boolean(derbyResult),
@@ -159,6 +184,134 @@ export function WorldSpectaclesPanel({
               value={exportCode}
               className="w-full px-2.5 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] font-mono-tabular text-[11px]"
             />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Serverless Pass-and-Play Friend Boss Exhibition Duel (MBM1:) */}
+      <div
+        data-testid="friend-duel-panel"
+        className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2.5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-display text-sm text-[#181B2C] flex items-center gap-1.5">
+              <Swords className="w-4 h-4 text-[#7209B7]" />
+              Pass-and-Play Friend Boss Exhibition Duel (MBM1: Codes)
+            </div>
+            <div className="text-xs font-bold text-[#4A5068]">
+              Paste a friend’s MBM1: Club Export Code — or load a built-in 90s Boss Club — for an instant Exhibition Duel!
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {([5, 7, 9] as const).map((inn) => (
+              <ComicButton
+                key={inn}
+                size="sm"
+                variant={duelInnings === inn ? 'gold' : 'cream'}
+                onClick={() => setDuelInnings(inn)}
+              >
+                {inn} Inn
+              </ComicButton>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {GUEST_BOSS_PRESETS.map((boss) => (
+            <ComicButton
+              key={boss.id}
+              size="sm"
+              variant="cream"
+              onClick={() => handleLoadBossCode(boss.id)}
+            >
+              Load {boss.name} Code
+            </ComicButton>
+          ))}
+          <ComicButton
+            size="sm"
+            variant="sky"
+            onClick={() => {
+              setChallengerCodeInput(encodeClubExportCode(club));
+              setDuelResult(null);
+              onNotice('Loaded your own club mirror MBM1 code for an intrasquad exhibition!');
+              soundEngine.play('ui_pop');
+            }}
+          >
+            Load My Mirror Code
+          </ComicButton>
+        </div>
+
+        <textarea
+          aria-label="Paste Friend MBM1 Club Export Code"
+          rows={2}
+          value={challengerCodeInput}
+          onChange={(e) => setChallengerCodeInput(e.target.value)}
+          placeholder="Paste a friend's MBM1:... Club Export Code here, or pick a 90s Boss Club above!"
+          className="w-full p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] font-mono-tabular text-[11px]"
+        />
+
+        {decodedChallenger ? (
+          decodedChallenger.ok ? (
+            <div
+              data-testid="decoded-challenger-preview"
+              className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] flex flex-wrap items-center justify-between gap-2"
+            >
+              <div>
+                <div className="font-display text-xs text-[#181B2C]">
+                  Challenger Ready: {decodedChallenger.club.city} {decodedChallenger.club.name} (
+                  {decodedChallenger.club.colors.monogram})
+                </div>
+                <div className="text-[11px] font-bold text-[#1D3557]">
+                  Tier {decodedChallenger.club.leagueTier.toUpperCase()} •{' '}
+                  {decodedChallenger.club.roster.length} players • Record{' '}
+                  {decodedChallenger.club.wins}-{decodedChallenger.club.losses}
+                </div>
+              </div>
+              <ComicButton
+                size="sm"
+                variant="coral"
+                icon={<Swords className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  const res = runHumanFriendExhibitionDuel(decodedChallenger.club, duelInnings);
+                  if (res.played && res.result) {
+                    setDuelResult(res.result);
+                    onNotice(
+                      `Exhibition Duel Final: ${res.result.awayClubName} ${res.result.awayScore} @ ${res.result.homeClubName} ${res.result.homeScore} (+$${res.result.rewardCash.toLocaleString()})!`,
+                    );
+                    soundEngine.play(res.result.humanWon ? 'trophy_fanfare' : 'crowd_gasp');
+                  }
+                }}
+              >
+                Play Boss Exhibition Duel
+              </ComicButton>
+            </div>
+          ) : (
+            <div className="p-2 rounded-xl border border-[#9D0208] bg-[#FFE5E5] text-xs font-extrabold text-[#9D0208]">
+              {decodedChallenger.error}
+            </div>
+          )
+        ) : null}
+
+        {duelResult ? (
+          <div
+            data-testid="exhibition-duel-result"
+            className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] space-y-1.5 text-xs text-[#181B2C]"
+          >
+            <div className="font-display text-sm">
+              {duelResult.humanWon ? '🏆 VICTORY! ' : '🔥 TOUGH BATTLE! '}
+              {duelResult.awayClubName} {duelResult.awayScore} @ {duelResult.homeClubName}{' '}
+              {duelResult.homeScore} ({duelResult.inningsPlayed} Inn)
+            </div>
+            <div className="font-extrabold text-[#1B4332]">
+              Game MVP: {duelResult.mvpName} ({duelResult.mvpLine}) • Bonus +$
+              {duelResult.rewardCash.toLocaleString()} &amp; +{duelResult.hypeDelta} Hype
+            </div>
+            <ul className="list-disc pl-4 space-y-0.5 text-[11px] font-bold text-[#4A5068]">
+              {duelResult.highlights.slice(0, 4).map((hl, i) => (
+                <li key={`${i}-${hl}`}>{hl}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </div>

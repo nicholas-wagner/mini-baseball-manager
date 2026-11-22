@@ -5,6 +5,7 @@ import {
   Coins,
   Dumbbell,
   Newspaper,
+  Palette,
   Sparkles,
   Trophy,
   Users,
@@ -57,6 +58,7 @@ import { useGameStore } from '../../store/gameStore';
 import { BallparkEconomyPanel } from '../components/BallparkEconomyPanel';
 import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
 import { MiniPlayerSvg } from '../components/MiniPlayerSvg';
+import { UniformDesignerPanel } from '../components/UniformDesignerPanel';
 import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -64,6 +66,7 @@ import { ComicCard } from '../design-system/ComicCard';
 type HubSubTab =
   | 'stadiums'
   | 'economy'
+  | 'uniforms'
   | 'staff'
   | 'practice'
   | 'manager'
@@ -157,6 +160,15 @@ export function ClubHubScreen() {
               onClick={() => setSubTab('economy')}
             >
               Economy &amp; District
+            </ComicButton>
+            <ComicButton
+              size="sm"
+              variant={subTab === 'uniforms' ? 'gold' : 'cream'}
+              active={subTab === 'uniforms'}
+              icon={<Palette className="w-3.5 h-3.5" />}
+              onClick={() => setSubTab('uniforms')}
+            >
+              Uniform Studio
             </ComicButton>
             <ComicButton
               size="sm"
@@ -305,6 +317,10 @@ export function ClubHubScreen() {
 
         {subTab === 'economy' ? (
           <BallparkEconomyPanel club={club} onNotice={setNotice} />
+        ) : null}
+
+        {subTab === 'uniforms' ? (
+          <UniformDesignerPanel club={club} onNotice={setNotice} />
         ) : null}
 
         {subTab === 'staff' ? (
