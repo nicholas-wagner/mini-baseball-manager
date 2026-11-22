@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Building2, Gamepad2, GitBranch, Palette, Trophy, Users } from 'lucide-react';
 import { soundEngine } from './audio/soundEngine';
+import { useGameStore } from './store/gameStore';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
 import { ComicCard } from './ui/design-system/ComicCard';
+import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
 import { DesignLabScreen } from './ui/screens/DesignLabScreen';
+import { GameDayScreen } from './ui/screens/GameDayScreen';
+import { RosterLineupScreen } from './ui/screens/RosterLineupScreen';
 
 type TabId = 'lab' | 'gameday' | 'roster' | 'skills' | 'economy' | 'trophies';
 
@@ -17,21 +21,9 @@ const NAV_ITEMS: readonly NavItem[] = [
 ];
 
 const UPCOMING_MILESTONES: Record<
-  Exclude<TabId, 'lab'>,
+  Exclude<TabId, 'lab' | 'gameday' | 'roster'>,
   { title: string; milestone: string; summary: string }
 > = {
-  gameday: {
-    title: 'Play Ball — Live 3D Games & Clutch Cam',
-    milestone: 'Milestone 2 (Core Playable MVP)',
-    summary:
-      'Pitch-by-pitch seeded simulation wired directly to the over-the-shoulder 3D ballpark with 1x/2x/4x speeds, Clutch Moments, tactical calls, and Manager Powers.',
-  },
-  roster: {
-    title: 'Clubhouse, Lineups, Draft & Free Agency',
-    milestone: 'Milestones 2 & 4',
-    summary:
-      'Set your 9-man batting order, starting rotation, and bullpen; scout prospects, draft 90s rookies, sign free agents, and manage team rivalries.',
-  },
   skills: {
     title: 'Branching Player & Manager Skill Trees',
     milestone: 'Milestone 3 (RPG Depth)',
@@ -55,6 +47,7 @@ const UPCOMING_MILESTONES: Record<
 export function App() {
   const [activeTab, setActiveTab] = useState<TabId>('lab');
   const [muted, setMuted] = useState(false);
+  const humanClub = useGameStore((s) => s.getHumanClub());
 
   const handleToggleMute = () => {
     const nextMuted = soundEngine.toggleMute();
@@ -64,10 +57,44 @@ export function App() {
     }
   };
 
+  const renderMainContent = () => {
+    if (activeTab === 'lab') {
+      return <DesignLabScreen />;
+    }
+    if (activeTab === 'gameday') {
+      return humanClub ? (
+        <GameDayScreen />
+      ) : (
+        <ClubCreatorScreen onCreated={() => setActiveTab('gameday')} />
+      );
+    }
+    if (activeTab === 'roster') {
+      return humanClub ? (
+        <RosterLineupScreen onPlayBall={() => setActiveTab('gameday')} />
+      ) : (
+        <ClubCreatorScreen onCreated={() => setActiveTab('roster')} />
+      );
+    }
+
+    const upcoming = UPCOMING_MILESTONES[activeTab];
+    return (
+      <ComicCard title={upcoming.title} subtitle={upcoming.milestone} headerBg="#1B4332">
+        <p className="font-bold text-sm text-[#4A5068] leading-relaxed">{upcoming.summary}</p>
+        <p className="mt-3 text-xs font-extrabold uppercase tracking-wider text-[#2FB356]">
+          Tracked in PLAN.md — Milestone 2 MVP Play Ball & Roster tabs are now live!
+        </p>
+      </ComicCard>
+    );
+  };
+
   return (
     <AppShell
-      clubName="Mini Baseball Manager"
-      leagueLabel="Rookie Sandlot League"
+      clubName={humanClub ? `${humanClub.city} ${humanClub.name}` : 'Mini Baseball Manager'}
+      leagueLabel={
+        humanClub
+          ? `${humanClub.leagueTier.toUpperCase()} LEAGUE • ${humanClub.wins}-${humanClub.losses}`
+          : 'Rookie Sandlot League'
+      }
       navItems={NAV_ITEMS}
       activeTab={activeTab}
       onSelectTab={(id) => {
@@ -77,22 +104,7 @@ export function App() {
       muted={muted}
       onToggleMute={handleToggleMute}
     >
-      {activeTab === 'lab' ? (
-        <DesignLabScreen />
-      ) : (
-        <ComicCard
-          title={UPCOMING_MILESTONES[activeTab].title}
-          subtitle={UPCOMING_MILESTONES[activeTab].milestone}
-          headerBg="#1B4332"
-        >
-          <p className="font-bold text-sm text-[#4A5068] leading-relaxed">
-            {UPCOMING_MILESTONES[activeTab].summary}
-          </p>
-          <p className="mt-3 text-xs font-extrabold uppercase tracking-wider text-[#2FB356]">
-            Tracked in PLAN.md — Ready to build right after our Milestone 1 visual checkpoint!
-          </p>
-        </ComicCard>
-      )}
+      {renderMainContent()}
     </AppShell>
   );
 }

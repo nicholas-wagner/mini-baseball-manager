@@ -80,7 +80,7 @@
 ---
 
 ### `TASK-015` — New Club Creator, Roster & Lineup/Rotation Manager
-- **Status**: `IN_PROGRESS`
+- **Status**: `DONE`
 - **Milestone**: M2 (`2C`)
 - **Depends On**: `TASK-013`
 - **Files to Create/Modify**:
@@ -96,7 +96,7 @@
 ---
 
 ### `TASK-016` — Live 3D Game Day Experience & Full 9-Fielder Playback Controller
-- **Status**: `BLOCKED` *(unblocks when `TASK-014` and `TASK-015` are `DONE`)*
+- **Status**: `DONE`
 - **Milestone**: M2 (`2D`)
 - **Depends On**: `TASK-014`, `TASK-015`
 - **Files to Create/Modify**:
@@ -114,7 +114,7 @@
 ---
 
 ### `TASK-017` — Exhibition / Opening Series & Post-Game MVP Flow
-- **Status**: `BLOCKED` *(unblocks when `TASK-016` is `DONE`)*
+- **Status**: `DONE`
 - **Milestone**: M2 (`2E`)
 - **Depends On**: `TASK-016`
 - **Files to Create**:
@@ -126,7 +126,7 @@
 ---
 
 ### `TASK-018` — Local IndexedDB Persistence, Multi-Slot Saves & JSON Backup
-- **Status**: `IN_PROGRESS`
+- **Status**: `DONE`
 - **Milestone**: M2 (`2F`)
 - **Depends On**: `TASK-015`
 - **Files to Create**:
@@ -145,9 +145,9 @@
 
 | Task ID | Status | Depends On | Slice & Key Deliverables |
 | :--- | :--- | :--- | :--- |
-| `TASK-019` | `BLOCKED` | `TASK-013`, `TASK-014` | **Branching Player Skill Trees** (`src/engine/rpg/skillTrees.ts` + pan/zoom `SkillTreeScreen.tsx`): Pitcher, Batter & Fielder node graphs (30+ nodes), prerequisite checks, SP spend/respec, capstone Special Powers (*Blazing Comet*, *Ghost Knuckle*, *Tornado Slider*, *Moonshot Bomb-Swing*, *Ninja Bunt*, *Rally Spark*, *Sky-High Leap*, *Cannon Arm*, *Ice Veins*) wired into sim & 3D VFX! |
+| `TASK-019` | `READY` | `TASK-013`, `TASK-014` | **Branching Player Skill Trees** (`src/engine/rpg/skillTrees.ts` + pan/zoom `SkillTreeScreen.tsx`): Pitcher, Batter & Fielder node graphs (30+ nodes), prerequisite checks, SP spend/respec, capstone Special Powers (*Blazing Comet*, *Ghost Knuckle*, *Tornado Slider*, *Moonshot Bomb-Swing*, *Ninja Bunt*, *Rally Spark*, *Sky-High Leap*, *Cannon Arm*, *Ice Veins*) wired into sim & 3D VFX! |
 | `TASK-020` | `BLOCKED` | `TASK-019` | **3-Tier Cultural Heritage Skill Branches** (`src/engine/rpg/heritageTrees.ts`): Unlockable 3-node cultural myth/animal progression per nationality (Tier 1 passive → Tier 2 clutch boost → Tier 3 Signature Myth/Animal Power with custom 3D VFX & Hype-gauge trigger!). |
-| `TASK-021` | `BLOCKED` | `TASK-014`, `TASK-017` | **Dynamic Hot Streaks & Cold Slumps** (`src/engine/rpg/formTracker.ts`): Rolling form score (`-100..+100`), 🔥 *Blazing/Hot* & 🧊 *Cold/Frozen* rating curves, fiery/icy card frames & moods, slump-busting hooks! |
+| `TASK-021` | `READY` | `TASK-014`, `TASK-017` | **Dynamic Hot Streaks & Cold Slumps** (`src/engine/rpg/formTracker.ts`): Rolling form score (`-100..+100`), 🔥 *Blazing/Hot* & 🧊 *Cold/Frozen* rating curves, fiery/icy card frames & moods, slump-busting hooks! |
 | `TASK-022` | `BLOCKED` | `TASK-019`, `TASK-021` | **Animated Practice & Training Complex** (`src/engine/rpg/practiceEngine.ts` + `PracticeScreen.tsx`): Batting Cage, Bullpen Lab, Fielding Fungos, Sprint Track, Slump-Buster Film Room, Fan Meet & Greet — cute animated 2.5D chibi dioramas with floating `+XP`, fatigue trade-off & double-SP crits! |
 | `TASK-023` | `BLOCKED` | `TASK-016`, `TASK-022` | **Human Manager RPG Tree & Active Power Dock** (`src/engine/manager/managerTree.ts` + `ManagerScreen.tsx`): Skipper Active Powers (*Pep Talk*, *Mound Whisper*, *Clutch Focus*, *Rally Cap Magic*), Coach Training Passives, Mogul GM Passives + in-game Power Dock with comic splash banners & organ riffs! |
 
@@ -157,7 +157,7 @@
 
 | Task ID | Status | Depends On | Slice & Key Deliverables |
 | :--- | :--- | :--- | :--- |
-| `TASK-024` | `BLOCKED` | `TASK-014`, `TASK-018` | **6-Tier Pyramid & 21-Game Season Engine** (`src/engine/league/seasonEngine.ts` + `LeagueScreen.tsx`): 48 unique themed clubs across Rookie → Majors, balanced 7-series (21-game) scheduler, standings, tiebreakers, leaders, 4-team Best-of-3 playoffs, promotion/relegation transitions. |
+| `TASK-024` | `READY` | `TASK-014`, `TASK-018` | **6-Tier Pyramid & 21-Game Season Engine** (`src/engine/league/seasonEngine.ts` + `LeagueScreen.tsx`): 48 unique themed clubs across Rookie → Majors, balanced 7-series (21-game) scheduler, standings, tiebreakers, leaders, 4-team Best-of-3 playoffs, promotion/relegation transitions. |
 | `TASK-025` | `BLOCKED` | `TASK-024` | **Fog-of-War Scouting & 3-Round Amateur Draft** (`src/engine/gm/draftEngine.ts` + `DraftScreen.tsx`): Scouting budget reveals potential/ratings, interactive Draft Room with retro cards & international prospects. |
 | `TASK-026` | `BLOCKED` | `TASK-024` | **Free Agency, Contracts, Payroll & Waivers** (`src/engine/gm/freeAgency.ts` + `MarketScreen.tsx`): Contract negotiation, bidding wars, cut/release morale & dead-cap logic. |
 | `TASK-027` | `BLOCKED` | `TASK-024`, `TASK-025`, `TASK-026` | **Personality-Driven AI GMs & Bullpen AI** (`src/engine/ai/aiGm.ts` + 10-season soak test): 5 AI philosophies drafting, signing, training, optimizing platoon lineups, and calling lefty specialists. |
@@ -218,6 +218,6 @@
 | :--- | :--- | :--- | :--- |
 | `TASK-048` | `BLOCKED` | `TASK-047` | **Unlockables Gallery & Cosmetic Unlocks** (`src/engine/events/unlockables.ts`): Throwback jerseys, custom bat VFX skins, stadium themes, secret legendary skill nodes. |
 | `TASK-049` | `BLOCKED` | `TASK-018`, `TASK-047` | **Exportable PNG Baseball Cards & Serverless Club Codes** (`src/art/export/cardExporter.ts`, `src/store/clubCode.ts`): Download any player's 90s card as crisp PNG + compact Base64 Club Export Code to battle friends' dynasty clubs offline! |
-| `TASK-050` | `BLOCKED` | `TASK-016` | **Android Haptics, Wake Lock & In-App PWA Install Banner** (`src/ui/components/PwaInstallBanner.tsx`): Tactile `navigator.vibrate`, optional Wake Lock during live games, custom install flow. |
+| `TASK-050` | `READY` | `TASK-016` | **Android Haptics, Wake Lock & In-App PWA Install Banner** (`src/ui/components/PwaInstallBanner.tsx`): Tactile `navigator.vibrate`, optional Wake Lock during live games, custom install flow. |
 | `TASK-051` | `BLOCKED` | `TASK-033`, `TASK-038` | **60 FPS Mobile WebGL Profiling & Accessibility Audit**: Sprite-cache memory cap, menu RAF throttling, reduced-motion mode, colorblind-safe badges, keyboard & screen-reader pass. |
 | `TASK-052` | `BLOCKED` | All above | **Final Release Gate & Full Career Playwright E2E Suite**: End-to-end Desktop & Android Pixel 7 tests + ≥90% `src/engine/` coverage + Lighthouse PWA check. |

@@ -8,6 +8,7 @@ import { createSeededRng } from '../rng/seededRng';
 import {
   applyGameStatDeltasToClub,
   createGameSession,
+  manualSwapPitcher,
   simFullGame,
   simUntilClutchOrEnd,
   stepAtBat,
@@ -314,5 +315,17 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
       0,
     );
     expect(totalGamesPlayed).toBeGreaterThanOrEqual(10);
+
+    // Manual bullpen pitching swap updates activePitcherId and emits pitching_change
+    const freshSession = createGameSession(away, home, 2026);
+    const relieverId = home.bullpenIds[0];
+    const swapResult = manualSwapPitcher(freshSession, 'home', relieverId);
+    expect(swapResult.nextSession.home.activePitcherId).toBe(relieverId);
+    expect(swapResult.nextSession.home.usedPitcherIds).toContain(relieverId);
+    expect(swapResult.event?.type).toBe('pitching_change');
+
+    // Invalid or duplicate reliever ID returns unchanged session with null event
+    const noopSwap = manualSwapPitcher(swapResult.nextSession, 'home', relieverId);
+    expect(noopSwap.event).toBeNull();
   });
 });

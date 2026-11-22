@@ -332,6 +332,45 @@ function maybeSwapReliever(state: GameSessionState, events: PlayEvent[]): void {
   );
 }
 
+/** Manually brings an unused reliever from the bullpen into the active game session. */
+export function manualSwapPitcher(
+  session: GameSessionState,
+  sideKey: 'away' | 'home',
+  relieverId: string,
+): { nextSession: GameSessionState; event: PlayEvent | null } {
+  if (session.status !== 'in_progress') {
+    return { nextSession: session, event: null };
+  }
+  const currentSide = sideKey === 'away' ? session.away : session.home;
+  const available =
+    currentSide.bullpenIds.includes(relieverId) &&
+    !currentSide.usedPitcherIds.includes(relieverId);
+  if (!available) {
+    return { nextSession: session, event: null };
+  }
+
+  const next = cloneSessionForStep(session);
+  next.stepCounter = session.stepCounter;
+  const targetSide = sideKey === 'away' ? next.away : next.home;
+  targetSide.usedPitcherIds = [...targetSide.usedPitcherIds, relieverId];
+  targetSide.activePitcherId = relieverId;
+  targetSide.pitcherFatigue = 0;
+
+  const pitcherMap =
+    sideKey === 'away' ? next.boxScore.awayPitchers : next.boxScore.homePitchers;
+  pitcherMap[relieverId] = createEmptyPitcherLine(relieverId);
+
+  const reliever = targetSide.playersById[relieverId];
+  const event = makeEvent(next, {
+    type: 'pitching_change',
+    outsBefore: next.outs,
+    pitcherId: relieverId,
+    commentary: `Manager calls the pen — ${reliever.name} (${reliever.throws}HP) takes the mound!`,
+    soundCue: 'organ_charge',
+  });
+  return { nextSession: next, event };
+}
+
 function assignPitcherDecisions(state: GameSessionState, winnerClubId: string): void {
   const winningPitchers = Object.values(
     winnerClubId === state.home.clubId ? state.boxScore.homePitchers : state.boxScore.awayPitchers,
@@ -610,7 +649,7 @@ function mergePitcherLineToDelta(
   return stat;
 }
 
-function buildPlayerStatDeltas(box: GameBoxScore): Record<string, PlayerSeasonStats> {
+export function buildPlayerStatDeltas(box: GameBoxScore): Record<string, PlayerSeasonStats> {
   const deltas: Record<string, PlayerSeasonStats> = {};
   for (const list of [Object.values(box.awayBatters), Object.values(box.homeBatters)]) {
     for (const line of list) {
