@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 
 export interface NavItem {
@@ -31,6 +31,12 @@ export function AppShell({
   utilityActions,
   children,
 }: AppShellProps) {
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [activeTab]);
+
   return (
     <div className="min-h-screen bg-halftone flex flex-col md:flex-row">
       {/* Desktop Sidebar */}

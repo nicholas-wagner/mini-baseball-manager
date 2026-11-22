@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { soundEngine } from '../audio/soundEngine';
 
+export type GameDayControlMode = 'simple' | 'advanced';
+
 export interface UserPreferences {
   sfxVolume: number;
   hapticsEnabled: boolean;
@@ -9,6 +11,7 @@ export interface UserPreferences {
   colorblindStatSymbols: boolean;
   enableInjuries: boolean;
   enableIllnesses: boolean;
+  gameDayControlMode: GameDayControlMode;
 }
 
 const PREFS_STORAGE_KEY = 'mbm.user.prefs.v1';
@@ -21,6 +24,7 @@ const DEFAULT_PREFS: UserPreferences = {
   colorblindStatSymbols: false,
   enableInjuries: true,
   enableIllnesses: true,
+  gameDayControlMode: 'simple',
 };
 
 function readSavedPrefs(): UserPreferences {
@@ -42,6 +46,8 @@ function readSavedPrefs(): UserPreferences {
       colorblindStatSymbols: parsed.colorblindStatSymbols ?? DEFAULT_PREFS.colorblindStatSymbols,
       enableInjuries: parsed.enableInjuries ?? DEFAULT_PREFS.enableInjuries,
       enableIllnesses: parsed.enableIllnesses ?? DEFAULT_PREFS.enableIllnesses,
+      gameDayControlMode:
+        parsed.gameDayControlMode === 'advanced' ? 'advanced' : DEFAULT_PREFS.gameDayControlMode,
     };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -77,6 +83,8 @@ interface UserPreferencesStore extends UserPreferences {
   toggleColorblindStatSymbols: () => void;
   toggleInjuries: () => void;
   toggleIllnesses: () => void;
+  setGameDayControlMode: (mode: GameDayControlMode) => void;
+  toggleGameDayControlMode: () => void;
   resetDefaults: () => void;
 }
 
@@ -92,6 +100,7 @@ function extractPrefs(state: UserPreferencesStore): UserPreferences {
     colorblindStatSymbols: state.colorblindStatSymbols,
     enableInjuries: state.enableInjuries,
     enableIllnesses: state.enableIllnesses,
+    gameDayControlMode: state.gameDayControlMode,
   };
 }
 
@@ -113,6 +122,11 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
       applyPatch({ colorblindStatSymbols: !get().colorblindStatSymbols }),
     toggleInjuries: () => applyPatch({ enableInjuries: !get().enableInjuries }),
     toggleIllnesses: () => applyPatch({ enableIllnesses: !get().enableIllnesses }),
+    setGameDayControlMode: (mode) => applyPatch({ gameDayControlMode: mode }),
+    toggleGameDayControlMode: () =>
+      applyPatch({
+        gameDayControlMode: get().gameDayControlMode === 'simple' ? 'advanced' : 'simple',
+      }),
     resetDefaults: () => applyPatch({ ...DEFAULT_PREFS }),
   };
 });

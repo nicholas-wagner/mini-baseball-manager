@@ -3,11 +3,13 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
 import { useNemesisStore } from '../../store/nemesisStore';
+import { useUserPreferencesStore } from '../../store/userPreferences';
 import { FoilPackModal } from './FoilPackModal';
 import { GameDayScreen } from '../screens/GameDayScreen';
 
 describe('Mind Games, Live Dugout Chess, 1994 Foil Packs & Nemesis Matchups UI', () => {
   beforeEach(() => {
+    useUserPreferencesStore.getState().resetDefaults();
     useNemesisStore.getState().resetHistory();
     useFoilPackStore.getState().resetPacks();
     useGameStore.getState().startNewCareer({
@@ -26,6 +28,7 @@ describe('Mind Games, Live Dugout Chess, 1994 Foil Packs & Nemesis Matchups UI',
   it('exposes Pitch Target / Guess Pitch Mind Games & Live Dugout Chess (Mound Visit, Kick Dirt, Bench) on GameDayScreen', () => {
     render(<GameDayScreen />);
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+    fireEvent.click(screen.getByTestId('control-mode-toggle'));
 
     // Top 1: Human is pitching -> Target Intent bar + Mound Visit + Kick Dirt button available
     expect(screen.getByTestId('mind-games-bar')).toBeInTheDocument();

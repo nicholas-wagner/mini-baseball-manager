@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ClipboardList,
   CloudRain,
-  FastForward,
   Flame,
   Gift,
   Play,
   RefreshCw,
-  SkipForward,
+  Sliders,
   Sparkles,
   Sun,
   Trophy,
@@ -73,6 +72,10 @@ import {
   resolveArgueCallGamble,
 } from '../../engine/simulation/dugoutDrama';
 import {
+  computeLiveActionCue,
+  type SuggestedQuickAction,
+} from '../../engine/simulation/liveActionAdvisor';
+import {
   BATTER_GUESS_OPTIONS,
   PITCH_TARGET_OPTIONS,
   type BatterPitchGuess,
@@ -97,9 +100,9 @@ import { useGameStore, type PostGameSummary } from '../../store/gameStore';
 import { useNemesisStore } from '../../store/nemesisStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
-import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
 import { BroadcastHud } from '../components/BroadcastHud';
 import { FoilPackModal } from '../components/FoilPackModal';
+import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { LiveGameCanvas } from '../components/LiveGameCanvas';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
@@ -170,7 +173,7 @@ export function GameDayScreen() {
     : [];
 
   const [selectedOpponentId, setSelectedOpponentId] = useState<string>(opponents[0]?.id ?? '');
-  const [gameLength, setGameLength] = useState<GameLengthInnings>(9);
+  const [gameLength, setGameLength] = useState<GameLengthInnings>(5);
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const [recentEvents, setRecentEvents] = useState<PlayEvent[]>([]);
@@ -201,6 +204,9 @@ export function GameDayScreen() {
   const [gameWeather, setGameWeather] = useState<GameDayWeather | null>(null);
   const hapticsEnabled = useUserPreferencesStore((s) => s.hapticsEnabled);
   const wakeLockEnabled = useUserPreferencesStore((s) => s.wakeLockEnabled);
+  const controlMode = useUserPreferencesStore((s) => s.gameDayControlMode);
+  const setControlMode = useUserPreferencesStore((s) => s.setGameDayControlMode);
+  const toggleControlMode = useUserPreferencesStore((s) => s.toggleGameDayControlMode);
   const pendingLivePlayoff = usePostseasonStore((s) => s.pendingLiveGame);
   const recordLivePlayoffResult = usePostseasonStore((s) => s.recordLivePlayoffResult);
   const nemesisHistory = useNemesisStore((s) => s.history);
@@ -215,6 +221,13 @@ export function GameDayScreen() {
     const starterRecord = createCrosstownStarterRivalry(humanClub, activeOpponent);
     return buildRivalryShowdownPreview(humanClub, activeOpponent, starterRecord);
   }, [humanClub, activeOpponent]);
+
+  const hasLiveSession = liveSession !== null;
+  useEffect(() => {
+    if (hasLiveSession && typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [hasLiveSession]);
 
   // Keep Android screen awake during active live 3D games when Wake Lock preference is ON
   useEffect(() => {
@@ -519,6 +532,65 @@ export function GameDayScreen() {
                 <span>Tap “Start Live 3D Game” to take the field!</span>
               </div>
             ) : null}
+            <div className="flex flex-wrap gap-3">
+              <ComicButton
+                variant="turf"
+                size="lg"
+                icon={<Play className="w-4 h-4" />}
+                onClick={() => handleStartLiveGame(false)}
+              >
+                Start Live 3D Game
+              </ComicButton>
+              <ComicButton
+                variant="gold"
+                size="lg"
+                icon={<Zap className="w-4 h-4" />}
+                onClick={handleInstantSimPreGame}
+              >
+                Instant Sim Game
+              </ComicButton>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-extrabold uppercase text-[#181B2C]">
+                Game Length:
+              </span>
+              {GAME_LENGTH_OPTIONS.map((opt) => (
+                <ComicButton
+                  key={opt.innings}
+                  size="sm"
+                  variant={gameLength === opt.innings ? 'gold' : 'cream'}
+                  active={gameLength === opt.innings}
+                  onClick={() => setGameLength(opt.innings)}
+                >
+                  {opt.label}
+                </ComicButton>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-extrabold uppercase text-[#181B2C] flex items-center gap-1">
+                <Sliders className="w-3.5 h-3.5" />
+                Play Style:
+              </span>
+              <ComicButton
+                size="sm"
+                variant={controlMode === 'simple' ? 'turf' : 'cream'}
+                active={controlMode === 'simple'}
+                onClick={() => setControlMode('simple')}
+              >
+                🎮 Arcade Mode (Simple)
+              </ComicButton>
+              <ComicButton
+                size="sm"
+                variant={controlMode === 'advanced' ? 'violet' : 'cream'}
+                active={controlMode === 'advanced'}
+                onClick={() => setControlMode('advanced')}
+              >
+                🧠 Pro Manager (All Controls)
+              </ComicButton>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {opponents.map((opp) => {
                 const selected = (selectedOpponentId || opponents[0]?.id) === opp.id;
@@ -549,42 +621,6 @@ export function GameDayScreen() {
                 );
               })}
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-extrabold uppercase text-[#181B2C]">
-                Game Length:
-              </span>
-              {GAME_LENGTH_OPTIONS.map((opt) => (
-                <ComicButton
-                  key={opt.innings}
-                  size="sm"
-                  variant={gameLength === opt.innings ? 'gold' : 'cream'}
-                  active={gameLength === opt.innings}
-                  onClick={() => setGameLength(opt.innings)}
-                >
-                  {opt.label}
-                </ComicButton>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <ComicButton
-                variant="turf"
-                size="lg"
-                icon={<Play className="w-4 h-4" />}
-                onClick={() => handleStartLiveGame(false)}
-              >
-                Start Live 3D Game
-              </ComicButton>
-              <ComicButton
-                variant="gold"
-                size="lg"
-                icon={<Zap className="w-4 h-4" />}
-                onClick={handleInstantSimPreGame}
-              >
-                Instant Sim Game
-              </ComicButton>
-            </div>
           </div>
         </ComicCard>
 
@@ -610,8 +646,6 @@ export function GameDayScreen() {
             </ComicButton>
           </div>
         ) : null}
-
-        <BallparkSoundboardCard />
 
         <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
 
@@ -655,6 +689,44 @@ export function GameDayScreen() {
   const availableRelievers = liveSession.home.bullpenIds.filter(
     (id) => !liveSession.home.usedPitcherIds.includes(id),
   );
+  const liveCue = computeLiveActionCue({
+    session: liveSession,
+    tacticalCall,
+    armedPowerId,
+    moundVisitUsed,
+  });
+  const liveCallout = buildComicCallout(playbackEvent);
+  const liveNemesis = evaluateNemesisMatchup(
+    nemesisHistory,
+    currentBatter.id,
+    currentPitcher.id,
+    currentBatter.name,
+    currentPitcher.name,
+  );
+
+  const handleSuggestedAction = (action: SuggestedQuickAction) => {
+    if (action.type === 'arm_power' && action.powerId) {
+      setArmedPowerId(action.powerId);
+      soundEngine.play('clutch_stinger');
+      return;
+    }
+    if (action.type === 'steal' && action.tacticalCall) {
+      setTacticalCall(action.tacticalCall);
+      soundEngine.play('steal_burst');
+      return;
+    }
+    if (action.type === 'mound_visit' && !moundVisitUsed) {
+      const res = applyMoundVisit(liveSession, 'home', 'calm_breath');
+      if (res.applied && res.event) {
+        setMoundVisitUsed(true);
+        applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+      }
+      return;
+    }
+    if (action.type === 'bullpen_swap' && action.relieverId) {
+      handleBullpenSwap(action.relieverId);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -672,95 +744,135 @@ export function GameDayScreen() {
         outs={liveSession.outs}
       />
 
-      {/* Dynamic Weather, Park Factors & 1-Tap Live Box Score Strip */}
-      {(() => {
-        const park = getBallparkPreset(liveSession.ballparkId);
-        const weatherImpact = gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : null;
-        return (
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
+        <div className="space-y-3">
+          {/* Unified 3D Ballpark + Directly Attached Live Action Bar (always visible together!) */}
           <div className="space-y-2">
-            <div
-              data-testid="game-weather-banner"
-              className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2 text-xs"
-            >
-              <div className="flex flex-wrap items-center gap-2 font-extrabold text-[#181B2C]">
-                {gameWeather?.condition === 'drizzle' ? (
-                  <CloudRain className="w-4 h-4 text-[#1D3557]" />
-                ) : (
-                  <Sun className="w-4 h-4 text-[#F77F00]" />
-                )}
-                <span>🏟️ {park.name}</span>
-                <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[10px] text-[#1D3557]">
-                  {weatherImpact ? weatherImpact.hudLabel : 'Clear Ballpark Skies'}
-                </span>
-                <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[10px]">
-                  Park HR {park.factors.hrFactor.toFixed(2)}x
-                  {weatherImpact && weatherImpact.hrCarryMultiplier !== 1
-                    ? ` • Wind Carry ${weatherImpact.hrCarryMultiplier.toFixed(2)}x`
-                    : ''}
-                </span>
-              </div>
-              <ComicButton
-                size="sm"
-                variant="sky"
-                icon={<ClipboardList className="w-3.5 h-3.5" />}
-                onClick={() => {
-                  setBoxScoreOpen(true);
-                  soundEngine.play('ui_pop');
-                }}
-              >
-                Live Box Score
-              </ComicButton>
-            </div>
+            <LiveGameCanvas
+              awayClub={activeOpponent}
+              homeClub={humanClub}
+              session={liveSession}
+              choreo={lastChoreo}
+              lastEvent={playbackEvent}
+              overlay={
+                liveCallout ? (
+                  <div
+                    data-testid="comic-callout-banner"
+                    className="px-3 py-1.5 rounded-xl border-[3px] border-[#181B2C] shadow-[3px_3px_0_#181B2C] flex flex-wrap items-center justify-center gap-2 max-w-[95%]"
+                    style={{ backgroundColor: liveCallout.bg, color: liveCallout.text }}
+                  >
+                    <span className="font-display text-xs sm:text-sm tracking-wide">
+                      {liveCallout.title}
+                    </span>
+                    <span className="hidden sm:inline text-[11px] font-extrabold opacity-95">
+                      {liveCallout.subtitle}
+                    </span>
+                  </div>
+                ) : null
+              }
+            />
 
-            {rivalryPreview ? (
+            <LiveActionBar
+              cue={liveCue}
+              matchupLabel={`${currentBatter.name} vs ${currentPitcher.name}`}
+              basesLabel={`Bases: ${liveSession.bases.map((b, idx) => (b ? `${idx + 1}B` : '·')).join(' ')}`}
+              latestEvent={recentEvents[0] ?? null}
+              controlMode={controlMode}
+              watchMode={watchMode}
+              tacticalCall={tacticalCall}
+              isBatting={liveSession.half === 'BOT'}
+              gameCompleted={liveSession.status === 'completed'}
+              onNextPitch={handleNextPitch}
+              onToggleWatchMode={() => setWatchMode((w) => (w === 'live' ? 'paused' : 'live'))}
+              onSimAtBat={handleSimAtBat}
+              onSimHalfInning={handleSimHalfInning}
+              onClutchSim={handleClutchSim}
+              onSimToEnd={handleSimToEnd}
+              onSelectTacticalCall={(call) => {
+                setTacticalCall(call);
+                soundEngine.play('ui_pop');
+              }}
+              onSuggestedAction={handleSuggestedAction}
+              onToggleControlMode={() => {
+                toggleControlMode();
+                soundEngine.play('ui_pop');
+              }}
+            />
+
+            {liveNemesis ? (
               <div
-                data-testid="rivalry-showdown-banner"
-                className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-gradient-to-r from-[#FF4D6D] via-[#FFC300] to-[#1D3557] text-[#181B2C] flex flex-wrap items-center justify-between gap-2 text-xs shadow-[3px_3px_0_#181B2C]"
+                data-testid="nemesis-matchup-banner"
+                className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] text-[#9D0208] text-[11px] font-extrabold flex flex-wrap items-center justify-between gap-1"
               >
-                <div className="flex items-center gap-1.5 font-display text-[#FFFDF7] drop-shadow-[1px_1px_0_#181B2C]">
-                  <Flame className="w-4 h-4 text-[#FFD166] shrink-0" />
-                  <span>{rivalryPreview.vsBannerTitle}</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
-                  <span className="px-2 py-0.5 rounded bg-[#FFFDF7] border border-[#181B2C]">
-                    🏆 {rivalryPreview.cupName}
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C]">
-                    Heat {rivalryPreview.heat}/100 • +{Math.round((rivalryPreview.modifiers.hypeGainMultiplier - 1) * 100)}% Hype
-                  </span>
-                </div>
+                <span>{liveNemesis.badgeText}</span>
+                <span className="text-[#181B2C]">{liveNemesis.bannerText}</span>
               </div>
             ) : null}
           </div>
-        );
-      })()}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
-        <div className="space-y-3">
+          {/* Dynamic Weather, Park Factors & 1-Tap Live Box Score Strip */}
           {(() => {
-            const callout = buildComicCallout(playbackEvent);
-            if (!callout) return null;
+            const park = getBallparkPreset(liveSession.ballparkId);
+            const weatherImpact = gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : null;
             return (
-              <div
-                data-testid="comic-callout-banner"
-                className="px-3.5 py-2 rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] flex flex-wrap items-center justify-between gap-2"
-                style={{ backgroundColor: callout.bg, color: callout.text }}
-              >
-                <span className="font-display text-sm sm:text-base tracking-wide">
-                  {callout.title}
-                </span>
-                <span className="text-[11px] font-extrabold opacity-95">{callout.subtitle}</span>
+              <div className="space-y-2">
+                <div
+                  data-testid="game-weather-banner"
+                  className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2 text-xs"
+                >
+                  <div className="flex flex-wrap items-center gap-2 font-extrabold text-[#181B2C]">
+                    {gameWeather?.condition === 'drizzle' ? (
+                      <CloudRain className="w-4 h-4 text-[#1D3557]" />
+                    ) : (
+                      <Sun className="w-4 h-4 text-[#F77F00]" />
+                    )}
+                    <span>🏟️ {park.name}</span>
+                    <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[10px] text-[#1D3557]">
+                      {weatherImpact ? weatherImpact.hudLabel : 'Clear Ballpark Skies'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[10px]">
+                      Park HR {park.factors.hrFactor.toFixed(2)}x
+                      {weatherImpact && weatherImpact.hrCarryMultiplier !== 1
+                        ? ` • Wind Carry ${weatherImpact.hrCarryMultiplier.toFixed(2)}x`
+                        : ''}
+                    </span>
+                  </div>
+                  <ComicButton
+                    size="sm"
+                    variant="sky"
+                    icon={<ClipboardList className="w-3.5 h-3.5" />}
+                    onClick={() => {
+                      setBoxScoreOpen(true);
+                      soundEngine.play('ui_pop');
+                    }}
+                  >
+                    Live Box Score
+                  </ComicButton>
+                </div>
+
+                {rivalryPreview ? (
+                  <div
+                    data-testid="rivalry-showdown-banner"
+                    className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-gradient-to-r from-[#FF4D6D] via-[#FFC300] to-[#1D3557] text-[#181B2C] flex flex-wrap items-center justify-between gap-2 text-xs shadow-[3px_3px_0_#181B2C]"
+                  >
+                    <div className="flex items-center gap-1.5 font-display text-[#FFFDF7] drop-shadow-[1px_1px_0_#181B2C]">
+                      <Flame className="w-4 h-4 text-[#FFD166] shrink-0" />
+                      <span>{rivalryPreview.vsBannerTitle}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
+                      <span className="px-2 py-0.5 rounded bg-[#FFFDF7] border border-[#181B2C]">
+                        🏆 {rivalryPreview.cupName}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C]">
+                        Heat {rivalryPreview.heat}/100 • +
+                        {Math.round((rivalryPreview.modifiers.hypeGainMultiplier - 1) * 100)}% Hype
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             );
           })()}
-
-          <LiveGameCanvas
-            awayClub={activeOpponent}
-            homeClub={humanClub}
-            session={liveSession}
-            choreo={lastChoreo}
-            lastEvent={playbackEvent}
-          />
 
           <BroadcastHud
             session={liveSession}
@@ -779,373 +891,325 @@ export function GameDayScreen() {
             atBatEvents={atBatEvents}
           />
 
-          <ComicCard
-            title={`${currentBatter.name} (${currentBatter.bats}) vs ${currentPitcher.name} (${currentPitcher.throws}HP)`}
-            subtitle={`${platoon.label} • Bases: ${liveSession.bases.map((b, idx) => (b ? `${idx + 1}B` : '·')).join(' ')}`}
-            headerBg="#1D3557"
-            badge={
-              <div className="flex flex-wrap gap-1.5">
-                {([1, 2, 4] as const).map((rate) => (
-                  <ComicButton
-                    key={rate}
-                    size="sm"
-                    variant={speed === rate ? 'gold' : 'cream'}
-                    active={speed === rate}
-                    onClick={() => setSpeed(rate)}
-                  >
-                    {rate}x
-                  </ComicButton>
-                ))}
-              </div>
-            }
-          >
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold">
-                <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
-                  Batter Crushes: {PITCH_TYPE_SHORT_LABELS[currentBatter.batterPitchProfile.favoritePitch]}
-                </span>
-                <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
-                  Batter Weak: {PITCH_TYPE_SHORT_LABELS[currentBatter.batterPitchProfile.weakPitch]}
-                </span>
-                {currentPitcher.pitchArsenal ? (
-                  <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[#181B2C]">
-                    {currentPitcher.position} Mix ({currentPitcher.pitchArsenal.repertoire.length}): ★{' '}
-                    {PITCH_TYPE_SHORT_LABELS[currentPitcher.pitchArsenal.favoritePitch]}
-                  </span>
-                ) : null}
-                <span
-                  data-testid="leverage-hud"
-                  className={`px-2 py-0.5 rounded border border-[#181B2C] ${
-                    currentLeverage.tier === 'critical'
-                      ? 'bg-[#FF4D6D] text-white'
-                      : currentLeverage.tier === 'high'
-                        ? 'bg-[#FFC300] text-[#181B2C]'
-                        : 'bg-[#F1E4C8] text-[#181B2C]'
-                  }`}
-                >
-                  LI {currentLeverage.leverageIndex.toFixed(2)} • {currentLeverage.label}
-                </span>
-                <span
-                  data-testid="endurance-hud"
-                  className={`px-2 py-0.5 rounded border border-[#181B2C] ${
-                    enduranceFx.tier === 'gassed' || enduranceFx.tier === 'fatigued'
-                      ? 'bg-[#FF4D6D] text-white'
-                      : enduranceFx.tier === 'tiring'
-                        ? 'bg-[#FFC300] text-[#181B2C]'
-                        : 'bg-[#D8F3DC] text-[#1B4332]'
-                  }`}
-                >
-                  Endurance {pitcherEndurance}% ({enduranceFx.tier}
-                  {enduranceFx.mphDrop < 0 ? `, ${enduranceFx.mphDrop} mph` : ''})
-                </span>
-                {enduranceFx.scoutWarning ? (
-                  <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
-                    ⚠️ {enduranceFx.scoutWarning}
-                  </span>
-                ) : null}
-                <span
-                  data-testid="special-ability-hud"
-                  className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]"
-                >
-                  ⚡ Hype {fieldingHype}/{SPECIAL_ABILITY_HYPE_COST} • Pitcher {pitcherSpecial.chargesLeft}/
-                  {pitcherSpecial.maxCharges}
-                  {pitcherSpecial.cooldownRemaining > 0
-                    ? ` (CD ${pitcherSpecial.cooldownRemaining})`
-                    : ''}{' '}
-                  • Batter {batterSpecial.chargesLeft}/{batterSpecial.maxCharges}
-                </span>
-              </div>
-
-              {/* Active National Heritage & Individual Capstone Matchup Badges + Unleash Power Dock */}
-              {(() => {
-                const batHer = evaluateHeritageGameplayProfile(currentBatter, currentLeverage.leverageIndex);
-                const pitHer = evaluateHeritageGameplayProfile(currentPitcher, currentLeverage.leverageIndex);
-                const batCaps = evaluateCapstoneGameplayProfile(currentBatter, currentLeverage.leverageIndex);
-                const pitCaps = evaluateCapstoneGameplayProfile(currentPitcher, currentLeverage.leverageIndex);
-                const humanRole: 'pitcher' | 'batter' = liveSession.half === 'BOT' ? 'batter' : 'pitcher';
-                const humanActor = humanRole === 'batter' ? currentBatter : currentPitcher;
-                const humanAvail = humanRole === 'batter' ? batterSpecial : pitcherSpecial;
-                const humanHypeNow = liveSession.home.hypeGauge;
-                const activatable = getActivatablePowersForPlayer(humanActor, humanRole);
-
-                return (
-                  <div className="space-y-2">
-                    <div
-                      data-testid="matchup-power-badges"
-                      className="flex flex-wrap gap-1.5 text-[10px] font-extrabold"
-                    >
-                      <span
-                        className="px-2 py-0.5 rounded border border-[#181B2C] bg-[#F5EEFF] text-[#4C1D95]"
-                        title={batHer.ability.shortEffect}
-                      >
-                        Batter Nation: {batHer.summaryTag}
-                        {batCaps.equippedPowerNames.length > 0
-                          ? ` + ${batCaps.equippedPowerNames.join(', ')}`
-                          : ''}
-                      </span>
-                      <span
-                        className="px-2 py-0.5 rounded border border-[#181B2C] bg-[#E0FBFC] text-[#1D3557]"
-                        title={pitHer.ability.shortEffect}
-                      >
-                        Pitcher Nation: {pitHer.summaryTag}
-                        {pitCaps.equippedPowerNames.length > 0
-                          ? ` + ${pitCaps.equippedPowerNames.join(', ')}`
-                          : ''}
-                      </span>
-                    </div>
-
-                    <div
-                      data-testid="active-powers-dock"
-                      className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#F5EEFF] space-y-1.5"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold uppercase text-[#4C1D95]">
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5" />
-                          {humanActor.name} — National &amp; Individual Powers ({humanRole})
-                        </span>
-                        <span>
-                          {humanAvail.allowed
-                            ? `READY! (${humanAvail.chargesLeft}/${humanAvail.maxCharges} left)`
-                            : `Charging Hype ${humanHypeNow}/${SPECIAL_ABILITY_HYPE_COST} (${humanAvail.reason ?? 'Locked'})`}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {activatable.map((pwr) => {
-                          const armed = armedPowerId === pwr.id;
-                          return (
-                            <ComicButton
-                              key={pwr.id}
-                              size="sm"
-                              variant={armed ? 'coral' : pwr.source === 'capstone' ? 'gold' : 'violet'}
-                              active={armed}
-                              disabled={!humanAvail.allowed || liveSession.status === 'completed'}
-                              onClick={() => {
-                                setArmedPowerId((prev) => (prev === pwr.id ? null : pwr.id));
-                                soundEngine.play('clutch_stinger');
-                              }}
-                            >
-                              {armed ? `🔥 ARMED: ${pwr.name}` : `⚡ ${pwr.name}`}
-                            </ComicButton>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Live Player-vs-Player Nemesis Grudge Banner */}
-              {(() => {
-                const nemesis = evaluateNemesisMatchup(
-                  nemesisHistory,
-                  currentBatter.id,
-                  currentPitcher.id,
-                  currentBatter.name,
-                  currentPitcher.name,
-                );
-                if (!nemesis) return null;
-                return (
-                  <div
-                    data-testid="nemesis-matchup-banner"
-                    className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] text-[#9D0208] text-[11px] font-extrabold flex flex-wrap items-center justify-between gap-1"
-                  >
-                    <span>{nemesis.badgeText}</span>
-                    <span className="text-[#181B2C]">{nemesis.bannerText}</span>
-                  </div>
-                );
-              })()}
-
-              {/* Pitcher/Batter Cat-and-Mouse Mind Games Bar */}
-              <div
-                data-testid="mind-games-bar"
-                className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
-              >
-                <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
-                  {liveSession.half === 'TOP'
-                    ? 'Pitch Target Intent (Trade Strikes vs Whiffs / Chase)'
-                    : 'Guess Pitch Mind-Game (Guess Right: +14 CON/+12 PWR • Wrong: -8)'}
-                </div>
+          {controlMode === 'advanced' ? (
+            <ComicCard
+              title={`${currentBatter.name} (${currentBatter.bats}) vs ${currentPitcher.name} (${currentPitcher.throws}HP)`}
+              subtitle={`${platoon.label} • Bases: ${liveSession.bases.map((b, idx) => (b ? `${idx + 1}B` : '·')).join(' ')}`}
+              headerBg="#1D3557"
+              badge={
                 <div className="flex flex-wrap gap-1.5">
-                  {liveSession.half === 'TOP'
-                    ? PITCH_TARGET_OPTIONS.map((opt) => (
-                        <ComicButton
-                          key={opt.id}
-                          size="sm"
-                          variant={pitchTarget === opt.id ? 'sky' : 'cream'}
-                          active={pitchTarget === opt.id}
-                          onClick={() => {
-                            setPitchTarget(opt.id);
-                            soundEngine.play('ui_pop');
-                          }}
-                        >
-                          {opt.label}
-                        </ComicButton>
-                      ))
-                    : BATTER_GUESS_OPTIONS.map((opt) => (
-                        <ComicButton
-                          key={opt.id}
-                          size="sm"
-                          variant={batterGuess === opt.id ? 'gold' : 'cream'}
-                          active={batterGuess === opt.id}
-                          onClick={() => {
-                            setBatterGuess(opt.id);
-                            soundEngine.play('ui_pop');
-                          }}
-                        >
-                          {opt.label}
-                        </ComicButton>
-                      ))}
-                </div>
-              </div>
-
-              {liveSession.half === 'TOP' && currentPitcher.pitchArsenal ? (
-                <div
-                  data-testid="pitch-selector-bar"
-                  className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5"
-                >
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4A5068]">
-                    Call Pitch ({currentPitcher.position} Arsenal: {currentPitcher.pitchArsenal.repertoire.length}{' '}
-                    Pitches)
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  {([1, 2, 4] as const).map((rate) => (
                     <ComicButton
+                      key={rate}
                       size="sm"
-                      variant={selectedPitchType === null ? 'sky' : 'cream'}
-                      active={selectedPitchType === null}
-                      onClick={() => setSelectedPitchType(null)}
+                      variant={speed === rate ? 'gold' : 'cream'}
+                      active={speed === rate}
+                      onClick={() => setSpeed(rate)}
                     >
-                      Auto Pitch
+                      {rate}x
                     </ComicButton>
-                    {currentPitcher.pitchArsenal.repertoire.map((slot) => {
-                      const isFav = slot.pitchType === currentPitcher.pitchArsenal!.favoritePitch;
-                      const hitsWeak = slot.pitchType === currentBatter.batterPitchProfile.weakPitch;
-                      const hitsFav = slot.pitchType === currentBatter.batterPitchProfile.favoritePitch;
-                      const isSelected = selectedPitchType === slot.pitchType;
-                      return (
-                        <ComicButton
-                          key={slot.pitchType}
-                          size="sm"
-                          variant={isSelected ? 'gold' : 'cream'}
-                          active={isSelected}
-                          aria-label={`Pitch ${PITCH_TYPE_SHORT_LABELS[slot.pitchType]}`}
-                          onClick={() => setSelectedPitchType(slot.pitchType)}
-                        >
-                          {isFav ? '★ ' : ''}
-                          {PITCH_TYPE_SHORT_LABELS[slot.pitchType]} ({slot.mastery})
-                          {hitsWeak ? ' 🎯' : hitsFav ? ' ⚠️' : ''}
-                        </ComicButton>
-                      );
-                    })}
-                  </div>
+                  ))}
                 </div>
-              ) : null}
+              }
+            >
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold">
+                  <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
+                    Batter Crushes:{' '}
+                    {PITCH_TYPE_SHORT_LABELS[currentBatter.batterPitchProfile.favoritePitch]}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
+                    Batter Weak:{' '}
+                    {PITCH_TYPE_SHORT_LABELS[currentBatter.batterPitchProfile.weakPitch]}
+                  </span>
+                  {currentPitcher.pitchArsenal ? (
+                    <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[#181B2C]">
+                      {currentPitcher.position} Mix ({currentPitcher.pitchArsenal.repertoire.length}): ★{' '}
+                      {PITCH_TYPE_SHORT_LABELS[currentPitcher.pitchArsenal.favoritePitch]}
+                    </span>
+                  ) : null}
+                  <span
+                    data-testid="leverage-hud"
+                    className={`px-2 py-0.5 rounded border border-[#181B2C] ${
+                      currentLeverage.tier === 'critical'
+                        ? 'bg-[#FF4D6D] text-white'
+                        : currentLeverage.tier === 'high'
+                          ? 'bg-[#FFC300] text-[#181B2C]'
+                          : 'bg-[#F1E4C8] text-[#181B2C]'
+                    }`}
+                  >
+                    LI {currentLeverage.leverageIndex.toFixed(2)} • {currentLeverage.label}
+                  </span>
+                  <span
+                    data-testid="endurance-hud"
+                    className={`px-2 py-0.5 rounded border border-[#181B2C] ${
+                      enduranceFx.tier === 'gassed' || enduranceFx.tier === 'fatigued'
+                        ? 'bg-[#FF4D6D] text-white'
+                        : enduranceFx.tier === 'tiring'
+                          ? 'bg-[#FFC300] text-[#181B2C]'
+                          : 'bg-[#D8F3DC] text-[#1B4332]'
+                    }`}
+                  >
+                    Endurance {pitcherEndurance}% ({enduranceFx.tier}
+                    {enduranceFx.mphDrop < 0 ? `, ${enduranceFx.mphDrop} mph` : ''})
+                  </span>
+                  {enduranceFx.scoutWarning ? (
+                    <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
+                      ⚠️ {enduranceFx.scoutWarning}
+                    </span>
+                  ) : null}
+                  <span
+                    data-testid="special-ability-hud"
+                    className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]"
+                  >
+                    ⚡ Hype {fieldingHype}/{SPECIAL_ABILITY_HYPE_COST} • Pitcher{' '}
+                    {pitcherSpecial.chargesLeft}/{pitcherSpecial.maxCharges}
+                    {pitcherSpecial.cooldownRemaining > 0
+                      ? ` (CD ${pitcherSpecial.cooldownRemaining})`
+                      : ''}{' '}
+                    • Batter {batterSpecial.chargesLeft}/{batterSpecial.maxCharges}
+                  </span>
+                </div>
 
-              {manager && manager.activePowerIds.length > 0 ? (
+                {/* Active National Heritage & Individual Capstone Matchup Badges + Unleash Power Dock */}
+                {(() => {
+                  const batHer = evaluateHeritageGameplayProfile(
+                    currentBatter,
+                    currentLeverage.leverageIndex,
+                  );
+                  const pitHer = evaluateHeritageGameplayProfile(
+                    currentPitcher,
+                    currentLeverage.leverageIndex,
+                  );
+                  const batCaps = evaluateCapstoneGameplayProfile(
+                    currentBatter,
+                    currentLeverage.leverageIndex,
+                  );
+                  const pitCaps = evaluateCapstoneGameplayProfile(
+                    currentPitcher,
+                    currentLeverage.leverageIndex,
+                  );
+                  const humanRole: 'pitcher' | 'batter' =
+                    liveSession.half === 'BOT' ? 'batter' : 'pitcher';
+                  const humanActor = humanRole === 'batter' ? currentBatter : currentPitcher;
+                  const humanAvail = humanRole === 'batter' ? batterSpecial : pitcherSpecial;
+                  const humanHypeNow = liveSession.home.hypeGauge;
+                  const activatable = getActivatablePowersForPlayer(humanActor, humanRole);
+
+                  return (
+                    <div className="space-y-2">
+                      <div
+                        data-testid="matchup-power-badges"
+                        className="flex flex-wrap gap-1.5 text-[10px] font-extrabold"
+                      >
+                        <span
+                          className="px-2 py-0.5 rounded border border-[#181B2C] bg-[#F5EEFF] text-[#4C1D95]"
+                          title={batHer.ability.shortEffect}
+                        >
+                          Batter Nation: {batHer.summaryTag}
+                          {batCaps.equippedPowerNames.length > 0
+                            ? ` + ${batCaps.equippedPowerNames.join(', ')}`
+                            : ''}
+                        </span>
+                        <span
+                          className="px-2 py-0.5 rounded border border-[#181B2C] bg-[#E0FBFC] text-[#1D3557]"
+                          title={pitHer.ability.shortEffect}
+                        >
+                          Pitcher Nation: {pitHer.summaryTag}
+                          {pitCaps.equippedPowerNames.length > 0
+                            ? ` + ${pitCaps.equippedPowerNames.join(', ')}`
+                            : ''}
+                        </span>
+                      </div>
+
+                      <div
+                        data-testid="active-powers-dock"
+                        className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#F5EEFF] space-y-1.5"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold uppercase text-[#4C1D95]">
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            {humanActor.name} — National &amp; Individual Powers ({humanRole})
+                          </span>
+                          <span>
+                            {humanAvail.allowed
+                              ? `READY! (${humanAvail.chargesLeft}/${humanAvail.maxCharges} left)`
+                              : `Charging Hype ${humanHypeNow}/${SPECIAL_ABILITY_HYPE_COST} (${humanAvail.reason ?? 'Locked'})`}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activatable.map((pwr) => {
+                            const armed = armedPowerId === pwr.id;
+                            return (
+                              <ComicButton
+                                key={pwr.id}
+                                size="sm"
+                                variant={
+                                  armed ? 'coral' : pwr.source === 'capstone' ? 'gold' : 'violet'
+                                }
+                                active={armed}
+                                disabled={!humanAvail.allowed || liveSession.status === 'completed'}
+                                onClick={() => {
+                                  setArmedPowerId((prev) => (prev === pwr.id ? null : pwr.id));
+                                  soundEngine.play('clutch_stinger');
+                                }}
+                              >
+                                {armed ? `🔥 ARMED: ${pwr.name}` : `⚡ ${pwr.name}`}
+                              </ComicButton>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Pitcher/Batter Cat-and-Mouse Mind Games Bar */}
                 <div
-                  data-testid="manager-power-dock"
-                  className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] space-y-1.5"
+                  data-testid="mind-games-bar"
+                  className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
                 >
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#181B2C]">
-                    Manager Skipper Power Dock{' '}
-                    {managerEjected ? '(🚨 EJECTED — LOCKED THIS GAME!)' : '(1 Charge / Game Each)'}
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
+                    {liveSession.half === 'TOP'
+                      ? 'Pitch Target Intent (Trade Strikes vs Whiffs / Chase)'
+                      : 'Guess Pitch Mind-Game (Guess Right: +14 CON/+12 PWR • Wrong: -8)'}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {manager.activePowerIds.map((powerId: ManagerPowerId) => {
-                      const meta = MANAGER_POWER_CATALOG[powerId];
-                      const used = powerTracker.usedPowerIds.includes(powerId);
-                      return (
-                        <ComicButton
-                          key={powerId}
-                          size="sm"
-                          variant={used || managerEjected ? 'cream' : 'gold'}
-                          disabled={used || managerEjected || liveSession.status === 'completed'}
-                          onClick={() => {
-                            const res = triggerInGameManagerPower(
-                              powerTracker,
-                              manager,
-                              powerId,
-                              liveSession,
-                              'home',
-                            );
-                            if (res.used && res.event) {
-                              setPowerTracker(res.tracker);
-                              applyStepResult(res.session, [res.event], activeOpponent.id);
-                            }
-                          }}
-                        >
-                          ⚡ {meta.label} {used ? '(Used)' : '(1/1)'}
-                        </ComicButton>
-                      );
-                    })}
+                    {liveSession.half === 'TOP'
+                      ? PITCH_TARGET_OPTIONS.map((opt) => (
+                          <ComicButton
+                            key={opt.id}
+                            size="sm"
+                            variant={pitchTarget === opt.id ? 'sky' : 'cream'}
+                            active={pitchTarget === opt.id}
+                            onClick={() => {
+                              setPitchTarget(opt.id);
+                              soundEngine.play('ui_pop');
+                            }}
+                          >
+                            {opt.label}
+                          </ComicButton>
+                        ))
+                      : BATTER_GUESS_OPTIONS.map((opt) => (
+                          <ComicButton
+                            key={opt.id}
+                            size="sm"
+                            variant={batterGuess === opt.id ? 'gold' : 'cream'}
+                            active={batterGuess === opt.id}
+                            onClick={() => {
+                              setBatterGuess(opt.id);
+                              soundEngine.play('ui_pop');
+                            }}
+                          >
+                            {opt.label}
+                          </ComicButton>
+                        ))}
                   </div>
                 </div>
-              ) : null}
 
-              <div className="flex flex-wrap gap-2">
-                {TACTICAL_OPTIONS.map((opt) => (
-                  <ComicButton
-                    key={opt.id}
-                    size="sm"
-                    variant={tacticalCall === opt.id ? 'coral' : 'cream'}
-                    active={tacticalCall === opt.id}
-                    onClick={() => setTacticalCall(opt.id)}
+                {liveSession.half === 'TOP' && currentPitcher.pitchArsenal ? (
+                  <div
+                    data-testid="pitch-selector-bar"
+                    className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5"
                   >
-                    {opt.label}
-                  </ComicButton>
-                ))}
-              </div>
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4A5068]">
+                      Call Pitch ({currentPitcher.position} Arsenal:{' '}
+                      {currentPitcher.pitchArsenal.repertoire.length} Pitches)
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <ComicButton
+                        size="sm"
+                        variant={selectedPitchType === null ? 'sky' : 'cream'}
+                        active={selectedPitchType === null}
+                        onClick={() => setSelectedPitchType(null)}
+                      >
+                        Auto Pitch
+                      </ComicButton>
+                      {currentPitcher.pitchArsenal.repertoire.map((slot) => {
+                        const isFav = slot.pitchType === currentPitcher.pitchArsenal!.favoritePitch;
+                        const hitsWeak =
+                          slot.pitchType === currentBatter.batterPitchProfile.weakPitch;
+                        const hitsFav =
+                          slot.pitchType === currentBatter.batterPitchProfile.favoritePitch;
+                        const isSelected = selectedPitchType === slot.pitchType;
+                        return (
+                          <ComicButton
+                            key={slot.pitchType}
+                            size="sm"
+                            variant={isSelected ? 'gold' : 'cream'}
+                            active={isSelected}
+                            aria-label={`Pitch ${PITCH_TYPE_SHORT_LABELS[slot.pitchType]}`}
+                            onClick={() => setSelectedPitchType(slot.pitchType)}
+                          >
+                            {isFav ? '★ ' : ''}
+                            {PITCH_TYPE_SHORT_LABELS[slot.pitchType]} ({slot.mastery})
+                            {hitsWeak ? ' 🎯' : hitsFav ? ' ⚠️' : ''}
+                          </ComicButton>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
 
-              <div className="flex flex-wrap gap-2">
-                <ComicButton
-                  size="sm"
-                  variant={watchMode === 'live' ? 'turf' : 'sky'}
-                  onClick={() => setWatchMode((w) => (w === 'live' ? 'paused' : 'live'))}
-                >
-                  {watchMode === 'live' ? 'Pause Auto' : 'Auto Play 3D'}
-                </ComicButton>
-                <ComicButton
-                  size="sm"
-                  variant="turf"
-                  icon={<Play className="w-4 h-4" />}
-                  onClick={handleNextPitch}
-                >
-                  Next Pitch
-                </ComicButton>
-                <ComicButton
-                  size="sm"
-                  variant="sky"
-                  icon={<SkipForward className="w-4 h-4" />}
-                  onClick={handleSimAtBat}
-                >
-                  Sim At-Bat
-                </ComicButton>
-                <ComicButton
-                  size="sm"
-                  variant="cream"
-                  icon={<FastForward className="w-4 h-4" />}
-                  onClick={handleSimHalfInning}
-                >
-                  Sim Half-Inn
-                </ComicButton>
-                <ComicButton
-                  size="sm"
-                  variant="violet"
-                  icon={<Zap className="w-4 h-4" />}
-                  onClick={handleClutchSim}
-                >
-                  Clutch Sim
-                </ComicButton>
-                <ComicButton
-                  size="sm"
-                  variant="gold"
-                  icon={<FastForward className="w-4 h-4" />}
-                  onClick={handleSimToEnd}
-                >
-                  Sim to End
-                </ComicButton>
+                {manager && manager.activePowerIds.length > 0 ? (
+                  <div
+                    data-testid="manager-power-dock"
+                    className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] space-y-1.5"
+                  >
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#181B2C]">
+                      Manager Skipper Power Dock{' '}
+                      {managerEjected
+                        ? '(🚨 EJECTED — LOCKED THIS GAME!)'
+                        : '(1 Charge / Game Each)'}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {manager.activePowerIds.map((powerId: ManagerPowerId) => {
+                        const meta = MANAGER_POWER_CATALOG[powerId];
+                        const used = powerTracker.usedPowerIds.includes(powerId);
+                        return (
+                          <ComicButton
+                            key={powerId}
+                            size="sm"
+                            variant={used || managerEjected ? 'cream' : 'gold'}
+                            disabled={used || managerEjected || liveSession.status === 'completed'}
+                            onClick={() => {
+                              const res = triggerInGameManagerPower(
+                                powerTracker,
+                                manager,
+                                powerId,
+                                liveSession,
+                                'home',
+                              );
+                              if (res.used && res.event) {
+                                setPowerTracker(res.tracker);
+                                applyStepResult(res.session, [res.event], activeOpponent.id);
+                              }
+                            }}
+                          >
+                            ⚡ {meta.label} {used ? '(Used)' : '(1/1)'}
+                          </ComicButton>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  {TACTICAL_OPTIONS.map((opt) => (
+                    <ComicButton
+                      key={opt.id}
+                      size="sm"
+                      variant={tacticalCall === opt.id ? 'coral' : 'cream'}
+                      active={tacticalCall === opt.id}
+                      onClick={() => setTacticalCall(opt.id)}
+                    >
+                      {opt.label}
+                    </ComicButton>
+                  ))}
+                </div>
               </div>
-            </div>
-          </ComicCard>
+            </ComicCard>
+          ) : null}
         </div>
 
         <div className="space-y-3">
@@ -1215,191 +1279,211 @@ export function GameDayScreen() {
             </ul>
           </ComicCard>
 
-          <ComicCard title="DUGOUT CHESS & BENCH" headerBg="#7209B7">
-            <div data-testid="dugout-chess-card" className="space-y-2.5">
-              <div className="space-y-1.5">
-                <div className="text-[10px] font-extrabold uppercase text-[#4C1D95]">
-                  Mound Visit (1/Game) &amp; Umpire Drama
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <ComicButton
-                    size="sm"
-                    variant={moundVisitUsed ? 'cream' : 'sky'}
-                    disabled={moundVisitUsed || liveSession.status === 'completed'}
-                    onClick={() => {
-                      const res = applyMoundVisit(liveSession, 'home', 'calm_breath');
-                      if (res.applied && res.event) {
-                        setMoundVisitUsed(true);
-                        applyStepResult(res.nextSession, [res.event], activeOpponent.id);
-                      }
-                    }}
-                  >
-                    Mound Visit: Calm Breath
-                  </ComicButton>
-                  <ComicButton
-                    size="sm"
-                    variant={moundVisitUsed ? 'cream' : 'gold'}
-                    disabled={moundVisitUsed || liveSession.status === 'completed'}
-                    onClick={() => {
-                      const res = applyMoundVisit(liveSession, 'home', 'fire_up_crowd');
-                      if (res.applied && res.event) {
-                        setMoundVisitUsed(true);
-                        applyStepResult(res.nextSession, [res.event], activeOpponent.id);
-                      }
-                    }}
-                  >
-                    Mound Visit: Fire Crowd
-                  </ComicButton>
-                  <ComicButton
-                    size="sm"
-                    variant={argueUsed ? 'cream' : 'coral'}
-                    disabled={argueUsed || liveSession.status === 'completed'}
-                    onClick={() => {
-                      const rng = createSeededRng(
-                        liveSession.rngSeed + liveSession.stepCounter * 71 + 19,
-                      );
-                      const gamble = resolveArgueCallGamble(rng, liveSession, 'home');
-                      setArgueUsed(true);
-                      if (gamble.ejected) setManagerEjected(true);
-                      applyStepResult(gamble.nextSession, [gamble.event], activeOpponent.id);
-                    }}
-                  >
-                    {managerEjected ? '🚨 Skipper Ejected' : '🔥 Kick Dirt! (Argue Call)'}
-                  </ComicButton>
-                </div>
-              </div>
-
-              {(() => {
-                const bench = getAvailableBenchPlayers(liveSession, 'home');
-                const occupiedBaseIdx = liveSession.bases.findIndex((b) => b !== null) as
-                  | -1
-                  | 0
-                  | 1
-                  | 2;
-                return (
-                  <div className="space-y-1.5 pt-1.5 border-t border-dashed border-[#181B2C]/20">
-                    <div className="text-[10px] font-extrabold uppercase text-[#181B2C]">
-                      Pinch Hitters &amp; Pinch Runners ({bench.length} Available)
+          {controlMode === 'advanced' ? (
+            <>
+              <ComicCard title="DUGOUT CHESS & BENCH" headerBg="#7209B7">
+                <div data-testid="dugout-chess-card" className="space-y-2.5">
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-extrabold uppercase text-[#4C1D95]">
+                      Mound Visit (1/Game) &amp; Umpire Drama
                     </div>
-                    {bench.length === 0 ? (
-                      <div className="text-[11px] font-bold text-[#4A5068]">
-                        Bench empty — all subs used.
-                      </div>
-                    ) : (
-                      bench.slice(0, 3).map((sub) => (
-                        <div
-                          key={sub.id}
-                          className="p-2 rounded-lg border border-[#181B2C]/20 bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-1.5 text-[11px]"
-                        >
-                          <div className="font-extrabold text-[#181B2C]">
-                            {sub.position} {sub.name} ({sub.bats}) • SPD {sub.ratings.speed}
+                    <div className="flex flex-wrap gap-1.5">
+                      <ComicButton
+                        size="sm"
+                        variant={moundVisitUsed ? 'cream' : 'sky'}
+                        disabled={moundVisitUsed || liveSession.status === 'completed'}
+                        onClick={() => {
+                          const res = applyMoundVisit(liveSession, 'home', 'calm_breath');
+                          if (res.applied && res.event) {
+                            setMoundVisitUsed(true);
+                            applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+                          }
+                        }}
+                      >
+                        Mound Visit: Calm Breath
+                      </ComicButton>
+                      <ComicButton
+                        size="sm"
+                        variant={moundVisitUsed ? 'cream' : 'gold'}
+                        disabled={moundVisitUsed || liveSession.status === 'completed'}
+                        onClick={() => {
+                          const res = applyMoundVisit(liveSession, 'home', 'fire_up_crowd');
+                          if (res.applied && res.event) {
+                            setMoundVisitUsed(true);
+                            applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+                          }
+                        }}
+                      >
+                        Mound Visit: Fire Crowd
+                      </ComicButton>
+                      <ComicButton
+                        size="sm"
+                        variant={argueUsed ? 'cream' : 'coral'}
+                        disabled={argueUsed || liveSession.status === 'completed'}
+                        onClick={() => {
+                          const rng = createSeededRng(
+                            liveSession.rngSeed + liveSession.stepCounter * 71 + 19,
+                          );
+                          const gamble = resolveArgueCallGamble(rng, liveSession, 'home');
+                          setArgueUsed(true);
+                          if (gamble.ejected) setManagerEjected(true);
+                          applyStepResult(gamble.nextSession, [gamble.event], activeOpponent.id);
+                        }}
+                      >
+                        {managerEjected ? '🚨 Skipper Ejected' : '🔥 Kick Dirt! (Argue Call)'}
+                      </ComicButton>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const bench = getAvailableBenchPlayers(liveSession, 'home');
+                    const occupiedBaseIdx = liveSession.bases.findIndex((b) => b !== null) as
+                      | -1
+                      | 0
+                      | 1
+                      | 2;
+                    return (
+                      <div className="space-y-1.5 pt-1.5 border-t border-dashed border-[#181B2C]/20">
+                        <div className="text-[10px] font-extrabold uppercase text-[#181B2C]">
+                          Pinch Hitters &amp; Pinch Runners ({bench.length} Available)
+                        </div>
+                        {bench.length === 0 ? (
+                          <div className="text-[11px] font-bold text-[#4A5068]">
+                            Bench empty — all subs used.
                           </div>
-                          <div className="flex gap-1">
-                            {liveSession.half === 'BOT' ? (
-                              <ComicButton
-                                size="sm"
-                                variant="gold"
-                                disabled={liveSession.status === 'completed'}
-                                onClick={() => {
-                                  const res = applyPinchHitter(liveSession, 'home', sub.id);
-                                  if (res.applied && res.event) {
-                                    applyStepResult(res.nextSession, [res.event], activeOpponent.id);
-                                  }
-                                }}
-                              >
-                                Pinch Hit
-                              </ComicButton>
-                            ) : null}
-                            {liveSession.half === 'BOT' && occupiedBaseIdx >= 0 ? (
-                              <ComicButton
-                                size="sm"
-                                variant="turf"
-                                disabled={liveSession.status === 'completed'}
-                                onClick={() => {
-                                  const res = applyPinchRunner(
-                                    liveSession,
-                                    'home',
-                                    occupiedBaseIdx as 0 | 1 | 2,
-                                    sub.id,
-                                  );
-                                  if (res.applied && res.event) {
-                                    applyStepResult(res.nextSession, [res.event], activeOpponent.id);
-                                  }
-                                }}
-                              >
-                                Pinch Run {occupiedBaseIdx + 1}B
-                              </ComicButton>
-                            ) : null}
+                        ) : (
+                          bench.slice(0, 3).map((sub) => (
+                            <div
+                              key={sub.id}
+                              className="p-2 rounded-lg border border-[#181B2C]/20 bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-1.5 text-[11px]"
+                            >
+                              <div className="font-extrabold text-[#181B2C]">
+                                {sub.position} {sub.name} ({sub.bats}) • SPD {sub.ratings.speed}
+                              </div>
+                              <div className="flex gap-1">
+                                {liveSession.half === 'BOT' ? (
+                                  <ComicButton
+                                    size="sm"
+                                    variant="gold"
+                                    disabled={liveSession.status === 'completed'}
+                                    onClick={() => {
+                                      const res = applyPinchHitter(liveSession, 'home', sub.id);
+                                      if (res.applied && res.event) {
+                                        applyStepResult(
+                                          res.nextSession,
+                                          [res.event],
+                                          activeOpponent.id,
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    Pinch Hit
+                                  </ComicButton>
+                                ) : null}
+                                {liveSession.half === 'BOT' && occupiedBaseIdx >= 0 ? (
+                                  <ComicButton
+                                    size="sm"
+                                    variant="turf"
+                                    disabled={liveSession.status === 'completed'}
+                                    onClick={() => {
+                                      const res = applyPinchRunner(
+                                        liveSession,
+                                        'home',
+                                        occupiedBaseIdx as 0 | 1 | 2,
+                                        sub.id,
+                                      );
+                                      if (res.applied && res.event) {
+                                        applyStepResult(
+                                          res.nextSession,
+                                          [res.event],
+                                          activeOpponent.id,
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    Pinch Run {occupiedBaseIdx + 1}B
+                                  </ComicButton>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </ComicCard>
+
+              <ComicCard title="BULLPEN PHONE" headerBg="#2B2D42">
+                {availableRelievers.length === 0 ? (
+                  <p className="text-xs font-bold text-[#4A5068]">No fresh relievers remaining.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {availableRelievers.map((relId) => {
+                      const rel = liveSession.home.playersById[relId];
+                      if (!rel) return null;
+                      const warmup = evaluateBullpenWarmup(rel.id, warmupCounts[rel.id] ?? 0);
+                      const isWarming = warmingRelieverIds.includes(rel.id);
+                      return (
+                        <div
+                          key={rel.id}
+                          className="space-y-1 p-2 rounded-xl border border-[#181B2C]/20 bg-[#FFFDF7]"
+                        >
+                          <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
+                            <span className="text-[#181B2C]">
+                              {rel.name} ({rel.throws}HP
+                              {rel.pitcherRole
+                                ? ` • ${PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole]}`
+                                : ''}
+                              )
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded border border-[#181B2C] uppercase ${
+                                warmup.status === 'hot'
+                                  ? 'bg-[#2FB356] text-white'
+                                  : warmup.status === 'warming'
+                                    ? 'bg-[#FFC300] text-[#181B2C]'
+                                    : warmup.status === 'overcooked'
+                                      ? 'bg-[#FF4D6D] text-white'
+                                      : 'bg-[#E2E8F0] text-[#181B2C]'
+                              }`}
+                            >
+                              {warmup.status}
+                            </span>
+                          </div>
+                          <div className="flex gap-1.5">
+                            <ComicButton
+                              size="sm"
+                              variant={isWarming ? 'gold' : 'sky'}
+                              onClick={() => {
+                                soundEngine.play('bullpen_phone');
+                                setWarmingRelieverIds((prev) =>
+                                  prev.includes(rel.id)
+                                    ? prev.filter((id) => id !== rel.id)
+                                    : [...prev, rel.id],
+                                );
+                              }}
+                            >
+                              {isWarming ? 'Sit Down' : 'Warm Up'}
+                            </ComicButton>
+                            <ComicButton
+                              size="sm"
+                              variant="cream"
+                              className="flex-1 justify-between"
+                              icon={<RefreshCw className="w-3.5 h-3.5" />}
+                              onClick={() => handleBullpenSwap(rel.id)}
+                            >
+                              Bring In {rel.name}
+                            </ComicButton>
                           </div>
                         </div>
-                      ))
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })()}
-            </div>
-          </ComicCard>
-
-          <ComicCard title="BULLPEN PHONE" headerBg="#2B2D42">
-            {availableRelievers.length === 0 ? (
-              <p className="text-xs font-bold text-[#4A5068]">No fresh relievers remaining.</p>
-            ) : (
-              <div className="space-y-2">
-                {availableRelievers.map((relId) => {
-                  const rel = liveSession.home.playersById[relId];
-                  if (!rel) return null;
-                  const warmup = evaluateBullpenWarmup(rel.id, warmupCounts[rel.id] ?? 0);
-                  const isWarming = warmingRelieverIds.includes(rel.id);
-                  return (
-                    <div key={rel.id} className="space-y-1 p-2 rounded-xl border border-[#181B2C]/20 bg-[#FFFDF7]">
-                      <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
-                        <span className="text-[#181B2C]">
-                          {rel.name} ({rel.throws}HP
-                          {rel.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole]}` : ''})
-                        </span>
-                        <span
-                          className={`px-1.5 py-0.5 rounded border border-[#181B2C] uppercase ${
-                            warmup.status === 'hot'
-                              ? 'bg-[#2FB356] text-white'
-                              : warmup.status === 'warming'
-                                ? 'bg-[#FFC300] text-[#181B2C]'
-                                : warmup.status === 'overcooked'
-                                  ? 'bg-[#FF4D6D] text-white'
-                                  : 'bg-[#E2E8F0] text-[#181B2C]'
-                          }`}
-                        >
-                          {warmup.status}
-                        </span>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <ComicButton
-                          size="sm"
-                          variant={isWarming ? 'gold' : 'sky'}
-                          onClick={() => {
-                            soundEngine.play('bullpen_phone');
-                            setWarmingRelieverIds((prev) =>
-                              prev.includes(rel.id) ? prev.filter((id) => id !== rel.id) : [...prev, rel.id],
-                            );
-                          }}
-                        >
-                          {isWarming ? 'Sit Down' : 'Warm Up'}
-                        </ComicButton>
-                        <ComicButton
-                          size="sm"
-                          variant="cream"
-                          className="flex-1 justify-between"
-                          icon={<RefreshCw className="w-3.5 h-3.5" />}
-                          onClick={() => handleBullpenSwap(rel.id)}
-                        >
-                          Bring In {rel.name}
-                        </ComicButton>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </ComicCard>
+                )}
+              </ComicCard>
+            </>
+          ) : null}
         </div>
       </div>
 

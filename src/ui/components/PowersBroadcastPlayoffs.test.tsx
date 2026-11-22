@@ -5,6 +5,7 @@ import { createSeededRng } from '../../engine/rng/seededRng';
 import { createGameSession, stepPitch } from '../../engine/simulation/baseballEngine';
 import { useGameStore } from '../../store/gameStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
+import { useUserPreferencesStore } from '../../store/userPreferences';
 import { BroadcastHud } from './BroadcastHud';
 import { GameDayScreen } from '../screens/GameDayScreen';
 import { LeagueScreen } from '../screens/LeagueScreen';
@@ -18,6 +19,7 @@ const TEST_COLORS = {
 
 describe('Broadcast Strike-Zone Plot, Active Special Power Dock & Interactive Playoff Bracket', () => {
   beforeEach(() => {
+    useUserPreferencesStore.getState().resetDefaults();
     usePostseasonStore.getState().clearBracket();
     useGameStore.getState().startNewCareer({
       city: 'Sandlot',
@@ -59,6 +61,7 @@ describe('Broadcast Strike-Zone Plot, Active Special Power Dock & Interactive Pl
   it('exposes live Active National/Capstone Power activation button & Matchup Power Badges in GameDayScreen', () => {
     render(<GameDayScreen />);
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+    fireEvent.click(screen.getByTestId('control-mode-toggle'));
 
     expect(screen.getByTestId('active-powers-dock')).toBeInTheDocument();
     expect(screen.getByTestId('matchup-power-badges')).toBeInTheDocument();

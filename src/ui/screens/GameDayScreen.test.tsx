@@ -2,10 +2,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useGameStore } from '../../store/gameStore';
+import { useUserPreferencesStore } from '../../store/userPreferences';
 import { GameDayScreen } from './GameDayScreen';
 
 describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
   beforeEach(() => {
+    useUserPreferencesStore.getState().resetDefaults();
     useGameStore.getState().startNewCareer({
       city: 'Sandlot',
       clubName: 'Comets',
@@ -20,14 +22,14 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
   });
 
   it(
-    'starts a live 3D game, shows starter 4-5 & reliever 2-3 pitch selectors, steps pitches, and opens MVP summary',
+    'starts a live 3D game in Arcade Mode, toggles Pro Manager for 4-5 SP & 2-3 RP pitch selectors, steps pitches, and opens MVP summary',
     async () => {
       const user = userEvent.setup();
       render(<GameDayScreen />);
 
       expect(screen.getByText(/choose today's matchup/i)).toBeInTheDocument();
-      expect(screen.getByTestId('ballpark-soundboard')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /walk-off fireworks/i })).toBeInTheDocument();
+      // Soundboard now lives exclusively in Design Lab
+      expect(screen.queryByTestId('ballpark-soundboard')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: /5 inn \(blitz\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /7 inn \(quick\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /9 inn \(classic\)/i })).toBeInTheDocument();
@@ -37,6 +39,11 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
 
       expect(screen.getByRole('region', { name: /live baseball scoreboard/i })).toBeInTheDocument();
       expect(screen.getByTestId('live-game-3d-canvas')).toBeInTheDocument();
+      expect(screen.getByTestId('live-action-bar')).toBeInTheDocument();
+      expect(screen.getByTestId('coach-action-cue')).toBeInTheDocument();
+
+      // Expand Pro Manager controls to access full pitch arsenal, bullpen phone, and telemetry
+      await user.click(screen.getByTestId('control-mode-toggle'));
 
       // Home SP pitches in TOP 1 with 4-5 selectable pitches + Endurance, Leverage & Special Ability HUD
       expect(screen.getByTestId('leverage-hud').textContent).toMatch(/LI /i);

@@ -12,24 +12,40 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(startBtn).toBeVisible();
   await startBtn.click();
 
-  // Start a Live 3D Game and verify Broadcast HUD + 40-cue Soundboard & 10-track Per-Stadium Jukebox
-  await expect(page.getByTestId('ballpark-soundboard')).toBeVisible();
-  await expect(page.getByTestId('arcade-bgm-jukebox')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Stomp-Stomp-Clap!' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Stadium Airhorn!' })).toBeVisible();
+  // Soundboard lives exclusively in Design Lab (NOT cluttering Game Day)
+  await expect(page.getByTestId('ballpark-soundboard')).toHaveCount(0);
   await page.getByRole('button', { name: /start live 3d game/i }).click();
+
+  // Verify 3D Ballpark Canvas + Live Action Bar + Next Pitch button are ALL visible on-screen together WITHOUT scrolling!
+  const canvasBox = await page.getByTestId('live-game-3d-canvas').boundingBox();
+  const nextPitchBtn = page.getByRole('button', { name: /next pitch/i });
+  const nextPitchBox = await nextPitchBtn.boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(canvasBox).not.toBeNull();
+  expect(nextPitchBox).not.toBeNull();
+  expect(canvasBox!.y).toBeGreaterThanOrEqual(0);
+  expect(nextPitchBox!.y + nextPitchBox!.height).toBeLessThanOrEqual(viewport.height);
+
+  await expect(page.getByTestId('coach-action-cue')).toBeVisible();
+  await nextPitchBtn.click();
+  await expect(page.getByTestId('live-last-pitch-readout')).toContainText(/mph|ball|strike|out|hit|walk/i);
+
+  // Verify Weather, Rivalry, Live Box Score, Broadcast HUD & Show Math Inspector
   await expect(page.getByTestId('broadcast-hud')).toBeVisible();
   await expect(page.getByTestId('game-weather-banner')).toBeVisible();
   await expect(page.getByTestId('rivalry-showdown-banner')).toBeVisible();
   await page.getByRole('button', { name: /live box score/i }).click();
   await expect(page.getByTestId('live-box-score-modal')).toBeVisible();
   await page.getByRole('button', { name: /close live box score/i }).click();
-  await page.getByRole('button', { name: /next pitch/i }).click();
   await expect(page.getByTestId('play-by-play-ticker')).toBeVisible();
   await page.getByRole('button', { name: /show math/i }).click();
   await expect(page.getByTestId('pitch-math-breakdown').first()).toBeVisible();
-  await expect(page.getByTestId('active-powers-dock')).toBeVisible();
   await expect(page.getByTestId('strike-zone-plot')).toBeVisible();
+
+  // Expand Pro Manager mode on 1 tap and verify deep Active Powers & Mind Games unlock cleanly
+  await page.getByTestId('control-mode-toggle').click();
+  await expect(page.getByTestId('active-powers-dock')).toBeVisible();
+  await expect(page.getByTestId('mind-games-bar')).toBeVisible();
 
   // Visit Roster -> verify Trainer's Table, Deep Scouting Dossier & 1-tap PNG Baseball Card export
   await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();
