@@ -11,7 +11,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
 2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
-4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-050`). Pick the highest-priority `READY` task!
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-052`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
 
 ---
@@ -105,5 +105,6 @@ Before marking a task `DONE` in `docs/TASKS.md`:
    - `./node_modules/.bin/eslint .`
    - `./node_modules/.bin/vite build`
 4. If touching UI, SVG art, or 3D scenes: run Playwright E2E and visually inspect real screenshots across Desktop (`1280×800`) and Android Mobile (`390×844`) viewports.
-5. Update `docs/TASKS.md` (`DONE` + any unlocked downstream `READY` tickets) AND update `PLAN.md` (Progress Dashboard counts, checkboxes, and Decision Log if any scope/design changed).
-6. Make a clean, focused Git commit referencing the Task ID (e.g., `Implement seeded pitch-by-pitch simulation engine (TASK-013)`).
+5. **Keep `README.md` & Visual Previews Up to Date**: Whenever shipping a new milestone, major feature, or noticeable UI/3D/art improvement, update `README.md` (status/progress count, feature highlights, commands) and refresh or add up-to-date screenshots in `docs/screenshots/`.
+6. Update `docs/TASKS.md` (`DONE` + any unlocked downstream `READY` tickets) AND update `PLAN.md` (Progress Dashboard counts, checkboxes, and Decision Log if any scope/design changed).
+7. Make a clean, focused Git commit referencing the Task ID (e.g., `Implement seeded pitch-by-pitch simulation engine (TASK-014)`).

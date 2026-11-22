@@ -5,7 +5,7 @@
 > 2. Pick the first task marked **`READY`** whose `Depends On` tasks are all `DONE`.
 > 3. Change its status to **`IN_PROGRESS`** before writing code.
 > 4. Follow **Strict TDD** (write the listed failing tests first → implement → verify `vitest`, `tsc`, `eslint`, `vite build`, and Playwright/screenshots for visual tasks).
-> 5. Mark the task **`DONE`**, flip any newly unblocked tasks to **`READY`**, update `PLAN.md`, and create a clean Git commit referencing the Task ID.
+> 5. Mark the task **`DONE`**, flip any newly unblocked tasks to **`READY`**, update `PLAN.md`, **refresh `README.md` and `docs/screenshots/` visual previews** whenever user-facing visuals or milestones advance, and create a clean Git commit referencing the Task ID.
 
 ---
 

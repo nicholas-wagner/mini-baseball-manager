@@ -40,5 +40,5 @@ npm run test:e2e
 
 - [ ] Failing TDD tests added first and passing (`npm test`).
 - [ ] `npm run typecheck`, `npm run lint`, and `npm run build` pass cleanly.
-- [ ] If touching UI, SVG art, or 3D scenes, tested visually on desktop & mobile viewports.
-- [ ] Updated `docs/TASKS.md` and `PLAN.md` progress counts if completing a roadmap ticket.
+- [ ] If touching UI, SVG art, or 3D scenes, tested visually on desktop & mobile viewports and refreshed `README.md` / `docs/screenshots/` previews as needed.
+- [ ] Updated `docs/TASKS.md`, `PLAN.md`, and `README.md` progress/features if completing a roadmap ticket or milestone.
