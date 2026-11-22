@@ -1,30 +1,77 @@
 import { useState } from 'react';
-import { ArrowLeftRight, Gamepad2, Save, Sparkles } from 'lucide-react';
+import { ArrowLeftRight, Flame, Gamepad2, Save, Snowflake, Sparkles, UserPlus } from 'lucide-react';
 import { FlagBadge } from '../../art/flags/FlagBadge';
 import { soundEngine } from '../../audio/soundEngine';
-import { computePlayerOverall, isPitcherPosition } from '../../engine/models/player';
+import type { FieldPosition } from '../../engine/handedness/types';
+import { MAX_ACTIVE_ROSTER_SIZE } from '../../engine/models/club';
+import {
+  computePlayerOverall,
+  isPitcherPosition,
+  MARKET_TIER_LABELS,
+  SPECIALIST_LABELS,
+  type FormState,
+} from '../../engine/models/player';
+import {
+  evaluatePositionAssignment,
+  getEligiblePositions,
+} from '../../engine/rpg/specialistsAndPositions';
 import { useGameStore } from '../../store/gameStore';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
 import { SaveSlotsModal } from '../components/SaveSlotsModal';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
-import { toBaseballCardPlayer } from '../utils/playerCardAdapter';
+import { formStateToCardMood, toBaseballCardPlayer } from '../utils/playerCardAdapter';
 
 interface RosterLineupScreenProps {
   onPlayBall: () => void;
 }
 
+const HITTER_CROSS_TRAIN_POSITIONS: readonly FieldPosition[] = [
+  'C',
+  '1B',
+  '2B',
+  '3B',
+  'SS',
+  'LF',
+  'CF',
+  'RF',
+];
+const PITCHER_CROSS_TRAIN_POSITIONS: readonly FieldPosition[] = ['SP', 'RP'];
+
+function renderFormBadge(formState: FormState) {
+  if (formState === 'blazing' || formState === 'hot') {
+    return (
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white text-[10px] font-extrabold">
+        <Flame className="w-3 h-3" /> {formState === 'blazing' ? 'ON FIRE' : 'HOT'}
+      </span>
+    );
+  }
+  if (formState === 'cold' || formState === 'frozen') {
+    return (
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#4CC3FF] text-[#181B2C] text-[10px] font-extrabold">
+        <Snowflake className="w-3 h-3" /> {formState === 'frozen' ? 'FROZEN' : 'COLD'}
+      </span>
+    );
+  }
+  return null;
+}
+
 export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const humanClub = useGameStore((s) => s.getHumanClub());
+  const freeAgents = useGameStore((s) => s.freeAgents);
   const swapLineupSlots = useGameStore((s) => s.swapLineupSlots);
   const assignLineupPlayer = useGameStore((s) => s.assignLineupPlayer);
   const autoOptimizeHumanLineup = useGameStore((s) => s.autoOptimizeHumanLineup);
   const swapRotationOrder = useGameStore((s) => s.swapRotationOrder);
+  const crossTrainPlayerPosition = useGameStore((s) => s.crossTrainPlayerPosition);
+  const signFreeAgent = useGameStore((s) => s.signFreeAgent);
+  const releasePlayer = useGameStore((s) => s.releasePlayer);
 
   const [selectedSlotIdx, setSelectedSlotIdx] = useState<number | null>(null);
   const [selectedRotationIdx, setSelectedRotationIdx] = useState<number | null>(null);
   const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [rosterMessage, setRosterMessage] = useState<string | null>(null);
 
   if (!humanClub) return null;
 
@@ -85,11 +132,48 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
     setSelectedRotationIdx(null);
   };
 
+  const handleCrossTrain = (targetPos: FieldPosition) => {
+    const res = crossTrainPlayerPosition(inspectedPlayer.id, targetPos);
+    if (res.trained) {
+      soundEngine.play('level_up');
+      setRosterMessage(
+        `Cross-trained ${inspectedPlayer.name} at ${targetPos} (+${res.deltaGain} mastery, -${res.rustApplied} rust elsewhere).`,
+      );
+    } else {
+      setRosterMessage(res.reason ?? 'Unable to cross-train that position.');
+    }
+  };
+
+  const handleSignAgent = (playerId: string, playerName: string) => {
+    const res = signFreeAgent(playerId);
+    if (res.signed) {
+      soundEngine.play('cash_chime');
+      setInspectedPlayerId(playerId);
+      setRosterMessage(`Signed ${playerName}!`);
+    } else {
+      setRosterMessage(res.reason ?? 'Unable to sign player.');
+    }
+  };
+
+  const handleRelease = (playerId: string, playerName: string) => {
+    const res = releasePlayer(playerId);
+    if (res.released) {
+      soundEngine.play('ui_pop');
+      setRosterMessage(`Released ${playerName} to Free Agency.`);
+    } else {
+      setRosterMessage(res.reason ?? 'Unable to release player.');
+    }
+  };
+
+  const crossTrainTargets = isPitcherPosition(inspectedPlayer.position)
+    ? PITCHER_CROSS_TRAIN_POSITIONS
+    : HITTER_CROSS_TRAIN_POSITIONS;
+
   return (
     <div className="space-y-4">
       <ComicCard
         title={`${humanClub.city} ${humanClub.name} Clubhouse`}
-        subtitle={`Record ${humanClub.wins}-${humanClub.losses} • Cash $${humanClub.economy.cash.toLocaleString()} • Hype ${humanClub.economy.teamHype}/100`}
+        subtitle={`Record ${humanClub.wins}-${humanClub.losses} • Roster ${humanClub.roster.length}/${MAX_ACTIVE_ROSTER_SIZE} • Cash $${humanClub.economy.cash.toLocaleString()} • Hype ${humanClub.economy.teamHype}/100`}
         headerBg={humanClub.colors.secondary}
         badge={
           <div className="flex flex-wrap gap-2">
@@ -123,12 +207,24 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           </div>
         }
       >
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_290px] gap-4 items-start">
+        {rosterMessage ? (
+          <div
+            data-testid="cross-train-feedback"
+            className="mb-3 px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]"
+          >
+            {rosterMessage}
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-display text-xs uppercase tracking-wider text-[#181B2C]">
-                  9-Man Batting Order {selectedSlotIdx !== null ? `(Swap Slot ${selectedSlotIdx + 1} with…)` : '(Tap 2 slots to swap)'}
+                  9-Man Batting Order{' '}
+                  {selectedSlotIdx !== null
+                    ? `(Swap Slot ${selectedSlotIdx + 1} with…)`
+                    : '(Tap 2 slots to swap)'}
                 </h3>
               </div>
               <div className="space-y-2">
@@ -136,6 +232,8 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                   const player = rosterById.get(slot.playerId);
                   if (!player) return null;
                   const ovr = computePlayerOverall(player);
+                  const posEval = evaluatePositionAssignment(player, slot.defensivePosition);
+                  const eligibleList = getEligiblePositions(player).join('/');
                   const isSelected = selectedSlotIdx === idx;
                   return (
                     <div
@@ -157,11 +255,25 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                         </span>
                         <FlagBadge nationalityId={player.nationalityId} size="sm" />
                         <div className="min-w-0">
-                          <div className="font-display text-xs text-[#181B2C] truncate">
-                            {player.name}
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="font-display text-xs text-[#181B2C] truncate">
+                              {player.name}
+                            </span>
+                            {posEval.isFavorite ? (
+                              <span className="px-1.5 py-0.5 rounded bg-[#FFC300] text-[#181B2C] text-[10px] font-extrabold">
+                                ★ FAV
+                              </span>
+                            ) : null}
+                            {posEval.isOutOfPosition ? (
+                              <span className="px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white text-[10px] font-extrabold">
+                                OOP
+                              </span>
+                            ) : null}
+                            {renderFormBadge(player.formState)}
                           </div>
                           <div className="text-[11px] font-bold text-[#4A5068]">
-                            B/T: {player.bats}/{player.throws} • OVR {ovr}
+                            B/T: {player.bats}/{player.throws} • OVR {ovr} •{' '}
+                            {SPECIALIST_LABELS[player.specialistArchetype]} • Pos: {eligibleList}
                           </div>
                         </div>
                       </button>
@@ -205,7 +317,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                         <div className="font-bold text-xs text-[#181B2C]">
                           SP{idx + 1}: {pitcher.name} ({pitcher.throws}HP)
                         </div>
-                        <div className="text-[11px] font-bold text-[#4A5068]">OVR {ovr}</div>
+                        <div className="text-[11px] font-bold text-[#4A5068]">
+                          OVR {ovr} • {SPECIALIST_LABELS[pitcher.specialistArchetype]}
+                        </div>
                       </button>
                       <ComicButton
                         size="sm"
@@ -227,15 +341,28 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                 {benchHitters.map((player) => (
                   <div
                     key={player.id}
-                    className="flex items-center justify-between gap-2 py-1 border-b border-[#181B2C]/15"
+                    className="flex flex-wrap items-center justify-between gap-1.5 py-1 border-b border-[#181B2C]/15"
                   >
-                    <div className="text-xs font-bold text-[#181B2C]">
+                    <button
+                      type="button"
+                      onClick={() => setInspectedPlayerId(player.id)}
+                      className="text-left text-xs font-bold text-[#181B2C] flex-1 min-h-[44px]"
+                    >
                       {player.position} {player.name} ({player.bats}/{player.throws}) • OVR{' '}
-                      {computePlayerOverall(player)}
+                      {computePlayerOverall(player)} • {MARKET_TIER_LABELS[player.marketTier]}
+                    </button>
+                    <div className="flex gap-1">
+                      <ComicButton size="sm" variant="sky" onClick={() => handleBenchSub(player.id)}>
+                        Sub In
+                      </ComicButton>
+                      <ComicButton
+                        size="sm"
+                        variant="coral"
+                        onClick={() => handleRelease(player.id, player.name)}
+                      >
+                        Release
+                      </ComicButton>
                     </div>
-                    <ComicButton size="sm" variant="sky" onClick={() => handleBenchSub(player.id)}>
-                      Sub In
-                    </ComicButton>
                   </div>
                 ))}
                 {bullpenPitchers.map((rp) => (
@@ -245,21 +372,99 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                     onClick={() => setInspectedPlayerId(rp.id)}
                     className="w-full text-left py-1 text-xs font-bold text-[#4A5068] min-h-[44px]"
                   >
-                    RP {rp.name} ({rp.throws}HP) • OVR {computePlayerOverall(rp)}
+                    RP {rp.name} ({rp.throws}HP) • OVR {computePlayerOverall(rp)} •{' '}
+                    {SPECIALIST_LABELS[rp.specialistArchetype]}
                   </button>
                 ))}
               </div>
             </div>
+
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-display text-xs text-[#181B2C]">
+                  <UserPlus className="w-4 h-4 text-[#2FB356]" />
+                  Free Agent Wire (Cap {humanClub.roster.length}/{MAX_ACTIVE_ROSTER_SIZE})
+                </div>
+                <span className="text-[11px] font-bold text-[#4A5068]">
+                  Rookies grow fast • Veterans stay steady • All-Stars cost big
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {freeAgents.slice(0, 6).map((fa) => {
+                  const full = humanClub.roster.length >= MAX_ACTIVE_ROSTER_SIZE;
+                  const canAfford = humanClub.economy.cash >= fa.contract.signingBonus;
+                  return (
+                    <div
+                      key={fa.id}
+                      className="p-2 rounded-xl border-2 border-[#181B2C]/30 bg-white flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-display text-xs text-[#181B2C] truncate">
+                            {fa.position} {fa.name}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-[#1D3557] text-[#FFD166] text-[10px] font-extrabold">
+                            {MARKET_TIER_LABELS[fa.marketTier]}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-[#4A5068]">
+                          OVR {computePlayerOverall(fa)} • {SPECIALIST_LABELS[fa.specialistArchetype]} •
+                          Bonus ${fa.contract.signingBonus.toLocaleString()}
+                        </div>
+                      </div>
+                      <ComicButton
+                        size="sm"
+                        variant="turf"
+                        disabled={full || !canAfford}
+                        onClick={() => handleSignAgent(fa.id, fa.name)}
+                      >
+                        Sign
+                      </ComicButton>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          <div className="mx-auto w-full max-w-[290px]">
-            <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C] mb-2 text-center">
+          <div className="mx-auto w-full max-w-[300px] space-y-3">
+            <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C] text-center">
               Selected Player Card
             </div>
             <FlipBaseballCard
               player={toBaseballCardPlayer(inspectedPlayer)}
               team={teamColors}
+              mood={formStateToCardMood(inspectedPlayer.formState)}
             />
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
+                <span>Cross-Train Position</span>
+                <span className="text-[#1B4332]">Fav: {inspectedPlayer.favoritePosition}</span>
+              </div>
+              <div className="text-[10px] font-bold text-[#4A5068]">
+                Gains mastery at target spot, adds rust elsewhere.
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {crossTrainTargets.map((pos) => {
+                  const leftyBlocked =
+                    inspectedPlayer.throws === 'L' &&
+                    (pos === '2B' || pos === '3B' || pos === 'SS');
+                  const prof = inspectedPlayer.positionProficiency[pos];
+                  return (
+                    <ComicButton
+                      key={pos}
+                      size="sm"
+                      variant={pos === inspectedPlayer.favoritePosition ? 'gold' : 'cream'}
+                      disabled={leftyBlocked}
+                      onClick={() => handleCrossTrain(pos)}
+                    >
+                      Train {pos}
+                      {prof ? ` (${prof})` : ''}
+                    </ComicButton>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </ComicCard>

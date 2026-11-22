@@ -1,6 +1,8 @@
 import type { Club } from '../models/club';
 import type { ManagerProfile } from '../models/manager';
-import type { Player, PlayerSeasonStats } from '../models/player';
+import { isPitcherPosition, type Player, type PlayerSeasonStats } from '../models/player';
+import { updatePlayerFormAfterGame } from '../rpg/formTracker';
+import { evolveSpecialistArchetype } from '../rpg/specialistsAndPositions';
 import { applyGameStatDeltasToClub } from './baseballEngine';
 import type {
   BatterBoxLine,
@@ -159,7 +161,8 @@ export function calculatePostGameRewards(
 
   const playerXpById: Record<string, number> = {};
   for (const player of club.roster) {
-    playerXpById[player.id] = computePlayerXpGain(result.playerStatDeltas[player.id]);
+    const baseXp = computePlayerXpGain(result.playerStatDeltas[player.id]);
+    playerXpById[player.id] = Math.max(2, Math.round(baseXp * player.xpGrowthMultiplier));
   }
 
   return {
@@ -172,18 +175,50 @@ export function calculatePostGameRewards(
   };
 }
 
+function nudgeRatingsWithinCaps(player: Player): Player['ratings'] {
+  const r = player.ratings;
+  const c = player.statCaps;
+  if (isPitcherPosition(player.position)) {
+    return {
+      ...r,
+      velocity: Math.min(c.velocity, r.velocity + 1),
+      movement: Math.min(c.movement, r.movement + 1),
+      control: Math.min(c.control, r.control + 1),
+    };
+  }
+  return {
+    ...r,
+    contact: Math.min(c.contact, r.contact + 1),
+    power: Math.min(c.power, r.power + 1),
+    fielding: Math.min(c.fielding, r.fielding + 1),
+  };
+}
+
 function applyPlayerXpAndLevelUps(player: Player, gainedXp: number): Player {
   let level = player.level;
   let xp = player.xp + gainedXp;
   let skillPoints = player.skillPoints;
+  let nextRatings = player.ratings;
 
   while (xp >= level * 100) {
     xp -= level * 100;
     level += 1;
     skillPoints += 1;
+    nextRatings = nudgeRatingsWithinCaps({ ...player, ratings: nextRatings });
   }
 
-  return { ...player, level, xp, skillPoints };
+  return {
+    ...player,
+    level,
+    xp,
+    skillPoints,
+    ratings: nextRatings,
+    specialistArchetype: evolveSpecialistArchetype({
+      position: player.position,
+      specialistArchetype: player.specialistArchetype,
+      ratings: nextRatings,
+    }),
+  };
 }
 
 function applyManagerXpAndLevelUp(
@@ -220,9 +255,10 @@ export function applyPostGameProgression(
   won: boolean,
 ): { club: Club; manager: ManagerProfile } {
   const clubWithStats = applyGameStatDeltasToClub(club, statDeltas, won);
-  const updatedRoster = clubWithStats.roster.map((player) =>
-    applyPlayerXpAndLevelUps(player, rewards.playerXpById[player.id] ?? 0),
-  );
+  const updatedRoster = clubWithStats.roster.map((player) => {
+    const withXp = applyPlayerXpAndLevelUps(player, rewards.playerXpById[player.id] ?? 0);
+    return updatePlayerFormAfterGame(withXp, statDeltas[player.id]);
+  });
 
   return {
     club: {

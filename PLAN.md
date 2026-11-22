@@ -19,15 +19,15 @@
 | **M0** | Project Foundation, TDD Harness & Android PWA Shell | 4 / 4 | `[x]` Done | Vitest + Playwright + TS + PWA manifest green |
 | **M1** | **Design-First Visual Identity & Interactive Design Lab** | 8 / 8 | `[x]` Done | 90s Cards, 2.5D Chibi Rigs, 11 Nations, Handedness, 3D Park, Web Audio |
 | **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 6 / 6 | `[x]` Done | **MVP Gate**: Complete playable game installable on Android |
-| **M3** | **RPG Core**: Skill Trees, Specialists & Positions, Cultural Powers, Hot/Cold Streaks, Practice & Manager Tree | 0 / 6 | `[ ]` Planned | Deep 5–60 min player & manager RPG growth loop |
-| **M4** | **Living League World**: 6-Tier Pyramid, Market Tiers & Roster Cap, 48 AI Clubs, Draft, FA & Rivalries | 0 / 6 | `[ ]` Planned | Multi-season promotion/relegation dynasty career |
+| **M3** | **RPG Core**: Skill Trees, Specialists & Positions, Cultural Powers, Hot/Cold Streaks, Practice & Manager Tree | 2 / 6 | `[/]` In Progress | Deep 5–60 min player & manager RPG growth loop |
+| **M4** | **Living League World**: 6-Tier Pyramid, Market Tiers & Roster Cap, 48 AI Clubs, Draft, FA & Rivalries | 1 / 6 | `[/]` In Progress | Multi-season promotion/relegation dynasty career |
 | **M5** | **Sim-City Ballpark District**: Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 0 / 5 | `[ ]` Planned | Interactive stadium & neighborhood builder visible in 3D |
 | **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches, 90s Gear Relics, Weather & Night Games | 0 / 5 | `[ ]` Planned | Synergy combos, coaching staff, loot relics & live weather |
 | **M7** | **10X Front Office**: Trade Machine, Deadline Drama, Prospect Academy & "The Sandlot Gazette" | 0 / 4 | `[ ]` Planned | Full GM trade negotiation, farm call-ups & 90s newspaper |
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `18 / 54` feature slices completed
+**Overall 10X Progress**: `21 / 54` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -102,23 +102,23 @@
 
 ---
 
-### Milestone 3 — RPG Core: Skill Trees, Specialists, Positions, Cultural Powers, Form & Practice (`0 / 6`)
+### Milestone 3 — RPG Core: Skill Trees, Specialists, Positions, Cultural Powers, Form & Practice (`2 / 6`)
 - [ ] **3A. Player Branching Skill Trees & Capstone Special Powers** (`TASK-019`): Pure graph engine + pan/zoom interactive Skill Tree UI for Pitcher, Batter, and Fielder paths respecting `statCaps` (with capstone breakthroughs) & evolving `specialistArchetype`.
 - [ ] **3B. 3-Tier Cultural Heritage Myth/Animal Skill Branches** (`TASK-020`): Expand each nationality's Heritage Ability into a 3-node unlockable progression with bespoke 3D VFX, Hype-gauge activation, and sim effects.
-- [ ] **3C. Dynamic Hot Streaks & Cold Slumps Engine** (`TASK-021`): Rolling multi-game form tracker driving 🔥 *On Fire!* & 🧊 *Cold Spell* stat curves, reactive 90s card frames/moods, and slump-busting triggers.
+- [x] **3C. Dynamic Hot Streaks & Cold Slumps Engine** (`TASK-021`): Rolling multi-game form tracker driving 🔥 *On Fire!* & 🧊 *Cold Spell* stat curves, reactive 90s card frames/moods, and slump-busting triggers.
 - [ ] **3D. Animated Practice & Training Complex** (`TASK-022`): Batting Cage, Bullpen Lab, Fielding Fungos, Sprint Track, Slump-Buster Film Session, **Position Cross-Training Drill**, and Fan Meet & Greet — cute 2.5D chibi dioramas respecting `xpGrowthMultiplier` & `statCaps`.
 - [ ] **3E. Human Manager RPG Progression & In-Game Power Dock** (`TASK-023`): Manager XP/leveling across *Skipper* (Active In-Game Powers with charges/banners/organ riffs), *Coach* (Training Passives), and *Mogul* (GM/Economy Passives).
-- [ ] **3F. Player Specialists, Positional Eligibility & Favorite Position Boost** (`TASK-053`): Asymmetric specialist archetypes, flexible vs single-position profiles (`1B`-only, `SS/2B`, all-infield), `★ FAV` position boosts, Out-of-Position penalties, and `crossTrainPosition` rust/training trade-offs.
+- [x] **3F. Player Specialists, Positional Eligibility & Favorite Position Boost** (`TASK-053`): Asymmetric specialist archetypes, flexible vs single-position profiles (`1B`-only, `SS/2B`, all-infield), `★ FAV` position boosts, Out-of-Position penalties, and `crossTrainPosition` rust/training trade-offs.
 
 ---
 
-### Milestone 4 — Living League World: 6-Tier Pyramid, Market Tiers, 48 AI Clubs, Draft & Rivalries (`0 / 6`)
+### Milestone 4 — Living League World: 6-Tier Pyramid, Market Tiers, 48 AI Clubs, Draft & Rivalries (`1 / 6`)
 - [ ] **4A. 6-Tier Promotion/Relegation Pyramid & 48 Unique Clubs** (`TASK-024`): Rookie → Low-A → High-A → AA → AAA → Mini Major League world generator, 21-game round-robin scheduler (7 three-game series), standings, tiebreakers, league leaders, 4-team Best-of-3 playoffs, and promotion/relegation ceremonies.
 - [ ] **4B. Fog-of-War Scouting & 3-Round Amateur Draft** (`TASK-025`): Scouting budget reveals rookie `statCaps` ceilings, `flexibilityProfile`, and `specialistArchetype`; interactive Draft Room honoring the 20-man roster limit.
 - [ ] **4C. Free Agency, Contracts, Payroll & Waivers** (`TASK-026`): Contract offers balancing expensive `all_star`s, value `veteran`s, and niche `below_average` specialists up to `MAX_ACTIVE_ROSTER_SIZE = 20`, bidding wars, and cut/release morale impacts.
 - [ ] **4D. Personality-Driven AI GMs & In-Game Bullpen AI** (`TASK-027`): 5 AI philosophies weighing `marketTier`, `specialistArchetype`, `favoritePosition`, `statCaps`, and roster limits across drafting, signings, platoon lineups, and lefty-specialist bullpen calls; verified via a **10-season headless soak test**.
 - [ ] **4E. Dynamic Team Rivalries Engine & Game Day Showdowns** (`TASK-028`): Cross-tier persistent Rivalry Heat (`0–100`), starter Crosstown Rival, walk-off/playoff/poached-star *Revenge Matchups*, 90s Comic "VS" splash card, +25–50% Hype charge, +25% XP, and Traveling Rivalry Cups.
-- [ ] **4F. Active Roster Limit (`20` Max) & 6 Player Market Tiers** (`TASK-054`): `rookie` (cheap / `1.35x` XP / variable `statCaps`), `all_star` (rare & expensive), `veteran` (affordable steady quality / `0.30x` minimal growth), `above_average`, `average`, and `below_average` bargain specialists + `20`-man roster limit enforcement.
+- [x] **4F. Active Roster Limit (`20` Max) & 6 Player Market Tiers** (`TASK-054`): `rookie` (cheap / `1.35x` XP / variable `statCaps`), `all_star` (rare & expensive), `veteran` (affordable steady quality / `0.30x` minimal growth), `above_average`, `average`, and `below_average` bargain specialists + `20`-man roster limit enforcement.
 
 ---
 

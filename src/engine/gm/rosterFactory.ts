@@ -1,16 +1,13 @@
 import { rollBatsHand, rollThrowsHand } from '../handedness/handedness';
 import type { FieldPosition } from '../handedness/types';
-import {
-  createInitialEconomy,
-  createInitialStadium,
-  type AiArchetype,
-  type Club,
-  type ClubColors,
-  type DefensiveLineupPosition,
-  type LeagueTierId,
-  type LineupSlot,
+import type {
+  LeagueTierId,
+  LineupSlot,
+  AiArchetype,
+  Club,
+  ClubColors,
+  DefensiveLineupPosition,
 } from '../models/club';
-import { createDefaultCoachStaff } from '../models/manager';
 import {
   computePlayerOverall,
   createEmptySeasonStats,
@@ -19,11 +16,28 @@ import {
   rollPlayerPortraitTraits,
   type PersonalityArchetype,
   type Player,
+  type PlayerMarketTier,
   type PlayerRatings,
+  type PlayerSpecialistArchetype,
 } from '../models/player';
 import { generatePlayerIdentity } from '../nationalities/pickNationality';
 import type { NationalityId } from '../nationalities/types';
 import type { SeededRng } from '../rng/seededRng';
+import {
+  applySpecialistRatingShape,
+  evaluatePositionAssignment,
+  rollPositionalEligibility,
+  rollSpecialistArchetype,
+} from '../rpg/specialistsAndPositions';
+import {
+  computeMarketContract,
+  MARKET_TIER_SPECS,
+  rollClubStarterMarketTier,
+  rollStatCapsForMarketTier,
+} from './marketTiers';
+
+import { createInitialEconomy, createInitialStadium } from '../models/club';
+import { createDefaultCoachStaff } from '../models/manager';
 
 export interface CreatePlayerOptions {
   position: FieldPosition;
@@ -31,6 +45,8 @@ export interface CreatePlayerOptions {
   forcedNationalityId?: NationalityId;
   jerseyNumber?: number;
   idPrefix?: string;
+  marketTier?: PlayerMarketTier;
+  specialistArchetype?: PlayerSpecialistArchetype;
 }
 
 export interface CreateClubOptions {
@@ -85,19 +101,6 @@ const REQUIRED_DEFENSIVE_POSITIONS: readonly DefensiveLineupPosition[] = [
   ...CORE_FIELD_POSITIONS,
   'DH',
 ];
-
-const SECONDARY_POSITIONS_MAP: Readonly<Record<FieldPosition, readonly FieldPosition[]>> = {
-  SP: ['RP'],
-  RP: ['SP'],
-  C: ['1B'],
-  '1B': ['LF', '3B'],
-  '2B': ['SS', '3B'],
-  '3B': ['1B', '2B'],
-  SS: ['2B', '3B'],
-  LF: ['RF', 'CF'],
-  CF: ['LF', 'RF'],
-  RF: ['LF', 'CF'],
-};
 
 const PERSONALITIES: readonly PersonalityArchetype[] = [
   'prankster',
@@ -202,15 +205,26 @@ function rollRatingsForRole(
   };
 }
 
-/** Generates a single deterministic player calibrated to position and tier. */
+/** Generates a single deterministic player calibrated to position, league tier, market tier, and specialist role. */
 export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Player {
   const band = TIER_RATING_BANDS[options.tier];
+  const marketTier = options.marketTier ?? rollClubStarterMarketTier(rng);
+  const marketSpec = MARKET_TIER_SPECS[marketTier];
+  const specialistArchetype =
+    options.specialistArchetype ?? rollSpecialistArchetype(rng, options.position, marketTier);
+
   const identity = generatePlayerIdentity(rng, options.forcedNationalityId);
   const bats = rollBatsHand(rng);
   const throws = rollThrowsHand(rng, options.position);
+  const eligibility = rollPositionalEligibility(rng, options.position, throws, specialistArchetype);
   const traitSeed = rng.int(1, 999999);
   const traits = rollPlayerPortraitTraits(rng, traitSeed);
-  const ratings = rollRatingsForRole(rng, options.position, band.min, band.max);
+
+  const shiftedMin = clampStat(band.min + marketSpec.ovrOffset);
+  const shiftedMax = clampStat(band.max + marketSpec.ovrOffset);
+  const baseRatings = rollRatingsForRole(rng, options.position, shiftedMin, shiftedMax);
+  const ratings = applySpecialistRatingShape(baseRatings, specialistArchetype, options.position);
+  const statCaps = rollStatCapsForMarketTier(rng, ratings, marketTier, options.position);
   const overall = computePlayerOverall({ position: options.position, ratings });
   const token = rng.int(100000, 999999);
   const prefix = options.idPrefix ?? 'plyr';
@@ -219,9 +233,9 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     id: `${prefix}-${options.position.toLowerCase()}-${token}`,
     name: identity.fullName,
     nickname: rng.pick(NICKNAMES),
-    age: rng.int(19, 32),
+    age: rng.int(marketSpec.ageRange[0], marketSpec.ageRange[1]),
     position: options.position,
-    secondaryPositions: [...SECONDARY_POSITIONS_MAP[options.position]],
+    secondaryPositions: eligibility.secondaryPositions,
     bats,
     throws,
     jerseyNumber: options.jerseyNumber ?? rng.int(1, 99),
@@ -238,16 +252,19 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     equippedPowerIds: [],
     equippedRelicIds: [],
     heritageTierUnlocked: 0,
+    marketTier,
+    specialistArchetype,
+    flexibilityProfile: eligibility.flexibilityProfile,
+    favoritePosition: eligibility.favoritePosition,
+    positionProficiency: eligibility.positionProficiency,
     ratings,
+    statCaps,
+    xpGrowthMultiplier: marketSpec.xpGrowthMultiplier,
     fatigue: 0,
     morale: 75,
     formScore: 0,
     formState: 'neutral',
-    contract: {
-      salaryPerSeason: Math.round(band.salaryBase * (overall / 60)),
-      yearsRemaining: rng.int(1, 3),
-      signingBonus: Math.round(band.salaryBase * 0.25),
-    },
+    contract: computeMarketContract(rng, marketTier, band.salaryBase, overall),
     formerClubIds: [],
     seasonStats: createEmptySeasonStats(),
     careerStats: createEmptySeasonStats(),
@@ -297,8 +314,11 @@ function assignFieldStarters(
   const assigned: { player: Player; defensivePosition: DefensiveLineupPosition }[] = [];
 
   for (const pos of CORE_FIELD_POSITIONS) {
-    const fitBonus = (p: Player): number =>
-      p.position === pos ? 200 : p.secondaryPositions.includes(pos) ? 80 : 0;
+    const fitBonus = (p: Player): number => {
+      const posEval = evaluatePositionAssignment(p, pos);
+      if (posEval.isFavorite) return 240;
+      return !posEval.isOutOfPosition ? 110 + posEval.proficiency * 0.4 : 0;
+    };
     const starter = takeBestCandidate(
       remaining,
       (p) => fitBonus(p) + p.ratings.fielding * 0.5 + scoreBatterValue(p),

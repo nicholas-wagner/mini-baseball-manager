@@ -1,13 +1,20 @@
 import { create } from 'zustand';
 import {
+  generateMarketPool,
+  validateRosterAddition,
+  validateRosterRelease,
+} from '../engine/gm/marketTiers';
+import {
   buildOptimalLineup,
   createClub,
   validateLineup,
 } from '../engine/gm/rosterFactory';
+import type { FieldPosition } from '../engine/handedness/types';
 import type { AiArchetype, Club, LeagueTierId } from '../engine/models/club';
 import { createManagerProfile, type ManagerProfile } from '../engine/models/manager';
-import { isPitcherPosition } from '../engine/models/player';
+import { isPitcherPosition, type Player } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
+import { crossTrainPosition } from '../engine/rpg/specialistsAndPositions';
 import { simFullGame } from '../engine/simulation/baseballEngine';
 import type { GameSessionResult } from '../engine/simulation/gameState';
 import {
@@ -56,9 +63,11 @@ export interface GameStoreState {
   worldSeed: number;
   seasonNumber: number;
   currentSeriesIndex: number;
+  rosterActionNonce: number;
   humanClubId: string | null;
   manager: ManagerProfile | null;
   leagues: Record<LeagueTierId, Club[]>;
+  freeAgents: Player[];
   settings: UserSaveSettings;
   lastPostGameSummary: PostGameSummary | null;
   getHumanClub: () => Club | null;
@@ -67,6 +76,12 @@ export interface GameStoreState {
   assignLineupPlayer: (slotIndex: number, playerId: string) => void;
   autoOptimizeHumanLineup: () => void;
   swapRotationOrder: (indexA: number, indexB: number) => void;
+  crossTrainPlayerPosition: (
+    playerId: string,
+    targetPos: FieldPosition,
+  ) => { trained: boolean; reason?: string; deltaGain?: number; rustApplied?: number };
+  signFreeAgent: (playerId: string) => { signed: boolean; reason?: string };
+  releasePlayer: (playerId: string) => { released: boolean; reason?: string };
   commitCompletedGame: (opponentClubId: string, result: GameSessionResult, isHomeGame: boolean) => PostGameSummary | null;
   playInstantExhibition: (opponentClubId: string, gameSeed?: number) => PostGameSummary | null;
   saveCareerToSlot: (slotId: SaveSlotId) => Promise<void>;
@@ -136,9 +151,11 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     worldSeed: 1994,
     seasonNumber: 1,
     currentSeriesIndex: 0,
+    rosterActionNonce: 1,
     humanClubId: null,
     manager: null,
     leagues: createEmptyLeagues(),
+    freeAgents: [],
     settings: { ...DEFAULT_SAVE_SETTINGS },
     lastPostGameSummary: null,
 
@@ -182,17 +199,20 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
 
       const leagues = createEmptyLeagues();
       leagues.rookie = [humanClub, ...aiClubs];
+      const freeAgents = generateMarketPool(createSeededRng(seed + 505), 'rookie', 12);
 
       set({
         worldSeed: seed,
         seasonNumber: 1,
         currentSeriesIndex: 0,
+        rosterActionNonce: 1,
         humanClubId: humanClub.id,
         manager: createManagerProfile({
           name: input.managerName.trim() || 'Skipper',
           avatarSeed: seed,
         }),
         leagues,
+        freeAgents,
         lastPostGameSummary: null,
       });
     },
@@ -266,6 +286,107 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           rotationIds: nextRotation,
         }),
       }));
+    },
+
+    crossTrainPlayerPosition: (playerId, targetPos) => {
+      const club = get().getHumanClub();
+      if (!club) return { trained: false, reason: 'No active club found.' };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target) return { trained: false, reason: 'Player is not on your roster.' };
+
+      const nonce = get().rosterActionNonce;
+      const result = crossTrainPosition(
+        createSeededRng(get().worldSeed + nonce * 97),
+        target,
+        targetPos,
+      );
+      if (!result.trained) {
+        return { trained: false, reason: result.reason };
+      }
+
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? result.player : p)),
+      };
+      set((state) => ({
+        rosterActionNonce: state.rosterActionNonce + 1,
+        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      }));
+      return {
+        trained: true,
+        deltaGain: result.deltaGain,
+        rustApplied: result.rustApplied,
+      };
+    },
+
+    signFreeAgent: (playerId) => {
+      const club = get().getHumanClub();
+      if (!club) return { signed: false, reason: 'No active club found.' };
+      const incoming = get().freeAgents.find((p) => p.id === playerId);
+      if (!incoming) return { signed: false, reason: 'Free agent is no longer available.' };
+
+      const capCheck = validateRosterAddition(club.roster, incoming.id);
+      if (!capCheck.allowed) {
+        return { signed: false, reason: capCheck.reason };
+      }
+      if (club.economy.cash < incoming.contract.signingBonus) {
+        return {
+          signed: false,
+          reason: `Need $${incoming.contract.signingBonus.toLocaleString()} signing bonus.`,
+        };
+      }
+
+      const nextRoster = [...club.roster, incoming];
+      const nextRotation =
+        incoming.position === 'SP' ? [...club.rotationIds, incoming.id] : club.rotationIds;
+      const nextBullpen =
+        incoming.position === 'RP' ? [...club.bullpenIds, incoming.id] : club.bullpenIds;
+
+      const updatedClub: Club = {
+        ...club,
+        roster: nextRoster,
+        rotationIds: nextRotation,
+        bullpenIds: nextBullpen,
+        economy: {
+          ...club.economy,
+          cash: club.economy.cash - incoming.contract.signingBonus,
+        },
+      };
+
+      set((state) => ({
+        leagues: updateHumanClubInLeagues(state.leagues, updatedClub),
+        freeAgents: state.freeAgents.filter((p) => p.id !== incoming.id),
+      }));
+      return { signed: true };
+    },
+
+    releasePlayer: (playerId) => {
+      const club = get().getHumanClub();
+      if (!club) return { released: false, reason: 'No active club found.' };
+
+      const releaseCheck = validateRosterRelease(club.roster, playerId);
+      if (!releaseCheck.allowed) {
+        return { released: false, reason: releaseCheck.reason };
+      }
+
+      const releasedPlayer = club.roster.find((p) => p.id === playerId)!;
+      const nextRoster = club.roster.filter((p) => p.id !== playerId);
+      const inLineup = club.lineup.some((s) => s.playerId === playerId);
+      const nextLineup = inLineup ? buildOptimalLineup(nextRoster) : club.lineup;
+
+      const updatedClub: Club = {
+        ...club,
+        roster: nextRoster,
+        lineup: nextLineup,
+        rotationIds: club.rotationIds.filter((id) => id !== playerId),
+        bullpenIds: club.bullpenIds.filter((id) => id !== playerId),
+      };
+
+      set((state) => ({
+        leagues: updateHumanClubInLeagues(state.leagues, updatedClub),
+        freeAgents: [releasedPlayer, ...state.freeAgents],
+      }));
+      return { released: true };
     },
 
     commitCompletedGame: (opponentClubId, result, isHomeGame) => {
@@ -348,6 +469,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,
+        freeAgents: generateMarketPool(createSeededRng(save.worldSeed + 505), 'rookie', 12),
         settings: save.settings,
         lastPostGameSummary: null,
       });
@@ -385,6 +507,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,
+        freeAgents: generateMarketPool(createSeededRng(save.worldSeed + 505), 'rookie', 12),
         settings: save.settings,
         lastPostGameSummary: null,
       });

@@ -541,12 +541,14 @@ export function stepPitch(
     fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + 1.45);
   }
 
+  const defenderPos = rng.pick(['SS', '2B', 'CF', 'LF', 'RF'] as const);
   const resolution = resolveSinglePitch({
     rng,
     batter,
     pitcher,
     catcher: getDefenderAtPosition(fielding, 'C'),
-    defender: getDefenderAtPosition(fielding, rng.pick(['SS', '2B', 'CF', 'LF', 'RF'])),
+    defender: getDefenderAtPosition(fielding, defenderPos),
+    defenderPos,
     firstBaseRunner,
     balls: next.balls,
     strikes: next.strikes,

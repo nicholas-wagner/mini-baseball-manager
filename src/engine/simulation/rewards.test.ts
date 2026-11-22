@@ -98,4 +98,33 @@ describe('Post-Game MVP & Rewards Engine', () => {
     expect(updated.manager.level).toBeGreaterThanOrEqual(2);
     expect(updated.manager.wins + updated.manager.losses).toBe(1);
   });
+
+  it('scales earned XP by xpGrowthMultiplier and respects statCaps when leveling up', () => {
+    const away = createClub(createSeededRng(810), AWAY_OPTS);
+    const home = createClub(createSeededRng(811), HOME_OPTS);
+    const rookie = {
+      ...home.roster[0],
+      xpGrowthMultiplier: 1.35,
+      xp: 90,
+      level: 1,
+      statCaps: { ...home.roster[0].statCaps, contact: home.roster[0].ratings.contact },
+    };
+    const veteran = {
+      ...home.roster[1],
+      xpGrowthMultiplier: 0.3,
+    };
+    const modHome = {
+      ...home,
+      roster: [rookie, veteran, ...home.roster.slice(2)],
+    };
+    const result = simFullGame(away, modHome, 888);
+    result.playerStatDeltas[rookie.id] = { ...rookie.seasonStats, games: 1, hits: 2, rbis: 2 };
+    result.playerStatDeltas[veteran.id] = { ...veteran.seasonStats, games: 1, hits: 2, rbis: 2 };
+
+    const rewards = calculatePostGameRewards(modHome, result, true, true);
+    expect(rewards.playerXpById[rookie.id]).toBeGreaterThan(rewards.playerXpById[veteran.id]);
+
+    const after = applyPostGameProgression(modHome, createManagerProfile({ name: 'Skip', avatarSeed: 1 }), rewards, result.playerStatDeltas, true);
+    expect(after.club.roster[0].ratings.contact).toBe(rookie.statCaps.contact);
+  });
 });

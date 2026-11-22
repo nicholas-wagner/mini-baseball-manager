@@ -66,6 +66,58 @@ export type PersonalityArchetype =
 
 export type FormState = 'blazing' | 'hot' | 'neutral' | 'cold' | 'frozen';
 
+export type PlayerSpecialistArchetype =
+  | 'balanced_regular'
+  | 'contact_technician'
+  | 'power_slugger'
+  | 'defensive_wizard'
+  | 'speed_smallball'
+  | 'super_utility'
+  | 'flame_closer'
+  | 'crafty_tactician'
+  | 'southpaw_specialist'
+  | 'workhorse_ace';
+
+export type PositionalFlexibilityProfile =
+  | 'single_position'
+  | 'middle_infield_pair'
+  | 'corner_infield_pair'
+  | 'infield_utility'
+  | 'corner_outfield_pair'
+  | 'all_outfield'
+  | 'catcher_first'
+  | 'swingman_pitcher';
+
+export type PlayerMarketTier =
+  | 'rookie'
+  | 'all_star'
+  | 'veteran'
+  | 'above_average'
+  | 'average'
+  | 'below_average';
+
+export const SPECIALIST_LABELS: Readonly<Record<PlayerSpecialistArchetype, string>> = {
+  balanced_regular: 'Balanced Regular',
+  contact_technician: 'Contact Technician',
+  power_slugger: 'Power Slugger',
+  defensive_wizard: 'Defensive Wizard',
+  speed_smallball: 'Speed / Smallball',
+  super_utility: 'Super-Utility',
+  flame_closer: 'Flame Closer',
+  crafty_tactician: 'Crafty Tactician',
+  southpaw_specialist: 'Matchup Specialist',
+  workhorse_ace: 'Workhorse Ace',
+};
+
+export const MARKET_TIER_LABELS: Readonly<Record<PlayerMarketTier, string>> = {
+  rookie: 'ROOKIE',
+  all_star: 'ALL-STAR',
+  veteran: 'VETERAN',
+  above_average: 'ABOVE AVG',
+  average: 'AVERAGE',
+  below_average: 'BARGAIN',
+};
+
 export interface PlayerRatings {
   // Batting (1-99)
   contact: number;
@@ -141,7 +193,14 @@ export interface Player {
   heritageTierUnlocked: 0 | 1 | 2 | 3;
 
   // Live Status & Form
+  marketTier: PlayerMarketTier;
+  specialistArchetype: PlayerSpecialistArchetype;
+  flexibilityProfile: PositionalFlexibilityProfile;
+  favoritePosition: FieldPosition;
+  positionProficiency: Partial<Record<FieldPosition, number>>;
   ratings: PlayerRatings;
+  statCaps: PlayerRatings;
+  xpGrowthMultiplier: number;
   fatigue: number;
   morale: number;
   formScore: number;

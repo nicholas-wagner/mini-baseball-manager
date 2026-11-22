@@ -66,6 +66,10 @@ export interface ClubEconomy {
   activeSponsorIds: string[];
 }
 
+export const MAX_ACTIVE_ROSTER_SIZE = 20;
+export const MIN_ACTIVE_ROSTER_SIZE = 15;
+export const MAX_ACADEMY_ROSTER_SIZE = 6;
+
 export interface Club {
   id: string;
   isHuman: boolean;

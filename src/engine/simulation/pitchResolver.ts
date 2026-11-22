@@ -12,6 +12,8 @@ import type {
 import type { Player } from '../models/player';
 import { getNationalityById } from '../nationalities/pickNationality';
 import type { SeededRng } from '../rng/seededRng';
+import { getFormStatModifiers } from '../rpg/formTracker';
+import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
 
 export interface PitchResolution {
@@ -274,8 +276,15 @@ function resolveOutOrError(
   outs: number,
   bases: BaseState,
   defender: Player,
+  defenderPos: Exclude<FieldPosition, 'SP' | 'RP'>,
 ): PitchResolution {
-  const errorProb = clampProb(0.055 - (defender.ratings.fielding - 60) * 0.0006, 0.015, 0.06);
+  const posEval = evaluatePositionAssignment(defender, defenderPos);
+  const effectiveFielding = defender.ratings.fielding + posEval.fieldingDelta;
+  const errorProb = clampProb(
+    (0.055 - (effectiveFielding - 60) * 0.0006) * posEval.errorMultiplier,
+    0.012,
+    0.16,
+  );
   if (rng.chance(errorProb)) {
     const inf = rng.pick(INFIELD_SPOTS);
     return {
@@ -327,6 +336,7 @@ export interface PitchResolverContext {
   pitcher: Player;
   catcher: Player;
   defender: Player;
+  defenderPos: Exclude<FieldPosition, 'SP' | 'RP'>;
   firstBaseRunner: Player | null;
   balls: number;
   strikes: number;
@@ -357,7 +367,7 @@ function resolveContactResult(
     }
     return hit;
   }
-  return resolveOutOrError(ctx.rng, ctx.batter, ctx.outs, ctx.bases, ctx.defender);
+  return resolveOutOrError(ctx.rng, ctx.batter, ctx.outs, ctx.bases, ctx.defender, ctx.defenderPos);
 }
 
 function resolveCalledStrikeOrOut(strikes: number, batterName: string): PitchResolution {
@@ -449,12 +459,27 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   }
 
   const mod = TACTICAL_CONFIG[ctx.tacticalCall];
+  const batterForm = getFormStatModifiers(ctx.batter.formState);
+  const pitcherForm = getFormStatModifiers(ctx.pitcher.formState);
+  const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
   const fatigueDrop = Math.max(0, ctx.pitcherFatigue - 45) * 0.28;
-  const effContact = ctx.batter.ratings.contact + platoon.batterContactDelta + mod.contactMod;
-  const effPower = ctx.batter.ratings.power + platoon.batterPowerDelta + mod.powerMod;
-  const effStuff = (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 + platoon.pitcherBreakDelta - fatigueDrop;
+  const effContact =
+    ctx.batter.ratings.contact + platoon.batterContactDelta + mod.contactMod + batterForm.contactDelta;
+  const effPower =
+    ctx.batter.ratings.power + platoon.batterPowerDelta + mod.powerMod + batterForm.powerDelta;
+  const effStuff =
+    (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 +
+    platoon.pitcherBreakDelta +
+    pitcherForm.stuffDelta -
+    fatigueDrop;
+  const effControl =
+    ctx.pitcher.ratings.control + pitcherForm.controlDelta + pitcherPosEval.controlDelta;
 
-  const zoneProb = clampProb(0.55 + (ctx.pitcher.ratings.control - ctx.batter.ratings.eye) * 0.0025, 0.40, 0.72);
+  const zoneProb = clampProb(
+    0.55 + (effControl - ctx.batter.ratings.eye) * 0.0025,
+    0.40,
+    0.72,
+  );
   const inZone = ctx.rng.chance(zoneProb);
   const swingProb = inZone
     ? clampProb(0.67 + mod.swingMod, 0.52, 0.85)

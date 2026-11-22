@@ -43,5 +43,28 @@ describe('RosterLineupScreen (TASK-015)', () => {
 
     await user.click(screen.getByRole('button', { name: /save \/ load/i }));
     expect(screen.getByRole('dialog', { name: /save & backup slots/i })).toBeInTheDocument();
-  });
+  }, 30_000);
+
+  it(
+    'displays 18/20 roster limit, favorite boost / specialist tags, cross-training, and free-agent signing',
+    async () => {
+      const user = userEvent.setup();
+      render(<RosterLineupScreen onPlayBall={vi.fn()} />);
+
+      expect(screen.getByText(/roster 18\/20/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/★ fav/i).length).toBeGreaterThanOrEqual(1);
+
+      // Cross-train default inspected #1 hitter at 1B before signing an FA (which may inspect a pitcher)
+      const crossTrainBtn = screen.getByRole('button', { name: /^train 1b/i });
+      await user.click(crossTrainBtn);
+      expect(screen.getByTestId('cross-train-feedback')).toBeInTheDocument();
+
+      // Sign a Rookie or Affordable Free Agent from the wire (18/20 -> 19/20)
+      const signButtons = screen.getAllByRole('button', { name: /^sign$/i });
+      expect(signButtons.length).toBeGreaterThanOrEqual(1);
+      await user.click(signButtons[0]);
+      expect(screen.getByText(/roster 19\/20/i)).toBeInTheDocument();
+    },
+    30_000,
+  );
 });

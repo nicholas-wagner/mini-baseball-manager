@@ -121,4 +121,73 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
     expect(importedOk).toBe(true);
     expect(store.getState().getHumanClub()!.name).toBe('Comets');
   });
+
+  it('enforces 20-man roster limit across free-agent signings, supports releases, and cross-trains positions', () => {
+    const store = createGameStore(createSaveRepository());
+    store.getState().startNewCareer({
+      city: 'Sandlot',
+      clubName: 'Comets',
+      mascot: 'Rocket Dog',
+      monogram: 'SC',
+      primaryColor: '#E63946',
+      secondaryColor: '#1D3557',
+      accentColor: '#FFD166',
+      managerName: 'Coach Skip',
+      seed: 1994,
+    });
+
+    // Give generous cash to afford any free agents in wire
+    const richHuman = {
+      ...store.getState().getHumanClub()!,
+      economy: { ...store.getState().getHumanClub()!.economy, cash: 50000 },
+    };
+    store.setState((s) => ({
+      leagues: {
+        ...s.leagues,
+        rookie: s.leagues.rookie.map((c) => (c.id === richHuman.id ? richHuman : c)),
+      },
+    }));
+
+    expect(store.getState().freeAgents.length).toBeGreaterThanOrEqual(8);
+    expect(store.getState().getHumanClub()!.roster).toHaveLength(18);
+
+    // Sign 2 free agents up to MAX_ACTIVE_ROSTER_SIZE = 20
+    const fa1 = store.getState().freeAgents[0];
+    const fa2 = store.getState().freeAgents[1];
+    const fa3 = store.getState().freeAgents[2];
+
+    expect(store.getState().signFreeAgent(fa1.id).signed).toBe(true);
+    expect(store.getState().signFreeAgent(fa2.id).signed).toBe(true);
+    expect(store.getState().getHumanClub()!.roster).toHaveLength(20);
+
+    // Signing 21st player is rejected by the 20-man cap
+    const blocked = store.getState().signFreeAgent(fa3.id);
+    expect(blocked.signed).toBe(false);
+    expect(blocked.reason).toMatch(/20/);
+
+    // Release a non-core bench player frees a slot back to 19
+    const club20 = store.getState().getHumanClub()!;
+    const activeIds = new Set(club20.lineup.map((l) => l.playerId));
+    const benchHitter = club20.roster.find(
+      (p) => p.position !== 'SP' && p.position !== 'RP' && !activeIds.has(p.id),
+    )!;
+    expect(store.getState().releasePlayer(benchHitter.id).released).toBe(true);
+    expect(store.getState().getHumanClub()!.roster).toHaveLength(19);
+
+    // Cross-training raises target position proficiency while applying rust to primary
+    const targetHitter = store.getState().getHumanClub()!.roster.find(
+      (p) => p.position !== 'SP' && p.position !== 'RP' && p.throws === 'R',
+    )!;
+    const altPos = targetHitter.position === '3B' ? '1B' : '3B';
+    const favBefore = targetHitter.positionProficiency[targetHitter.favoritePosition] ?? 90;
+    const trainRes = store.getState().crossTrainPlayerPosition(targetHitter.id, altPos);
+    expect(trainRes.trained).toBe(true);
+
+    const updatedHitter = store
+      .getState()
+      .getHumanClub()!
+      .roster.find((p) => p.id === targetHitter.id)!;
+    expect(updatedHitter.positionProficiency[altPos]!).toBeGreaterThanOrEqual(45);
+    expect(updatedHitter.positionProficiency[updatedHitter.favoritePosition]!).toBeLessThan(favBefore);
+  });
 });

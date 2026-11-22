@@ -126,7 +126,8 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
     expect(jpnAce.jerseyNumber).toBe(18);
     expect(jpnAce.seasonStats).toEqual(createEmptySeasonStats());
     expect(jpnAce.careerStats).toEqual(createEmptySeasonStats());
-    expect(jpnAce.secondaryPositions).toEqual(['RP']);
+    expect(jpnAce.favoritePosition).toBe('SP');
+    expect(['single_position', 'swingman_pitcher']).toContain(jpnAce.flexibilityProfile);
 
     for (let i = 0; i < 20; i += 1) {
       const ss = createPlayer(createSeededRng(500 + i), { position: 'SS', tier: 'rookie' });

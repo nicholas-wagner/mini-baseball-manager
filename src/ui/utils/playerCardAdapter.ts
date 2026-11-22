@@ -1,6 +1,20 @@
-import type { CardRarity } from '../../art/portraits/types';
-import { computePlayerOverall, isPitcherPosition, type Player } from '../../engine/models/player';
+import type { CardRarity, PortraitMood } from '../../art/portraits/types';
+import {
+  computePlayerOverall,
+  isPitcherPosition,
+  MARKET_TIER_LABELS,
+  SPECIALIST_LABELS,
+  type FormState,
+  type Player,
+} from '../../engine/models/player';
 import type { BaseballCardPlayer } from '../components/FlipBaseballCard';
+
+/** Maps rolling player streak state onto retro portrait facial mood expressions. */
+export function formStateToCardMood(formState: FormState): PortraitMood {
+  if (formState === 'blazing' || formState === 'hot') return 'fired_up';
+  if (formState === 'cold' || formState === 'frozen') return 'sweating';
+  return 'happy';
+}
 
 /** Adapts a canonical domain `Player` to `<FlipBaseballCard />` props. */
 export function toBaseballCardPlayer(
@@ -15,6 +29,11 @@ export function toBaseballCardPlayer(
           player.ratings.control * 0.25,
       )
     : player.ratings.velocity;
+
+  const badgePills =
+    player.equippedPowerIds.length > 0
+      ? player.equippedPowerIds
+      : [SPECIALIST_LABELS[player.specialistArchetype], MARKET_TIER_LABELS[player.marketTier]];
 
   return {
     id: player.id,
@@ -31,8 +50,7 @@ export function toBaseballCardPlayer(
     level: player.level,
     popularity: player.ratings.popularity,
     traits: player.traits,
-    specialPowers:
-      player.equippedPowerIds.length > 0 ? player.equippedPowerIds : ['Sandlot Grit'],
+    specialPowers: badgePills,
     stats: {
       contact: player.ratings.contact,
       power: player.ratings.power,
