@@ -6,6 +6,8 @@ const nodeProcess = (
   }
 ).process;
 const isCI = Boolean(nodeProcess?.env?.CI);
+const previewPort = nodeProcess?.env?.PLAYWRIGHT_PORT ?? '4173';
+const baseUrl = `http://127.0.0.1:${previewPort}`;
 
 const executablePath =
   nodeProcess?.env?.PLAYWRIGHT_CHROMIUM_PATH ??
@@ -35,7 +37,7 @@ export default defineConfig({
   workers: isCI ? 1 : undefined,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: baseUrl,
     trace: 'on-first-retry',
     launchOptions,
   },
@@ -50,8 +52,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: './node_modules/.bin/vite preview --host 127.0.0.1 --port 4173',
-    url: 'http://127.0.0.1:4173',
+    command: `./node_modules/.bin/vite preview --host 127.0.0.1 --port ${previewPort}`,
+    url: baseUrl,
     reuseExistingServer: !isCI,
     timeout: 60_000,
   },
