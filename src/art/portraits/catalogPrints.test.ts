@@ -6,6 +6,7 @@ it.each([
   { first: 1, last: 100, women: 25 },
   { first: 101, last: 350, women: 56 },
   { first: 351, last: 600, women: 52 },
+  { first: 601, last: 1600, women: 232 },
 ])('binds distinct prints to commissioned players $first through $last', ({ first, last, women }) => {
   const batch = PLAYER_CATALOG.filter(player => player.id.startsWith('mbm-')).slice(first - 1, last);
   expect(batch).toHaveLength(last - first + 1);
