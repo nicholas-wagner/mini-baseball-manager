@@ -111,6 +111,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const [rosterView, setRosterView] = useState<'lineup' | 'cards'>('lineup');
   const [cardFilter, setCardFilter] = useState<'all' | 'lineup' | 'pitchers' | 'bench'>('all');
   const [cardModalOpen, setCardModalOpen] = useState(false);
+  const [scoutFreeAgentId, setScoutFreeAgentId] = useState<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [dossierOpen, setDossierOpen] = useState(false);
   const [rosterMessage, setRosterMessage] = useState<string | null>(null);
@@ -681,14 +682,28 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                           ${fa.contract.salaryPerSeason.toLocaleString()}/yr • Bonus ${fa.contract.signingBonus.toLocaleString()}
                         </div>
                       </div>
-                      <ComicButton
-                        size="sm"
-                        variant="turf"
-                        disabled={full || !canAfford || !fitsCap}
-                        onClick={() => handleSignAgent(fa.id, fa.name)}
-                      >
-                        Sign
-                      </ComicButton>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <ComicButton
+                          size="sm"
+                          variant="sky"
+                          data-testid="fa-scout-card-btn"
+                          aria-label={`Scout card for ${fa.name}`}
+                          onClick={() => {
+                            setScoutFreeAgentId(fa.id);
+                            soundEngine.play('card_flip');
+                          }}
+                        >
+                          🃏 Scout
+                        </ComicButton>
+                        <ComicButton
+                          size="sm"
+                          variant="turf"
+                          disabled={full || !canAfford || !fitsCap}
+                          onClick={() => handleSignAgent(fa.id, fa.name)}
+                        >
+                          Sign
+                        </ComicButton>
+                      </div>
                     </div>
                   );
                 })}
@@ -948,6 +963,37 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
         onDownloadCard={(p) => triggerPngDownload(p)}
         onClose={() => setCardModalOpen(false)}
       />
+
+      {(() => {
+        const faClubShell = {
+          ...humanClub,
+          city: 'Free Agent',
+          name: 'Market',
+          colors: {
+            primary: '#1D3557',
+            secondary: '#181B2C',
+            accent: '#FFC300',
+            monogram: 'FA',
+          },
+        };
+        const faEntries: InspectableCardEntry[] = freeAgents.slice(0, 8).map((fa) => ({
+          player: fa,
+          club: faClubShell,
+          roleTag: `FREE AGENT • ${MARKET_TIER_LABELS[fa.marketTier]} ($${fa.contract.salaryPerSeason.toLocaleString()}/yr)`,
+        }));
+        const activeFaEntry = scoutFreeAgentId
+          ? (faEntries.find((e) => e.player.id === scoutFreeAgentId) ?? null)
+          : null;
+        return (
+          <PlayerCardModal
+            open={scoutFreeAgentId !== null}
+            entry={activeFaEntry}
+            allEntries={faEntries}
+            onSelectPlayerId={(id) => setScoutFreeAgentId(id)}
+            onClose={() => setScoutFreeAgentId(null)}
+          />
+        );
+      })()}
 
       <PlayerDossierModal
         player={dossierOpen ? inspectedPlayer : null}

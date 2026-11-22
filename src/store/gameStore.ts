@@ -7,6 +7,7 @@ import {
   type GmInboxEvent,
   type SeriesGameplanId,
 } from '../engine/gm/gmSeasonPulse';
+import { SERIES_SWEEP_BONUS_CASH } from '../engine/gm/gameDayMoments';
 import {
   applySeriesAutoProgression,
   diffClubLevelUps,
@@ -116,6 +117,7 @@ export interface PostGameSummary {
   rewards: PostGameRewards;
   result: GameSessionResult;
   levelUps?: readonly PlayerLevelUpEvent[];
+  sweepBonusAwarded?: boolean;
 }
 
 export interface GameStoreState {
@@ -123,6 +125,7 @@ export interface GameStoreState {
   seasonNumber: number;
   currentSeriesIndex: number;
   currentGameInSeries: number;
+  seriesResults: Partial<Record<number, { wins: number; losses: number }>>;
   practiceAvailable: boolean;
   lastPracticeFocusLabel: string | null;
   activeGameplan: SeriesGameplanId;
@@ -247,6 +250,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     seasonNumber: 1,
     currentSeriesIndex: 0,
     currentGameInSeries: 0,
+    seriesResults: {},
     practiceAvailable: true,
     lastPracticeFocusLabel: null,
     activeGameplan: 'balanced',
@@ -276,6 +280,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: 1,
         currentSeriesIndex: 0,
         currentGameInSeries: 0,
+        seriesResults: {},
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
         activeGameplan: 'balanced',
@@ -336,10 +341,18 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       let levelUps: PlayerLevelUpEvent[] = [];
       let nextOwnerGoalClaimed = state.ownerGoalClaimedSeason;
       let nextInboxEvent = state.activeGmInboxEvent;
+      let nextSeriesResults = state.seriesResults;
 
       if (prevHumanClub && postHumanClub && state.manager) {
         winsGained = Math.max(0, postHumanClub.wins - prevHumanClub.wins);
         lossesGained = Math.max(0, postHumanClub.losses - prevHumanClub.losses);
+        const prevRec = state.seriesResults[state.currentSeriesIndex] ?? { wins: 0, losses: 0 };
+        const totalSeriesWins = prevRec.wins + winsGained;
+        const totalSeriesLosses = prevRec.losses + lossesGained;
+        nextSeriesResults = {
+          ...state.seriesResults,
+          [state.currentSeriesIndex]: { wins: totalSeriesWins, losses: totalSeriesLosses },
+        };
         const autoProg = applySeriesAutoProgression(
           postHumanClub,
           state.manager,
@@ -347,6 +360,16 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           lossesGained,
         );
         let finalClub = autoProg.club;
+        if (totalSeriesWins >= 3 && totalSeriesLosses === 0) {
+          cashEarned += SERIES_SWEEP_BONUS_CASH;
+          finalClub = {
+            ...finalClub,
+            economy: {
+              ...finalClub.economy,
+              cash: finalClub.economy.cash + SERIES_SWEEP_BONUS_CASH,
+            },
+          };
+        }
         const tierClubs = nextLeagues[finalClub.leagueTier].map((c) =>
           c.id === finalClub.id ? finalClub : c,
         );
@@ -390,6 +413,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         manager: nextManager,
         currentSeriesIndex: nextIndex,
         currentGameInSeries: 0,
+        seriesResults: nextSeriesResults,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
         spotlightUsedThisSeries: false,
@@ -511,6 +535,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: nextSeasonNumber,
         currentSeriesIndex: 0,
         currentGameInSeries: 0,
+        seriesResults: {},
         leagues: offseason.leagues,
         freeAgents: nextFreeAgents,
         lastPlayoffResult: humanPlayoffs,
@@ -589,6 +614,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: done.nextSeasonNumber,
         currentSeriesIndex: 0,
         currentGameInSeries: 0,
+        seriesResults: {},
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
         leagues: done.leagues,
@@ -926,10 +952,31 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       let nextSeriesIndex = state.currentSeriesIndex;
       let nextGameInSeries = state.currentGameInSeries;
       let nextInboxEvent = state.activeGmInboxEvent;
+      let nextSeriesResults = state.seriesResults;
+      let sweepBonusAwarded = false;
 
       if (state.currentSeriesIndex < 7) {
+        const prevRec = state.seriesResults[state.currentSeriesIndex] ?? { wins: 0, losses: 0 };
+        const updatedSeriesWins = prevRec.wins + (won ? 1 : 0);
+        const updatedSeriesLosses = prevRec.losses + (won ? 0 : 1);
+        nextSeriesResults = {
+          ...state.seriesResults,
+          [state.currentSeriesIndex]: { wins: updatedSeriesWins, losses: updatedSeriesLosses },
+        };
+
         const candidateGame = state.currentGameInSeries + 1;
         if (candidateGame >= 3) {
+          if (updatedSeriesWins >= 3 && updatedSeriesLosses === 0) {
+            sweepBonusAwarded = true;
+            const sweptClub: Club = {
+              ...progressed.club,
+              economy: {
+                ...progressed.club.economy,
+                cash: progressed.club.economy.cash + SERIES_SWEEP_BONUS_CASH,
+              },
+            };
+            nextLeagues = updateHumanClubInLeagues(nextLeagues, sweptClub);
+          }
           // Completed all 3 games of the current scheduled series — sync other AI matchups cleanly!
           LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
             if (nextLeagues[tier].length < 2) return;
@@ -974,9 +1021,12 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         awayScore: result.awayScore,
         homeScore: result.homeScore,
         mvp,
-        rewards,
+        rewards: sweepBonusAwarded
+          ? { ...rewards, cashDelta: rewards.cashDelta + SERIES_SWEEP_BONUS_CASH }
+          : rewards,
         result,
         levelUps,
+        sweepBonusAwarded,
       };
 
       set({
@@ -984,6 +1034,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         leagues: nextLeagues,
         currentSeriesIndex: nextSeriesIndex,
         currentGameInSeries: nextGameInSeries,
+        seriesResults: nextSeriesResults,
         activeGmInboxEvent: nextInboxEvent,
         lastPostGameSummary: summary,
         practiceAvailable: true,
@@ -1042,6 +1093,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: save.seasonNumber,
         currentSeriesIndex: save.currentSeriesIndex,
         currentGameInSeries: 0,
+        seriesResults: {},
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,
@@ -1082,6 +1134,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: save.seasonNumber,
         currentSeriesIndex: save.currentSeriesIndex,
         currentGameInSeries: 0,
+        seriesResults: {},
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,

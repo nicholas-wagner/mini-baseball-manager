@@ -21,6 +21,12 @@ import {
   evaluateRosterSpotlight,
 } from '../../engine/gm/gmSeasonPulse';
 import {
+  buildLiveBroadcastLowerThird,
+  buildPreGameProbableMatchup,
+  createClutchMomentSession,
+  evaluateSeriesStakes,
+} from '../../engine/gm/gameDayMoments';
+import {
   buildManagerActionInbox,
   recommendTeamPracticeFocus,
   type ManagerJumpTarget,
@@ -48,6 +54,7 @@ import {
 import type { ManagerPowerId } from '../../engine/models/manager';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import {
+  computePlayerOverall,
   PITCHER_ROLE_SHORT_LABELS,
   PITCH_TYPE_SHORT_LABELS,
   type GameLengthInnings,
@@ -199,6 +206,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const worldSeed = useGameStore((s) => s.worldSeed);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const currentGameInSeries = useGameStore((s) => s.currentGameInSeries);
+  const seriesResults = useGameStore((s) => s.seriesResults);
   const practiceAvailable = useGameStore((s) => s.practiceAvailable);
   const lastPracticeFocusLabel = useGameStore((s) => s.lastPracticeFocusLabel);
   const activeGameplan = useGameStore((s) => s.activeGameplan);
@@ -253,6 +261,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const [modalSummary, setModalSummary] = useState<PostGameSummary | null>(null);
   const [boxScoreOpen, setBoxScoreOpen] = useState(false);
   const [inspectedGamePlayerId, setInspectedGamePlayerId] = useState<string | null>(null);
+  const [preGameScoutPlayerId, setPreGameScoutPlayerId] = useState<string | null>(null);
+  const [clutchRecap, setClutchRecap] = useState<string | null>(null);
   const [showPitchMath, setShowPitchMath] = useState(false);
   const [gameWeather, setGameWeather] = useState<GameDayWeather | null>(null);
   const hapticsEnabled = useUserPreferencesStore((s) => s.hapticsEnabled);
@@ -330,6 +340,9 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
             : `Victory ${isHumanHome ? 'vs' : '@'} ${rivalSide.name} (${humanSide.score}-${rivalSide.score})`,
         );
       }
+      if (summary?.sweepBonusAwarded) {
+        awardFoilPack('sandlot_foil', `3-0 Series Sweep vs ${rivalSide.name}!`);
+      }
       if (summary) {
         setModalSummary(summary);
         setWatchMode('paused');
@@ -376,6 +389,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     setModalSummary(null);
     setBoxScoreOpen(false);
     setInspectedGamePlayerId(null);
+    setPreGameScoutPlayerId(null);
+    setClutchRecap(null);
     const park = getBallparkPreset(session.ballparkId);
     const rolledWeather = rollGameDayWeather(createSeededRng(seed + 41), {
       isDome: park.factors.isDome,
@@ -385,6 +400,57 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     setWatchMode(autoPlay ? 'live' : 'paused');
     bgmEngine.syncStadium(session.ballparkId);
     soundEngine.play(rolledWeather.condition === 'drizzle' ? 'rain_thunder' : 'organ_charge');
+  };
+
+  const handleStartClutchMoment = () => {
+    if (!humanClub || !scheduledOpponent) return;
+    const opp = scheduledOpponent;
+    const isHumanHome = scheduledIsHome;
+    const awayClub = isHumanHome ? opp : humanClub;
+    const homeClub = isHumanHome ? humanClub : opp;
+    const seed = worldSeed + humanClub.wins + humanClub.losses + 1;
+    const pressure = pendingLivePlayoff?.pressureLevel ?? 'regular';
+    const clutch = createClutchMomentSession({
+      awayClub,
+      homeClub,
+      seed,
+      regulationInnings: gameLength,
+      awayGameplan: isHumanHome ? 'balanced' : activeGameplan,
+      homeGameplan: isHumanHome ? activeGameplan : 'balanced',
+      pressureLevel: pressure,
+    });
+    setActiveOpponentId(opp.id);
+    setLiveSession(clutch.session);
+    setRecentEvents([...clutch.events].reverse());
+    setAtBatEvents([]);
+    setArmedPowerId(null);
+    setPitchTarget('attack_zone');
+    setBatterGuess('none');
+    setMoundVisitUsed(false);
+    setArgueUsed(false);
+    setManagerEjected(false);
+    setLastChoreo(null);
+    setPlaybackEvent(clutch.events[clutch.events.length - 1] ?? null);
+    setSelectedPitchType(null);
+    setDefensiveShift('standard');
+    setWinProbHistory([estimateHomeWinProbability(clutch.session)]);
+    setWarmingRelieverIds([]);
+    setWarmupCounts({});
+    setPowerTracker(createInGameManagerPowerTracker());
+    setModalSummary(null);
+    setBoxScoreOpen(false);
+    setInspectedGamePlayerId(null);
+    setPreGameScoutPlayerId(null);
+    setClutchRecap(clutch.recapHeadline);
+    const park = getBallparkPreset(clutch.session.ballparkId);
+    const rolledWeather = rollGameDayWeather(createSeededRng(seed + 41), {
+      isDome: park.factors.isDome,
+      hasNightLights: homeClub.stadium.hasNightLights,
+    });
+    setGameWeather(rolledWeather);
+    setWatchMode('paused');
+    bgmEngine.syncStadium(clutch.session.ballparkId);
+    soundEngine.play('clutch_stinger');
   };
 
   const applyStepResult = useCallback(
@@ -645,6 +711,37 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     );
     const tiredStarter = detectTiredScheduledStarter(humanClub);
     const rosterSpotlight = evaluateRosterSpotlight(humanClub);
+    const currentSeriesRec = seriesResults[currentSeriesIndex] ?? { wins: 0, losses: 0 };
+    const currentSeriesStakes = evaluateSeriesStakes(
+      currentSeriesRec.wins,
+      currentSeriesRec.losses,
+    );
+    const probableMatchup = scheduledOpponent
+      ? buildPreGameProbableMatchup(humanClub, scheduledOpponent)
+      : null;
+    const preGameScoutEntries: InspectableCardEntry[] =
+      probableMatchup && scheduledOpponent
+        ? [
+            {
+              player: probableMatchup.humanStarter,
+              club: humanClub,
+              roleTag: 'YOUR PROBABLE STARTER',
+            },
+            {
+              player: probableMatchup.opponentStarter,
+              club: scheduledOpponent,
+              roleTag: 'RIVAL PROBABLE STARTER',
+            },
+            {
+              player: probableMatchup.opponentStarHitter,
+              club: scheduledOpponent,
+              roleTag: 'RIVAL STAR SLUGGER',
+            },
+          ]
+        : [];
+    const activePreGameScoutEntry = preGameScoutPlayerId
+      ? (preGameScoutEntries.find((e) => e.player.id === preGameScoutPlayerId) ?? null)
+      : null;
 
     return (
       <div className="space-y-4">
@@ -762,13 +859,81 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                       </div>
                     </div>
                   </div>
-                  <div className="text-[11px] font-extrabold text-[#1D3557] px-2.5 py-1 rounded-lg border border-[#181B2C]/30 bg-[#FBF4E4]">
-                    🏟️{' '}
-                    {
-                      getBallparkPreset(
-                        (scheduledIsHome ? humanClub : scheduledOpponent).stadium.ballparkId,
-                      ).name
-                    }
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {nextScheduled ? (
+                      <span
+                        data-testid="series-stakes-badge"
+                        className={`px-2 py-1 rounded-lg border-2 border-[#181B2C] text-[10px] font-extrabold ${
+                          currentSeriesStakes.isSweepOpportunity || currentSeriesStakes.isRubberMatch
+                            ? 'bg-[#FFC300] text-[#181B2C]'
+                            : 'bg-[#FFF3BF] text-[#181B2C]'
+                        }`}
+                      >
+                        {currentSeriesStakes.badgeText}
+                      </span>
+                    ) : null}
+                    <div className="text-[11px] font-extrabold text-[#1D3557] px-2.5 py-1 rounded-lg border border-[#181B2C]/30 bg-[#FBF4E4]">
+                      🏟️{' '}
+                      {
+                        getBallparkPreset(
+                          (scheduledIsHome ? humanClub : scheduledOpponent).stadium.ballparkId,
+                        ).name
+                      }
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {probableMatchup && scheduledOpponent ? (
+                <div
+                  data-testid="probable-matchup-strip"
+                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-1.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold uppercase text-[#1D3557]">
+                    <span>⚾ Probable Pitching Matchup &amp; Rival Scout Cards</span>
+                    <span className="text-[#4A5068] normal-case font-bold">
+                      {currentSeriesStakes.gamesPlayed > 0
+                        ? currentSeriesStakes.summaryLine
+                        : probableMatchup.matchupNote}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      data-testid="scout-human-starter-btn"
+                      onClick={() => {
+                        setPreGameScoutPlayerId(probableMatchup.humanStarter.id);
+                        soundEngine.play('card_flip');
+                      }}
+                      className="px-2.5 py-1.5 min-h-[38px] rounded-lg border-2 border-[#181B2C] bg-[#D8F3DC] hover:bg-[#FFF3BF] text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                    >
+                      🃏 Your SP: {probableMatchup.humanStarter.name} ({probableMatchup.humanStarter.throws}HP • OVR{' '}
+                      {computePlayerOverall(probableMatchup.humanStarter)})
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="scout-rival-starter-btn"
+                      onClick={() => {
+                        setPreGameScoutPlayerId(probableMatchup.opponentStarter.id);
+                        soundEngine.play('card_flip');
+                      }}
+                      className="px-2.5 py-1.5 min-h-[38px] rounded-lg border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[11px] font-extrabold text-[#1D3557] cursor-pointer"
+                    >
+                      🃏 Rival SP: {probableMatchup.opponentStarter.name} ({probableMatchup.opponentStarter.throws}HP • OVR{' '}
+                      {computePlayerOverall(probableMatchup.opponentStarter)})
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="scout-rival-star-btn"
+                      onClick={() => {
+                        setPreGameScoutPlayerId(probableMatchup.opponentStarHitter.id);
+                        soundEngine.play('card_flip');
+                      }}
+                      className="px-2.5 py-1.5 min-h-[38px] rounded-lg border-2 border-[#181B2C] bg-[#FFE5EC] hover:bg-[#FFF3BF] text-[11px] font-extrabold text-[#9D0208] cursor-pointer"
+                    >
+                      🃏 Rival Star: {probableMatchup.opponentStarHitter.name} ({probableMatchup.opponentStarHitter.position} • OVR{' '}
+                      {computePlayerOverall(probableMatchup.opponentStarHitter)})
+                    </button>
                   </div>
                 </div>
               ) : null}
@@ -794,6 +959,15 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                   onClick={() => handleStartLiveGame(false)}
                 >
                   Start Live 3D Game
+                </ComicButton>
+                <ComicButton
+                  variant="coral"
+                  size="lg"
+                  data-testid="start-clutch-moment-btn"
+                  icon={<Flame className="w-4 h-4" />}
+                  onClick={handleStartClutchMoment}
+                >
+                  Play Clutch Moment
                 </ComicButton>
                 <ComicButton
                   variant="gold"
@@ -858,7 +1032,22 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                   data-testid="season-schedule-strip"
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
                 >
-                  {seasonSchedule.entries.map((entry) => (
+                  {seasonSchedule.entries.map((entry) => {
+                    const rec = seriesResults[entry.seriesIndex];
+                    const badgeLabel = (() => {
+                      if (entry.status === 'current') {
+                        return rec && rec.wins + rec.losses > 0
+                          ? `${rec.wins}-${rec.losses} LIVE`
+                          : 'NEXT';
+                      }
+                      if (entry.status === 'completed') {
+                        if (!rec) return '✓ DONE';
+                        if (rec.wins >= 3 && rec.losses === 0) return '🧹 3-0 SWEEP';
+                        return `${rec.wins > rec.losses ? 'W' : 'L'} ${rec.wins}-${rec.losses}`;
+                      }
+                      return '3G';
+                    })();
+                    return (
                     <div
                       key={entry.seriesIndex}
                       data-testid="schedule-series-pill"
@@ -866,7 +1055,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                         entry.status === 'current'
                           ? 'bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C]'
                           : entry.status === 'completed'
-                            ? 'bg-[#E9F5EC] opacity-80'
+                            ? 'bg-[#E9F5EC] opacity-85'
                             : 'bg-[#FFFDF7]'
                       }`}
                     >
@@ -879,15 +1068,13 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                             entry.status === 'current'
                               ? 'bg-[#FFC300] text-[#181B2C]'
                               : entry.status === 'completed'
-                                ? 'bg-[#2FB356] text-white'
+                                ? rec && rec.losses > rec.wins
+                                  ? 'bg-[#E63946] text-white'
+                                  : 'bg-[#2FB356] text-white'
                                 : 'bg-[#F1E4C8] text-[#4A5068]'
                           }`}
                         >
-                          {entry.status === 'current'
-                            ? 'NEXT'
-                            : entry.status === 'completed'
-                              ? '✓ DONE'
-                              : '3G'}
+                          {badgeLabel}
                         </span>
                       </div>
                       <div className="font-display text-xs text-[#181B2C] mt-1 flex items-center gap-1.5">
@@ -904,7 +1091,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                         {getBallparkPreset(entry.hostBallparkId).name}
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             </div>
@@ -935,6 +1123,14 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
         ) : null}
 
         <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
+
+        <PlayerCardModal
+          open={preGameScoutPlayerId !== null}
+          entry={activePreGameScoutEntry}
+          allEntries={preGameScoutEntries}
+          onSelectPlayerId={(id) => setPreGameScoutPlayerId(id)}
+          onClose={() => setPreGameScoutPlayerId(null)}
+        />
 
         <PostGameSummaryModal
           summary={modalSummary}
@@ -1090,6 +1286,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const activeInspectedEntry = inspectedGamePlayerId
     ? (gameCardEntries.find((e) => e.player.id === inspectedGamePlayerId) ?? gameCardEntries[0] ?? null)
     : null;
+  const liveLowerThird = buildLiveBroadcastLowerThird(liveSession);
   const liveRunnerIds = liveSession.bases.filter((id): id is string => Boolean(id));
   const openGamePlayerCard = (playerId: string) => {
     if (watchMode === 'live') setWatchMode('paused');
@@ -1161,6 +1358,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               basesLabel={`Bases: ${liveSession.bases.map((b, idx) => (b ? `${idx + 1}B` : '·')).join(' ')}`}
               batterName={currentBatter.name}
               pitcherName={currentPitcher.name}
+              lowerThird={liveLowerThird}
+              clutchRecap={clutchRecap}
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
               watchMode={watchMode}

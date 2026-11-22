@@ -1,4 +1,5 @@
 import { FastForward, Play, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
+import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
 import type { GameDayControlMode } from '../../store/userPreferences';
@@ -10,6 +11,8 @@ interface LiveActionBarProps {
   basesLabel: string;
   batterName?: string;
   pitcherName?: string;
+  lowerThird?: LiveBroadcastLowerThird;
+  clutchRecap?: string | null;
   latestEvent: PlayEvent | null;
   controlMode: GameDayControlMode;
   watchMode: 'live' | 'clutch' | 'paused';
@@ -42,6 +45,8 @@ export function LiveActionBar({
   basesLabel,
   batterName,
   pitcherName,
+  lowerThird,
+  clutchRecap,
   latestEvent,
   controlMode,
   watchMode,
@@ -224,7 +229,44 @@ export function LiveActionBar({
         </ComicButton>
       </div>
 
-      {/* Row 3: Simple Arcade Optional 3-Pill Swing Approach (when batting) + Live Pitch Readout */}
+      {/* Row 3: Compact TV Broadcast Lower-Third + Clutch Jump-In Banner + Optional Swing Pills + Live Readout */}
+      {clutchRecap ? (
+        <div
+          data-testid="clutch-recap-banner"
+          className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] text-[#9D0208] text-[11px] font-extrabold"
+        >
+          🔥 {clutchRecap}
+        </div>
+      ) : null}
+
+      {lowerThird ? (
+        <div
+          data-testid="broadcast-lower-third"
+          className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#181B2C] text-[#FBF4E4] flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-[11px] font-bold"
+        >
+          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+            <span className="text-[#FFD166] font-extrabold">
+              🏏 {lowerThird.batterName} ({lowerThird.batterLineText})
+            </span>
+            <span className="text-[#89C2A5]">• On Deck: {lowerThird.onDeckName}</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 font-mono-tabular">
+            <span className="text-[#E0FBFC]">⚾ {lowerThird.pitcherName}</span>
+            <span
+              className={`px-1.5 py-0.5 rounded font-extrabold border border-white/25 ${
+                lowerThird.enduranceTone === 'gassed'
+                  ? 'bg-[#FF4D6D] text-white'
+                  : lowerThird.enduranceTone === 'tiring'
+                    ? 'bg-[#FFC300] text-[#181B2C]'
+                    : 'bg-[#2FB356] text-white'
+              }`}
+            >
+              {lowerThird.pitchCount} P • {lowerThird.endurancePct}%
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-dashed border-[#181B2C]/20 text-[11px]">
         {controlMode === 'simple' && isBatting ? (
           <div className="flex flex-wrap items-center gap-1">

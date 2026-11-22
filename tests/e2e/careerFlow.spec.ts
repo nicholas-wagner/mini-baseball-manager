@@ -17,6 +17,11 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('manager-action-inbox')).toBeVisible();
   await expect(page.getByTestId('scheduled-matchup-card')).toBeVisible();
   await expect(page.getByTestId('schedule-series-pill')).toHaveCount(7);
+  await expect(page.getByTestId('probable-matchup-strip')).toBeVisible();
+  await expect(page.getByTestId('start-clutch-moment-btn')).toBeVisible();
+  await page.getByTestId('scout-rival-starter-btn').click();
+  await expect(page.getByRole('dialog', { name: /player baseball card/i })).toBeVisible();
+  await page.getByRole('button', { name: /close player card/i }).click();
   await page.getByRole('button', { name: /start live 3d game/i }).click();
 
   // Verify Sticky R/H/E Scoreboard + 3D Ballpark Canvas + Next Pitch button are ALL visible on-screen together WITHOUT scrolling!
@@ -37,6 +42,7 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   expect(nextPitchBox!.y + nextPitchBox!.height).toBeLessThanOrEqual(viewport.height);
 
   await expect(page.getByTestId('coach-action-cue')).toBeVisible();
+  await expect(page.getByTestId('broadcast-lower-third')).toBeVisible();
   await nextPitchBtn.click();
   await expect(page.getByTestId('live-last-pitch-readout')).toContainText(/mph|ball|strike|out|hit|walk/i);
 
@@ -87,6 +93,9 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByTestId('roster-view-cards-btn').click();
   await expect(page.getByTestId('roster-card-binder')).toBeVisible();
   await page.getByTestId('roster-view-lineup-btn').click();
+  await page.getByTestId('fa-scout-card-btn').first().click();
+  await expect(page.getByRole('dialog', { name: /player baseball card/i })).toBeVisible();
+  await page.getByRole('button', { name: /close player card/i }).click();
   await expect(page.getByTestId('trainers-table-panel')).toBeVisible();
   await page.getByRole('button', { name: /full scouting dossier/i }).click();
   await expect(page.getByTestId('player-dossier-modal')).toBeVisible();
