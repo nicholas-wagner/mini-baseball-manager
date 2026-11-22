@@ -2,6 +2,7 @@ import type { Club, LeagueTierId } from '../engine/models/club';
 import type { ManagerProfile } from '../engine/models/manager';
 import { isPitcherPosition, type Player } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
+import { rollMentalAndPressureProfile } from '../engine/rpg/mentalAndLeverage';
 import {
   computeTotalRatingBudget,
   rollBatterPitchProfile,
@@ -35,6 +36,17 @@ function hydratePlayerDefaults(player: Player): Player {
   const batterPitchProfile =
     player.batterPitchProfile ??
     rollBatterPitchProfile(seedRng, specialistArchetype, player.ratings, marketTier);
+  const mental =
+    player.mentalTraits && player.pressureProfile
+      ? { mentalTraits: player.mentalTraits, pressureProfile: player.pressureProfile }
+      : rollMentalAndPressureProfile(seedRng, player.personality ?? 'clutch_captain', marketTier);
+  const ratings =
+    typeof player.ratings.luck === 'number' ? player.ratings : { ...player.ratings, luck: 50 };
+  const statCaps = player.statCaps
+    ? typeof player.statCaps.luck === 'number'
+      ? player.statCaps
+      : { ...player.statCaps, luck: Math.min(99, ratings.luck + 10) }
+    : { ...ratings, potential: 99 };
 
   return {
     ...player,
@@ -45,7 +57,10 @@ function hydratePlayerDefaults(player: Player): Player {
     positionProficiency: player.positionProficiency ?? { [favoritePosition]: 90 },
     ...(pitchArsenal ? { pitchArsenal } : {}),
     batterPitchProfile,
-    statCaps: player.statCaps ?? { ...player.ratings, potential: 99 },
+    mentalTraits: mental.mentalTraits,
+    pressureProfile: mental.pressureProfile,
+    ratings,
+    statCaps,
     totalRatingBudget:
       player.totalRatingBudget ?? computeTotalRatingBudget(marketTier, player.position),
     xpGrowthMultiplier: player.xpGrowthMultiplier ?? 0.85,

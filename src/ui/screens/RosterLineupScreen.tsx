@@ -8,7 +8,9 @@ import {
   computePlayerOverall,
   isPitcherPosition,
   MARKET_TIER_LABELS,
+  MENTAL_TRAIT_LABELS,
   PITCH_TYPE_SHORT_LABELS,
+  PRESSURE_PROFILE_LABELS,
   SPECIALIST_LABELS,
   type FormState,
 } from '../../engine/models/player';
@@ -498,6 +500,22 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                   </div>
                 </>
               )}
+              <div className="flex flex-wrap gap-1 pt-1 border-t border-[#181B2C]/15 text-[10px] font-extrabold">
+                <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]">
+                  {PRESSURE_PROFILE_LABELS[inspectedPlayer.pressureProfile]}
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[#181B2C]">
+                  Luck {inspectedPlayer.ratings.luck}
+                </span>
+                {inspectedPlayer.mentalTraits.map((trait) => (
+                  <span
+                    key={trait}
+                    className="px-1.5 py-0.5 rounded bg-[#F1E4C8] border border-[#181B2C] text-[#181B2C]"
+                  >
+                    {MENTAL_TRAIT_LABELS[trait]}
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
               <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">

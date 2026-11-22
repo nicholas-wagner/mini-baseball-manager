@@ -19,6 +19,7 @@ import {
 } from '../../engine/simulation/baseballEngine';
 import {
   getCurrentBatter,
+  getCurrentLeverage,
   getCurrentPitcher,
   type GameSessionResult,
   type GameSessionState,
@@ -277,6 +278,7 @@ export function GameDayScreen() {
 
   const currentBatter = getCurrentBatter(liveSession);
   const currentPitcher = getCurrentPitcher(liveSession);
+  const currentLeverage = getCurrentLeverage(liveSession);
   const platoon = evaluatePlatoonMatchup(currentBatter.bats, currentPitcher.throws);
   const battingSideKey = liveSession.half === 'TOP' ? 'away' : 'home';
   const fieldingSideKey = liveSession.half === 'TOP' ? 'home' : 'away';
@@ -360,6 +362,18 @@ export function GameDayScreen() {
                     {PITCH_TYPE_SHORT_LABELS[currentPitcher.pitchArsenal.favoritePitch]}
                   </span>
                 ) : null}
+                <span
+                  data-testid="leverage-hud"
+                  className={`px-2 py-0.5 rounded border border-[#181B2C] ${
+                    currentLeverage.tier === 'critical'
+                      ? 'bg-[#FF4D6D] text-white'
+                      : currentLeverage.tier === 'high'
+                        ? 'bg-[#FFC300] text-[#181B2C]'
+                        : 'bg-[#F1E4C8] text-[#181B2C]'
+                  }`}
+                >
+                  LI {currentLeverage.leverageIndex.toFixed(2)} • {currentLeverage.label}
+                </span>
                 <span
                   data-testid="special-ability-hud"
                   className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]"

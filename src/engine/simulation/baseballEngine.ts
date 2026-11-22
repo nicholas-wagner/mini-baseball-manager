@@ -1,6 +1,11 @@
 import type { Club } from '../models/club';
 import type { PlayEvent, TacticalCall } from '../models/playEvent';
-import { createEmptySeasonStats, type PitchType, type PlayerSeasonStats } from '../models/player';
+import {
+  createEmptySeasonStats,
+  type GamePressureLevel,
+  type PitchType,
+  type PlayerSeasonStats,
+} from '../models/player';
 import { createSeededRng } from '../rng/seededRng';
 import {
   canTriggerSpecialAbility,
@@ -19,6 +24,7 @@ import {
   createTeamGameSide,
   getBattingSide,
   getCurrentBatter,
+  getCurrentLeverage,
   getCurrentPitcher,
   getDefenderAtPosition,
   getFieldingSide,
@@ -41,6 +47,7 @@ export function createGameSession(
   awayClub: Club,
   homeClub: Club,
   seed: number,
+  gamePressureLevel: GamePressureLevel = 'regular',
 ): GameSessionState {
   const away = createTeamGameSide(awayClub);
   const home = createTeamGameSide(homeClub);
@@ -48,6 +55,7 @@ export function createGameSession(
     rngSeed: seed >>> 0,
     stepCounter: 0,
     status: 'in_progress',
+    gamePressureLevel,
     inning: 1,
     half: 'TOP',
     outs: 0,
@@ -87,6 +95,7 @@ function makeEvent(
     pitcherId: partial.pitcherId,
     outcome: partial.outcome,
     isClutchMoment: isClutchSituation(state),
+    leverageIndex: getCurrentLeverage(state).leverageIndex,
     specialPowerTriggered: partial.specialPowerTriggered,
     ballFlight: partial.ballFlight,
     fieldingHighlight: partial.fieldingHighlight,
@@ -327,8 +336,14 @@ function applyPostPlateHypeAndCooldowns(
     return;
   }
 
-  batting.hypeGauge = Math.min(100, batting.hypeGauge + (res.totalBases ? 16 : 6));
-  fielding.hypeGauge = Math.min(100, fielding.hypeGauge + (res.outsAdded > 0 ? 14 : 4));
+  batting.hypeGauge = Math.min(
+    100,
+    batting.hypeGauge + Math.round((res.totalBases ? 16 : 6) * batting.clubhouseHypeMultiplier),
+  );
+  fielding.hypeGauge = Math.min(
+    100,
+    fielding.hypeGauge + Math.round((res.outsAdded > 0 ? 14 : 4) * fielding.clubhouseHypeMultiplier),
+  );
 }
 
 function applyPlateComplete(
@@ -656,6 +671,7 @@ export function stepPitch(
     fieldingHype: fielding.hypeGauge,
     canBatterTriggerSpecial: readiness.canBatterTriggerSpecial,
     canPitcherTriggerSpecial: readiness.canPitcherTriggerSpecial,
+    leverageIndex: getCurrentLeverage(next).leverageIndex,
     tacticalCall,
     atBatPitchHistory: next.atBatPitchHistory,
     requestedPitchType: options?.requestedPitchType,

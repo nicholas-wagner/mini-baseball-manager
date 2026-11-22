@@ -86,6 +86,7 @@ export function applySpecialistRatingShape(
     fielding: bump('fielding', ratings.fielding),
     arm: bump('arm', ratings.arm),
     clutch: bump('clutch', ratings.clutch),
+    luck: ratings.luck,
     popularity: ratings.popularity,
     potential: ratings.potential,
   };

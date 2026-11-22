@@ -17,6 +17,7 @@ import {
 import { getNationalityById } from '../nationalities/pickNationality';
 import type { SeededRng } from '../rng/seededRng';
 import { getFormStatModifiers } from '../rpg/formTracker';
+import { evaluatePressureAndLuckModifiers } from '../rpg/mentalAndLeverage';
 import {
   evaluatePitchMatchup,
   selectPitchForCount,
@@ -287,11 +288,12 @@ function resolveOutOrError(
   bases: BaseState,
   defender: Player,
   defenderPos: Exclude<FieldPosition, 'SP' | 'RP'>,
+  luckErrorMultiplier: number,
 ): PitchResolution {
   const posEval = evaluatePositionAssignment(defender, defenderPos);
   const effectiveFielding = defender.ratings.fielding + posEval.fieldingDelta;
   const errorProb = clampProb(
-    (0.055 - (effectiveFielding - 60) * 0.0006) * posEval.errorMultiplier,
+    (0.055 - (effectiveFielding - 60) * 0.0006) * posEval.errorMultiplier * luckErrorMultiplier,
     0.012,
     0.16,
   );
@@ -357,6 +359,7 @@ export interface PitchResolverContext {
   fieldingHype: number;
   canBatterTriggerSpecial: boolean;
   canPitcherTriggerSpecial: boolean;
+  leverageIndex: number;
   tacticalCall: TacticalCall;
   atBatPitchHistory: readonly PitchType[];
   requestedPitchType?: PitchType;
@@ -368,11 +371,13 @@ function resolveContactResult(
   effPower: number,
   effStuff: number,
   firstBaseStepBonus: number,
+  luckHitShift: number,
+  defenderLuckErrMult: number,
 ): PitchResolution {
   const hitProb = clampProb(
-    0.295 + (effContact - effStuff) * 0.0044 + firstBaseStepBonus * 0.008,
+    0.295 + (effContact - effStuff) * 0.0044 + firstBaseStepBonus * 0.008 + luckHitShift,
     0.16,
-    0.49,
+    0.50,
   );
   if (ctx.rng.chance(hitProb)) {
     const hit = resolveHitType(ctx.rng, ctx.batter, effPower, ctx.defender);
@@ -381,7 +386,15 @@ function resolveContactResult(
     }
     return hit;
   }
-  return resolveOutOrError(ctx.rng, ctx.batter, ctx.outs, ctx.bases, ctx.defender, ctx.defenderPos);
+  return resolveOutOrError(
+    ctx.rng,
+    ctx.batter,
+    ctx.outs,
+    ctx.bases,
+    ctx.defender,
+    ctx.defenderPos,
+    defenderLuckErrMult,
+  );
 }
 
 function resolveCalledStrikeOrOut(strikes: number, batterName: string): PitchResolution {
@@ -424,6 +437,8 @@ function evaluateSwingResult(
   effPower: number,
   effStuff: number,
   firstBaseStepBonus: number,
+  luckHitShift: number,
+  defenderLuckErrMult: number,
 ): PitchResolution {
   const contactProb = inZone
     ? clampProb(0.76 + (effContact - effStuff) * 0.0048, 0.48, 0.94)
@@ -448,7 +463,15 @@ function evaluateSwingResult(
     };
   }
 
-  return resolveContactResult(ctx, effContact, effPower, effStuff, firstBaseStepBonus);
+  return resolveContactResult(
+    ctx,
+    effContact,
+    effPower,
+    effStuff,
+    firstBaseStepBonus,
+    luckHitShift,
+    defenderLuckErrMult,
+  );
 }
 
 function countTrailingPitchRepeats(
@@ -517,6 +540,9 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const mod = TACTICAL_CONFIG[ctx.tacticalCall];
   const batterForm = getFormStatModifiers(ctx.batter.formState);
   const pitcherForm = getFormStatModifiers(ctx.pitcher.formState);
+  const batterMental = evaluatePressureAndLuckModifiers(ctx.batter, ctx.leverageIndex);
+  const pitcherMental = evaluatePressureAndLuckModifiers(ctx.pitcher, ctx.leverageIndex);
+  const defenderMental = evaluatePressureAndLuckModifiers(ctx.defender, ctx.leverageIndex);
   const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
   const fatigueDrop = Math.max(0, ctx.pitcherFatigue - 45) * 0.28;
   const effContact =
@@ -524,27 +550,33 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     platoon.batterContactDelta +
     mod.contactMod +
     batterForm.contactDelta +
-    pitchMatchup.batterContactDelta;
+    pitchMatchup.batterContactDelta +
+    batterMental.pressureRatingDelta;
   const effPower =
     ctx.batter.ratings.power +
     platoon.batterPowerDelta +
     mod.powerMod +
     batterForm.powerDelta +
-    pitchMatchup.batterPowerDelta;
+    pitchMatchup.batterPowerDelta +
+    batterMental.pressureRatingDelta;
   const effStuff =
     (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 +
     platoon.pitcherBreakDelta +
     pitcherForm.stuffDelta +
-    pitchMatchup.pitcherStuffDelta -
+    pitchMatchup.pitcherStuffDelta +
+    pitcherMental.pressureRatingDelta -
     fatigueDrop;
   const effControl =
     ctx.pitcher.ratings.control +
     pitcherForm.controlDelta +
     pitcherPosEval.controlDelta +
-    pitchMatchup.pitcherControlDelta;
+    pitchMatchup.pitcherControlDelta +
+    pitcherMental.pressureRatingDelta;
 
+  const luckZoneShift = pitcherMental.luckZoneProbDelta - batterMental.luckZoneProbDelta * 0.5;
+  const luckHitShift = batterMental.luckHitProbDelta - pitcherMental.luckHitProbDelta * 0.5;
   const zoneProb = clampProb(
-    0.55 + (effControl - ctx.batter.ratings.eye) * 0.0025,
+    0.55 + (effControl - ctx.batter.ratings.eye) * 0.0025 + luckZoneShift,
     0.40,
     0.72,
   );
@@ -561,7 +593,16 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     ? inZone
       ? resolveCalledStrikeOrOut(ctx.strikes, ctx.batter.name)
       : resolveBallOrWalk(ctx.balls, ctx.batter.name)
-    : evaluateSwingResult(ctx, inZone, effContact, effPower, effStuff, platoon.firstBaseStepBonus);
+    : evaluateSwingResult(
+        ctx,
+        inZone,
+        effContact,
+        effPower,
+        effStuff,
+        platoon.firstBaseStepBonus,
+        luckHitShift,
+        defenderMental.luckErrorMultiplier,
+      );
 
   return attachPitchTelemetry(rawResult, pitchMatchup);
 }

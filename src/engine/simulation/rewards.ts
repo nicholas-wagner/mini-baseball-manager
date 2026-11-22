@@ -2,6 +2,7 @@ import type { Club } from '../models/club';
 import type { ManagerProfile } from '../models/manager';
 import { isPitcherPosition, type Player, type PlayerSeasonStats } from '../models/player';
 import { updatePlayerFormAfterGame } from '../rpg/formTracker';
+import { evaluateClubhouseMentalAura } from '../rpg/mentalAndLeverage';
 import { evolveSpecialistArchetype } from '../rpg/specialistsAndPositions';
 import { enforceRatingBudget } from '../rpg/trainingCompromises';
 import { applyGameStatDeltasToClub } from './baseballEngine';
@@ -256,9 +257,15 @@ export function applyPostGameProgression(
   won: boolean,
 ): { club: Club; manager: ManagerProfile } {
   const clubWithStats = applyGameStatDeltasToClub(club, statDeltas, won);
+  const aura = evaluateClubhouseMentalAura(clubWithStats.roster);
+  const moraleShift = (won ? 4 : -4) + aura.moraleRecoveryBonus;
   const updatedRoster = clubWithStats.roster.map((player) => {
     const withXp = applyPlayerXpAndLevelUps(player, rewards.playerXpById[player.id] ?? 0);
-    return updatePlayerFormAfterGame(withXp, statDeltas[player.id]);
+    const withForm = updatePlayerFormAfterGame(withXp, statDeltas[player.id]);
+    return {
+      ...withForm,
+      morale: Math.max(20, Math.min(100, withForm.morale + moraleShift)),
+    };
   });
 
   return {

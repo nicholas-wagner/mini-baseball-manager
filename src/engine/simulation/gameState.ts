@@ -1,11 +1,21 @@
 import type { FieldPosition } from '../handedness/types';
 import type { Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
-import type { Player, PitchType, PlayerSeasonStats } from '../models/player';
+import type {
+  GamePressureLevel,
+  Player,
+  PitchType,
+  PlayerSeasonStats,
+} from '../models/player';
 import {
   SPECIAL_ABILITY_HYPE_COST,
   type AbilityCooldownState,
 } from '../rpg/abilityCooldowns';
+import {
+  computeSituationLeverage,
+  evaluateClubhouseMentalAura,
+  type SituationLeverageResult,
+} from '../rpg/mentalAndLeverage';
 
 export type HalfInning = 'TOP' | 'BOT';
 
@@ -65,12 +75,14 @@ export interface TeamGameSide {
   hits: number;
   errors: number;
   hypeGauge: number;
+  clubhouseHypeMultiplier: number;
 }
 
 export interface GameSessionState {
   rngSeed: number;
   stepCounter: number;
   status: 'in_progress' | 'completed';
+  gamePressureLevel: GamePressureLevel;
   inning: number;
   half: HalfInning;
   outs: number;
@@ -155,6 +167,7 @@ export function createTeamGameSide(club: Club): TeamGameSide {
     hits: 0,
     errors: 0,
     hypeGauge: 25,
+    clubhouseHypeMultiplier: evaluateClubhouseMentalAura(club.roster).hypeGainMultiplier,
   };
 }
 
@@ -204,14 +217,26 @@ export function getDefenderAtPosition(
   return side.playersById[side.lineup[0].playerId];
 }
 
-/** Detects RISP, close late-inning pressure, or maxed Hype special power readiness. */
+/** Computes real-time Leverage Index for the active game state. */
+export function getCurrentLeverage(state: GameSessionState): SituationLeverageResult {
+  return computeSituationLeverage({
+    inning: state.inning,
+    outs: state.outs,
+    bases: state.bases,
+    scoreDiff: state.home.score - state.away.score,
+    gamePressureLevel: state.gamePressureLevel,
+  });
+}
+
+/** Detects RISP, high Leverage Index, close late-inning pressure, or Special Ability Hype readiness. */
 export function isClutchSituation(state: GameSessionState): boolean {
   const hasRisp = state.bases[1] !== null || state.bases[2] !== null;
   const closeLate = state.inning >= 7 && Math.abs(state.away.score - state.home.score) <= 2;
   const powerReady =
     state.away.hypeGauge >= SPECIAL_ABILITY_HYPE_COST ||
     state.home.hypeGauge >= SPECIAL_ABILITY_HYPE_COST;
-  return hasRisp || closeLate || powerReady;
+  const highLeverage = getCurrentLeverage(state).leverageIndex >= 1.6;
+  return hasRisp || closeLate || powerReady || highLeverage;
 }
 
 /** Advances runners only when forced on a walk/intentional walk. */

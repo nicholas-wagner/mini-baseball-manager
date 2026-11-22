@@ -74,6 +74,7 @@ export interface PlayEvent {
   pitcherId?: string;
   outcome?: AtBatOutcome;
   isClutchMoment: boolean;
+  leverageIndex?: number;
   isRivalrySpark?: boolean;
   specialPowerTriggered?: {
     actor: 'pitcher' | 'batter' | 'fielder' | 'manager';

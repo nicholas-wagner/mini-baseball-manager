@@ -66,6 +66,7 @@ function makeMatchupClubs(
       fielding: 74,
       arm: 74,
       clutch: 72,
+      luck: 50,
       popularity: 70,
       potential: 80,
     },
@@ -435,5 +436,56 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
     }
 
     expect(totalSpecialsAcrossGames).toBeGreaterThan(0);
+  });
+
+  it('gives ice_veins batters a statistical edge over pressure_wilt batters in critical playoff spots (TASK-057)', () => {
+    const runPressureHits = (profile: 'ice_veins' | 'pressure_wilt'): number => {
+      const { away, home } = makeMatchupClubs('R', 'R', 9600);
+      const shapedAway: Club = {
+        ...away,
+        roster: away.roster.map((p) => ({
+          ...p,
+          pressureProfile: profile,
+          mentalTraits: [profile === 'ice_veins' ? 'ice_veins' : 'pressure_wilt'],
+          ratings: { ...p.ratings, clutch: profile === 'ice_veins' ? 85 : 42 },
+        })),
+      };
+      const steadyHome: Club = {
+        ...home,
+        roster: home.roster.map((p) => ({
+          ...p,
+          pressureProfile: 'steady',
+          mentalTraits: ['steady_hand'],
+        })),
+      };
+
+      let hits = 0;
+      for (let i = 0; i < 600; i += 1) {
+        const base = createGameSession(shapedAway, steadyHome, 55000 + i, 'elimination_championship');
+        const criticalSpot: GameSessionState = {
+          ...base,
+          inning: 9,
+          outs: 2,
+          bases: ['r1', 'r2', 'r3'],
+          away: { ...base.away, score: 3 },
+          home: { ...base.home, score: 3 },
+        };
+        const res = stepAtBat(criticalSpot);
+        if (
+          res.events.some(
+            (e) =>
+              e.outcome === 'single' ||
+              e.outcome === 'double' ||
+              e.outcome === 'triple' ||
+              e.outcome === 'home_run',
+          )
+        ) {
+          hits += 1;
+        }
+      }
+      return hits;
+    };
+
+    expect(runPressureHits('ice_veins')).toBeGreaterThan(runPressureHits('pressure_wilt'));
   });
 });

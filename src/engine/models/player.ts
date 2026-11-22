@@ -178,6 +178,45 @@ export interface BatterPitchProfile {
   pitchRecognition: Partial<Record<PitchType, number>>;
 }
 
+export type MentalTraitId =
+  | 'clubhouse_glue'
+  | 'high_energy'
+  | 'ice_veins'
+  | 'pressure_riser'
+  | 'pressure_wilt'
+  | 'steady_hand'
+  | 'fiery_competitor';
+
+export const MENTAL_TRAIT_LABELS: Readonly<Record<MentalTraitId, string>> = {
+  clubhouse_glue: 'Clubhouse Glue',
+  high_energy: 'High Energy',
+  ice_veins: 'Ice in Veins',
+  pressure_riser: 'Clutch Riser',
+  pressure_wilt: 'Pressure Wilt',
+  steady_hand: 'Steady Hand',
+  fiery_competitor: 'Fiery Competitor',
+};
+
+export type PressureResponseProfile =
+  | 'ice_veins'
+  | 'clutch_riser'
+  | 'steady'
+  | 'pressure_wilt';
+
+export const PRESSURE_PROFILE_LABELS: Readonly<Record<PressureResponseProfile, string>> = {
+  ice_veins: 'Ice in Veins',
+  clutch_riser: 'Big-Game Riser',
+  steady: 'Steady',
+  pressure_wilt: 'Wilts Under Pressure',
+};
+
+export type GamePressureLevel =
+  | 'regular'
+  | 'series_rubber'
+  | 'rivalry_showdown'
+  | 'playoff_game'
+  | 'elimination_championship';
+
 export interface PlayerRatings {
   // Batting (1-99)
   contact: number;
@@ -194,6 +233,7 @@ export interface PlayerRatings {
   fielding: number;
   arm: number;
   clutch: number;
+  luck: number;
   popularity: number;
   potential: number;
 }
@@ -260,6 +300,8 @@ export interface Player {
   positionProficiency: Partial<Record<FieldPosition, number>>;
   pitchArsenal?: PitcherArsenalProfile;
   batterPitchProfile: BatterPitchProfile;
+  mentalTraits: MentalTraitId[];
+  pressureProfile: PressureResponseProfile;
   ratings: PlayerRatings;
   statCaps: PlayerRatings;
   totalRatingBudget: number;

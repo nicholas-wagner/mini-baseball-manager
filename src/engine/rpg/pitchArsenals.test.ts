@@ -30,6 +30,7 @@ describe('Pitcher Arsenals & Batter Pitch-Matchup Profiles (TASK-055)', () => {
       fielding: 60,
       arm: 75,
       clutch: 68,
+      luck: 55,
       popularity: 62,
       potential: 78,
     };

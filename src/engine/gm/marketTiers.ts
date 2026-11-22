@@ -146,6 +146,7 @@ export function rollStatCapsForMarketTier(
     fielding: capTool(ratings.fielding, true),
     arm: capTool(ratings.arm, true),
     clutch: capTool(ratings.clutch, true),
+    luck: capTool(ratings.luck, true),
     popularity: capTool(ratings.popularity, true),
     potential: 99,
   };

@@ -26,6 +26,7 @@ describe('TASK-053 — Player Specialists, Positional Eligibility & Cross-Traini
       fielding: 65,
       arm: 65,
       clutch: 65,
+      luck: 55,
       popularity: 60,
       potential: 75,
     };
