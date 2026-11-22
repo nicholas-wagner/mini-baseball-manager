@@ -12,6 +12,7 @@ import {
   type Player,
   type PlayerRatings,
 } from '../../engine/models/player';
+import { resolvePlayerCardBio } from '../../engine/models/playerBio';
 import { getNationalityById } from '../../engine/nationalities/pickNationality';
 import { getRelicById } from '../../engine/rpg/relics';
 import {
@@ -187,6 +188,9 @@ export function PlayerDossierModal({ player, clubName, onClose }: PlayerDossierM
                       .map((p) => `${PITCH_TYPE_SHORT_LABELS[p.pitchType]} ${p.mastery}`)
                       .join(' • ')}`
                   : `Crushes ${PITCH_TYPE_SHORT_LABELS[player.batterPitchProfile.favoritePitch]} • Weak vs ${PITCH_TYPE_SHORT_LABELS[player.batterPitchProfile.weakPitch]}`}
+              </div>
+              <div className="text-[11px] italic font-bold text-[#181B2C]/85 pt-0.5">
+                “{resolvePlayerCardBio(player)}”
               </div>
             </div>
           </div>

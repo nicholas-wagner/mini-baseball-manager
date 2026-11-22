@@ -8,6 +8,7 @@ import {
   type FormState,
   type Player,
 } from '../../engine/models/player';
+import { resolvePlayerCardBio } from '../../engine/models/playerBio';
 import { buildPlayerCardStatProfile } from '../../engine/models/playerCardStats';
 import type { BaseballCardPlayer } from '../components/FlipBaseballCard';
 
@@ -68,6 +69,6 @@ export function toBaseballCardPlayer(
     },
     cardStatRows: cardProfile.ratings,
     statLine: cardProfile.statLine,
-    bio: player.bio,
+    bio: resolvePlayerCardBio(player),
   };
 }
