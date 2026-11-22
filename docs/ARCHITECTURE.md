@@ -159,6 +159,18 @@ export interface CareerServiceProfile {
   experienceTier: CareerExperienceTier;
 }
 
+export type GameLengthInnings = 5 | 7 | 9; // 5 = Sandlot Blitz (~2 min), 7 = Doubleheader (~4 min), 9 = Classic
+
+export interface PitcherEnduranceEffect {
+  enduranceRemaining: number; // 100 (fresh) .. 0 (gassed)
+  tier: 'fresh' | 'solid' | 'tiring' | 'fatigued' | 'gassed';
+  mphDrop: number;            // 0 .. -7 mph fastball/sinker/cutter radar drop
+  breakDrop: number;          // 0 .. -15 drop in sinker sink, slider sweep, curve/splitter drop
+  controlDrop: number;        // 0 .. -10 command fade / hanger risk
+  gbRateShift: number;        // sinker/two-seam loses groundball sink when tired!
+  scoutWarning?: string;      // e.g. "Sinker losing drop — Bullpen time!"
+}
+
 export interface PlayerRatings {
   // Batting (1–99) — drives AVG, OBP, SLG, OPS, BB%, K%
   contact: number;
@@ -316,6 +328,8 @@ export interface Player {
 - **Specialized Pitching Staff Roles (`PitcherRole`)**: `starter`, `long_reliever`, `short_reliever`, `loogy` (southpaw platoon assassin), `setup_man` (7th–8th bridge), `closer` (9th+ save specialist), and `fireman` (high-LI multi-inning jam stopper with inherited runners).
 - **Balls & Strikes, Batted-Ball Profiles & Sabermetrics**: Explicit ball/strike counts & zone strike rate (`Strike%`, `BB%`, `K%`), batted-ball profiles (`GB%`, `LD%`, `FB%`, `PopUp%`, `pop_out`), defender `fielding` (`FPCT`), `range` (converting hits to outs), and `arm` (runner throws), plus full derived stat lines (`AVG`, `OBP`, `SLG`, `OPS`, `ISO`, `BABIP`, `ERA`, `WHIP`, `K/9`, `BB/9`, `FPCT`).
 - **Slow-Earned Career Experience & Veteran Savvy Advantage**: Career Experience (`CareerServiceProfile`: `seasonsPlayed`, `careerGames`, `careerPAs`/`IP`, `careerPlayoffGames` -> `experienceScore 0..100`) takes multiple full seasons of real games/at-bats to climb from `rookie_green` -> `developing` -> `seasoned` -> `cagey_veteran` (and RPG level XP thresholds scale slowly per level). Seasoned pros and veterans gain a small, realistic edge over green rookies (`+2..+3` Eye/Control, `+2` high-LI composure vs rookie jitters `-1..-2`, and reduced rust decay).
+- **Pitcher Endurance & Pitch-Specific Fatigue Drop-Off**: Pitchers track live **`endurance` (`100` fresh → `0` gassed)** scaled by `ratings.stamina`, `pitcherRole`, high-leverage stress pitches (`LI >= 1.6`), and regulation inning length. As endurance falls below `60%` → `35%` → `20%`, pitch physics visibly degrade per pitch family: **`four_seam`/`two_seam`/`cutter`** lose radar-gun velocity (`-1..-7 mph`), **`two_seam` sinkers & `splitter`s** lose downward drop & `GB%` (flattening into line drives), and **`slider`/`curveball`** lose break & control (hanging meatballs). Between-game recovery makes rotation & bullpen management matter across a series.
+- **Short-Burst & Long-Burst Game Pacing (Games Never Drag)**: Players choose **5-Inning Blitz**, **7-Inning Doubleheader**, or **9-Inning Classic** (scaling starter endurance proportionally), paired with **1x/2x/4x Live 3D**, **Sim At-Bat**, **Sim Half-Inning**, **Clutch-Moments Auto-Burst** (fast-sims routine frames and snaps into 3D only on `LI >= 1.55` / RISP / tired pitcher / Special Ready — ~2–4 min/game), **Instant Sim**, and **automatic Extra-Inning Ghost Runner on 2B** starting in the very first extra frame (`inning > regulationInnings`)!
 
 ### 2.2 Club, Lineup & Stadium District (`src/engine/models/club.ts`)
 

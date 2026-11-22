@@ -11,7 +11,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 1. **`AGENTS.md`** *(this file)* — Rules, architecture invariants, commands, pitfalls already solved, Definition of Done.
 2. **`PLAN.md`** — 10X Master Vision, Progress Dashboard (`M0`–`M9`), and Plan Adjustment / Decision Log.
 3. **`docs/ARCHITECTURE.md`** — Canonical TypeScript interfaces, `PlayEvent` contracts, and save schema.
-4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-060`). Pick the highest-priority `READY` task!
+4. **`docs/TASKS.md`** — Atomic dependency-ordered task queue (`TASK-001`..`TASK-062`). Pick the highest-priority `READY` task!
 5. **`docs/DESIGN_SYSTEM.md`** — Exact 90s colors, borders, shadows, typography, touch targets, and 3D ballpark coordinates.
 6. **Project Workflow Skills (`.agents/skills/`)** — Portable engineering skills (auto-discovered by Antigravity and readable by any AI editor):
    - [`.agents/skills/ub-tdd-craft/SKILL.md`](./.agents/skills/ub-tdd-craft/SKILL.md) — Strict TDD, behavior-focused tests, Clean Code refactoring, and CRAP-lite complexity discipline (*inspired by `unclebob/ub-mode`*).
@@ -55,6 +55,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 | **Luck, Mental Traits & Leverage (`LI`)** | Universal subtle `luck` (`1..99`), clubhouse/mental traits (`clubhouse_glue`, `high_energy`, `ice_veins`, `pressure_riser`, `pressure_wilt`), and dynamic Leverage Index (`LI`) × Game Stakes driving clutch surges vs pressure wilting | `docs/ARCHITECTURE.md` |
 | **Pitcher Roles & Sabermetrics** | 7 `PitcherRole` profiles (`starter`, `long_reliever`, `short_reliever`, `loogy`, `setup_man`, `closer`, `fireman`), explicit ball/strike command, `GB%/LD%/FB%/PopUp%` batted-ball profiles, defender `range`/`arm`/`fielding`, and derived `AVG/OBP/SLG/OPS/WHIP/ERA/K9/BB9/Strike%/FPCT` | `docs/ARCHITECTURE.md` |
 | **Slow-Earned Career Experience** | `CareerServiceProfile` (`seasonsPlayed`, `careerGames`, `PAs/IP`, `playoffGames` -> `rookie_green`..`cagey_veteran`) takes multiple seasons to earn and grants veterans a subtle `+2..+3` Eye/Control & high-LI composure edge over green rookies | `docs/ARCHITECTURE.md` |
+| **Pitcher Endurance & Game Pacing** | Live mound `endurance` (`100 -> 0`) degrades fastball velo (`-1..-7 mph`), sinker/splitter drop & `GB%`, and breaking-ball break; games support `5 / 7 / 9`-inning formats, `Sim Half-Inning`, `Clutch Burst`, and 1st-extra-inning 2B Ghost Runner for 2–5 min short bursts & long sessions | `docs/ARCHITECTURE.md` |
 
 ---
 
