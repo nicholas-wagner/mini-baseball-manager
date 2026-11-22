@@ -24,6 +24,11 @@ import { generatePlayerIdentity } from '../nationalities/pickNationality';
 import type { NationalityId } from '../nationalities/types';
 import type { SeededRng } from '../rng/seededRng';
 import {
+  computeTotalRatingBudget,
+  rollBatterPitchProfile,
+  rollPitcherArsenal,
+} from '../rpg/pitchArsenals';
+import {
   applySpecialistRatingShape,
   evaluatePositionAssignment,
   rollPositionalEligibility,
@@ -225,6 +230,11 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   const baseRatings = rollRatingsForRole(rng, options.position, shiftedMin, shiftedMax);
   const ratings = applySpecialistRatingShape(baseRatings, specialistArchetype, options.position);
   const statCaps = rollStatCapsForMarketTier(rng, ratings, marketTier, options.position);
+  const batterPitchProfile = rollBatterPitchProfile(rng, specialistArchetype, ratings, marketTier);
+  const pitchArsenal = isPitcherPosition(options.position)
+    ? rollPitcherArsenal(rng, options.position, specialistArchetype, ratings, marketTier)
+    : undefined;
+  const totalRatingBudget = computeTotalRatingBudget(marketTier, options.position);
   const overall = computePlayerOverall({ position: options.position, ratings });
   const token = rng.int(100000, 999999);
   const prefix = options.idPrefix ?? 'plyr';
@@ -257,8 +267,11 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     flexibilityProfile: eligibility.flexibilityProfile,
     favoritePosition: eligibility.favoritePosition,
     positionProficiency: eligibility.positionProficiency,
+    ...(pitchArsenal ? { pitchArsenal } : {}),
+    batterPitchProfile,
     ratings,
     statCaps,
+    totalRatingBudget,
     xpGrowthMultiplier: marketSpec.xpGrowthMultiplier,
     fatigue: 0,
     morale: 75,

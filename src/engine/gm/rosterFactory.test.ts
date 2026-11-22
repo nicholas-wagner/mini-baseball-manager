@@ -112,6 +112,20 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
     const rpIds = new Set(club.roster.filter((p) => p.position === 'RP').map((p) => p.id));
     for (const id of club.rotationIds) expect(spIds.has(id)).toBe(true);
     for (const id of club.bullpenIds) expect(rpIds.has(id)).toBe(true);
+
+    for (const player of club.roster) {
+      expect(player.batterPitchProfile.favoritePitch).not.toBe(player.batterPitchProfile.weakPitch);
+      expect(player.totalRatingBudget).toBeGreaterThan(300);
+      if (player.position === 'SP') {
+        expect(player.pitchArsenal!.repertoire.length).toBeGreaterThanOrEqual(4);
+        expect(player.pitchArsenal!.repertoire.length).toBeLessThanOrEqual(5);
+      } else if (player.position === 'RP') {
+        expect(player.pitchArsenal!.repertoire.length).toBeGreaterThanOrEqual(2);
+        expect(player.pitchArsenal!.repertoire.length).toBeLessThanOrEqual(3);
+      } else {
+        expect(player.pitchArsenal).toBeUndefined();
+      }
+    }
   });
 
   it('respects forced nationality and position throwing handedness invariants in createPlayer', () => {

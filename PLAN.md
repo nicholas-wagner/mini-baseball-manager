@@ -19,7 +19,7 @@
 | **M0** | Project Foundation, TDD Harness & Android PWA Shell | 4 / 4 | `[x]` Done | Vitest + Playwright + TS + PWA manifest green |
 | **M1** | **Design-First Visual Identity & Interactive Design Lab** | 8 / 8 | `[x]` Done | 90s Cards, 2.5D Chibi Rigs, 11 Nations, Handedness, 3D Park, Web Audio |
 | **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 6 / 6 | `[x]` Done | **MVP Gate**: Complete playable game installable on Android |
-| **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals & Matchups, Compromise Training, Ability Cooldowns, Hot/Cold & Manager | 2 / 8 | `[/]` In Progress | Deep 5–60 min player & manager RPG growth loop |
+| **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals & Matchups, Compromise Training, Ability Cooldowns, Hot/Cold & Manager | 3 / 8 | `[/]` In Progress | Deep 5–60 min player & manager RPG growth loop |
 | **M4** | **Living League World**: 6-Tier Pyramid, Market Tiers & Roster Cap, 48 AI Clubs, Draft, FA & Rivalries | 1 / 6 | `[/]` In Progress | Multi-season promotion/relegation dynasty career |
 | **M5** | **Sim-City Ballpark District**: Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 0 / 5 | `[ ]` Planned | Interactive stadium & neighborhood builder visible in 3D |
 | **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches, 90s Gear Relics, Weather & Night Games | 0 / 5 | `[ ]` Planned | Synergy combos, coaching staff, loot relics & live weather |
@@ -27,7 +27,7 @@
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `21 / 56` feature slices completed
+**Overall 10X Progress**: `22 / 56` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -105,14 +105,14 @@
 
 ---
 
-### Milestone 3 — RPG Core: Skill Trees, Specialists, Pitch Arsenals, Compromise Training & Ability Cooldowns (`2 / 8`)
+### Milestone 3 — RPG Core: Skill Trees, Specialists, Pitch Arsenals, Compromise Training & Ability Cooldowns (`3 / 8`)
 - [ ] **3A. Player Branching Skill Trees & Capstone Special Powers** (`TASK-019`): Pure graph engine + pan/zoom interactive Skill Tree UI for Pitcher, Batter, and Fielder paths respecting `statCaps` & `totalRatingBudget`, with charge/cooldown/fatigue-gated capstone Special Powers & evolving `specialistArchetype`.
 - [ ] **3B. 3-Tier Cultural Heritage Myth/Animal Skill Branches** (`TASK-020`): Expand each nationality's Heritage Ability into a 3-node unlockable progression with bespoke 3D VFX, `65–100` Hype-gauge consumption, strict charge/cooldown caps, and sim effects.
 - [x] **3C. Dynamic Hot Streaks & Cold Slumps Engine** (`TASK-021`): Rolling multi-game form tracker driving 🔥 *On Fire!* & 🧊 *Cold Spell* stat curves, reactive 90s card frames/moods, and slump-busting triggers.
 - [ ] **3D. Animated Practice & Training Complex** (`TASK-022`): Compromise-first Power/Contact Cage, Pitch-Recognition Timing Lab, Bullpen Pitch Lab, Velocity/Control Conditioning, Fielding Fungos, Sprint Track, Slump-Buster Film Session, **Position Cross-Training Drill**, and Fan Meet & Greet — cute 2.5D chibi dioramas respecting `xpGrowthMultiplier`, `statCaps`, and `totalRatingBudget`.
 - [ ] **3E. Human Manager RPG Progression & In-Game Power Dock** (`TASK-023`): Manager XP/leveling across *Skipper* (Active In-Game Powers with `1/game` charge/cooldown badges, banners, and organ riffs), *Coach* (Training Passives), and *Mogul* (GM/Economy Passives).
 - [x] **3F. Player Specialists, Positional Eligibility & Favorite Position Boost** (`TASK-053`): Asymmetric specialist archetypes, flexible vs single-position profiles (`1B`-only, `SS/2B`, all-infield), `★ FAV` position boosts, Out-of-Position penalties, and `crossTrainPosition` rust/training trade-offs.
-- [ ] **3G. Pitcher Pitch Arsenals (`2–3` RP / `4–5` SP), Favorite/Weak Pitches & Batter Pitch-Matchup Profiles** (`TASK-055`): 8-pitch catalog, role-locked repertoire sizes, pitcher Favorite Out-Pitch bonus & Weak-Pitch hanger risk, batter Favorite Pitch to Crush & Pitch Weakness, trainable recognition/mastery, card tags, and live pitch selection.
+- [x] **3G. Pitcher Pitch Arsenals (`2–3` RP / `4–5` SP), Favorite/Weak Pitches & Batter Pitch-Matchup Profiles** (`TASK-055`): 8-pitch catalog, role-locked repertoire sizes, pitcher Favorite Out-Pitch bonus & Weak-Pitch hanger risk, batter Favorite Pitch to Crush & Pitch Weakness, trainable recognition/mastery, card tags, and live pitch selection.
 - [ ] **3H. Compromise-First Training Engine & Special Ability Charge/Cooldown Gates** (`TASK-056`): Zero-free-lunch training trade-offs bounded by `totalRatingBudget` & `statCaps` (preserving rare `all_star` star power without overpowered clones), plus strict per-game charge caps, multi-batter/PA cooldowns, Hype drain & exertion fatigue on all Special Swings, Special Pitches & Heritage Powers.
 
 ---

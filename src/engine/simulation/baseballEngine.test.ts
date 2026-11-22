@@ -328,4 +328,76 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
     const noopSwap = manualSwapPitcher(swapResult.nextSession, 'home', relieverId);
     expect(noopSwap.event).toBeNull();
   });
+
+  it('emits pitchThrown strictly from pitcher arsenal, honors requestedPitchType, and rewards batter favoritePitch over weakPitch', () => {
+    const away = createClub(createSeededRng(910), AWAY_OPTS);
+    const home = createClub(createSeededRng(911), HOME_OPTS);
+
+    const session = createGameSession(away, home, 3030);
+    const homePitcher = session.home.playersById[session.home.activePitcherId];
+    const ownedPitches = homePitcher.pitchArsenal!.repertoire.map((slot) => slot.pitchType);
+    const chosenPitch = ownedPitches[ownedPitches.length - 1];
+
+    const manual = stepPitch(session, 'normal', { requestedPitchType: chosenPitch });
+    const pitchEvent = manual.events.find((ev) => ev.pitchThrown !== undefined);
+    expect(pitchEvent?.pitchThrown?.pitchType).toBe(chosenPitch);
+    expect(pitchEvent?.pitchThrown?.mph).toBeGreaterThanOrEqual(62);
+
+    // Statistical check: throwing batter's favoritePitch yields more hits than throwing batter's weakPitch
+    const runMatchupHits = (target: 'favorite' | 'weak'): number => {
+      const { away: clubA, home: clubH } = makeMatchupClubs('R', 'R', 9500);
+      const forcedPitch = target === 'favorite' ? 'curveball' : 'slider';
+      const riggedAway: Club = {
+        ...clubA,
+        roster: clubA.roster.map((p) => ({
+          ...p,
+          batterPitchProfile: {
+            favoritePitch: 'curveball',
+            weakPitch: 'slider',
+            pitchRecognition: { curveball: 16, slider: -16, four_seam: 0 },
+          },
+        })),
+      };
+      const riggedHome: Club = {
+        ...clubH,
+        roster: clubH.roster.map((p) =>
+          p.pitchArsenal
+            ? {
+                ...p,
+                pitchArsenal: {
+                  repertoire: [
+                    { pitchType: 'four_seam', mastery: 72 },
+                    { pitchType: 'curveball', mastery: 72 },
+                    { pitchType: 'slider', mastery: 72 },
+                    { pitchType: 'changeup', mastery: 70 },
+                  ],
+                  favoritePitch: 'four_seam',
+                  weakestPitch: 'changeup',
+                },
+              }
+            : p,
+        ),
+      };
+
+      let hits = 0;
+      for (let i = 0; i < 600; i += 1) {
+        const s = createGameSession(riggedAway, riggedHome, 40000 + i);
+        const res = stepAtBat(s, 'normal', { requestedPitchType: forcedPitch });
+        if (
+          res.events.some(
+            (e) =>
+              e.outcome === 'single' ||
+              e.outcome === 'double' ||
+              e.outcome === 'triple' ||
+              e.outcome === 'home_run',
+          )
+        ) {
+          hits += 1;
+        }
+      }
+      return hits;
+    };
+
+    expect(runMatchupHits('favorite')).toBeGreaterThan(runMatchupHits('weak'));
+  });
 });

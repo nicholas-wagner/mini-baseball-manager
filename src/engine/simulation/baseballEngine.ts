@@ -1,6 +1,6 @@
 import type { Club } from '../models/club';
 import type { PlayEvent, TacticalCall } from '../models/playEvent';
-import { createEmptySeasonStats, type PlayerSeasonStats } from '../models/player';
+import { createEmptySeasonStats, type PitchType, type PlayerSeasonStats } from '../models/player';
 import { createSeededRng } from '../rng/seededRng';
 import {
   advanceHitRunners,
@@ -24,6 +24,10 @@ import {
 } from './gameState';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
 
+export interface StepPitchOptions {
+  requestedPitchType?: PitchType;
+}
+
 export function createGameSession(
   awayClub: Club,
   homeClub: Club,
@@ -41,6 +45,7 @@ export function createGameSession(
     balls: 0,
     strikes: 0,
     bases: [null, null, null],
+    atBatPitchHistory: [],
     away,
     home,
     eventSeq: 0,
@@ -75,6 +80,7 @@ function makeEvent(
     specialPowerTriggered: partial.specialPowerTriggered,
     ballFlight: partial.ballFlight,
     fieldingHighlight: partial.fieldingHighlight,
+    pitchThrown: partial.pitchThrown,
     commentary: partial.commentary,
     soundCue: partial.soundCue,
     type: partial.type,
@@ -150,6 +156,9 @@ function applyCountPitch(
 
   const batting = getBattingSide(state);
   batting.hypeGauge = Math.min(100, batting.hypeGauge + 4);
+  if (res.pitchThrown) {
+    state.atBatPitchHistory.push(res.pitchThrown.pitchType);
+  }
 
   return makeEvent(state, {
     type: 'pitch_thrown',
@@ -157,6 +166,7 @@ function applyCountPitch(
     batterId,
     pitcherId,
     outcome: res.outcome,
+    pitchThrown: res.pitchThrown,
     commentary: res.commentary,
     soundCue: res.soundCue,
   });
@@ -278,6 +288,7 @@ function applyPlateComplete(
 
   state.balls = 0;
   state.strikes = 0;
+  state.atBatPitchHistory = [];
   batting.lineupIndex = (batting.lineupIndex + 1) % batting.lineup.length;
 
   if (res.specialPowerTriggered) {
@@ -300,6 +311,7 @@ function applyPlateComplete(
     specialPowerTriggered: res.specialPowerTriggered,
     ballFlight: res.ballFlight,
     fieldingHighlight: res.fieldingHighlight,
+    pitchThrown: res.pitchThrown,
     commentary: res.commentary,
     soundCue: res.soundCue,
   });
@@ -317,6 +329,7 @@ function maybeSwapReliever(state: GameSessionState, events: PlayEvent[]): void {
   fielding.usedPitcherIds = [...fielding.usedPitcherIds, nextRelieverId];
   fielding.activePitcherId = nextRelieverId;
   fielding.pitcherFatigue = 0;
+  state.atBatPitchHistory = [];
   const pitcherLines = getPitcherLines(state);
   pitcherLines[nextRelieverId] = createEmptyPitcherLine(nextRelieverId);
 
@@ -355,6 +368,7 @@ export function manualSwapPitcher(
   targetSide.usedPitcherIds = [...targetSide.usedPitcherIds, relieverId];
   targetSide.activePitcherId = relieverId;
   targetSide.pitcherFatigue = 0;
+  next.atBatPitchHistory = [];
 
   const pitcherMap =
     sideKey === 'away' ? next.boxScore.awayPitchers : next.boxScore.homePitchers;
@@ -413,6 +427,7 @@ function rotateToNextHalfInning(state: GameSessionState): void {
   state.outs = 0;
   state.balls = 0;
   state.strikes = 0;
+  state.atBatPitchHistory = [];
 
   if (state.half === 'TOP') {
     state.half = 'BOT';
@@ -477,6 +492,7 @@ function cloneSessionForStep(session: GameSessionState): GameSessionState {
     ...session,
     stepCounter: session.stepCounter + 1,
     bases: [...session.bases] as BaseState,
+    atBatPitchHistory: [...session.atBatPitchHistory],
     away: { ...session.away },
     home: { ...session.home },
     boxScore: cloneBoxScore(session.boxScore),
@@ -519,6 +535,7 @@ function dispatchPitchResolution(
 export function stepPitch(
   session: GameSessionState,
   tacticalCall: TacticalCall = 'normal',
+  options?: StepPitchOptions,
 ): { nextSession: GameSessionState; events: PlayEvent[] } {
   if (session.status === 'completed') {
     return { nextSession: session, events: [] };
@@ -558,6 +575,8 @@ export function stepPitch(
     battingHype: batting.hypeGauge,
     fieldingHype: fielding.hypeGauge,
     tacticalCall,
+    atBatPitchHistory: next.atBatPitchHistory,
+    requestedPitchType: options?.requestedPitchType,
   });
 
   events.push(dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
@@ -573,6 +592,7 @@ export function stepPitch(
 export function stepAtBat(
   session: GameSessionState,
   tacticalCall: TacticalCall = 'normal',
+  options?: StepPitchOptions,
 ): { nextSession: GameSessionState; events: PlayEvent[] } {
   if (session.status === 'completed') {
     return { nextSession: session, events: [] };
@@ -586,7 +606,7 @@ export function stepAtBat(
   let activeCall = tacticalCall;
 
   for (let i = 0; i < 20; i += 1) {
-    const step = stepPitch(current, activeCall);
+    const step = stepPitch(current, activeCall, options);
     current = step.nextSession;
     events.push(...step.events);
     activeCall = activeCall === 'steal' ? 'normal' : activeCall;

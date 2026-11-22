@@ -117,5 +117,34 @@ describe('Local Multi-Slot Persistence & Schema Migrations', () => {
     expect(migrated.humanClubId).toBe(v1Ref.humanClubId);
     expect(migrated.leagues.rookie).toHaveLength(1);
     expect(migrated.settings.defaultGameSpeed).toBe(1);
+
+    // Strip newer pitchArsenal / batterPitchProfile / totalRatingBudget fields from legacy players
+    const strippedClub = {
+      ...v1Ref.leagues.rookie[0],
+      roster: v1Ref.leagues.rookie[0].roster.map((p) => {
+        const clone = { ...p } as Record<string, unknown>;
+        delete clone.pitchArsenal;
+        delete clone.batterPitchProfile;
+        delete clone.totalRatingBudget;
+        return clone;
+      }),
+    };
+    const hydratedV0 = migrateSavePayload({
+      ...legacyV0,
+      humanClub: strippedClub,
+    });
+    for (const player of hydratedV0.leagues.rookie[0].roster) {
+      expect(player.batterPitchProfile.favoritePitch).not.toBe(player.batterPitchProfile.weakPitch);
+      expect(player.totalRatingBudget).toBeGreaterThan(300);
+      if (player.position === 'SP') {
+        expect(player.pitchArsenal!.repertoire.length).toBeGreaterThanOrEqual(4);
+        expect(player.pitchArsenal!.repertoire.length).toBeLessThanOrEqual(5);
+      } else if (player.position === 'RP') {
+        expect(player.pitchArsenal!.repertoire.length).toBeGreaterThanOrEqual(2);
+        expect(player.pitchArsenal!.repertoire.length).toBeLessThanOrEqual(3);
+      } else {
+        expect(player.pitchArsenal).toBeUndefined();
+      }
+    }
   });
 });

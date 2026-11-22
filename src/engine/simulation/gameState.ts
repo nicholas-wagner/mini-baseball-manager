@@ -1,7 +1,7 @@
 import type { FieldPosition } from '../handedness/types';
 import type { Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
-import type { Player, PlayerSeasonStats } from '../models/player';
+import type { Player, PitchType, PlayerSeasonStats } from '../models/player';
 
 export type HalfInning = 'TOP' | 'BOT';
 
@@ -73,6 +73,7 @@ export interface GameSessionState {
   balls: number;
   strikes: number;
   bases: BaseState;
+  atBatPitchHistory: PitchType[];
   away: TeamGameSide;
   home: TeamGameSide;
   eventSeq: number;

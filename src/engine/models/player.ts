@@ -118,6 +118,66 @@ export const MARKET_TIER_LABELS: Readonly<Record<PlayerMarketTier, string>> = {
   below_average: 'BARGAIN',
 };
 
+export type PitchType =
+  | 'four_seam'
+  | 'two_seam'
+  | 'cutter'
+  | 'slider'
+  | 'curveball'
+  | 'changeup'
+  | 'splitter'
+  | 'knuckleball';
+
+export const ALL_PITCH_TYPES: readonly PitchType[] = [
+  'four_seam',
+  'two_seam',
+  'cutter',
+  'slider',
+  'curveball',
+  'changeup',
+  'splitter',
+  'knuckleball',
+];
+
+export const PITCH_TYPE_LABELS: Readonly<Record<PitchType, string>> = {
+  four_seam: '4-Seam Fastball',
+  two_seam: '2-Seam Sinker',
+  cutter: 'Cutter',
+  slider: 'Slider',
+  curveball: 'Curveball',
+  changeup: 'Changeup',
+  splitter: 'Splitter',
+  knuckleball: 'Knuckleball',
+};
+
+export const PITCH_TYPE_SHORT_LABELS: Readonly<Record<PitchType, string>> = {
+  four_seam: '4-Seam',
+  two_seam: '2-Seam',
+  cutter: 'Cutter',
+  slider: 'Slider',
+  curveball: 'Curve',
+  changeup: 'Change',
+  splitter: 'Splitter',
+  knuckleball: 'Knuckle',
+};
+
+export interface PitchSlot {
+  pitchType: PitchType;
+  mastery: number;
+}
+
+export interface PitcherArsenalProfile {
+  repertoire: PitchSlot[];
+  favoritePitch: PitchType;
+  weakestPitch: PitchType;
+}
+
+export interface BatterPitchProfile {
+  favoritePitch: PitchType;
+  weakPitch: PitchType;
+  pitchRecognition: Partial<Record<PitchType, number>>;
+}
+
 export interface PlayerRatings {
   // Batting (1-99)
   contact: number;
@@ -198,8 +258,11 @@ export interface Player {
   flexibilityProfile: PositionalFlexibilityProfile;
   favoritePosition: FieldPosition;
   positionProficiency: Partial<Record<FieldPosition, number>>;
+  pitchArsenal?: PitcherArsenalProfile;
+  batterPitchProfile: BatterPitchProfile;
   ratings: PlayerRatings;
   statCaps: PlayerRatings;
+  totalRatingBudget: number;
   xpGrowthMultiplier: number;
   fatigue: number;
   morale: number;
@@ -328,7 +391,7 @@ export function createEmptySeasonStats(): PlayerSeasonStats {
   };
 }
 
-export function isPitcherPosition(position: FieldPosition): boolean {
+export function isPitcherPosition(position: FieldPosition): position is 'SP' | 'RP' {
   return position === 'SP' || position === 'RP';
 }
 

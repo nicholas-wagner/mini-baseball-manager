@@ -1,5 +1,6 @@
 import type { FieldPosition } from '../handedness/types';
 import type { BallVfxStyle } from '../vfx/types';
+import type { PitchType } from './player';
 
 export type PlaySoundCue =
   | 'bat_crack'
@@ -91,6 +92,13 @@ export interface PlayEvent {
     fielderId: string;
     fielderPos: FieldPosition;
     anim: 'field_run' | 'field_dive' | 'field_high_jump';
+  };
+  pitchThrown?: {
+    pitchType: PitchType;
+    mph: number;
+    isFavoritePitch: boolean;
+    isWeakPitchForPitcher: boolean;
+    batterAffinity: 'favorite' | 'weak' | 'neutral';
   };
   commentary: string;
   soundCue?: PlaySoundCue;

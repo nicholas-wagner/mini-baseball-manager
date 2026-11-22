@@ -3,6 +3,7 @@ import { FastForward, Play, RefreshCw, SkipForward, Zap } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
+import { PITCH_TYPE_SHORT_LABELS, type PitchType } from '../../engine/models/player';
 import {
   buildPlayerStatDeltas,
   createGameSession,
@@ -54,6 +55,7 @@ export function GameDayScreen() {
   const [speed, setSpeed] = useState<1 | 2 | 4>(1);
   const [watchMode, setWatchMode] = useState<'live' | 'clutch' | 'paused'>('paused');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
+  const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
   const [modalSummary, setModalSummary] = useState<PostGameSummary | null>(null);
 
   const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? opponents[0];
@@ -89,6 +91,7 @@ export function GameDayScreen() {
     setLiveSession(session);
     setRecentEvents([]);
     setLastChoreo(null);
+    setSelectedPitchType(null);
     setModalSummary(null);
     setWatchMode(autoPlay ? 'live' : 'paused');
     soundEngine.play('organ_charge');
@@ -111,18 +114,38 @@ export function GameDayScreen() {
     [finalizeSessionIfComplete, speed],
   );
 
+  const resolvePitchCallOption = useCallback(
+    (session: GameSessionState): { requestedPitchType?: PitchType } => {
+      if (session.half !== 'TOP' || !selectedPitchType) return {};
+      const pitcher = getCurrentPitcher(session);
+      const ownsPitch = pitcher.pitchArsenal?.repertoire.some(
+        (slot) => slot.pitchType === selectedPitchType,
+      );
+      return ownsPitch ? { requestedPitchType: selectedPitchType } : {};
+    },
+    [selectedPitchType],
+  );
+
   const handleNextPitch = useCallback(() => {
     if (!liveSession || liveSession.status === 'completed') return;
-    const { nextSession, events } = stepPitch(liveSession, tacticalCall);
+    const { nextSession, events } = stepPitch(
+      liveSession,
+      tacticalCall,
+      resolvePitchCallOption(liveSession),
+    );
     applyStepResult(nextSession, events, activeOpponentId);
     if (tacticalCall === 'steal' || tacticalCall === 'intentional_walk') {
       setTacticalCall('normal');
     }
-  }, [activeOpponentId, applyStepResult, liveSession, tacticalCall]);
+  }, [activeOpponentId, applyStepResult, liveSession, resolvePitchCallOption, tacticalCall]);
 
   const handleSimAtBat = () => {
     if (!liveSession || liveSession.status === 'completed') return;
-    const { nextSession, events } = stepAtBat(liveSession, tacticalCall);
+    const { nextSession, events } = stepAtBat(
+      liveSession,
+      tacticalCall,
+      resolvePitchCallOption(liveSession),
+    );
     applyStepResult(nextSession, events, activeOpponentId);
   };
 
@@ -159,6 +182,7 @@ export function GameDayScreen() {
     if (!liveSession) return;
     const swapped = manualSwapPitcher(liveSession, 'home', relieverId);
     if (swapped.event) {
+      setSelectedPitchType(null);
       applyStepResult(swapped.nextSession, [swapped.event], activeOpponentId);
     }
   };
@@ -301,6 +325,63 @@ export function GameDayScreen() {
             }
           >
             <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold">
+                <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
+                  Batter Crushes: {PITCH_TYPE_SHORT_LABELS[currentBatter.batterPitchProfile.favoritePitch]}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
+                  Batter Weak: {PITCH_TYPE_SHORT_LABELS[currentBatter.batterPitchProfile.weakPitch]}
+                </span>
+                {currentPitcher.pitchArsenal ? (
+                  <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[#181B2C]">
+                    {currentPitcher.position} Mix ({currentPitcher.pitchArsenal.repertoire.length}): ★{' '}
+                    {PITCH_TYPE_SHORT_LABELS[currentPitcher.pitchArsenal.favoritePitch]}
+                  </span>
+                ) : null}
+              </div>
+
+              {liveSession.half === 'TOP' && currentPitcher.pitchArsenal ? (
+                <div
+                  data-testid="pitch-selector-bar"
+                  className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5"
+                >
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4A5068]">
+                    Call Pitch ({currentPitcher.position} Arsenal: {currentPitcher.pitchArsenal.repertoire.length}{' '}
+                    Pitches)
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <ComicButton
+                      size="sm"
+                      variant={selectedPitchType === null ? 'sky' : 'cream'}
+                      active={selectedPitchType === null}
+                      onClick={() => setSelectedPitchType(null)}
+                    >
+                      Auto Pitch
+                    </ComicButton>
+                    {currentPitcher.pitchArsenal.repertoire.map((slot) => {
+                      const isFav = slot.pitchType === currentPitcher.pitchArsenal!.favoritePitch;
+                      const hitsWeak = slot.pitchType === currentBatter.batterPitchProfile.weakPitch;
+                      const hitsFav = slot.pitchType === currentBatter.batterPitchProfile.favoritePitch;
+                      const isSelected = selectedPitchType === slot.pitchType;
+                      return (
+                        <ComicButton
+                          key={slot.pitchType}
+                          size="sm"
+                          variant={isSelected ? 'gold' : 'cream'}
+                          active={isSelected}
+                          aria-label={`Pitch ${PITCH_TYPE_SHORT_LABELS[slot.pitchType]}`}
+                          onClick={() => setSelectedPitchType(slot.pitchType)}
+                        >
+                          {isFav ? '★ ' : ''}
+                          {PITCH_TYPE_SHORT_LABELS[slot.pitchType]} ({slot.mastery})
+                          {hitsWeak ? ' 🎯' : hitsFav ? ' ⚠️' : ''}
+                        </ComicButton>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap gap-2">
                 {TACTICAL_OPTIONS.map((opt) => (
                   <ComicButton

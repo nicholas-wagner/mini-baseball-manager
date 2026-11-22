@@ -19,30 +19,47 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
     });
   });
 
-  it('starts a live 3D game, steps pitches, adjusts speed/tactics, simulates to completion, and shows MVP summary', async () => {
-    const user = userEvent.setup();
-    render(<GameDayScreen />);
+  it(
+    'starts a live 3D game, shows starter 4-5 & reliever 2-3 pitch selectors, steps pitches, and opens MVP summary',
+    async () => {
+      const user = userEvent.setup();
+      render(<GameDayScreen />);
 
-    expect(screen.getByText(/choose today's matchup/i)).toBeInTheDocument();
+      expect(screen.getByText(/choose today's matchup/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /start live 3d game/i }));
+      await user.click(screen.getByRole('button', { name: /start live 3d game/i }));
 
-    expect(screen.getByRole('region', { name: /live baseball scoreboard/i })).toBeInTheDocument();
-    expect(screen.getByTestId('live-game-3d-canvas')).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: /live baseball scoreboard/i })).toBeInTheDocument();
+      expect(screen.getByTestId('live-game-3d-canvas')).toBeInTheDocument();
 
-    // Switch speed to 4x and choose Power tactical call
-    await user.click(screen.getByRole('button', { name: /4x/i }));
-    await user.click(screen.getByRole('button', { name: /^power$/i }));
+      // Home SP pitches in TOP 1 with 4-5 selectable pitches + Auto Pitch
+      const spPitchButtons = screen.getAllByRole('button', { name: /^pitch /i });
+      expect(spPitchButtons.length).toBeGreaterThanOrEqual(4);
+      expect(spPitchButtons.length).toBeLessThanOrEqual(5);
+      await user.click(spPitchButtons[0]);
 
-    // Step 1 manual pitch and confirm commentary updates
-    await user.click(screen.getByRole('button', { name: /next pitch/i }));
-    expect(screen.getByTestId('play-by-play-ticker').textContent?.length).toBeGreaterThan(5);
+      // Switch speed to 4x and choose Power tactical call
+      await user.click(screen.getByRole('button', { name: /4x/i }));
+      await user.click(screen.getByRole('button', { name: /^power$/i }));
 
-    // Sim to End completes game cleanly and opens PostGameSummaryModal
-    await user.click(screen.getByRole('button', { name: /sim to end/i }));
-    expect(await screen.findByRole('dialog', { name: /post-game box score & mvp/i })).toBeInTheDocument();
+      // Step 1 manual pitch and confirm commentary updates with pitch telemetry
+      await user.click(screen.getByRole('button', { name: /next pitch/i }));
+      expect(screen.getByTestId('play-by-play-ticker').textContent).toMatch(/mph/i);
 
-    const updatedClub = useGameStore.getState().getHumanClub()!;
-    expect(updatedClub.wins + updatedClub.losses).toBe(1);
-  });
+      // Swap in a reliever from Bullpen Phone -> repertoire drops to strictly 2-3 pitches
+      const relieverButtons = screen.getAllByRole('button', { name: /bring in /i });
+      await user.click(relieverButtons[0]);
+      const rpPitchButtons = screen.getAllByRole('button', { name: /^pitch /i });
+      expect(rpPitchButtons.length).toBeGreaterThanOrEqual(2);
+      expect(rpPitchButtons.length).toBeLessThanOrEqual(3);
+
+      // Sim to End completes game cleanly and opens PostGameSummaryModal
+      await user.click(screen.getByRole('button', { name: /sim to end/i }));
+      expect(await screen.findByRole('dialog', { name: /post-game box score & mvp/i })).toBeInTheDocument();
+
+      const updatedClub = useGameStore.getState().getHumanClub()!;
+      expect(updatedClub.wins + updatedClub.losses).toBe(1);
+    },
+    30_000,
+  );
 });

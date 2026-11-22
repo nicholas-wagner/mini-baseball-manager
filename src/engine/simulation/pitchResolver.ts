@@ -9,10 +9,19 @@ import type {
   PlaySoundCue,
   TacticalCall,
 } from '../models/playEvent';
-import type { Player } from '../models/player';
+import {
+  PITCH_TYPE_SHORT_LABELS,
+  type PitchType,
+  type Player,
+} from '../models/player';
 import { getNationalityById } from '../nationalities/pickNationality';
 import type { SeededRng } from '../rng/seededRng';
 import { getFormStatModifiers } from '../rpg/formTracker';
+import {
+  evaluatePitchMatchup,
+  selectPitchForCount,
+  type PitchMatchupEvaluation,
+} from '../rpg/pitchArsenals';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
 import type { BaseState } from './gameState';
 
@@ -29,6 +38,7 @@ export interface PitchResolution {
   ballFlight?: PlayEvent['ballFlight'];
   fieldingHighlight?: PlayEvent['fieldingHighlight'];
   specialPowerTriggered?: PlayEvent['specialPowerTriggered'];
+  pitchThrown?: PlayEvent['pitchThrown'];
 }
 
 interface TacticalModifiers {
@@ -346,6 +356,8 @@ export interface PitchResolverContext {
   battingHype: number;
   fieldingHype: number;
   tacticalCall: TacticalCall;
+  atBatPitchHistory: readonly PitchType[];
+  requestedPitchType?: PitchType;
 }
 
 function resolveContactResult(
@@ -437,6 +449,36 @@ function evaluateSwingResult(
   return resolveContactResult(ctx, effContact, effPower, effStuff, firstBaseStepBonus);
 }
 
+function countTrailingPitchRepeats(
+  history: readonly PitchType[],
+  pitchType: PitchType,
+): number {
+  let count = 0;
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    if (history[i] !== pitchType) break;
+    count += 1;
+  }
+  return count;
+}
+
+function attachPitchTelemetry(
+  res: PitchResolution,
+  matchup: PitchMatchupEvaluation,
+): PitchResolution {
+  const pitchTag = `${matchup.mph} mph ${PITCH_TYPE_SHORT_LABELS[matchup.pitchType]}`;
+  return {
+    ...res,
+    commentary: `${pitchTag} — ${res.commentary}`,
+    pitchThrown: {
+      pitchType: matchup.pitchType,
+      mph: matchup.mph,
+      isFavoritePitch: matchup.isFavoritePitch,
+      isWeakPitchForPitcher: matchup.isWeakPitchForPitcher,
+      batterAffinity: matchup.batterAffinity,
+    },
+  };
+}
+
 /** Resolves a single baseball pitch or tactical action cleanly from seeded state. */
 export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   if (ctx.tacticalCall === 'intentional_walk') {
@@ -458,22 +500,46 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     return resolveBuntAttempt(ctx.rng, ctx.batter, ctx.pitcher, platoon.firstBaseStepBonus, boxSide);
   }
 
+  const pitchType = selectPitchForCount(
+    ctx.rng,
+    ctx.pitcher,
+    ctx.batter,
+    ctx.balls,
+    ctx.strikes,
+    ctx.atBatPitchHistory,
+    ctx.requestedPitchType,
+  );
+  const repeatCount = countTrailingPitchRepeats(ctx.atBatPitchHistory, pitchType);
+  const pitchMatchup = evaluatePitchMatchup(ctx.pitcher, ctx.batter, pitchType, repeatCount);
+
   const mod = TACTICAL_CONFIG[ctx.tacticalCall];
   const batterForm = getFormStatModifiers(ctx.batter.formState);
   const pitcherForm = getFormStatModifiers(ctx.pitcher.formState);
   const pitcherPosEval = evaluatePositionAssignment(ctx.pitcher, ctx.pitcher.position);
   const fatigueDrop = Math.max(0, ctx.pitcherFatigue - 45) * 0.28;
   const effContact =
-    ctx.batter.ratings.contact + platoon.batterContactDelta + mod.contactMod + batterForm.contactDelta;
+    ctx.batter.ratings.contact +
+    platoon.batterContactDelta +
+    mod.contactMod +
+    batterForm.contactDelta +
+    pitchMatchup.batterContactDelta;
   const effPower =
-    ctx.batter.ratings.power + platoon.batterPowerDelta + mod.powerMod + batterForm.powerDelta;
+    ctx.batter.ratings.power +
+    platoon.batterPowerDelta +
+    mod.powerMod +
+    batterForm.powerDelta +
+    pitchMatchup.batterPowerDelta;
   const effStuff =
     (ctx.pitcher.ratings.velocity + ctx.pitcher.ratings.movement) * 0.5 +
     platoon.pitcherBreakDelta +
-    pitcherForm.stuffDelta -
+    pitcherForm.stuffDelta +
+    pitchMatchup.pitcherStuffDelta -
     fatigueDrop;
   const effControl =
-    ctx.pitcher.ratings.control + pitcherForm.controlDelta + pitcherPosEval.controlDelta;
+    ctx.pitcher.ratings.control +
+    pitcherForm.controlDelta +
+    pitcherPosEval.controlDelta +
+    pitchMatchup.pitcherControlDelta;
 
   const zoneProb = clampProb(
     0.55 + (effControl - ctx.batter.ratings.eye) * 0.0025,
@@ -483,13 +549,17 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const inZone = ctx.rng.chance(zoneProb);
   const swingProb = inZone
     ? clampProb(0.67 + mod.swingMod, 0.52, 0.85)
-    : clampProb(0.26 - (ctx.batter.ratings.eye - 65) * 0.002 + mod.chaseMod, 0.12, 0.44);
+    : clampProb(
+        0.26 - (ctx.batter.ratings.eye - 65) * 0.002 + mod.chaseMod + pitchMatchup.chaseRateDelta,
+        0.10,
+        0.48,
+      );
 
-  if (!ctx.rng.chance(swingProb)) {
-    return inZone
+  const rawResult = !ctx.rng.chance(swingProb)
+    ? inZone
       ? resolveCalledStrikeOrOut(ctx.strikes, ctx.batter.name)
-      : resolveBallOrWalk(ctx.balls, ctx.batter.name);
-  }
+      : resolveBallOrWalk(ctx.balls, ctx.batter.name)
+    : evaluateSwingResult(ctx, inZone, effContact, effPower, effStuff, platoon.firstBaseStepBonus);
 
-  return evaluateSwingResult(ctx, inZone, effContact, effPower, effStuff, platoon.firstBaseStepBonus);
+  return attachPitchTelemetry(rawResult, pitchMatchup);
 }

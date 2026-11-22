@@ -8,6 +8,7 @@ import {
   computePlayerOverall,
   isPitcherPosition,
   MARKET_TIER_LABELS,
+  PITCH_TYPE_SHORT_LABELS,
   SPECIALIST_LABELS,
   type FormState,
 } from '../../engine/models/player';
@@ -436,6 +437,56 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
               team={teamColors}
               mood={formStateToCardMood(inspectedPlayer.formState)}
             />
+            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
+              {isPitcherPosition(inspectedPlayer.position) && inspectedPlayer.pitchArsenal ? (
+                <>
+                  <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
+                    <span>Pitch Arsenal ({inspectedPlayer.pitchArsenal.repertoire.length} Pitches)</span>
+                    <span className="text-[#1B4332]">
+                      ★ {PITCH_TYPE_SHORT_LABELS[inspectedPlayer.pitchArsenal.favoritePitch]}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {inspectedPlayer.pitchArsenal.repertoire.map((slot) => {
+                      const isFav = slot.pitchType === inspectedPlayer.pitchArsenal!.favoritePitch;
+                      const isWeak = slot.pitchType === inspectedPlayer.pitchArsenal!.weakestPitch;
+                      return (
+                        <span
+                          key={slot.pitchType}
+                          className={`px-1.5 py-0.5 rounded border border-[#181B2C] text-[10px] font-extrabold ${
+                            isFav
+                              ? 'bg-[#FFC300] text-[#181B2C]'
+                              : isWeak
+                                ? 'bg-[#FFE5EC] text-[#9D0208]'
+                                : 'bg-white text-[#181B2C]'
+                          }`}
+                        >
+                          {isFav ? '★ ' : ''}
+                          {PITCH_TYPE_SHORT_LABELS[slot.pitchType]} {slot.mastery}
+                          {isWeak ? ' (Weak)' : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[11px] font-extrabold uppercase text-[#181B2C]">
+                    Batter Pitch Scouting
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
+                    <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
+                      Crushes: {PITCH_TYPE_SHORT_LABELS[inspectedPlayer.batterPitchProfile.favoritePitch]} (
+                      +{inspectedPlayer.batterPitchProfile.pitchRecognition[inspectedPlayer.batterPitchProfile.favoritePitch] ?? 12})
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
+                      Weak vs: {PITCH_TYPE_SHORT_LABELS[inspectedPlayer.batterPitchProfile.weakPitch]} (
+                      {inspectedPlayer.batterPitchProfile.pitchRecognition[inspectedPlayer.batterPitchProfile.weakPitch] ?? -12})
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
               <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
                 <span>Cross-Train Position</span>

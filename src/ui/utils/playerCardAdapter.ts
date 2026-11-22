@@ -3,6 +3,7 @@ import {
   computePlayerOverall,
   isPitcherPosition,
   MARKET_TIER_LABELS,
+  PITCH_TYPE_SHORT_LABELS,
   SPECIALIST_LABELS,
   type FormState,
   type Player,
@@ -30,10 +31,14 @@ export function toBaseballCardPlayer(
       )
     : player.ratings.velocity;
 
+  const pitchPill = isPitcherPosition(player.position) && player.pitchArsenal
+    ? `★ ${PITCH_TYPE_SHORT_LABELS[player.pitchArsenal.favoritePitch]} (${player.pitchArsenal.repertoire.length}P)`
+    : `Crush ${PITCH_TYPE_SHORT_LABELS[player.batterPitchProfile.favoritePitch]}`;
+
   const badgePills =
     player.equippedPowerIds.length > 0
       ? player.equippedPowerIds
-      : [SPECIALIST_LABELS[player.specialistArchetype], MARKET_TIER_LABELS[player.marketTier]];
+      : [SPECIALIST_LABELS[player.specialistArchetype], MARKET_TIER_LABELS[player.marketTier], pitchPill];
 
   return {
     id: player.id,

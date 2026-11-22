@@ -1,6 +1,12 @@
 import type { Club, LeagueTierId } from '../engine/models/club';
 import type { ManagerProfile } from '../engine/models/manager';
-import type { Player } from '../engine/models/player';
+import { isPitcherPosition, type Player } from '../engine/models/player';
+import { createSeededRng } from '../engine/rng/seededRng';
+import {
+  computeTotalRatingBudget,
+  rollBatterPitchProfile,
+  rollPitcherArsenal,
+} from '../engine/rpg/pitchArsenals';
 import {
   CURRENT_SAVE_SCHEMA_VERSION,
   DEFAULT_SAVE_SETTINGS,
@@ -17,14 +23,31 @@ interface RawLegacyV0Payload {
 
 function hydratePlayerDefaults(player: Player): Player {
   const favoritePosition = player.favoritePosition ?? player.position;
+  const marketTier = player.marketTier ?? 'average';
+  const specialistArchetype = player.specialistArchetype ?? 'balanced_regular';
+  const seedRng = createSeededRng((player.traits?.seed ?? 1994) ^ (player.jerseyNumber * 131));
+
+  const pitchArsenal =
+    player.pitchArsenal ??
+    (isPitcherPosition(player.position)
+      ? rollPitcherArsenal(seedRng, player.position, specialistArchetype, player.ratings, marketTier)
+      : undefined);
+  const batterPitchProfile =
+    player.batterPitchProfile ??
+    rollBatterPitchProfile(seedRng, specialistArchetype, player.ratings, marketTier);
+
   return {
     ...player,
-    marketTier: player.marketTier ?? 'average',
-    specialistArchetype: player.specialistArchetype ?? 'balanced_regular',
+    marketTier,
+    specialistArchetype,
     flexibilityProfile: player.flexibilityProfile ?? 'single_position',
     favoritePosition,
     positionProficiency: player.positionProficiency ?? { [favoritePosition]: 90 },
+    ...(pitchArsenal ? { pitchArsenal } : {}),
+    batterPitchProfile,
     statCaps: player.statCaps ?? { ...player.ratings, potential: 99 },
+    totalRatingBudget:
+      player.totalRatingBudget ?? computeTotalRatingBudget(marketTier, player.position),
     xpGrowthMultiplier: player.xpGrowthMultiplier ?? 0.85,
   };
 }
