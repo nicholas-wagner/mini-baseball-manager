@@ -73,6 +73,34 @@ export type PlayerMarketTier =
   | 'average'        // Fair-salaried everyday regular, balanced tools
   | 'below_average'; // League-minimum depth, often carries 1 sharp specialist tool
 
+export type PitchType =
+  | 'four_seam'    // 4-Seam Fastball (pure velocity, riding heat)
+  | 'two_seam'     // 2-Seam / Sinker (arm-side tail, groundball heavy)
+  | 'cutter'       // Cut Fastball (late glove-side bite, jams opposite-hand bats)
+  | 'slider'       // Slider (sharp lateral sweep, two-strike chase weapon)
+  | 'curveball'    // 12-6 / Knuckle-Curve (big vertical drop, speed change)
+  | 'changeup'     // Circle Change (arm-speed deception, fades away)
+  | 'splitter'     // Split-Finger / Forkball (late bottom-out drop)
+  | 'knuckleball'; // Rare dancing flutterball (unpredictable break, lower velo)
+
+export interface PitchSlot {
+  pitchType: PitchType;
+  mastery: number; // 1..99 per-pitch effectiveness & command feel
+}
+
+export interface PitcherArsenalProfile {
+  // Strictly 2–3 pitches for Relievers ('RP'), 4–5 pitches for Starters ('SP')
+  repertoire: PitchSlot[];
+  favoritePitch: PitchType; // Highest-mastery "Out Pitch" (+6 Stuff, +4 Control; decays if spammed 3+ pitches in a row)
+  weakestPitch: PitchType;  // Lowest-mastery "Show-Me Pitch" (-6 Stuff, -5 Control; trainable via Pitch Lab trade-offs)
+}
+
+export interface BatterPitchProfile {
+  favoritePitch: PitchType; // Pitch they crush (e.g., Curveball Crusher, Dead-Red Fastball Hitter: +10..+16)
+  weakPitch: PitchType;     // Pitch vulnerability (e.g., Slider Chase Hole, Changeup Timing Flaw: -10..-16)
+  pitchRecognition: Partial<Record<PitchType, number>>; // -20..+20 per-pitch Contact/Power/Eye & chase modifier
+}
+
 export interface PlayerRatings {
   // Batting (1–99)
   contact: number;
@@ -153,8 +181,11 @@ export interface Player {
   flexibilityProfile: PositionalFlexibilityProfile;
   favoritePosition: FieldPosition; // Playing favorite position awards +5 Fielding/+4 Control, +3 Clutch, +5 Morale
   positionProficiency: Partial<Record<FieldPosition, number>>; // 0..100; < 50 triggers Out-of-Position penalty
+  pitchArsenal?: PitcherArsenalProfile; // Populated for SP (4–5 pitches) & RP (2–3 pitches)
+  batterPitchProfile: BatterPitchProfile; // Favorite pitch to crush, pitch weakness & trainable recognition map
   ratings: PlayerRatings;
   statCaps: PlayerRatings; // Per-tool max rating ceilings (1..99), widest variance on rookies
+  totalRatingBudget: number; // Archetype + marketTier tool envelope preventing generic 99-all-stat overpowered clones (rare 'all_star' carries elite budget)
   xpGrowthMultiplier: number; // 1.35 (rookie) .. 0.30 (veteran)
   fatigue: number; // 0 (fresh) .. 100 (exhausted)
   morale: number; // 0 .. 100
@@ -170,7 +201,7 @@ export interface Player {
 }
 ```
 
-#### 2.1.1 Market Tier Pros/Cons & Positional Cross-Training Rules
+#### 2.1.1 Market Tiers, Pitch Arsenals, Compromise Training & Ability Scarcity Rules
 
 | Market Tier | Age Band | Cost / Salary | XP Growth | Max `statCaps` / Upside | Strategic Role |
 | :--- | :---: | :--- | :---: | :--- | :--- |
@@ -183,6 +214,19 @@ export interface Player {
 
 - **Favorite Position & Out-of-Position Rules**: Deploying a player at `favoritePosition` grants **Favorite Position Boost** (`+5 Fielding` or `+4 Control` on mound, `+3 Clutch`, `+5 Morale`). Deploying them at a listed position with proficiency `>= 50` plays cleanly at normal rating. Deploying them below `50` or unlisted triggers Out-of-Position fielding/error penalties.
 - **Cross-Training Trade-Off**: Training a new eligible position consumes a Practice turn (opportunity cost vs batting/pitching/slump drills), increases `positionProficiency[targetPos]` by `+12..+20`, and applies **`-4..-8` positional rust decay** to other secondary/current positions until sharpened again. Reaching `95+` mastery unlocks shifting `favoritePosition` to the newly mastered position.
+- **Role-Locked Pitcher Arsenals (`2–3` RP vs `4–5` SP)**: Relievers (`RP`) carry strictly **`2` or `3` pitches** (high short-burst bite, faster second-time-through exposure); Starters (`SP`) carry strictly **`4` or `5` pitches** (at least one fastball + breaking/offspeed mix). Every pitcher has a **`favoritePitch`** (*Out Pitch*: `+6 Stuff / +4 Control`, with `-4` predictability decay per consecutive repeat past 2 in the same PA) and a **`weakestPitch`** (*Show-Me Pitch*: `-6 Stuff / -5 Control` hanger risk until trained).
+- **Batter Pitch Affinities (`favoritePitch` & `weakPitch`)**: Every hitter rolls a **`favoritePitch` to face** (`+10..+16` recognition -> `+7..+11 Contact`, `+6..+10 Power`, sharper zone read) and a **`weakPitch`** (`-10..-16` recognition -> `+8..+12%` chase rate, `-8..-12 Contact`, higher whiff rate).
+- **Universal Compromise-First Training (Zero Free God-Mode)**: Every training action involves a concrete trade-off bounded by `statCaps` and `totalRatingBudget` (so no ordinary player becomes overpowered across every tool, while rare, expensive `all_star` players retain genuinely high multi-tool ceilings):
+  - *Power Launch Cage*: `+2..+4 Power`, **`-1..-2 Contact/Eye`** + `+12 Fatigue`.
+  - *Contact Choke-Up Cage*: `+2..+3 Contact/Eye`, **`-1..-2 Power`** + `+10 Fatigue`.
+  - *Batter Pitch-Recognition Drill*: `+4..+7` recognition on target pitch (mitigating `weakPitch` or boosting `favoritePitch` up to `+18`), **`-2..-4` timing drift on 1–2 neglected pitch types**.
+  - *Bullpen Pitch Lab (Polish / Learn Pitch)*: `+4..+7` mastery on target pitch (can soften `weakestPitch` or shift `favoritePitch`), **`-2..-4` feel/command rust on neglected pitches** (and learning/replacing a pitch within the `2–3` RP / `4–5` SP slot limit temporarily taxes `-4..-6 Control` & `-3` mastery elsewhere).
+  - *Velocity vs Pinpoint Conditioning*: Velocity training (`+2..+3 VEL`) trades `-1..-2 CTL` & `+16 Fatigue`; Command training (`+2..+4 CTL`) dials back `-1 VEL`.
+  - *Position Cross-Training*: `+12..+20` target position mastery, **`-4..-8` positional rust** on other positions.
+- **Limited-Use Special Abilities (Charges, Cooldowns & Hype Drain)**: Super-power swings, pitches, Cultural Heritage Tier-3 powers, and Manager powers are **scarce tactical finishers**, never constant every-PA spam:
+  - *Batter Special Swings / Heritage Swings*: Max **`1` use per batter per game** (`2` only for Legend capstone), **`>= 2` PA team super-swing cooldown**, drains **`65–100` Team Hype**, and adds **`+8` Fatigue**.
+  - *Pitcher Special Pitches / Heritage Pitches*: Max **`1` use per `RP` outing** and **`2` uses per `SP` outing**, **`>= 3` batters (`12` pitches) cooldown** between super-pitches, drains **`65–100` Team Hype**, and adds **`+8` arm Fatigue**.
+  - *Manager Active Skipper Powers*: Max **`1` charge per power per game**.
 
 ### 2.2 Club, Lineup & Stadium District (`src/engine/models/club.ts`)
 
@@ -339,6 +383,13 @@ export interface PlayEvent {
     fielderId: string;
     fielderPos: FieldPosition;
     anim: 'field_run' | 'field_dive' | 'field_high_jump';
+  };
+  pitchThrown?: {
+    pitchType: PitchType;
+    mph: number;
+    isFavoritePitch: boolean;
+    isWeakPitchForPitcher: boolean;
+    batterAffinity: 'favorite' | 'weak' | 'neutral';
   };
   commentary: string;
   soundCue?: SoundCue;
