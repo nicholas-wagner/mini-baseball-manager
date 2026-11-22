@@ -21,13 +21,13 @@
 | **M2** | **Core Playable MVP** (Sim Engine + Club Creator + Live 3D + Local Save) | 6 / 6 | `[x]` Done | **MVP Gate**: Complete playable game installable on Android |
 | **M3** | **RPG Core**: Skill Trees, Specialists, Pitch Arsenals, Compromise Training, Cooldowns, Mental/Leverage, Roles, Sabermetrics, Endurance, Pacing, Co-Ed Traits & Role Cards | 14 / 16 | `[/]` In Progress | Deep 2–60 min player, tactical & RPG simulation core |
 | **M4** | **Living League World**: 6-Tier Pyramid, Fair Start Presets, Market Tiers, Salary Caps, Offseason (Retirements/Expiring/Draft/FA) & Rivalries | 4 / 8 | `[/]` In Progress | Multi-season climb from Rookie Ball to World Champions |
-| **M5** | **Sim-City Ballpark District**: Multiple Stadiums & Park Factors, Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 0 / 6 | `[ ]` Planned | Multiple distinct 3D ballparks & interactive district builder |
+| **M5** | **Sim-City Ballpark District**: Multiple Stadiums & Park Factors, Dynamic Fans, Pricing, Sponsors, TV, District Grid & 3D Upgrades | 1 / 6 | `[/]` In Progress | Multiple distinct 3D ballparks & interactive district builder |
 | **M6** | **10X RPG Depth**: Clubhouse Chemistry, Coaches & Equipment Manager, Team Doctors & Trainers, Toggleable Injuries/Illnesses, Relics & Weather | 3 / 7 | `[/]` In Progress | Synergy combos, full coaching/equipment/medical staff, low-frequency health drama & loot relics |
 | **M7** | **10X Front Office**: Trade Machine, Deadline Drama, Prospect Academy & "The Sandlot Gazette" | 1 / 4 | `[/]` In Progress | Full GM trade negotiation, farm call-ups & 90s newspaper |
 | **M8** | **10X World Events**: All-Star Week & HR Derby, Global Chibi Cup, Winter Ball, Trophies & HOF | 0 / 5 | `[ ]` Planned | International Cup, Derby, Hall of Fame & Retired Jerseys on 3D wall |
 | **M9** | **10X Polish & Sharing**: Shareable PNG Cards, Serverless Club Codes, Haptics, Perf & PWA Audit | 0 / 5 | `[ ]` Planned | 60 FPS Android perfection, shareable legends & release readiness |
 
-**Overall 10X Progress**: `40 / 69` feature slices completed
+**Overall 10X Progress**: `41 / 69` feature slices completed
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -150,13 +150,13 @@ Grow the permanent catalog to **3,000 distinct players across all six tiers**, w
 
 ---
 
-### Milestone 5 — Sim-City Ballpark District, Multiple Stadiums, Fanbase & Club Economy (`0 / 6`)
+### Milestone 5 — Sim-City Ballpark District, Multiple Stadiums, Fanbase & Club Economy (`1 / 6`)
 - [ ] **5A. Fanbase, Hype & Dynamic Attendance Simulation** (`TASK-029`): Attendance engine combining Stadium Capacity, Team Hype, Win Streak, Star Popularity, Rivalry Sellout Surge, Promo Nights, and Ticket Fairness — driving real 3D chibi crowd density, rival fan pockets, and stadium waves.
 - [ ] **5B. Ticket & Concession Pricing, Promo Nights & Cash Ledger** (`TASK-030`): Interactive pricing sliders with live Sim-City fan-mood meters, Hot Dog / Nacho / Foam Finger / Ice Cream Helmet quality controls, Promo Night calendar (*Bobblehead Night*, *Dollar Dog Day*, *Fireworks Friday*), and financial statements.
 - [ ] **5C. 90s Parody Sponsors & Tier-Gated TV Contracts** (`TASK-031`): Negotiable endorsements (*Turbo Fizz*, *Pixel Pizza*, *Rad Shades*, *Crunch-O's*) with series milestone bonuses visibly rendered on your 3D outfield wall, plus Public Access → Local Cable → Regional Sports → National Primetime TV deals.
 - [ ] **5D. Interactive Ballpark District Builder Grid** (`TASK-032`): Visual Sim-City neighborhood grid around your ballpark (*Nacho Cantina*, *Bobblehead Megastore*, *Arcade Pavilion*, *Batting Academy*, *Pitching Lab*, *Transit Shuttle*, *Broadcast Tower*, *Club Museum*) with adjacency synergies, upkeep, and upgrade tiers.
 - [ ] **5E. Visual 3D Stadium Evolution Engine** (`TASK-033`): Purchased stadium tiers (Bleachers → Grandstand → Double-Deck → Mega Dome, Jumbotron, Floodlights, Mascot Cannon, District Skyline, Championship Pennants) visibly transform your 3D ballpark in real time.
-- [ ] **5F. Multiple Distinct Stadiums, Park Factors & Home Ballpark Relocation** (`TASK-069`): `10` distinct retro stadiums assigned across all 48 clubs & unlockable/commissionable for your franchise — each with real fence dimensions, wall heights, grass/turf surface, dome/altitude weather traits, simulation **Park Factors** (`HR`, `L/R pull`, `2B/3B`, `GB speed`), and bespoke 3D scenery & color palettes!
+- [x] **5F. Multiple Distinct Stadiums, Park Factors & Home Ballpark Relocation** (`TASK-069`): `10` distinct retro stadiums assigned across all 48 clubs & unlockable/commissionable for your franchise — each with real fence dimensions, wall heights, grass/turf surface, dome/altitude weather traits, simulation **Park Factors** (`HR`, `L/R pull`, `2B/3B`, `GB speed`), and bespoke 3D scenery & color palettes!
 
 ---
 

@@ -62,6 +62,7 @@ export function createGameSession(
     status: 'in_progress',
     regulationInnings,
     gamePressureLevel,
+    ballparkId: homeClub.stadium.ballparkId ?? 'sandlot_commons',
     inning: 1,
     half: 'TOP',
     outs: 0,
@@ -773,6 +774,7 @@ export function stepPitch(
     requestedPitchType: options?.requestedPitchType,
     battingCoEdSynergy: batting.coEdSynergy,
     fieldingCoEdSynergy: fielding.coEdSynergy,
+    ballparkId: next.ballparkId,
   });
 
   events.push(dispatchPitchResolution(next, resolution, batter.id, pitcher.id));

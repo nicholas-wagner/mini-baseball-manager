@@ -1,3 +1,4 @@
+import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
 import type { FieldPosition } from '../handedness/types';
 import type { Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
@@ -104,6 +105,7 @@ export interface GameSessionState {
   status: 'in_progress' | 'completed';
   regulationInnings: GameLengthInnings;
   gamePressureLevel: GamePressureLevel;
+  ballparkId: BallparkPresetId;
   inning: number;
   half: HalfInning;
   outs: number;

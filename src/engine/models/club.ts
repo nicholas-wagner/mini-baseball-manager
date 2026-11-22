@@ -1,3 +1,4 @@
+import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
 import type { FieldPosition } from '../handedness/types';
 import type { CoachStaffState } from './manager';
 import type { Player } from './player';
@@ -52,6 +53,7 @@ export interface DistrictTile {
 }
 
 export interface StadiumState {
+  ballparkId?: BallparkPresetId;
   name: string;
   seatingTier: 1 | 2 | 3 | 4;
   capacity: number;
@@ -165,16 +167,53 @@ const TIER_DEFAULTS: Readonly<Record<LeagueTierId, TierFacilityDefaults>> = {
 
 const INITIAL_DISTRICT_SLOTS = ['north-1', 'north-2', 'east-1', 'west-1'] as const;
 
-export function createInitialStadium(name: string, tier: LeagueTierId): StadiumState {
+const DEFAULT_PARKS_BY_TIER: Readonly<Record<LeagueTierId, readonly BallparkPresetId[]>> = {
+  rookie: ['sandlot_commons', 'cornfield_twilight', 'brickyard_classic'],
+  low_a: ['brickyard_classic', 'cornfield_twilight', 'harbor_shipyard', 'bayfront_cove'],
+  high_a: ['harbor_shipyard', 'bayfront_cove', 'sunbelt_cactus', 'brickyard_classic'],
+  aa: ['sunbelt_cactus', 'sakura_garden', 'bayfront_cove', 'harbor_shipyard'],
+  aaa: ['high_altitude_mesa', 'neon_metro_dome', 'sakura_garden', 'sunbelt_cactus'],
+  majors: [
+    'grand_cathedral',
+    'neon_metro_dome',
+    'high_altitude_mesa',
+    'sakura_garden',
+    'brickyard_classic',
+    'bayfront_cove',
+    'harbor_shipyard',
+    'sunbelt_cactus',
+  ],
+};
+
+function hashStadiumName(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+export function createInitialStadium(
+  name: string,
+  tier: LeagueTierId,
+  ballparkId?: BallparkPresetId,
+): StadiumState {
   const defaults = TIER_DEFAULTS[tier];
+  const tierParks = DEFAULT_PARKS_BY_TIER[tier];
+  const resolvedParkId =
+    ballparkId ??
+    (tier === 'rookie' && name.toLowerCase().includes('sandlot')
+      ? 'sandlot_commons'
+      : tierParks[hashStadiumName(name) % tierParks.length]);
   return {
+    ballparkId: resolvedParkId,
     name,
     seatingTier: defaults.seatingTier,
     capacity: defaults.capacity,
     hasJumbotron: tier === 'aaa' || tier === 'majors',
     hasNightLights: tier !== 'rookie' && tier !== 'low_a',
     hasMascotCannon: tier === 'majors',
-    themeId: 'sandlot_classic',
+    themeId: resolvedParkId,
     retiredNumbers: [],
     championshipPennants: [],
     districtTiles: INITIAL_DISTRICT_SLOTS.map((slotId) => ({

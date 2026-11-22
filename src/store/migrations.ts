@@ -118,6 +118,10 @@ function hydratePlayerDefaults(player: Player): Player {
 function hydrateClubDefaults(club: Club): Club {
   return {
     ...club,
+    stadium: {
+      ...club.stadium,
+      ballparkId: club.stadium?.ballparkId ?? 'sandlot_commons',
+    },
     coaches: {
       ...club.coaches,
       activeStaff: club.coaches?.activeStaff ?? [],

@@ -1,4 +1,8 @@
 import {
+  evaluateParkHitMultipliers,
+  type BallparkPresetId,
+} from '../ballparks/stadiumCatalog';
+import {
   evaluatePlatoonMatchup,
   getPositionalHandednessBonus,
 } from '../handedness/handedness';
@@ -180,15 +184,22 @@ function resolveHitType(
   effPower: number,
   defender: Player,
   battedBallType: BattedBallType,
+  parkHrMult = 1,
+  parkXbhMult = 1,
 ): PitchResolution {
   const hrMult = battedBallType === 'fly_ball' ? 1.55 : battedBallType === 'line_drive' ? 0.9 : 0.08;
   const gapBonus = (batter.ratings.gapPower - 60) * 0.0024;
-  const hrChance = clampProb((0.11 + (effPower - 60) * 0.0038) * hrMult, 0.01, 0.42);
-  const tripleChance = clampProb(0.045 + (batter.ratings.speed - 65) * 0.002 + gapBonus * 0.4, 0.015, 0.12);
+  const hrChance = clampProb((0.11 + (effPower - 60) * 0.0038) * hrMult * parkHrMult, 0.01, 0.48);
+  const tripleChance = clampProb(
+    (0.045 + (batter.ratings.speed - 65) * 0.002 + gapBonus * 0.4) * parkXbhMult,
+    0.015,
+    0.14,
+  );
   const doubleChance = clampProb(
-    0.22 + (effPower - 60) * 0.0018 + gapBonus + (battedBallType === 'line_drive' ? 0.08 : 0),
+    (0.22 + (effPower - 60) * 0.0018 + gapBonus + (battedBallType === 'line_drive' ? 0.08 : 0)) *
+      parkXbhMult,
     0.12,
-    0.38,
+    0.42,
   );
   const roll = rng.next();
   const ofSpot = rng.pick(OUTFIELD_SPOTS);
@@ -441,6 +452,7 @@ export interface PitchResolverContext {
   requestedPitchType?: PitchType;
   battingCoEdSynergy?: CoEdClubhouseSynergy;
   fieldingCoEdSynergy?: CoEdClubhouseSynergy;
+  ballparkId?: BallparkPresetId;
 }
 
 const BATTED_BALL_BABIP_SHIFT: Readonly<Record<BattedBallType, number>> = {
@@ -471,19 +483,31 @@ function resolveContactResult(
     fatiguedPitcherProfile,
     pitchType,
   );
+  const effectiveSide = evaluatePlatoonMatchup(ctx.batter.bats, ctx.pitcher.throws).effectiveBatSide;
+  const parkFx = evaluateParkHitMultipliers(ctx.ballparkId, effectiveSide);
+  const gbSpeedBonus = battedBallType === 'ground_ball' ? parkFx.groundballHitBonus : 0;
   const rangeSuppress = (ctx.defender.ratings.range - 62) * 0.0018;
   const hitProb = clampProb(
     0.295 +
       (effContact - effStuff) * 0.0044 +
       firstBaseStepBonus * 0.008 +
       luckHitShift +
-      BATTED_BALL_BABIP_SHIFT[battedBallType] -
+      BATTED_BALL_BABIP_SHIFT[battedBallType] +
+      gbSpeedBonus -
       rangeSuppress,
     0.04,
     0.66,
   );
   if (ctx.rng.chance(hitProb)) {
-    const hit = resolveHitType(ctx.rng, ctx.batter, effPower, ctx.defender, battedBallType);
+    const hit = resolveHitType(
+      ctx.rng,
+      ctx.batter,
+      effPower,
+      ctx.defender,
+      battedBallType,
+      parkFx.hrMultiplier,
+      parkFx.xbhMultiplier,
+    );
     if (ctx.canBatterTriggerSpecial) {
       hit.specialPowerTriggered = buildHeritagePowerTrigger(ctx.batter, 'batter');
     }
