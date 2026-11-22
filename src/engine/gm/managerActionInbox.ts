@@ -4,7 +4,7 @@ import {
 } from '../ballparks/stadiumProgression';
 import type { Club } from '../models/club';
 import type { ManagerProfile } from '../models/manager';
-import type { Player } from '../models/player';
+import { isPitcherPosition, type Player } from '../models/player';
 import { deriveFormState } from '../rpg/formTracker';
 import {
   applyManagerXpAndLevelUp,
@@ -69,7 +69,55 @@ export interface SeriesAutoProgressionResult {
   hypeDelta: number;
 }
 
+export type TeamPracticeFocusId = 'batting_cage' | 'bullpen_lab' | 'full_squad' | 'rest_film';
+
+export interface TeamPracticeOption {
+  id: TeamPracticeFocusId;
+  icon: string;
+  label: string;
+  gainBadge: string;
+  tradeoffBadge: string;
+}
+
+export interface TeamPracticeRecommendation {
+  focusId: TeamPracticeFocusId;
+  reason: string;
+}
+
+export const TEAM_PRACTICE_OPTIONS: readonly TeamPracticeOption[] = [
+  {
+    id: 'batting_cage',
+    icon: '🏏',
+    label: 'Batting Cage Marathon',
+    gainBadge: '+110 XP & +8 Form (Hitters)',
+    tradeoffBadge: 'Pitchers 0 XP • +7 Fatigue',
+  },
+  {
+    id: 'bullpen_lab',
+    icon: '⚾',
+    label: 'Bullpen & Pitch Lab',
+    gainBadge: '+110 XP & +8 Form (Pitchers)',
+    tradeoffBadge: 'Hitters 0 XP • +8 Fatigue',
+  },
+  {
+    id: 'full_squad',
+    icon: '🧤',
+    label: 'Full-Squad Fundamentals',
+    gainBadge: '+65 XP & +5 Morale (All)',
+    tradeoffBadge: 'Slower XP • +6 Fatigue',
+  },
+  {
+    id: 'rest_film',
+    icon: '🧘',
+    label: 'Rest, Ice & Film Room',
+    gainBadge: '-24 Fatigue • Busts Slumps • +45 Mgr XP',
+    tradeoffBadge: '0 Player XP this cycle',
+  },
+];
+
 export interface QuickTeamPracticeResult {
+  focusId: TeamPracticeFocusId;
+  focusLabel: string;
   club: Club;
   manager: ManagerProfile;
   playersBoosted: number;
@@ -263,38 +311,134 @@ export function applySeriesAutoProgression(
   };
 }
 
-/** One-tap joyful team practice giving automatic XP/level-ups and a morale/form lift across the roster. */
-export function runQuickTeamPractice(
-  club: Club,
-  manager: ManagerProfile,
-): QuickTeamPracticeResult {
-  const updatedRoster = club.roster.map((player) => {
-    const youthBonus = player.age <= 24 ? 30 : 0;
-    const xpGain = Math.round((80 + youthBonus) * player.xpGrowthMultiplier);
-    const withLevels = applyPlayerXpAndLevelUps(player, xpGain);
-    const nextForm = Math.min(100, withLevels.formScore + 6);
+/** Recommends the smartest between-games Team Practice focus based on current club fatigue and form. */
+export function recommendTeamPracticeFocus(club: Club): TeamPracticeRecommendation {
+  const pitchers = club.roster.filter((p) => isPitcherPosition(p.position));
+  const hitters = club.roster.filter((p) => !isPitcherPosition(p.position));
+  const avgPitcherFatigue =
+    pitchers.length > 0
+      ? pitchers.reduce((sum, p) => sum + p.fatigue, 0) / pitchers.length
+      : 0;
+  const tiredPlayers = club.roster.filter((p) => p.fatigue >= 45).length;
+
+  if (avgPitcherFatigue >= 38 || tiredPlayers >= 3) {
+    return {
+      focusId: 'rest_film',
+      reason: 'Players are carrying fatigue — Rest, Ice & Film Room gets everyone fresh!',
+    };
+  }
+
+  const coldHitters = hitters.filter((p) => p.formScore <= -10).length;
+  if (coldHitters >= 3) {
+    return {
+      focusId: 'batting_cage',
+      reason: 'Bats have gone chilly — Batting Cage Marathon heats up your lineup!',
+    };
+  }
+
+  const coldPitchers = pitchers.filter((p) => p.formScore <= -10).length;
+  if (coldPitchers >= 2) {
+    return {
+      focusId: 'bullpen_lab',
+      reason: 'Your staff needs rhythm — Bullpen & Pitch Lab sharpens your arms!',
+    };
+  }
+
+  return {
+    focusId: 'full_squad',
+    reason: 'Club is rested & healthy — grow the whole squad or target one unit!',
+  };
+}
+
+function applyFocusToPlayer(player: Player, focusId: TeamPracticeFocusId): Player {
+  const pitcher = isPitcherPosition(player.position);
+  const youth = player.age <= 24 ? 30 : 0;
+
+  if (focusId === 'rest_film') {
+    const formBoost = player.formScore < 0 ? 14 : 5;
+    const nextForm = Math.min(100, player.formScore + formBoost);
+    return {
+      ...player,
+      fatigue: Math.max(0, player.fatigue - 24),
+      formScore: nextForm,
+      formState: deriveFormState(nextForm),
+      morale: Math.min(100, player.morale + 6),
+    };
+  }
+
+  if (focusId === 'batting_cage') {
+    if (pitcher) return { ...player, fatigue: Math.max(0, player.fatigue - 4) };
+    const withLevels = applyPlayerXpAndLevelUps(
+      player,
+      Math.round((110 + youth) * player.xpGrowthMultiplier),
+    );
+    const nextForm = Math.min(100, withLevels.formScore + 8);
     return {
       ...withLevels,
       formScore: nextForm,
       formState: deriveFormState(nextForm),
-      morale: Math.min(100, withLevels.morale + 4),
-      fatigue: Math.min(100, withLevels.fatigue + 4),
+      fatigue: Math.min(100, withLevels.fatigue + 7),
     };
-  });
+  }
 
+  if (focusId === 'bullpen_lab') {
+    if (!pitcher) return { ...player, fatigue: Math.max(0, player.fatigue - 4) };
+    const withLevels = applyPlayerXpAndLevelUps(
+      player,
+      Math.round((110 + youth) * player.xpGrowthMultiplier),
+    );
+    const nextForm = Math.min(100, withLevels.formScore + 8);
+    return {
+      ...withLevels,
+      formScore: nextForm,
+      formState: deriveFormState(nextForm),
+      fatigue: Math.min(100, withLevels.fatigue + 8),
+    };
+  }
+
+  const fullYouth = player.age <= 24 ? 20 : 0;
+  const withLevels = applyPlayerXpAndLevelUps(
+    player,
+    Math.round((65 + fullYouth) * player.xpGrowthMultiplier),
+  );
+  const nextForm = Math.min(100, withLevels.formScore + 4);
+  return {
+    ...withLevels,
+    formScore: nextForm,
+    formState: deriveFormState(nextForm),
+    morale: Math.min(100, withLevels.morale + 5),
+    fatigue: Math.min(100, withLevels.fatigue + 6),
+  };
+}
+
+/** Runs a focused between-games Team Practice with clear reward/tradeoff dynamics (1 per game/series). */
+export function runQuickTeamPractice(
+  club: Club,
+  manager: ManagerProfile,
+  focusId: TeamPracticeFocusId = 'full_squad',
+): QuickTeamPracticeResult {
+  const option =
+    TEAM_PRACTICE_OPTIONS.find((opt) => opt.id === focusId) ?? TEAM_PRACTICE_OPTIONS[2];
+  const updatedRoster = club.roster.map((player) => applyFocusToPlayer(player, focusId));
   const levelUps = diffClubLevelUps(club.roster, updatedRoster);
-  const nextManager = applyManagerXpAndLevelUp(manager, 35, false);
-  const levelText =
-    levelUps.length > 0
-      ? ` ${levelUps.length} player${levelUps.length === 1 ? '' : 's'} leveled up (+SP ready for Skill Trees)!`
-      : ' Roster gained +XP & sharpened form!';
+  const mgrXp = focusId === 'rest_film' ? 45 : 35;
+  const nextManager = applyManagerXpAndLevelUp(manager, mgrXp, false);
+
+  const suffix =
+    focusId === 'rest_film'
+      ? ' Cleared -24 Fatigue, busted cold slumps & earned +45 Manager XP!'
+      : levelUps.length > 0
+        ? ` ${levelUps.length} player${levelUps.length === 1 ? '' : 's'} leveled up (+SP ready for Skill Trees)!`
+        : ' Sharpened form & earned focused XP!';
 
   return {
+    focusId,
+    focusLabel: option.label,
     club: { ...club, roster: updatedRoster },
     manager: nextManager,
     playersBoosted: updatedRoster.length,
     levelUps,
     managerLeveledUp: nextManager.level > manager.level,
-    summary: `Team Practice complete!${levelText}`,
+    summary: `${option.icon} ${option.label} complete!${suffix}`,
   };
 }

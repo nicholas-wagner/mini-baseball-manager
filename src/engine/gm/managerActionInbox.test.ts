@@ -5,7 +5,9 @@ import { createClub } from './rosterFactory';
 import {
   applySeriesAutoProgression,
   buildManagerActionInbox,
+  recommendTeamPracticeFocus,
   runQuickTeamPractice,
+  TEAM_PRACTICE_OPTIONS,
 } from './managerActionInbox';
 
 const COLORS = { primary: '#E63946', secondary: '#1D3557', accent: '#FFC300', monogram: 'SC' };
@@ -132,7 +134,7 @@ describe('Manager Action Inbox, Series Auto-Progression & Quick Team Practice', 
     expect(practice.club.roster[0].skillPoints).toBeGreaterThanOrEqual(1);
     expect(practice.club.roster[0].formScore).toBeGreaterThan(-10);
     expect(practice.levelUps.length).toBeGreaterThanOrEqual(1);
-    expect(practice.summary).toMatch(/team practice/i);
+    expect(practice.summary).toMatch(/full-squad fundamentals/i);
 
     // Exercise plural/singular branches, null manager, night_lights upgrade & zero-level-up practice
     const freshClub = {
@@ -172,8 +174,83 @@ describe('Manager Action Inbox, Series Auto-Progression & Quick Team Practice', 
     expect(multiInbox.tabBadges.skills).toBe('⚡ 1');
     expect(multiInbox.tabBadges.economy).toBe('⬆');
 
-    const noLvPractice = runQuickTeamPractice(freshClub, manager);
+    const noLvPractice = runQuickTeamPractice(freshClub, manager, 'full_squad');
     expect(noLvPractice.levelUps).toHaveLength(0);
-    expect(noLvPractice.summary).toMatch(/sharpened form/i);
+    expect(noLvPractice.summary).toMatch(/sharpened form|balanced/i);
+  });
+
+  it('applies distinct real tradeoffs across all 4 Team Practice focuses and recommends the smartest focus for the club', () => {
+    const { club, manager } = makeClubAndManager();
+    expect(TEAM_PRACTICE_OPTIONS).toHaveLength(4);
+
+    const normalizedClub = {
+      ...club,
+      roster: club.roster.map((p) => ({
+        ...p,
+        xp: 0,
+        level: 1,
+        skillPoints: 0,
+        fatigue: 30,
+        formScore: -15,
+        xpGrowthMultiplier: 1,
+      })),
+    };
+
+    // 1. Batting Cage Marathon: hitters gain big XP & +7 fatigue; pitchers sit out (0 XP, lose fatigue)
+    const batRes = runQuickTeamPractice(normalizedClub, manager, 'batting_cage');
+    const batHitter = batRes.club.roster.find((p) => p.position !== 'SP' && p.position !== 'RP')!;
+    const batPitcher = batRes.club.roster.find((p) => p.position === 'SP' || p.position === 'RP')!;
+    expect(batHitter.xp).toBeGreaterThanOrEqual(110);
+    expect(batHitter.fatigue).toBe(37);
+    expect(batPitcher.xp).toBe(0);
+    expect(batPitcher.fatigue).toBeLessThan(30);
+
+    // 2. Bullpen & Pitch Lab: pitchers gain big XP & +8 fatigue; hitters sit out (0 XP)
+    const pitRes = runQuickTeamPractice(normalizedClub, manager, 'bullpen_lab');
+    const pitHitter = pitRes.club.roster.find((p) => p.position !== 'SP' && p.position !== 'RP')!;
+    const pitPitcher = pitRes.club.roster.find((p) => p.position === 'SP' || p.position === 'RP')!;
+    expect(pitPitcher.xp).toBeGreaterThanOrEqual(110);
+    expect(pitPitcher.fatigue).toBe(38);
+    expect(pitHitter.xp).toBe(0);
+
+    // 3. Rest, Ice & Film Room: 0 Player XP, big -24 fatigue recovery, cold slump bust (+14 Form), +45 Manager XP
+    const restRes = runQuickTeamPractice(normalizedClub, manager, 'rest_film');
+    expect(restRes.club.roster.every((p) => p.xp === 0)).toBe(true);
+    expect(restRes.club.roster[0].fatigue).toBe(6);
+    expect(restRes.club.roster[0].formScore).toBe(-1);
+    expect(restRes.manager.xp).toBe(manager.xp + 45);
+
+    // 4. Coach recommendation adapts to club fatigue & cold slumps
+    const tiredClub = {
+      ...normalizedClub,
+      roster: normalizedClub.roster.map((p) => ({ ...p, fatigue: 55 })),
+    };
+    expect(recommendTeamPracticeFocus(tiredClub).focusId).toBe('rest_film');
+
+    const coldBatsClub = {
+      ...normalizedClub,
+      roster: normalizedClub.roster.map((p) => ({
+        ...p,
+        fatigue: 5,
+        formScore: p.position === 'SP' || p.position === 'RP' ? 10 : -20,
+      })),
+    };
+    expect(recommendTeamPracticeFocus(coldBatsClub).focusId).toBe('batting_cage');
+
+    const coldArmsClub = {
+      ...normalizedClub,
+      roster: normalizedClub.roster.map((p) => ({
+        ...p,
+        fatigue: 5,
+        formScore: p.position === 'SP' || p.position === 'RP' ? -20 : 10,
+      })),
+    };
+    expect(recommendTeamPracticeFocus(coldArmsClub).focusId).toBe('bullpen_lab');
+
+    const freshClub = {
+      ...normalizedClub,
+      roster: normalizedClub.roster.map((p) => ({ ...p, fatigue: 5, formScore: 10 })),
+    };
+    expect(recommendTeamPracticeFocus(freshClub).focusId).toBe('full_squad');
   });
 });

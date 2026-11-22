@@ -17,7 +17,9 @@ import { soundEngine } from '../../audio/soundEngine';
 import { getBallparkPreset } from '../../engine/ballparks/stadiumCatalog';
 import {
   buildManagerActionInbox,
+  recommendTeamPracticeFocus,
   type ManagerJumpTarget,
+  type TeamPracticeFocusId,
 } from '../../engine/gm/managerActionInbox';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
 import {
@@ -187,6 +189,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const worldSeed = useGameStore((s) => s.worldSeed);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const practiceAvailable = useGameStore((s) => s.practiceAvailable);
+  const lastPracticeFocusLabel = useGameStore((s) => s.lastPracticeFocusLabel);
   const commitCompletedGame = useGameStore((s) => s.commitCompletedGame);
   const simNextSeriesRound = useGameStore((s) => s.simNextSeriesRound);
   const runQuickTeamPracticeAction = useGameStore((s) => s.runQuickTeamPracticeAction);
@@ -559,12 +562,14 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
       );
     };
 
-    const handleQuickPractice = () => {
-      const res = runQuickTeamPracticeAction();
+    const handleQuickPractice = (focusId: TeamPracticeFocusId) => {
+      const res = runQuickTeamPracticeAction(focusId);
       if (!res) return;
       soundEngine.play(res.levelUps.length > 0 ? 'level_up' : 'ui_pop');
       setGmQuickFeedback(res.summary);
     };
+
+    const recommendedPractice = recommendTeamPracticeFocus(humanClub);
 
     return (
       <div className="space-y-4">
@@ -575,9 +580,11 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           seriesIndex={currentSeriesIndex}
           inbox={inbox}
           practiceAvailable={practiceAvailable}
+          lastPracticeFocusLabel={lastPracticeFocusLabel}
+          recommendedPractice={recommendedPractice}
           quickFeedback={gmQuickFeedback}
           onSimNextSeries={handleFastSimSeries}
-          onQuickPractice={handleQuickPractice}
+          onSelectPractice={handleQuickPractice}
           onActionClick={handleManagerJump}
         />
 

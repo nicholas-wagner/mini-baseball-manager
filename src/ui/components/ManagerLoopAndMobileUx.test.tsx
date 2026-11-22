@@ -30,18 +30,25 @@ describe('GM-First Manager Clipboard, Auto-Leveling, Sticky Score & Mobile Modal
 
     expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sim next 3-game series/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /quick team practice/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /team practice/i })).toBeInTheDocument();
 
-    // Running Quick Team Practice boosts XP ONCE, then locks until the next game or series is played
-    const practiceBtn = screen.getByRole('button', { name: /quick team practice/i });
-    fireEvent.click(practiceBtn);
-    expect(screen.getByTestId('gm-quick-feedback')).toHaveTextContent(/team practice/i);
+    // Opening Team Practice shows all 4 tradeoff focuses & Coach's recommendation, then picking one locks until next game/series
+    fireEvent.click(screen.getByRole('button', { name: /team practice/i }));
+    expect(screen.getByTestId('team-practice-picker')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /batting cage marathon/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /bullpen & pitch lab/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /full-squad fundamentals/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /rest, ice & film room/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /batting cage marathon/i }));
+    expect(screen.getByTestId('gm-quick-feedback')).toHaveTextContent(/batting cage/i);
+    expect(screen.queryByTestId('team-practice-picker')).not.toBeInTheDocument();
     expect(useGameStore.getState().practiceAvailable).toBe(false);
     expect(screen.getByRole('button', { name: /practice done/i })).toBeDisabled();
 
     // Direct store spam attempt is blocked cleanly (zero extra XP/SP exploit!)
     const xpAfterFirst = useGameStore.getState().getHumanClub()!.roster[0].xp;
-    expect(useGameStore.getState().runQuickTeamPracticeAction()).toBeNull();
+    expect(useGameStore.getState().runQuickTeamPracticeAction('batting_cage')).toBeNull();
     expect(useGameStore.getState().getHumanClub()!.roster[0].xp).toBe(xpAfterFirst);
 
     // Sim Next 3-Game Series advances the season, grants auto XP/cash, AND unlocks 1 fresh practice
@@ -50,11 +57,12 @@ describe('GM-First Manager Clipboard, Auto-Leveling, Sticky Score & Mobile Modal
     expect(useGameStore.getState().currentSeriesIndex).toBe(1);
     expect(useGameStore.getState().getHumanClub()!.economy.cash).toBeGreaterThan(cashBefore);
     expect(useGameStore.getState().practiceAvailable).toBe(true);
-    expect(screen.getByRole('button', { name: /quick team practice/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /team practice/i })).not.toBeDisabled();
     expect(screen.getByTestId('gm-quick-feedback')).toHaveTextContent(/series 1/i);
 
-    // Practice again -> locked; playing a single game unlocks practice once more
-    fireEvent.click(screen.getByRole('button', { name: /quick team practice/i }));
+    // Practice again (Rest & Film) -> locked; playing a single game unlocks practice once more
+    fireEvent.click(screen.getByRole('button', { name: /team practice/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rest, ice & film room/i }));
     expect(useGameStore.getState().practiceAvailable).toBe(false);
     const club = useGameStore.getState().getHumanClub()!;
     const opp = useGameStore.getState().leagues[club.leagueTier].find((c) => c.id !== club.id)!;

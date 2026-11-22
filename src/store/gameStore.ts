@@ -5,6 +5,7 @@ import {
   runQuickTeamPractice,
   type PlayerLevelUpEvent,
   type QuickTeamPracticeResult,
+  type TeamPracticeFocusId,
 } from '../engine/gm/managerActionInbox';
 import {
   generateMarketPool,
@@ -111,6 +112,7 @@ export interface GameStoreState {
   seasonNumber: number;
   currentSeriesIndex: number;
   practiceAvailable: boolean;
+  lastPracticeFocusLabel: string | null;
   rosterActionNonce: number;
   humanClubId: string | null;
   manager: ManagerProfile | null;
@@ -133,7 +135,7 @@ export interface GameStoreState {
     cashEarned?: number;
     levelUps?: readonly PlayerLevelUpEvent[];
   };
-  runQuickTeamPracticeAction: () => QuickTeamPracticeResult | null;
+  runQuickTeamPracticeAction: (focusId?: TeamPracticeFocusId) => QuickTeamPracticeResult | null;
   runPlayoffsAndAdvanceSeason: (
     regulationInnings?: GameLengthInnings,
   ) => {
@@ -225,6 +227,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     seasonNumber: 1,
     currentSeriesIndex: 0,
     practiceAvailable: true,
+    lastPracticeFocusLabel: null,
     rosterActionNonce: 1,
     humanClubId: null,
     manager: null,
@@ -248,6 +251,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: 1,
         currentSeriesIndex: 0,
         practiceAvailable: true,
+        lastPracticeFocusLabel: null,
         rosterActionNonce: 1,
         humanClubId: world.humanClubId,
         manager: createManagerProfile({
@@ -321,6 +325,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         manager: nextManager,
         currentSeriesIndex: nextIndex,
         practiceAvailable: true,
+        lastPracticeFocusLabel: null,
       });
       return {
         seriesCompleted: nextIndex,
@@ -332,15 +337,16 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       };
     },
 
-    runQuickTeamPracticeAction: () => {
+    runQuickTeamPracticeAction: (focusId = 'full_squad') => {
       const state = get();
       const humanClub = get().getHumanClub();
       if (!humanClub || !state.manager || !state.practiceAvailable) return null;
-      const res = runQuickTeamPractice(humanClub, state.manager);
+      const res = runQuickTeamPractice(humanClub, state.manager, focusId);
       set({
         leagues: updateHumanClubInLeagues(state.leagues, res.club),
         manager: res.manager,
         practiceAvailable: false,
+        lastPracticeFocusLabel: res.focusLabel,
       });
       return res;
     },
@@ -460,6 +466,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: done.nextSeasonNumber,
         currentSeriesIndex: 0,
         practiceAvailable: true,
+        lastPracticeFocusLabel: null,
         leagues: done.leagues,
         freeAgents: done.freeAgents,
         activeOffseason: null,
@@ -797,6 +804,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         leagues: updateHumanClubInLeagues(leagues, progressed.club),
         lastPostGameSummary: summary,
         practiceAvailable: true,
+        lastPracticeFocusLabel: null,
       });
 
       return summary;

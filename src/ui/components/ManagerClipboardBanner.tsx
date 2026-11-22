@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { ArrowRight, CheckCircle2, Dumbbell, FastForward, Sparkles } from 'lucide-react';
-import type {
-  ManagerActionInbox,
-  ManagerJumpTarget,
+import {
+  TEAM_PRACTICE_OPTIONS,
+  type ManagerActionInbox,
+  type ManagerJumpTarget,
+  type TeamPracticeFocusId,
+  type TeamPracticeRecommendation,
 } from '../../engine/gm/managerActionInbox';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -13,9 +17,11 @@ interface ManagerClipboardBannerProps {
   seriesIndex: number;
   inbox: ManagerActionInbox;
   practiceAvailable: boolean;
+  lastPracticeFocusLabel?: string | null;
+  recommendedPractice: TeamPracticeRecommendation;
   quickFeedback: string | null;
   onSimNextSeries: () => void;
-  onQuickPractice: () => void;
+  onSelectPractice: (focusId: TeamPracticeFocusId) => void;
   onActionClick: (target: ManagerJumpTarget) => void;
 }
 
@@ -26,11 +32,14 @@ export function ManagerClipboardBanner({
   seriesIndex,
   inbox,
   practiceAvailable,
+  lastPracticeFocusLabel = null,
+  recommendedPractice,
   quickFeedback,
   onSimNextSeries,
-  onQuickPractice,
+  onSelectPractice,
   onActionClick,
 }: ManagerClipboardBannerProps) {
+  const [practicePickerOpen, setPracticePickerOpen] = useState(false);
   const seasonRegularDone = seriesIndex >= 7;
 
   return (
@@ -69,14 +78,73 @@ export function ManagerClipboardBanner({
 
           <ComicButton
             size="sm"
-            variant={practiceAvailable ? 'sky' : 'cream'}
+            variant={practiceAvailable ? (practicePickerOpen ? 'violet' : 'sky') : 'cream'}
             disabled={!practiceAvailable}
             icon={<Dumbbell className="w-4 h-4" />}
-            onClick={onQuickPractice}
+            onClick={() => setPracticePickerOpen((open) => !open)}
           >
-            {practiceAvailable ? 'Quick Team Practice (+XP)' : 'Practice Done ✓ (After Next Game)'}
+            {practiceAvailable
+              ? practicePickerOpen
+                ? 'Hide Practice Choices'
+                : 'Team Practice (1/1 — Pick Focus)'
+              : `Practice Done ✓${lastPracticeFocusLabel ? ` (${lastPracticeFocusLabel})` : ''}`}
           </ComicButton>
         </div>
+
+        {/* Effortless 1-Tap Inline Team Practice Focus Chooser (4 Trade-Off Cards) */}
+        {practiceAvailable && practicePickerOpen ? (
+          <div
+            data-testid="team-practice-picker"
+            className="p-2.5 rounded-2xl border-2 border-[#181B2C] bg-[#F5EEFF] space-y-2"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-extrabold text-[#4C1D95]">
+              <span>Pick 1 Focus Before Your Next Game (Each Has a Real Trade-Off):</span>
+              <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[#181B2C] text-[10px]">
+                ★ Coach’s Pick: {recommendedPractice.reason}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {TEAM_PRACTICE_OPTIONS.map((opt) => {
+                const isRecommended = opt.id === recommendedPractice.focusId;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setPracticePickerOpen(false);
+                      onSelectPractice(opt.id);
+                    }}
+                    className={`p-2.5 rounded-xl border-2 border-[#181B2C] text-left min-h-[72px] transition-transform hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between gap-1.5 ${
+                      isRecommended
+                        ? 'bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C]'
+                        : 'bg-[#FFFDF7] shadow-[2px_2px_0_#181B2C]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="font-display text-xs text-[#181B2C]">
+                        {opt.icon} {opt.label}
+                      </span>
+                      {isRecommended ? (
+                        <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[9px] shrink-0">
+                          ★ RECOMMENDED
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap gap-1 text-[10px] font-extrabold">
+                      <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#1B4332] text-[#1B4332]">
+                        + {opt.gainBadge}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-[#FFE5EC] border border-[#9D0208] text-[#9D0208]">
+                        − {opt.tradeoffBadge}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {quickFeedback ? (
           <div
