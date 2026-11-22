@@ -6,13 +6,28 @@ import {
 } from '../engine/gm/marketTiers';
 import {
   buildOptimalLineup,
-  createClub,
   validateLineup,
 } from '../engine/gm/rosterFactory';
 import type { FieldPosition } from '../engine/handedness/types';
-import type { AiArchetype, Club, LeagueTierId } from '../engine/models/club';
+import {
+  advanceOffseasonWorld,
+  generateSixTierWorld,
+  simulateBestOfThreePlayoffs,
+  simulateSeriesRound,
+  type TierPlayoffResult,
+  type TierPromotionTransition,
+} from '../engine/league/seasonEngine';
+import {
+  LEAGUE_TIER_ORDER,
+  type Club,
+  type LeagueTierId,
+} from '../engine/models/club';
 import { createManagerProfile, type ManagerProfile } from '../engine/models/manager';
-import { isPitcherPosition, type Player } from '../engine/models/player';
+import {
+  isPitcherPosition,
+  type GameLengthInnings,
+  type Player,
+} from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
 import { unlockNextHeritageTier } from '../engine/rpg/heritageTrees';
 import {
@@ -81,8 +96,20 @@ export interface GameStoreState {
   freeAgents: Player[];
   settings: UserSaveSettings;
   lastPostGameSummary: PostGameSummary | null;
+  lastPlayoffResult: TierPlayoffResult | null;
+  lastOffseasonTransitions: readonly TierPromotionTransition[];
   getHumanClub: () => Club | null;
   startNewCareer: (input: StartNewCareerInput) => void;
+  simNextSeriesRound: (
+    regulationInnings?: GameLengthInnings,
+  ) => { seriesCompleted: number; seasonComplete: boolean };
+  runPlayoffsAndAdvanceSeason: (
+    regulationInnings?: GameLengthInnings,
+  ) => {
+    humanPlayoffs: TierPlayoffResult;
+    transitions: readonly TierPromotionTransition[];
+    nextSeasonNumber: number;
+  } | null;
   swapLineupSlots: (slotIndexA: number, slotIndexB: number) => void;
   assignLineupPlayer: (slotIndex: number, playerId: string) => void;
   autoOptimizeHumanLineup: () => void;
@@ -111,27 +138,6 @@ export interface GameStoreState {
   exportCurrentCareerJson: () => string;
   importCareerJson: (rawJson: string) => boolean;
 }
-
-interface AiClubSeedTemplate {
-  city: string;
-  name: string;
-  mascot: string;
-  monogram: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-  archetype: AiArchetype;
-}
-
-const AI_ROOKIE_TEMPLATES: readonly AiClubSeedTemplate[] = [
-  { city: 'Bayside', name: 'Pelicans', mascot: 'Pelican', monogram: 'BP', primary: '#1D63B8', secondary: '#0F2B46', accent: '#FFD166', archetype: 'ace_factory' },
-  { city: 'Maple', name: 'Lumberjacks', mascot: 'Moose', monogram: 'ML', primary: '#B8332A', secondary: '#2E1A18', accent: '#F4A261', archetype: 'mashers' },
-  { city: 'Cactus', name: 'Runners', mascot: 'Roadrunner', monogram: 'CR', primary: '#2FB356', secondary: '#1B4332', accent: '#FFC300', archetype: 'speed_demons' },
-  { city: 'Ironwood', name: 'Knights', mascot: 'Hawk', monogram: 'IK', primary: '#5A4AE3', secondary: '#181B2C', accent: '#00E5FF', archetype: 'defense_first' },
-  { city: 'Harbor', name: 'Pelicanos', mascot: 'Gull', monogram: 'HP', primary: '#0096C7', secondary: '#023E8A', accent: '#FFF3B0', archetype: 'moneyball' },
-  { city: 'Sunset', name: 'coyotes', mascot: 'Coyote', monogram: 'SC', primary: '#F77F00', secondary: '#3A1C0E', accent: '#FCBF49', archetype: 'mashers' },
-  { city: 'Clover', name: 'Shamrocks', mascot: 'Fox', monogram: 'CS', primary: '#1F9D55', secondary: '#0D3B22', accent: '#FFD166', archetype: 'speed_demons' },
-];
 
 function createEmptyLeagues(): Record<LeagueTierId, Club[]> {
   return {
@@ -180,47 +186,14 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     freeAgents: [],
     settings: { ...DEFAULT_SAVE_SETTINGS },
     lastPostGameSummary: null,
+    lastPlayoffResult: null,
+    lastOffseasonTransitions: [],
 
     getHumanClub: () => findClubAcrossLeagues(get().leagues, get().humanClubId),
 
     startNewCareer: (input) => {
       const seed = input.seed ?? 1994;
-      const rng = createSeededRng(seed);
-      const humanClub = createClub(rng, {
-        id: `club-human-${seed}`,
-        city: input.city.trim() || 'Sandlot',
-        name: input.clubName.trim() || 'Comets',
-        mascot: input.mascot.trim() || 'Rocket Dog',
-        colors: {
-          primary: input.primaryColor,
-          secondary: input.secondaryColor,
-          accent: input.accentColor,
-          monogram: input.monogram.trim().toUpperCase().slice(0, 2) || 'SC',
-        },
-        leagueTier: 'rookie',
-        isHuman: true,
-      });
-
-      const aiClubs = AI_ROOKIE_TEMPLATES.map((tpl, idx) =>
-        createClub(createSeededRng(seed + 100 + idx), {
-          id: `club-ai-rookie-${idx + 1}`,
-          city: tpl.city,
-          name: tpl.name,
-          mascot: tpl.mascot,
-          colors: {
-            primary: tpl.primary,
-            secondary: tpl.secondary,
-            accent: tpl.accent,
-            monogram: tpl.monogram,
-          },
-          leagueTier: 'rookie',
-          isHuman: false,
-          aiArchetype: tpl.archetype,
-        }),
-      );
-
-      const leagues = createEmptyLeagues();
-      leagues.rookie = [humanClub, ...aiClubs];
+      const world = generateSixTierWorld(seed, input);
       const freeAgents = generateMarketPool(createSeededRng(seed + 505), 'rookie', 12);
 
       set({
@@ -228,15 +201,97 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seasonNumber: 1,
         currentSeriesIndex: 0,
         rosterActionNonce: 1,
-        humanClubId: humanClub.id,
+        humanClubId: world.humanClubId,
         manager: createManagerProfile({
           name: input.managerName.trim() || 'Skipper',
           avatarSeed: seed,
         }),
-        leagues,
+        leagues: world.leagues,
         freeAgents,
         lastPostGameSummary: null,
+        lastPlayoffResult: null,
+        lastOffseasonTransitions: [],
       });
+    },
+
+    simNextSeriesRound: (regulationInnings = 5) => {
+      const state = get();
+      if (state.currentSeriesIndex >= 7) {
+        return { seriesCompleted: state.currentSeriesIndex, seasonComplete: true };
+      }
+
+      const nextLeagues = { ...state.leagues };
+      LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
+        if (nextLeagues[tier].length < 2) return;
+        const roundSeed =
+          state.worldSeed +
+          state.seasonNumber * 10000 +
+          state.currentSeriesIndex * 500 +
+          tierIdx * 71;
+        nextLeagues[tier] = simulateSeriesRound(
+          nextLeagues[tier],
+          state.currentSeriesIndex,
+          roundSeed,
+          regulationInnings,
+        ).clubs;
+      });
+
+      const nextIndex = state.currentSeriesIndex + 1;
+      set({
+        leagues: nextLeagues,
+        currentSeriesIndex: nextIndex,
+      });
+      return { seriesCompleted: nextIndex, seasonComplete: nextIndex >= 7 };
+    },
+
+    runPlayoffsAndAdvanceSeason: (regulationInnings = 5) => {
+      const state = get();
+      const humanClub = get().getHumanClub();
+      if (!humanClub) return null;
+
+      const championsByTier: Partial<Record<LeagueTierId, string>> = {};
+      let humanPlayoffs: TierPlayoffResult | null = null;
+
+      LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
+        if (state.leagues[tier].length < 4) return;
+        const playoffSeed = state.worldSeed + state.seasonNumber * 20000 + tierIdx * 131;
+        const res = simulateBestOfThreePlayoffs(
+          state.leagues[tier],
+          playoffSeed,
+          regulationInnings,
+        );
+        championsByTier[tier] = res.championClubId;
+        if (tier === humanClub.leagueTier) humanPlayoffs = res;
+      });
+
+      const offseason = advanceOffseasonWorld(
+        state.leagues,
+        state.worldSeed + state.seasonNumber * 30000,
+        championsByTier,
+      );
+      const nextSeasonNumber = state.seasonNumber + 1;
+      const updatedHuman = findClubAcrossLeagues(offseason.leagues, state.humanClubId);
+      const nextTier = updatedHuman?.leagueTier ?? 'rookie';
+      const nextFreeAgents = generateMarketPool(
+        createSeededRng(state.worldSeed + nextSeasonNumber * 733),
+        nextTier,
+        12,
+      );
+
+      set({
+        seasonNumber: nextSeasonNumber,
+        currentSeriesIndex: 0,
+        leagues: offseason.leagues,
+        freeAgents: nextFreeAgents,
+        lastPlayoffResult: humanPlayoffs,
+        lastOffseasonTransitions: offseason.transitions,
+      });
+
+      return {
+        humanPlayoffs: humanPlayoffs!,
+        transitions: offseason.transitions,
+        nextSeasonNumber,
+      };
     },
 
     swapLineupSlots: (slotIndexA, slotIndexB) => {

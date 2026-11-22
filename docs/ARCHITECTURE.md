@@ -333,6 +333,22 @@ export interface Player {
 - **Role-Specific Baseball Card Stats (`src/engine/models/playerCardStats.ts`)**: Collectible 90s baseball cards always show role-authentic stats on the back rather than one generic stat block:
   - **Pitchers (`SP` / `RP`)**: **Velocity**, **Movement**, **Control**, **Stamina**, **Clutch** + pitching stat line (`ERA`, `WHIP`, `K/9`, `Strike%`) and pitch arsenal summary — never batter Contact/Power bars.
   - **Batters & Fielders (`C`, `1B`, `2B`, `3B`, `SS`, `LF`, `CF`, `RF`)**: Classic 5 tools — **Contact**, **Power**, **Speed**, **Fielding**, **Arm** + batting/fielding stat line (`AVG`, `OBP`, `OPS`, `FPCT`) — never a Pitching bar.
+- **Fair Starting Roster Presets (`StartingRosterPreset`, `TASK-064`)**:
+  - Choosing `all_rookies | balanced | veterans | good_defense | good_hitting | good_pitching` in Club Creator shapes your club's starting age, market tiers, and tool strengths while keeping every preset inside the **exact same Rookie Sandlot OVR parity band** (`±1.5` avg OVR vs competing Rookie AI clubs) so winning the top-tier **Mini Major League World Championship** is always earned through multi-season development and GM craft:
+    - `all_rookies`: 100% `rookie` prospects (`1.35x` XP, lowest payroll, high long-term ceiling, early rookie jitters).
+    - `balanced`: Classic mix of rookies, average starters, and seasoned leaders.
+    - `veterans`: Cagey older core (`veteran`/`seasoned` composure & command edge early, minimal `0.30x` growth, looming retirements).
+    - `good_defense`: Boosted `fielding`/`range`/`arm` & glove specialists, offset by lighter power bats.
+    - `good_hitting`: Boosted `contact`/`power`/`gapPower` bats, offset by work-in-progress pitching & average defense.
+    - `good_pitching`: Boosted `velocity`/`movement`/`control` staff, offset by scrappy small-ball offense.
+- **Full End-of-Season & Offseason Cycle + Tier Salary Caps (`TASK-065`)**:
+  - **Tier-Scaled Payroll Salary Caps**: `rookie: $12,000`, `low_a: $18,000`, `high_a: $26,000`, `aa: $38,000`, `aaa: $54,000`, `majors: $80,000` annual club payroll limits enforced across Re-Signings, Free Agency, and Draft signings alongside `MAX_ACTIVE_ROSTER_SIZE = 20`.
+  - **Structured 5-Stage Offseason Pipeline**:
+    1. **Playoffs, Awards & Promotion/Relegation** (World Champions crowned in Mini Major League!).
+    2. **Player Retirements** (age/decline-based retirements clearing roster slots & cap space, with retiring club legends eligible for HOF/Coach transition).
+    3. **Expiring Contracts & Re-Signing Window** (`yearsRemaining - 1`; players at `0` enter expiring queue where human & AI clubs offer extensions under Salary Cap or let them hit Free Agency).
+    4. **3-Round Amateur Draft** (reverse-standings draft order replenishing youth talent on cheap rookie deals).
+    5. **Offseason Free-Agent Signing Window** (open market populated by league expiring players + fresh FA pool; AI & human fill rosters under the `20`-man cap and Tier Salary Cap before Opening Day).
 
 ### 2.2 Club, Lineup & Stadium District (`src/engine/models/club.ts`)
 

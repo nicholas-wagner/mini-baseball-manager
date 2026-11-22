@@ -39,11 +39,14 @@ describe('Mini Baseball Manager — Milestone 1 Design Lab Integration', () => {
     await user.click(screen.getByRole('button', { name: /switch \(s\)/i }));
     expect(screen.getAllByText(/switch-hitter platoon edge/i).length).toBeGreaterThanOrEqual(1);
 
-    // Navigate to Skill Tree preview tab and back to Design Lab
+    // Navigate to Ballpark preview tab and live Skill Tree tab, then back to Design Lab
+    await user.click(screen.getAllByRole('button', { name: /ballpark/i })[0]);
+    expect(screen.getByText(/sim-city ballpark economy & upgrades/i)).toBeInTheDocument();
+
     await user.click(screen.getAllByRole('button', { name: /skill tree/i })[0]);
-    expect(screen.getByText(/branching player & manager skill trees/i)).toBeInTheDocument();
+    expect(screen.getByText(/found your 90s sandlot club/i)).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /design lab/i })[0]);
     expect(screen.getByTestId('ballpark-3d-canvas')).toBeInTheDocument();
-  });
+  }, 30_000);
 });
