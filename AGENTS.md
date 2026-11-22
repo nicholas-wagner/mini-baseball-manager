@@ -56,6 +56,7 @@ Any AI agent (fresh session, subagent, or parallel worker) should read this file
 | **Pitcher Roles & Sabermetrics** | 7 `PitcherRole` profiles (`starter`, `long_reliever`, `short_reliever`, `loogy`, `setup_man`, `closer`, `fireman`), explicit ball/strike command, `GB%/LD%/FB%/PopUp%` batted-ball profiles, defender `range`/`arm`/`fielding`, and derived `AVG/OBP/SLG/OPS/WHIP/ERA/K9/BB9/Strike%/FPCT` | `docs/ARCHITECTURE.md` |
 | **Slow-Earned Career Experience** | `CareerServiceProfile` (`seasonsPlayed`, `careerGames`, `PAs/IP`, `playoffGames` -> `rookie_green`..`cagey_veteran`) takes multiple seasons to earn and grants veterans a subtle `+2..+3` Eye/Control & high-LI composure edge over green rookies | `docs/ARCHITECTURE.md` |
 | **Pitcher Endurance & Game Pacing** | Live mound `endurance` (`100 -> 0`) degrades fastball velo (`-1..-7 mph`), sinker/splitter drop & `GB%`, and breaking-ball break; games support `5 / 7 / 9`-inning formats, `Sim Half-Inning`, `Clutch Burst`, and 1st-extra-inning 2B Ghost Runner for 2–5 min short bursts & long sessions | `docs/ARCHITECTURE.md` |
+| **Role-Specific Card Stats** | Baseball card backs show distinct stats by role: **Pitchers (`SP`/`RP`)** display `Velocity`, `Movement`, `Control`, `Stamina`, `Clutch` + `ERA/WHIP/K9/Strike%`; **Batters/Fielders** display `Contact`, `Power`, `Speed`, `Fielding`, `Arm` + `AVG/OBP/OPS/FPCT` (never Contact/Power on pitchers or Pitching on hitters) | `src/engine/models/playerCardStats.ts` |
 
 ---
 
