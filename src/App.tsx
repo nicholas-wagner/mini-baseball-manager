@@ -4,6 +4,7 @@ import {
   Building2,
   Disc3,
   Gamepad2,
+  Gift,
   GitBranch,
   HardDrive,
   Palette,
@@ -16,9 +17,11 @@ import { bgmEngine } from './audio/bgmEngine';
 import { soundEngine } from './audio/soundEngine';
 import { getNextAvailableStoryChapter } from './engine/story/storyEngine';
 import { useCareerStoryStore } from './store/careerSlots';
+import { useFoilPackStore } from './store/foilPackStore';
 import { useGameStore } from './store/gameStore';
 import { CareerSlotsModal } from './ui/components/CareerSlotsModal';
 import { DugoutGuideModal } from './ui/components/DugoutGuideModal';
+import { FoilPackModal } from './ui/components/FoilPackModal';
 import { MusicJukeboxModal } from './ui/components/MusicJukeboxModal';
 import { PwaInstallBanner } from './ui/components/PwaInstallBanner';
 import { SettingsModal } from './ui/components/SettingsModal';
@@ -92,7 +95,9 @@ export function App() {
   const [slotsOpen, setSlotsOpen] = useState(false);
   const [jukeboxOpen, setJukeboxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [packsOpen, setPacksOpen] = useState(false);
   const humanClub = useGameStore((s) => s.getHumanClub());
+  const unopenedPackCount = useFoilPackStore((s) => s.unopenedPacks.length);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
   const storyState = useCareerStoryStore((s) => s.storyState);
   const lastAutoSavedIso = useCareerStoryStore((s) => s.lastAutoSavedIso);
@@ -249,9 +254,26 @@ export function App() {
         type="button"
         onClick={() => {
           soundEngine.play('ui_pop');
+          setPacksOpen(true);
+        }}
+        className={`comic-btn w-10 h-11 md:w-auto md:h-auto md:px-2.5 md:py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 ${
+          unopenedPackCount > 0 ? 'bg-[#FFC300] text-[#181B2C]' : 'bg-[#F5EEFF] text-[#4C1D95]'
+        }`}
+        aria-label="Open 1994 Foil Packs"
+        title="1994 Foil Card Booster Packs"
+      >
+        <Gift className="w-4 h-4 md:w-3.5 md:h-3.5 shrink-0" />
+        <span className="hidden md:inline">
+          Foil Packs{unopenedPackCount > 0 ? ` (${unopenedPackCount})` : ''}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          soundEngine.play('ui_pop');
           setSettingsOpen(true);
         }}
-        className="comic-btn bg-[#E0FBFC] text-[#1D3557] w-11 h-11 md:w-auto md:h-auto md:px-2.5 md:py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
+        className="comic-btn bg-[#E0FBFC] text-[#1D3557] w-10 h-11 md:w-auto md:h-auto md:px-2.5 md:py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
         aria-label="Open Settings and Accessibility"
         title="Settings & Accessibility"
       >
@@ -362,6 +384,7 @@ export function App() {
         onStartNewInSlot={() => setActiveTab('gameday')}
       />
       <MusicJukeboxModal open={jukeboxOpen} onClose={() => setJukeboxOpen(false)} />
+      <FoilPackModal open={packsOpen} onClose={() => setPacksOpen(false)} />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </AppShell>
   );

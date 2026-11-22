@@ -93,6 +93,12 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('music-jukebox-modal')).toBeVisible();
   await page.getByRole('button', { name: /close music jukebox/i }).click();
 
+  await page.getByRole('button', { name: /open 1994 foil packs/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('foil-pack-modal')).toBeVisible();
+  await page.getByRole('button', { name: /rip open 1994 foil pack/i }).click();
+  await expect(page.getByTestId('foil-pack-card')).toHaveCount(3);
+  await page.getByRole('button', { name: /close foil packs/i }).click();
+
   await page.getByRole('button', { name: /open settings and accessibility/i }).locator('visible=true').first().click();
   await expect(page.getByTestId('settings-modal')).toBeVisible();
   await page.getByRole('button', { name: /close settings/i }).click();

@@ -4,6 +4,7 @@ import {
   CloudRain,
   FastForward,
   Flame,
+  Gift,
   Play,
   RefreshCw,
   SkipForward,
@@ -20,6 +21,7 @@ import {
   buildRivalryShowdownPreview,
   createCrosstownStarterRivalry,
 } from '../../engine/league/rivalryEngine';
+import { evaluateNemesisMatchup } from '../../engine/league/nemesisTracker';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import {
   evaluateWeatherSimulationImpact,
@@ -64,6 +66,19 @@ import {
   stepPitch,
 } from '../../engine/simulation/baseballEngine';
 import {
+  applyMoundVisit,
+  applyPinchHitter,
+  applyPinchRunner,
+  getAvailableBenchPlayers,
+  resolveArgueCallGamble,
+} from '../../engine/simulation/dugoutDrama';
+import {
+  BATTER_GUESS_OPTIONS,
+  PITCH_TARGET_OPTIONS,
+  type BatterPitchGuess,
+  type PitchTargetIntent,
+} from '../../engine/simulation/pitchMindGames';
+import {
   getCurrentBatter,
   getCurrentLeverage,
   getCurrentPitcher,
@@ -77,11 +92,14 @@ import {
   type DefensiveShiftId,
 } from '../../engine/simulation/winProbability';
 import { choreographPlayEvent, type ChoreographedStep } from '../../scene/playback/eventChoreographer';
+import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore, type PostGameSummary } from '../../store/gameStore';
+import { useNemesisStore } from '../../store/nemesisStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
 import { BroadcastHud } from '../components/BroadcastHud';
+import { FoilPackModal } from '../components/FoilPackModal';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { LiveGameCanvas } from '../components/LiveGameCanvas';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
@@ -162,6 +180,12 @@ export function GameDayScreen() {
   const [watchMode, setWatchMode] = useState<'live' | 'clutch' | 'paused'>('paused');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
+  const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('attack_zone');
+  const [batterGuess, setBatterGuess] = useState<BatterPitchGuess>('none');
+  const [moundVisitUsed, setMoundVisitUsed] = useState(false);
+  const [argueUsed, setArgueUsed] = useState(false);
+  const [managerEjected, setManagerEjected] = useState(false);
+  const [foilModalOpen, setFoilModalOpen] = useState(false);
   const [armedPowerId, setArmedPowerId] = useState<string | null>(null);
   const [atBatEvents, setAtBatEvents] = useState<PlayEvent[]>([]);
   const [defensiveShift, setDefensiveShift] = useState<DefensiveShiftId>('standard');
@@ -179,6 +203,10 @@ export function GameDayScreen() {
   const wakeLockEnabled = useUserPreferencesStore((s) => s.wakeLockEnabled);
   const pendingLivePlayoff = usePostseasonStore((s) => s.pendingLiveGame);
   const recordLivePlayoffResult = usePostseasonStore((s) => s.recordLivePlayoffResult);
+  const nemesisHistory = useNemesisStore((s) => s.history);
+  const recordNemesisEvents = useNemesisStore((s) => s.recordEvents);
+  const unopenedPacks = useFoilPackStore((s) => s.unopenedPacks);
+  const awardFoilPack = useFoilPackStore((s) => s.awardPack);
 
   const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? opponents[0];
 
@@ -222,12 +250,20 @@ export function GameDayScreen() {
       if (pendingLivePlayoff && pendingLivePlayoff.opponentClubId === opponentId) {
         recordLivePlayoffResult(result.winnerClubId, result.awayScore, result.homeScore);
       }
+      if (result.winnerClubId === finalState.home.clubId) {
+        awardFoilPack(
+          pendingLivePlayoff ? 'championship_holo' : rivalryPreview ? 'rivalry_chrome' : 'sandlot_foil',
+          pendingLivePlayoff
+            ? `Postseason Win vs ${finalState.away.name}`
+            : `Victory vs ${finalState.away.name} (${finalState.home.score}-${finalState.away.score})`,
+        );
+      }
       if (summary) {
         setModalSummary(summary);
         setWatchMode('paused');
       }
     },
-    [commitCompletedGame, pendingLivePlayoff, recordLivePlayoffResult],
+    [awardFoilPack, commitCompletedGame, pendingLivePlayoff, recordLivePlayoffResult, rivalryPreview],
   );
 
   const handleStartLiveGame = (autoPlay: boolean) => {
@@ -243,6 +279,11 @@ export function GameDayScreen() {
     setRecentEvents([]);
     setAtBatEvents([]);
     setArmedPowerId(null);
+    setPitchTarget('attack_zone');
+    setBatterGuess('none');
+    setMoundVisitUsed(false);
+    setArgueUsed(false);
+    setManagerEjected(false);
     setLastChoreo(null);
     setPlaybackEvent(null);
     setSelectedPitchType(null);
@@ -303,6 +344,7 @@ export function GameDayScreen() {
           }
         }
         setRecentEvents((prev) => [...emitted.slice().reverse(), ...prev].slice(0, 12));
+        recordNemesisEvents(emitted);
         const pitchEvs = emitted.filter((ev) => Boolean(ev.pitchThrown));
         if (pitchEvs.length > 0) {
           const latestBatterId = pitchEvs[pitchEvs.length - 1].batterId;
@@ -314,33 +356,48 @@ export function GameDayScreen() {
       }
       finalizeSessionIfComplete(nextSession, emitted, oppId);
     },
-    [finalizeSessionIfComplete, speed, warmingRelieverIds, liveSession, hapticsEnabled],
+    [finalizeSessionIfComplete, speed, warmingRelieverIds, liveSession, hapticsEnabled, recordNemesisEvents],
   );
 
   const resolvePitchCallOption = useCallback(
     (session: GameSessionState) => {
+      const batterNow = getCurrentBatter(session);
+      const pitcherNow = getCurrentPitcher(session);
+      const nemesisBonus =
+        evaluateNemesisMatchup(
+          nemesisHistory,
+          batterNow.id,
+          pitcherNow.id,
+          batterNow.name,
+          pitcherNow.name,
+        ) ?? undefined;
       const opts: {
         requestedPitchType?: PitchType;
         requestedPowerId?: string;
         defensiveShift?: DefensiveShiftId;
         weatherImpact?: ReturnType<typeof evaluateWeatherSimulationImpact>;
+        pitchTarget?: PitchTargetIntent;
+        batterGuess?: BatterPitchGuess;
+        nemesisBonus?: typeof nemesisBonus;
       } = {
         defensiveShift,
         weatherImpact: gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : undefined,
+        pitchTarget: session.half === 'TOP' ? pitchTarget : undefined,
+        batterGuess: session.half === 'BOT' ? batterGuess : 'none',
+        nemesisBonus,
       };
       if (armedPowerId) {
         opts.requestedPowerId = armedPowerId;
       }
       if (session.half === 'TOP' && selectedPitchType) {
-        const pitcher = getCurrentPitcher(session);
-        const ownsPitch = pitcher.pitchArsenal?.repertoire.some(
+        const ownsPitch = pitcherNow.pitchArsenal?.repertoire.some(
           (slot) => slot.pitchType === selectedPitchType,
         );
         if (ownsPitch) opts.requestedPitchType = selectedPitchType;
       }
       return opts;
     },
-    [armedPowerId, defensiveShift, gameWeather, selectedPitchType],
+    [armedPowerId, batterGuess, defensiveShift, gameWeather, nemesisHistory, pitchTarget, selectedPitchType],
   );
 
   const handleNextPitch = useCallback(() => {
@@ -531,7 +588,32 @@ export function GameDayScreen() {
           </div>
         </ComicCard>
 
+        {unopenedPacks.length > 0 ? (
+          <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-r from-[#7209B7] via-[#F72585] to-[#FFC300] text-white flex flex-wrap items-center justify-between gap-2 shadow-[4px_4px_0_#181B2C]">
+            <div className="flex items-center gap-2 font-display text-xs sm:text-sm drop-shadow-[1px_1px_0_#181B2C]">
+              <Gift className="w-4 h-4 text-[#FFD166] shrink-0" />
+              <span>
+                You have {unopenedPacks.length} unopened 1994 Foil Booster Pack
+                {unopenedPacks.length === 1 ? '' : 's'}!
+              </span>
+            </div>
+            <ComicButton
+              size="sm"
+              variant="gold"
+              icon={<Sparkles className="w-3.5 h-3.5" />}
+              onClick={() => {
+                setFoilModalOpen(true);
+                soundEngine.play('ui_pop');
+              }}
+            >
+              Rip Foil Pack!
+            </ComicButton>
+          </div>
+        ) : null}
+
         <BallparkSoundboardCard />
+
+        <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
 
         <PostGameSummaryModal
           summary={modalSummary}
@@ -852,6 +934,70 @@ export function GameDayScreen() {
                 );
               })()}
 
+              {/* Live Player-vs-Player Nemesis Grudge Banner */}
+              {(() => {
+                const nemesis = evaluateNemesisMatchup(
+                  nemesisHistory,
+                  currentBatter.id,
+                  currentPitcher.id,
+                  currentBatter.name,
+                  currentPitcher.name,
+                );
+                if (!nemesis) return null;
+                return (
+                  <div
+                    data-testid="nemesis-matchup-banner"
+                    className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] text-[#9D0208] text-[11px] font-extrabold flex flex-wrap items-center justify-between gap-1"
+                  >
+                    <span>{nemesis.badgeText}</span>
+                    <span className="text-[#181B2C]">{nemesis.bannerText}</span>
+                  </div>
+                );
+              })()}
+
+              {/* Pitcher/Batter Cat-and-Mouse Mind Games Bar */}
+              <div
+                data-testid="mind-games-bar"
+                className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
+              >
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
+                  {liveSession.half === 'TOP'
+                    ? 'Pitch Target Intent (Trade Strikes vs Whiffs / Chase)'
+                    : 'Guess Pitch Mind-Game (Guess Right: +14 CON/+12 PWR • Wrong: -8)'}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {liveSession.half === 'TOP'
+                    ? PITCH_TARGET_OPTIONS.map((opt) => (
+                        <ComicButton
+                          key={opt.id}
+                          size="sm"
+                          variant={pitchTarget === opt.id ? 'sky' : 'cream'}
+                          active={pitchTarget === opt.id}
+                          onClick={() => {
+                            setPitchTarget(opt.id);
+                            soundEngine.play('ui_pop');
+                          }}
+                        >
+                          {opt.label}
+                        </ComicButton>
+                      ))
+                    : BATTER_GUESS_OPTIONS.map((opt) => (
+                        <ComicButton
+                          key={opt.id}
+                          size="sm"
+                          variant={batterGuess === opt.id ? 'gold' : 'cream'}
+                          active={batterGuess === opt.id}
+                          onClick={() => {
+                            setBatterGuess(opt.id);
+                            soundEngine.play('ui_pop');
+                          }}
+                        >
+                          {opt.label}
+                        </ComicButton>
+                      ))}
+                </div>
+              </div>
+
               {liveSession.half === 'TOP' && currentPitcher.pitchArsenal ? (
                 <div
                   data-testid="pitch-selector-bar"
@@ -900,7 +1046,8 @@ export function GameDayScreen() {
                   className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] space-y-1.5"
                 >
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#181B2C]">
-                    Manager Skipper Power Dock (1 Charge / Game Each)
+                    Manager Skipper Power Dock{' '}
+                    {managerEjected ? '(🚨 EJECTED — LOCKED THIS GAME!)' : '(1 Charge / Game Each)'}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {manager.activePowerIds.map((powerId: ManagerPowerId) => {
@@ -910,8 +1057,8 @@ export function GameDayScreen() {
                         <ComicButton
                           key={powerId}
                           size="sm"
-                          variant={used ? 'cream' : 'gold'}
-                          disabled={used || liveSession.status === 'completed'}
+                          variant={used || managerEjected ? 'cream' : 'gold'}
+                          disabled={used || managerEjected || liveSession.status === 'completed'}
                           onClick={() => {
                             const res = triggerInGameManagerPower(
                               powerTracker,
@@ -1066,6 +1213,131 @@ export function GameDayScreen() {
                 ))
               )}
             </ul>
+          </ComicCard>
+
+          <ComicCard title="DUGOUT CHESS & BENCH" headerBg="#7209B7">
+            <div data-testid="dugout-chess-card" className="space-y-2.5">
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-extrabold uppercase text-[#4C1D95]">
+                  Mound Visit (1/Game) &amp; Umpire Drama
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <ComicButton
+                    size="sm"
+                    variant={moundVisitUsed ? 'cream' : 'sky'}
+                    disabled={moundVisitUsed || liveSession.status === 'completed'}
+                    onClick={() => {
+                      const res = applyMoundVisit(liveSession, 'home', 'calm_breath');
+                      if (res.applied && res.event) {
+                        setMoundVisitUsed(true);
+                        applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+                      }
+                    }}
+                  >
+                    Mound Visit: Calm Breath
+                  </ComicButton>
+                  <ComicButton
+                    size="sm"
+                    variant={moundVisitUsed ? 'cream' : 'gold'}
+                    disabled={moundVisitUsed || liveSession.status === 'completed'}
+                    onClick={() => {
+                      const res = applyMoundVisit(liveSession, 'home', 'fire_up_crowd');
+                      if (res.applied && res.event) {
+                        setMoundVisitUsed(true);
+                        applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+                      }
+                    }}
+                  >
+                    Mound Visit: Fire Crowd
+                  </ComicButton>
+                  <ComicButton
+                    size="sm"
+                    variant={argueUsed ? 'cream' : 'coral'}
+                    disabled={argueUsed || liveSession.status === 'completed'}
+                    onClick={() => {
+                      const rng = createSeededRng(
+                        liveSession.rngSeed + liveSession.stepCounter * 71 + 19,
+                      );
+                      const gamble = resolveArgueCallGamble(rng, liveSession, 'home');
+                      setArgueUsed(true);
+                      if (gamble.ejected) setManagerEjected(true);
+                      applyStepResult(gamble.nextSession, [gamble.event], activeOpponent.id);
+                    }}
+                  >
+                    {managerEjected ? '🚨 Skipper Ejected' : '🔥 Kick Dirt! (Argue Call)'}
+                  </ComicButton>
+                </div>
+              </div>
+
+              {(() => {
+                const bench = getAvailableBenchPlayers(liveSession, 'home');
+                const occupiedBaseIdx = liveSession.bases.findIndex((b) => b !== null) as
+                  | -1
+                  | 0
+                  | 1
+                  | 2;
+                return (
+                  <div className="space-y-1.5 pt-1.5 border-t border-dashed border-[#181B2C]/20">
+                    <div className="text-[10px] font-extrabold uppercase text-[#181B2C]">
+                      Pinch Hitters &amp; Pinch Runners ({bench.length} Available)
+                    </div>
+                    {bench.length === 0 ? (
+                      <div className="text-[11px] font-bold text-[#4A5068]">
+                        Bench empty — all subs used.
+                      </div>
+                    ) : (
+                      bench.slice(0, 3).map((sub) => (
+                        <div
+                          key={sub.id}
+                          className="p-2 rounded-lg border border-[#181B2C]/20 bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-1.5 text-[11px]"
+                        >
+                          <div className="font-extrabold text-[#181B2C]">
+                            {sub.position} {sub.name} ({sub.bats}) • SPD {sub.ratings.speed}
+                          </div>
+                          <div className="flex gap-1">
+                            {liveSession.half === 'BOT' ? (
+                              <ComicButton
+                                size="sm"
+                                variant="gold"
+                                disabled={liveSession.status === 'completed'}
+                                onClick={() => {
+                                  const res = applyPinchHitter(liveSession, 'home', sub.id);
+                                  if (res.applied && res.event) {
+                                    applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+                                  }
+                                }}
+                              >
+                                Pinch Hit
+                              </ComicButton>
+                            ) : null}
+                            {liveSession.half === 'BOT' && occupiedBaseIdx >= 0 ? (
+                              <ComicButton
+                                size="sm"
+                                variant="turf"
+                                disabled={liveSession.status === 'completed'}
+                                onClick={() => {
+                                  const res = applyPinchRunner(
+                                    liveSession,
+                                    'home',
+                                    occupiedBaseIdx as 0 | 1 | 2,
+                                    sub.id,
+                                  );
+                                  if (res.applied && res.event) {
+                                    applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+                                  }
+                                }}
+                              >
+                                Pinch Run {occupiedBaseIdx + 1}B
+                              </ComicButton>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </ComicCard>
 
           <ComicCard title="BULLPEN PHONE" headerBg="#2B2D42">

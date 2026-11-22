@@ -43,6 +43,8 @@ import {
   type TeamGameSide,
 } from './gameState';
 import { shouldAiAttemptSteal } from './baserunning';
+import type { NemesisMatchupEvaluation } from '../league/nemesisTracker';
+import type { BatterPitchGuess, PitchTargetIntent } from './pitchMindGames';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
 import type { WeatherSimulationImpact } from './weather';
 import type { DefensiveShiftId } from './winProbability';
@@ -52,6 +54,9 @@ export interface StepPitchOptions {
   requestedPowerId?: string;
   defensiveShift?: DefensiveShiftId;
   weatherImpact?: WeatherSimulationImpact;
+  pitchTarget?: PitchTargetIntent;
+  batterGuess?: BatterPitchGuess;
+  nemesisBonus?: NemesisMatchupEvaluation;
 }
 
 export function createGameSession(
@@ -895,6 +900,9 @@ export function stepPitch(
     ballparkId: next.ballparkId,
     defensiveShift: options.defensiveShift,
     weatherImpact: options.weatherImpact,
+    pitchTarget: options.pitchTarget,
+    batterGuess: options.batterGuess,
+    nemesisBonus: options.nemesisBonus,
     battingPlayersById: batting.playersById,
     catcherPopTimeBonus: fielding.catcherPopTimeBonus,
     stealDefenseCall: resolveStealDefenseCall(tacticalCall),
