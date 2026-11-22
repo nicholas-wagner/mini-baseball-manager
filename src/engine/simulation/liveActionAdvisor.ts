@@ -57,8 +57,15 @@ const STEAL_PLAY_TO_CALL: Readonly<Record<StealPlayType, TacticalCall>> = {
   steal_home: 'steal_home',
 };
 
-function findBestStealOpportunity(session: GameSessionState): SuggestedQuickAction | null {
-  if (session.half !== 'BOT') return null;
+function getHumanSideKey(session: GameSessionState): 'away' | 'home' {
+  return session.away.isHuman && !session.home.isHuman ? 'away' : 'home';
+}
+
+function findBestStealOpportunity(
+  session: GameSessionState,
+  isBatting: boolean,
+): SuggestedQuickAction | null {
+  if (!isBatting) return null;
   const battingSide = getBattingSide(session);
   const fieldingSide = getFieldingSide(session);
   const pitcher = getCurrentPitcher(session);
@@ -80,10 +87,9 @@ function findBestStealOpportunity(session: GameSessionState): SuggestedQuickActi
   };
 }
 
-function findFreshRelieverId(session: GameSessionState): string | null {
-  return (
-    session.home.bullpenIds.find((id) => !session.home.usedPitcherIds.includes(id)) ?? null
-  );
+function findFreshRelieverId(session: GameSessionState, humanSideKey: 'away' | 'home'): string | null {
+  const humanSide = session[humanSideKey];
+  return humanSide.bullpenIds.find((id) => !humanSide.usedPitcherIds.includes(id)) ?? null;
 }
 
 function buildPitcherGassedCue(
@@ -165,6 +171,7 @@ function buildClutchOrDefaultCue(
 
 function findReadyPowerCue(
   session: GameSessionState,
+  humanSideKey: 'away' | 'home',
   isBatting: boolean,
   turnLabel: string,
   primaryButtonLabel: string,
@@ -173,10 +180,10 @@ function findReadyPowerCue(
   const humanActor = isBatting ? getCurrentBatter(session) : getCurrentPitcher(session);
   const avail = canTriggerSpecialAbility(
     session.abilityCooldowns,
-    'home',
+    humanSideKey,
     humanActor,
     humanRole,
-    session.home.hypeGauge,
+    session[humanSideKey].hypeGauge,
   );
   if (!avail.allowed) return null;
   const activatable = getActivatablePowersForPlayer(humanActor, humanRole);
@@ -186,12 +193,13 @@ function findReadyPowerCue(
 
 function findStealCue(
   session: GameSessionState,
+  isBatting: boolean,
   tacticalCall: TacticalCall,
   turnLabel: string,
   primaryButtonLabel: string,
 ): LiveActionCue | null {
   if (tacticalCall !== 'normal') return null;
-  const stealAction = findBestStealOpportunity(session);
+  const stealAction = findBestStealOpportunity(session, isBatting);
   if (!stealAction) return null;
   return {
     kind: 'steal_opportunity',
@@ -210,7 +218,8 @@ function findStealCue(
  */
 export function computeLiveActionCue(input: LiveActionAdvisorInput): LiveActionCue {
   const { session, tacticalCall, armedPowerId, moundVisitUsed } = input;
-  const isBatting = session.half === 'BOT';
+  const humanSideKey = getHumanSideKey(session);
+  const isBatting = (session.half === 'BOT') === (humanSideKey === 'home');
   const turnLabel = isBatting ? '🏏 YOUR TURN TO BAT' : '⚾ YOUR TURN TO PITCH';
   const primaryButtonLabel = isBatting ? 'Next Pitch' : 'Throw Pitch (Next Pitch)';
 
@@ -238,21 +247,21 @@ export function computeLiveActionCue(input: LiveActionAdvisorInput): LiveActionC
     };
   }
 
-  const endurance = fatigueToEndurance(session.home.pitcherFatigue);
+  const endurance = fatigueToEndurance(session[humanSideKey].pitcherFatigue);
   if (!isBatting && endurance <= 35) {
     return buildPitcherGassedCue(
       endurance,
       moundVisitUsed,
-      findFreshRelieverId(session),
+      findFreshRelieverId(session, humanSideKey),
       turnLabel,
       primaryButtonLabel,
     );
   }
 
-  const powerCue = findReadyPowerCue(session, isBatting, turnLabel, primaryButtonLabel);
+  const powerCue = findReadyPowerCue(session, humanSideKey, isBatting, turnLabel, primaryButtonLabel);
   if (powerCue) return powerCue;
 
-  const stealCue = findStealCue(session, tacticalCall, turnLabel, primaryButtonLabel);
+  const stealCue = findStealCue(session, isBatting, tacticalCall, turnLabel, primaryButtonLabel);
   if (stealCue) return stealCue;
 
   const { leverageIndex } = getCurrentLeverage(session);

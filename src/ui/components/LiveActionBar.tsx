@@ -8,6 +8,8 @@ interface LiveActionBarProps {
   cue: LiveActionCue;
   matchupLabel: string;
   basesLabel: string;
+  batterName?: string;
+  pitcherName?: string;
   latestEvent: PlayEvent | null;
   controlMode: GameDayControlMode;
   watchMode: 'live' | 'clutch' | 'paused';
@@ -23,6 +25,9 @@ interface LiveActionBarProps {
   onSelectTacticalCall: (call: TacticalCall) => void;
   onSuggestedAction: (action: SuggestedQuickAction) => void;
   onToggleControlMode: () => void;
+  onInspectBatter?: () => void;
+  onInspectPitcher?: () => void;
+  onInspectPlayers?: () => void;
 }
 
 const SIMPLE_BAT_APPROACHES: readonly { id: TacticalCall; label: string }[] = [
@@ -35,6 +40,8 @@ export function LiveActionBar({
   cue,
   matchupLabel,
   basesLabel,
+  batterName,
+  pitcherName,
   latestEvent,
   controlMode,
   watchMode,
@@ -50,6 +57,9 @@ export function LiveActionBar({
   onSelectTacticalCall,
   onSuggestedAction,
   onToggleControlMode,
+  onInspectBatter,
+  onInspectPitcher,
+  onInspectPlayers,
 }: LiveActionBarProps) {
   const cuePalette =
     cue.urgency === 'high'
@@ -88,6 +98,40 @@ export function LiveActionBar({
             </span>
           </div>
           <p className="text-xs font-extrabold leading-snug text-[#181B2C]">{cue.headline}</p>
+          {(onInspectBatter || onInspectPitcher || onInspectPlayers) ? (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {onInspectBatter ? (
+                <button
+                  type="button"
+                  data-testid="inspect-batter-card-btn"
+                  onClick={onInspectBatter}
+                  className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                >
+                  🃏 Batter: {batterName ?? 'Card'}
+                </button>
+              ) : null}
+              {onInspectPitcher ? (
+                <button
+                  type="button"
+                  data-testid="inspect-pitcher-card-btn"
+                  onClick={onInspectPitcher}
+                  className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#1D3557] cursor-pointer"
+                >
+                  🃏 Pitcher: {pitcherName ?? 'Card'}
+                </button>
+              ) : null}
+              {onInspectPlayers ? (
+                <button
+                  type="button"
+                  data-testid="inspect-game-players-btn"
+                  onClick={onInspectPlayers}
+                  className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                >
+                  🃏 All Players
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {cue.suggestedAction ? (

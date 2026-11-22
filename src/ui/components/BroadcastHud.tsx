@@ -115,7 +115,8 @@ export function BroadcastHud({
     fieldingSide.pitcherFatigue,
     fieldingSide.catcherPopTimeBonus,
   );
-  const humanBatting = session.half === 'BOT';
+  const humanBatting =
+    session.away.isHuman && !session.home.isHuman ? session.half === 'TOP' : session.half === 'BOT';
   const hasRunners = session.bases.some((b) => b !== null);
   const sparkPoints = buildSparklinePoints(winProbHistory.length > 0 ? winProbHistory : [homeWp]);
   const plottedPitches = plotAtBatPitches(

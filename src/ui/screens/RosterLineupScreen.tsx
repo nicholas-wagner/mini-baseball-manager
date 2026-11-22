@@ -48,6 +48,10 @@ import {
 import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises';
 import { useGameStore } from '../../store/gameStore';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
+import {
+  PlayerCardModal,
+  type InspectableCardEntry,
+} from '../components/PlayerCardModal';
 import { PlayerDossierModal } from '../components/PlayerDossierModal';
 import { SaveSlotsModal } from '../components/SaveSlotsModal';
 import { TrainersTablePanel } from '../components/TrainersTablePanel';
@@ -104,6 +108,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const [selectedSlotIdx, setSelectedSlotIdx] = useState<number | null>(null);
   const [selectedRotationIdx, setSelectedRotationIdx] = useState<number | null>(null);
   const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
+  const [rosterView, setRosterView] = useState<'lineup' | 'cards'>('lineup');
+  const [cardFilter, setCardFilter] = useState<'all' | 'lineup' | 'pitchers' | 'bench'>('all');
+  const [cardModalOpen, setCardModalOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [dossierOpen, setDossierOpen] = useState(false);
   const [rosterMessage, setRosterMessage] = useState<string | null>(null);
@@ -217,6 +224,59 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const salaryCap = TIER_SALARY_CAPS[humanClub.leagueTier];
   const coEdSynergy = evaluateCoEdClubhouseSynergy(humanClub.roster);
 
+  const openCardModalFor = (playerId: string) => {
+    setInspectedPlayerId(playerId);
+    setCardModalOpen(true);
+    soundEngine.play('card_flip');
+  };
+
+  const orderedRosterEntries: InspectableCardEntry[] = [];
+  const seenRosterIds = new Set<string>();
+  const pushRosterEntry = (p: (typeof humanClub.roster)[number] | undefined, roleTag: string) => {
+    if (!p || seenRosterIds.has(p.id)) return;
+    seenRosterIds.add(p.id);
+    orderedRosterEntries.push({ player: p, club: humanClub, roleTag });
+  };
+  humanClub.lineup.forEach((slot, idx) => {
+    pushRosterEntry(rosterById.get(slot.playerId), `LINEUP #${idx + 1} (${slot.defensivePosition})`);
+  });
+  humanClub.rotationIds.forEach((id, idx) => {
+    pushRosterEntry(rosterById.get(id), `ROTATION SP${idx + 1}`);
+  });
+  bullpenPitchers.forEach((rp) => {
+    pushRosterEntry(rp, rp.pitcherRole ? `BULLPEN (${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]})` : 'BULLPEN');
+  });
+  benchHitters.forEach((p) => {
+    pushRosterEntry(p, `BENCH (${p.position})`);
+  });
+  humanClub.roster.forEach((p) => {
+    pushRosterEntry(p, p.position);
+  });
+
+  const filteredBinderEntries = orderedRosterEntries.filter(({ player }) => {
+    if (cardFilter === 'lineup') return activeLineupIds.has(player.id);
+    if (cardFilter === 'pitchers') return isPitcherPosition(player.position);
+    if (cardFilter === 'bench') return !isPitcherPosition(player.position) && !activeLineupIds.has(player.id);
+    return true;
+  });
+  const activeCardModalEntry =
+    orderedRosterEntries.find((e) => e.player.id === inspectedPlayer.id) ??
+    orderedRosterEntries[0] ??
+    null;
+
+  const triggerPngDownload = (player: (typeof humanClub.roster)[number]) => {
+    void downloadPlayerCardPng(
+      player,
+      teamColors,
+      `${humanClub.city} ${humanClub.name}`,
+    ).then((res) => {
+      setRosterMessage(
+        `Exported 90s Baseball Card: ${res.filename} (${res.format.toUpperCase()})!`,
+      );
+      soundEngine.play('card_flip');
+    });
+  };
+
   return (
     <div className="space-y-4">
       <ComicCard
@@ -274,6 +334,111 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           <span>{coEdSynergy.summary}</span>
         </div>
 
+        {/* Mobile & Desktop Quick Switch: Lineup Management vs Full 90s Roster Baseball Card Binder */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4]">
+          <div className="flex flex-wrap gap-2">
+            <ComicButton
+              size="sm"
+              data-testid="roster-view-lineup-btn"
+              variant={rosterView === 'lineup' ? 'gold' : 'cream'}
+              active={rosterView === 'lineup'}
+              onClick={() => {
+                setRosterView('lineup');
+                soundEngine.play('ui_pop');
+              }}
+            >
+              📋 Lineup &amp; Roster
+            </ComicButton>
+            <ComicButton
+              size="sm"
+              data-testid="roster-view-cards-btn"
+              variant={rosterView === 'cards' ? 'coral' : 'cream'}
+              active={rosterView === 'cards'}
+              onClick={() => {
+                setRosterView('cards');
+                soundEngine.play('card_flip');
+              }}
+            >
+              🃏 Roster Cards ({humanClub.roster.length})
+            </ComicButton>
+          </div>
+          <span className="text-[11px] font-bold text-[#4A5068]">
+            {rosterView === 'cards'
+              ? 'Tap any card to flip front & back!'
+              : 'Tap 🃏 Card on any player to inspect instantly'}
+          </span>
+        </div>
+
+        {rosterView === 'cards' ? (
+          <div data-testid="roster-card-binder" className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  { id: 'all', label: `All (${humanClub.roster.length})` },
+                  { id: 'lineup', label: 'Lineup (9)' },
+                  { id: 'pitchers', label: 'Pitchers' },
+                  { id: 'bench', label: 'Bench' },
+                ] as const
+              ).map((tab) => (
+                <ComicButton
+                  key={tab.id}
+                  size="sm"
+                  variant={cardFilter === tab.id ? 'sky' : 'cream'}
+                  active={cardFilter === tab.id}
+                  onClick={() => {
+                    setCardFilter(tab.id);
+                    soundEngine.play('ui_pop');
+                  }}
+                >
+                  {tab.label}
+                </ComicButton>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredBinderEntries.map(({ player, roleTag }) => (
+                <div
+                  key={player.id}
+                  data-testid="roster-binder-card-slot"
+                  className="mx-auto w-full max-w-[300px] space-y-2 p-2.5 rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7]"
+                >
+                  <div className="text-center text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
+                    {roleTag}
+                  </div>
+                  <FlipBaseballCard
+                    player={toBaseballCardPlayer(player)}
+                    team={teamColors}
+                    mood={formStateToCardMood(player.formState)}
+                  />
+                  <div className="flex gap-1.5">
+                    <ComicButton
+                      size="sm"
+                      variant="sky"
+                      className="flex-1"
+                      icon={<FileSearch className="w-3.5 h-3.5" />}
+                      onClick={() => {
+                        setInspectedPlayerId(player.id);
+                        setDossierOpen(true);
+                        soundEngine.play('ui_pop');
+                      }}
+                    >
+                      Dossier
+                    </ComicButton>
+                    <ComicButton
+                      size="sm"
+                      variant="gold"
+                      className="flex-1"
+                      icon={<Download className="w-3.5 h-3.5" />}
+                      onClick={() => triggerPngDownload(player)}
+                    >
+                      PNG
+                    </ComicButton>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">
           <div className="space-y-4">
             <div>
@@ -336,16 +501,27 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                         </div>
                       </button>
 
-                      <ComicButton
-                        size="sm"
-                        variant={isSelected ? 'coral' : 'cream'}
-                        active={isSelected}
-                        icon={<ArrowLeftRight className="w-3.5 h-3.5" />}
-                        aria-label={`Swap slot ${idx + 1}`}
-                        onClick={() => handleSlotSwapClick(idx, player.id)}
-                      >
-                        {isSelected ? 'Selected' : 'Swap'}
-                      </ComicButton>
+                      <div className="flex items-center gap-1.5">
+                        <ComicButton
+                          size="sm"
+                          variant="sky"
+                          data-testid="roster-open-card-btn"
+                          aria-label={`View card for ${player.name}`}
+                          onClick={() => openCardModalFor(player.id)}
+                        >
+                          🃏 Card
+                        </ComicButton>
+                        <ComicButton
+                          size="sm"
+                          variant={isSelected ? 'coral' : 'cream'}
+                          active={isSelected}
+                          icon={<ArrowLeftRight className="w-3.5 h-3.5" />}
+                          aria-label={`Swap slot ${idx + 1}`}
+                          onClick={() => handleSlotSwapClick(idx, player.id)}
+                        >
+                          {isSelected ? 'Selected' : 'Swap'}
+                        </ComicButton>
+                      </div>
                     </div>
                   );
                 })}
@@ -379,14 +555,25 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                           OVR {ovr} • {SPECIALIST_LABELS[pitcher.specialistArchetype]}
                         </div>
                       </button>
-                      <ComicButton
-                        size="sm"
-                        variant={isSelected ? 'coral' : 'cream'}
-                        aria-label={`Swap rotation SP${idx + 1}`}
-                        onClick={() => handleRotationSwapClick(idx, pitcher.id)}
-                      >
-                        {isSelected ? 'Pick SP' : 'Swap'}
-                      </ComicButton>
+                      <div className="flex items-center gap-1">
+                        <ComicButton
+                          size="sm"
+                          variant="sky"
+                          data-testid="roster-open-card-btn"
+                          aria-label={`View card for ${pitcher.name}`}
+                          onClick={() => openCardModalFor(pitcher.id)}
+                        >
+                          🃏
+                        </ComicButton>
+                        <ComicButton
+                          size="sm"
+                          variant={isSelected ? 'coral' : 'cream'}
+                          aria-label={`Swap rotation SP${idx + 1}`}
+                          onClick={() => handleRotationSwapClick(idx, pitcher.id)}
+                        >
+                          {isSelected ? 'Pick SP' : 'Swap'}
+                        </ComicButton>
+                      </div>
                     </div>
                   );
                 })}
@@ -410,6 +597,15 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                       {computePlayerOverall(player)} • {MARKET_TIER_LABELS[player.marketTier]}
                     </button>
                     <div className="flex gap-1">
+                      <ComicButton
+                        size="sm"
+                        variant="gold"
+                        data-testid="roster-open-card-btn"
+                        aria-label={`View card for ${player.name}`}
+                        onClick={() => openCardModalFor(player.id)}
+                      >
+                        🃏
+                      </ComicButton>
                       <ComicButton size="sm" variant="sky" onClick={() => handleBenchSub(player.id)}>
                         Sub In
                       </ComicButton>
@@ -424,16 +620,29 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                   </div>
                 ))}
                 {bullpenPitchers.map((rp) => (
-                  <button
+                  <div
                     key={rp.id}
-                    type="button"
-                    onClick={() => setInspectedPlayerId(rp.id)}
-                    className="w-full text-left py-1 text-xs font-bold text-[#4A5068] min-h-[44px]"
+                    className="flex items-center justify-between gap-1.5 py-1 border-b border-[#181B2C]/15 last:border-b-0"
                   >
-                    RP {rp.name} ({rp.throws}HP
-                    {rp.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]}` : ''}) • OVR{' '}
-                    {computePlayerOverall(rp)} • {SPECIALIST_LABELS[rp.specialistArchetype]}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setInspectedPlayerId(rp.id)}
+                      className="text-left py-1 text-xs font-bold text-[#4A5068] flex-1 min-h-[44px]"
+                    >
+                      RP {rp.name} ({rp.throws}HP
+                      {rp.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]}` : ''}) • OVR{' '}
+                      {computePlayerOverall(rp)} • {SPECIALIST_LABELS[rp.specialistArchetype]}
+                    </button>
+                    <ComicButton
+                      size="sm"
+                      variant="sky"
+                      data-testid="roster-open-card-btn"
+                      aria-label={`View card for ${rp.name}`}
+                      onClick={() => openCardModalFor(rp.id)}
+                    >
+                      🃏
+                    </ComicButton>
+                  </div>
                 ))}
               </div>
             </div>
@@ -723,7 +932,22 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
             </div>
           </div>
         </div>
+        )}
       </ComicCard>
+
+      <PlayerCardModal
+        open={cardModalOpen}
+        entry={activeCardModalEntry}
+        allEntries={orderedRosterEntries}
+        onSelectPlayerId={(id) => setInspectedPlayerId(id)}
+        onOpenDossier={(p) => {
+          setInspectedPlayerId(p.id);
+          setCardModalOpen(false);
+          setDossierOpen(true);
+        }}
+        onDownloadCard={(p) => triggerPngDownload(p)}
+        onClose={() => setCardModalOpen(false)}
+      />
 
       <PlayerDossierModal
         player={dossierOpen ? inspectedPlayer : null}

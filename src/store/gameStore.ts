@@ -67,7 +67,10 @@ import {
   applyTrainingDrill,
   type TrainingDrillRequest,
 } from '../engine/rpg/trainingCompromises';
-import { simFullGame } from '../engine/simulation/baseballEngine';
+import {
+  applyGameStatDeltasToClub,
+  simFullGame,
+} from '../engine/simulation/baseballEngine';
 import type { GameSessionResult } from '../engine/simulation/gameState';
 import {
   applyPostGameProgression,
@@ -119,6 +122,7 @@ export interface GameStoreState {
   worldSeed: number;
   seasonNumber: number;
   currentSeriesIndex: number;
+  currentGameInSeries: number;
   practiceAvailable: boolean;
   lastPracticeFocusLabel: string | null;
   activeGameplan: SeriesGameplanId;
@@ -242,6 +246,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     worldSeed: 1994,
     seasonNumber: 1,
     currentSeriesIndex: 0,
+    currentGameInSeries: 0,
     practiceAvailable: true,
     lastPracticeFocusLabel: null,
     activeGameplan: 'balanced',
@@ -270,6 +275,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         worldSeed: seed,
         seasonNumber: 1,
         currentSeriesIndex: 0,
+        currentGameInSeries: 0,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
         activeGameplan: 'balanced',
@@ -317,6 +323,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           roundSeed,
           regulationInnings,
           state.activeGameplan,
+          tier === prevHumanClub?.leagueTier ? state.currentGameInSeries : 0,
         ).clubs;
       });
 
@@ -382,6 +389,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         leagues: nextLeagues,
         manager: nextManager,
         currentSeriesIndex: nextIndex,
+        currentGameInSeries: 0,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
         spotlightUsedThisSeries: false,
@@ -502,6 +510,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       set({
         seasonNumber: nextSeasonNumber,
         currentSeriesIndex: 0,
+        currentGameInSeries: 0,
         leagues: offseason.leagues,
         freeAgents: nextFreeAgents,
         lastPlayoffResult: humanPlayoffs,
@@ -579,6 +588,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       set({
         seasonNumber: done.nextSeasonNumber,
         currentSeriesIndex: 0,
+        currentGameInSeries: 0,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
         leagues: done.leagues,
@@ -881,7 +891,8 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     },
 
     commitCompletedGame: (opponentClubId, result, isHomeGame) => {
-      const { manager, leagues } = get();
+      const state = get();
+      const { manager, leagues } = state;
       const humanClub = get().getHumanClub();
       const opponentClub = findClubAcrossLeagues(leagues, opponentClubId);
       if (!humanClub || !opponentClub || !manager) return null;
@@ -898,6 +909,61 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         result.playerStatDeltas,
         won,
       );
+      const updatedOpponent = applyGameStatDeltasToClub(
+        opponentClub,
+        result.playerStatDeltas,
+        !won,
+      );
+
+      let nextLeagues = updateHumanClubInLeagues(leagues, progressed.club);
+      nextLeagues = {
+        ...nextLeagues,
+        [updatedOpponent.leagueTier]: nextLeagues[updatedOpponent.leagueTier].map((club) =>
+          club.id === updatedOpponent.id ? updatedOpponent : club,
+        ),
+      };
+
+      let nextSeriesIndex = state.currentSeriesIndex;
+      let nextGameInSeries = state.currentGameInSeries;
+      let nextInboxEvent = state.activeGmInboxEvent;
+
+      if (state.currentSeriesIndex < 7) {
+        const candidateGame = state.currentGameInSeries + 1;
+        if (candidateGame >= 3) {
+          // Completed all 3 games of the current scheduled series — sync other AI matchups cleanly!
+          LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
+            if (nextLeagues[tier].length < 2) return;
+            const roundSeed =
+              state.worldSeed +
+              state.seasonNumber * 10000 +
+              state.currentSeriesIndex * 500 +
+              tierIdx * 71;
+            nextLeagues[tier] = simulateSeriesRound(
+              nextLeagues[tier],
+              state.currentSeriesIndex,
+              roundSeed,
+              result.finalState.regulationInnings,
+              state.activeGameplan,
+              tier === progressed.club.leagueTier ? 3 : 0,
+            ).clubs;
+          });
+          nextSeriesIndex = state.currentSeriesIndex + 1;
+          nextGameInSeries = 0;
+          if (!nextInboxEvent && nextSeriesIndex < 7) {
+            const inboxRng = createSeededRng(
+              state.worldSeed + state.seasonNumber * 997 + nextSeriesIndex * 131,
+            );
+            nextInboxEvent = rollGmInboxEvent(
+              inboxRng,
+              nextLeagues[progressed.club.leagueTier],
+              progressed.club.id,
+              nextSeriesIndex,
+            );
+          }
+        } else {
+          nextGameInSeries = candidateGame;
+        }
+      }
 
       const levelUps = diffClubLevelUps(humanClub.roster, progressed.club.roster);
 
@@ -915,7 +981,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
 
       set({
         manager: progressed.manager,
-        leagues: updateHumanClubInLeagues(leagues, progressed.club),
+        leagues: nextLeagues,
+        currentSeriesIndex: nextSeriesIndex,
+        currentGameInSeries: nextGameInSeries,
+        activeGmInboxEvent: nextInboxEvent,
         lastPostGameSummary: summary,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
@@ -972,6 +1041,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         worldSeed: save.worldSeed,
         seasonNumber: save.seasonNumber,
         currentSeriesIndex: save.currentSeriesIndex,
+        currentGameInSeries: 0,
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,
@@ -1011,6 +1081,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         worldSeed: save.worldSeed,
         seasonNumber: save.seasonNumber,
         currentSeriesIndex: save.currentSeriesIndex,
+        currentGameInSeries: 0,
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,

@@ -13,6 +13,7 @@ import type { PlayEvent } from '../../engine/models/playEvent';
 import type { Player } from '../../engine/models/player';
 import type { GameSessionState } from '../../engine/simulation/gameState';
 import { createMiniBallpark } from '../ballpark/ballparkBuilder';
+import { buildLiveStadiumScoreboardSnapshot } from '../ballpark/liveScoreboardData';
 import {
   createStadiumEvolutionOverlay,
   type StadiumEvolutionOverlay,
@@ -164,6 +165,10 @@ export class GameSceneController {
     const half = choreo && event ? event.half : session.half;
     const fieldingClub = half === 'TOP' ? homeClub : awayClub;
     const battingClub = half === 'TOP' ? awayClub : homeClub;
+
+    this.ballpark.updateScoreboard(
+      buildLiveStadiumScoreboardSnapshot(awayClub, homeClub, session),
+    );
 
     const nextSig = `${homeClub.leagueTier}:${homeClub.stadium.ballparkId ?? 'sandlot'}:${homeClub.stadium.seatingTier}:${Number(homeClub.stadium.hasJumbotron)}:${Number(homeClub.stadium.hasNightLights)}:${Number(homeClub.stadium.hasMascotCannon)}:${homeClub.stadium.retiredNumbers.length}:${homeClub.stadium.championshipPennants.length}`;
     if (nextSig !== this.stadiumSignature) {

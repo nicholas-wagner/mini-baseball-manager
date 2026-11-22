@@ -12,6 +12,7 @@ interface LiveBoxScoreModalProps {
   session: GameSessionState;
   awayClub: Club;
   homeClub: Club;
+  onInspectPlayer?: (playerId: string) => void;
 }
 
 function formatInningsPitched(outs: number): string {
@@ -24,10 +25,12 @@ function BattingTable({
   title,
   club,
   lines,
+  onInspectPlayer,
 }: {
   title: string;
   club: Club;
   lines: Record<string, BatterBoxLine>;
+  onInspectPlayer?: (playerId: string) => void;
 }) {
   const nameById = new Map(club.roster.map((p) => [p.id, `${p.name} (${p.position})`]));
   const rows = Object.values(lines);
@@ -53,7 +56,17 @@ function BattingTable({
             {rows.map((r) => (
               <tr key={r.playerId} className="border-t border-[#181B2C]/15">
                 <td className="px-2 py-1 truncate max-w-[145px]">
-                  {nameById.get(r.playerId) ?? r.playerId}
+                  {onInspectPlayer ? (
+                    <button
+                      type="button"
+                      onClick={() => onInspectPlayer(r.playerId)}
+                      className="text-left underline decoration-dotted hover:text-[#E63946] cursor-pointer"
+                    >
+                      {nameById.get(r.playerId) ?? r.playerId}
+                    </button>
+                  ) : (
+                    (nameById.get(r.playerId) ?? r.playerId)
+                  )}
                 </td>
                 <td className="px-1.5 py-1 text-right font-mono-tabular">{r.atBats}</td>
                 <td className="px-1.5 py-1 text-right font-mono-tabular">{r.hits}</td>
@@ -76,10 +89,12 @@ function PitchingTable({
   title,
   club,
   lines,
+  onInspectPlayer,
 }: {
   title: string;
   club: Club;
   lines: Record<string, PitcherBoxLine>;
+  onInspectPlayer?: (playerId: string) => void;
 }) {
   const nameById = new Map(club.roster.map((p) => [p.id, p.name]));
   const rows = Object.values(lines);
@@ -103,7 +118,17 @@ function PitchingTable({
             {rows.map((p) => (
               <tr key={p.playerId} className="border-t border-[#181B2C]/15">
                 <td className="px-2 py-1 truncate max-w-[145px]">
-                  {nameById.get(p.playerId) ?? p.playerId}
+                  {onInspectPlayer ? (
+                    <button
+                      type="button"
+                      onClick={() => onInspectPlayer(p.playerId)}
+                      className="text-left underline decoration-dotted hover:text-[#E63946] cursor-pointer"
+                    >
+                      {nameById.get(p.playerId) ?? p.playerId}
+                    </button>
+                  ) : (
+                    (nameById.get(p.playerId) ?? p.playerId)
+                  )}
                 </td>
                 <td className="px-1.5 py-1 text-right font-mono-tabular">
                   {formatInningsPitched(p.outsRecorded)}
@@ -128,6 +153,7 @@ export function LiveBoxScoreModal({
   session,
   awayClub,
   homeClub,
+  onInspectPlayer,
 }: LiveBoxScoreModalProps) {
   if (!open) return null;
 
@@ -179,6 +205,8 @@ export function LiveBoxScoreModal({
                     </th>
                   ))}
                   <th className="px-3 py-1.5 bg-[#2FB356]/30">R</th>
+                  <th className="px-2.5 py-1.5 bg-[#1D3557]/60">H</th>
+                  <th className="px-2.5 py-1.5 bg-[#1D3557]/60">E</th>
                 </tr>
               </thead>
               <tbody>
@@ -190,6 +218,8 @@ export function LiveBoxScoreModal({
                     </td>
                   ))}
                   <td className="px-3 py-1.5 text-[#FFD166]">{session.away.score}</td>
+                  <td className="px-2.5 py-1.5 text-[#E0FBFC]">{session.away.hits}</td>
+                  <td className="px-2.5 py-1.5 text-white/80">{session.away.errors}</td>
                 </tr>
                 <tr>
                   <td className="px-3 py-1.5 text-left font-display">{homeClub.colors.monogram}</td>
@@ -199,6 +229,8 @@ export function LiveBoxScoreModal({
                     </td>
                   ))}
                   <td className="px-3 py-1.5 text-[#FFD166]">{session.home.score}</td>
+                  <td className="px-2.5 py-1.5 text-[#E0FBFC]">{session.home.hits}</td>
+                  <td className="px-2.5 py-1.5 text-white/80">{session.home.errors}</td>
                 </tr>
               </tbody>
             </table>
@@ -209,11 +241,13 @@ export function LiveBoxScoreModal({
               title={`${awayClub.city} ${awayClub.name} Batting`}
               club={awayClub}
               lines={session.boxScore.awayBatters}
+              onInspectPlayer={onInspectPlayer}
             />
             <BattingTable
               title={`${homeClub.city} ${homeClub.name} Batting`}
               club={homeClub}
               lines={session.boxScore.homeBatters}
+              onInspectPlayer={onInspectPlayer}
             />
           </div>
 
@@ -222,11 +256,13 @@ export function LiveBoxScoreModal({
               title={`${awayClub.name} Pitching`}
               club={awayClub}
               lines={session.boxScore.awayPitchers}
+              onInspectPlayer={onInspectPlayer}
             />
             <PitchingTable
               title={`${homeClub.name} Pitching`}
               club={homeClub}
               lines={session.boxScore.homePitchers}
+              onInspectPlayer={onInspectPlayer}
             />
           </div>
         </div>

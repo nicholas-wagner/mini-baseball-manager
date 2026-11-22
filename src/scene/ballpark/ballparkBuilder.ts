@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import { BATTERS_BOX, batterBox } from '../playback/diamondLayout';
 import { createClayTexture, createFloodlights, createHorizon } from './parkScenery';
 import { createToonMaterial, getToonGradientMap } from '../core/toonMaterials';
+import type { LiveStadiumScoreboardSnapshot } from './liveScoreboardData';
 
 export interface BallparkEnvironment {
   group: THREE.Group;
   update: (timeSec: number, crowdExcitement: number) => void;
+  updateScoreboard: (snapshot: LiveStadiumScoreboardSnapshot) => void;
   dispose: () => void;
 }
 
@@ -76,35 +78,211 @@ function createBillboardTexture(
   return tex;
 }
 
-function createScoreboardTexture(): THREE.CanvasTexture {
+const DEFAULT_SCOREBOARD_SNAPSHOT: LiveStadiumScoreboardSnapshot = {
+  stadiumName: 'SANDLOT PARK',
+  awayAbbr: 'VIS',
+  homeAbbr: 'HOM',
+  awayRuns: 0,
+  homeRuns: 0,
+  awayHits: 0,
+  homeHits: 0,
+  awayErrors: 0,
+  homeErrors: 0,
+  inning: 1,
+  half: 'TOP',
+  balls: 0,
+  strikes: 0,
+  outs: 0,
+  bases: [false, false, false],
+  inningColumns: [
+    { inning: 1, away: 0, home: null },
+    { inning: 2, away: null, home: null },
+    { inning: 3, away: null, home: null },
+    { inning: 4, away: null, home: null },
+    { inning: 5, away: null, home: null },
+  ],
+  signature: 'default',
+};
+
+function drawScoreboardLampRow(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  count: number,
+  max: number,
+  x: number,
+  y: number,
+  litColor: string,
+): void {
+  ctx.fillStyle = '#B8DEC9';
+  ctx.font = '800 18px JetBrains Mono, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(label, x, y);
+  for (let i = 0; i < max; i += 1) {
+    ctx.beginPath();
+    ctx.arc(x + 28 + i * 20, y - 6, 7, 0, Math.PI * 2);
+    ctx.fillStyle = i < count ? litColor : '#1C3F30';
+    ctx.fill();
+    ctx.strokeStyle = '#081811';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+
+function drawScoreboardCanvas(
+  ctx: CanvasRenderingContext2D,
+  snap: LiveStadiumScoreboardSnapshot,
+): void {
+  // Retro deep ballpark green border & wood-frame outline
+  ctx.fillStyle = '#1B4332';
+  ctx.fillRect(0, 0, 512, 256);
+  ctx.strokeStyle = '#181B2C';
+  ctx.lineWidth = 12;
+  ctx.strokeRect(6, 6, 500, 244);
+
+  // Header bar: Stadium name + live inning badge
+  ctx.fillStyle = '#FFC300';
+  ctx.font = '900 24px Bungee, Fredoka, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(snap.stadiumName.slice(0, 20), 26, 40);
+
+  ctx.fillStyle = '#102A1F';
+  ctx.fillRect(392, 16, 96, 32);
+  ctx.strokeStyle = '#FFC300';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(392, 16, 96, 32);
+  ctx.fillStyle = '#FFD166';
+  ctx.font = '900 20px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${snap.half === 'TOP' ? '▲' : '▼'} INN ${snap.inning}`, 440, 39);
+
+  // Main LED Line Scoreboard panel
+  ctx.fillStyle = '#0E261C';
+  ctx.fillRect(24, 58, 464, 126);
+  ctx.strokeStyle = '#081811';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(24, 58, 464, 126);
+
+  // Column headers: TEAM  1 2 3 4 5   R  H  E
+  ctx.fillStyle = '#89C2A5';
+  ctx.font = '700 18px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('TEAM', 62, 82);
+  snap.inningColumns.forEach((col, idx) => {
+    ctx.fillText(String(col.inning), 130 + idx * 38, 82);
+  });
+  ctx.fillStyle = '#FFC300';
+  ctx.fillText('R', 350, 82);
+  ctx.fillText('H', 402, 82);
+  ctx.fillText('E', 454, 82);
+
+  // Separator line
+  ctx.strokeStyle = '#245842';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(32, 90);
+  ctx.lineTo(480, 90);
+  ctx.stroke();
+
+  // Away & Home lines
+  const rows = [
+    {
+      abbr: snap.awayAbbr,
+      y: 124,
+      runs: snap.awayRuns,
+      hits: snap.awayHits,
+      errors: snap.awayErrors,
+      vals: snap.inningColumns.map((c) => c.away),
+      batting: snap.half === 'TOP',
+    },
+    {
+      abbr: snap.homeAbbr,
+      y: 164,
+      runs: snap.homeRuns,
+      hits: snap.homeHits,
+      errors: snap.homeErrors,
+      vals: snap.inningColumns.map((c) => c.home),
+      batting: snap.half === 'BOT',
+    },
+  ];
+
+  for (const row of rows) {
+    ctx.textAlign = 'left';
+    ctx.fillStyle = row.batting ? '#FFD166' : '#FBF4E4';
+    ctx.font = '900 24px JetBrains Mono, monospace';
+    ctx.fillText((row.batting ? '▸' : ' ') + row.abbr.padEnd(3, ' '), 30, row.y);
+
+    ctx.textAlign = 'center';
+    ctx.font = '700 22px JetBrains Mono, monospace';
+    row.vals.forEach((v, idx) => {
+      ctx.fillStyle = v === null ? '#3A6B54' : '#FBF4E4';
+      ctx.fillText(v === null ? '·' : String(v), 130 + idx * 38, row.y);
+    });
+
+    ctx.font = '900 26px JetBrains Mono, monospace';
+    ctx.fillStyle = '#FFD166';
+    ctx.fillText(String(row.runs), 350, row.y);
+    ctx.fillStyle = '#E0FBFC';
+    ctx.fillText(String(row.hits), 402, row.y);
+    ctx.fillStyle = row.errors > 0 ? '#FF6B81' : '#B8DEC9';
+    ctx.fillText(String(row.errors), 454, row.y);
+  }
+
+  // Bottom B / S / O LED panel + mini glowing base diamond
+  ctx.fillStyle = '#0E261C';
+  ctx.fillRect(24, 194, 464, 42);
+  drawScoreboardLampRow(ctx, 'B', snap.balls, 3, 38, 222, '#2FB356');
+  drawScoreboardLampRow(ctx, 'S', snap.strikes, 2, 152, 222, '#FFC300');
+  drawScoreboardLampRow(ctx, 'O', snap.outs, 2, 246, 222, '#FF4D6D');
+
+  // Text count readout (e.g. "2-1 • 1 OUT")
+  ctx.fillStyle = '#FFD166';
+  ctx.font = '800 17px JetBrains Mono, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${snap.balls}-${snap.strikes}  ${snap.outs} OUT`, 328, 221);
+
+  // Mini glowing 3-base diamond on the far right
+  const basePts: readonly [number, number, boolean][] = [
+    [466, 215, snap.bases[0]], // 1B
+    [454, 203, snap.bases[1]], // 2B
+    [442, 215, snap.bases[2]], // 3B
+  ];
+  for (const [bx, by, occupied] of basePts) {
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = occupied ? '#FFC300' : '#1C3F30';
+    ctx.fillRect(-5, -5, 10, 10);
+    ctx.strokeStyle = '#081811';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-5, -5, 10, 10);
+    ctx.restore();
+  }
+}
+
+function createScoreboardDisplay(): {
+  texture: THREE.CanvasTexture;
+  updateScoreboard: (snapshot: LiveStadiumScoreboardSnapshot) => void;
+} {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#1B4332';
-    ctx.fillRect(0, 0, 512, 256);
-    ctx.strokeStyle = '#181B2C';
-    ctx.lineWidth = 14;
-    ctx.strokeRect(7, 7, 498, 242);
-
-    ctx.fillStyle = '#FFC300';
-    ctx.font = '900 34px Bungee, Fredoka, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('SANDLOT PARK', 256, 52);
-
-    ctx.fillStyle = '#102A1F';
-    ctx.fillRect(36, 78, 440, 142);
-
-    ctx.fillStyle = '#FFD166';
-    ctx.font = '700 32px JetBrains Mono, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('GUEST  0 1 0 2   3', 56, 128);
-    ctx.fillText('HOME   1 0 2 1   4', 56, 184);
+    drawScoreboardCanvas(ctx, DEFAULT_SCOREBOARD_SNAPSHOT);
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  let lastSig = DEFAULT_SCOREBOARD_SNAPSHOT.signature;
+
+  const updateScoreboard = (snapshot: LiveStadiumScoreboardSnapshot) => {
+    if (snapshot.signature === lastSig) return;
+    lastSig = snapshot.signature;
+    if (ctx) {
+      drawScoreboardCanvas(ctx, snapshot);
+      texture.needsUpdate = true;
+    }
+  };
+  return { texture, updateScoreboard };
 }
 
 export function createMiniBallpark(): BallparkEnvironment {
@@ -279,11 +457,11 @@ export function createMiniBallpark(): BallparkEnvironment {
     group.add(board);
   }
 
-  // Towering Center-Field Classic Scoreboard
-  const sbTex = createScoreboardTexture();
+  // Towering Center-Field Classic Scoreboard (dynamically updated every pitch!)
+  const scoreboardDisplay = createScoreboardDisplay();
   const scoreboard = new THREE.Mesh(
     new THREE.BoxGeometry(14, 7, 0.9),
-    new THREE.MeshBasicMaterial({ map: sbTex }),
+    new THREE.MeshBasicMaterial({ map: scoreboardDisplay.texture }),
   );
   scoreboard.position.set(0, 7.6, -44.2);
   group.add(scoreboard);
@@ -554,5 +732,10 @@ export function createMiniBallpark(): BallparkEnvironment {
     });
   };
 
-  return { group, update, dispose };
+  return {
+    group,
+    update,
+    updateScoreboard: scoreboardDisplay.updateScoreboard,
+    dispose,
+  };
 }

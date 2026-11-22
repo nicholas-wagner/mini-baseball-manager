@@ -32,6 +32,7 @@ import {
   createCrosstownStarterRivalry,
 } from '../../engine/league/rivalryEngine';
 import { evaluateNemesisMatchup } from '../../engine/league/nemesisTracker';
+import { getHumanSeasonSchedule } from '../../engine/league/seasonEngine';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import {
   evaluateWeatherSimulationImpact,
@@ -117,6 +118,10 @@ import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { LiveGameCanvas } from '../components/LiveGameCanvas';
 import { ManagerClipboardBanner } from '../components/ManagerClipboardBanner';
+import {
+  PlayerCardModal,
+  type InspectableCardEntry,
+} from '../components/PlayerCardModal';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -193,6 +198,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const manager = useGameStore((s) => s.manager);
   const worldSeed = useGameStore((s) => s.worldSeed);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
+  const currentGameInSeries = useGameStore((s) => s.currentGameInSeries);
   const practiceAvailable = useGameStore((s) => s.practiceAvailable);
   const lastPracticeFocusLabel = useGameStore((s) => s.lastPracticeFocusLabel);
   const activeGameplan = useGameStore((s) => s.activeGameplan);
@@ -211,7 +217,14 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     ? leagues[humanClub.leagueTier].filter((c) => c.id !== humanClub.id)
     : [];
 
-  const [selectedOpponentId, setSelectedOpponentId] = useState<string>(opponents[0]?.id ?? '');
+  const seasonSchedule = useMemo(
+    () =>
+      humanClub
+        ? getHumanSeasonSchedule(leagues[humanClub.leagueTier], humanClub.id, currentSeriesIndex)
+        : { entries: [], nextSeries: null },
+    [currentSeriesIndex, humanClub, leagues],
+  );
+
   const [gameLength, setGameLength] = useState<GameLengthInnings>(5);
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
@@ -239,6 +252,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   );
   const [modalSummary, setModalSummary] = useState<PostGameSummary | null>(null);
   const [boxScoreOpen, setBoxScoreOpen] = useState(false);
+  const [inspectedGamePlayerId, setInspectedGamePlayerId] = useState<string | null>(null);
   const [showPitchMath, setShowPitchMath] = useState(false);
   const [gameWeather, setGameWeather] = useState<GameDayWeather | null>(null);
   const hapticsEnabled = useUserPreferencesStore((s) => s.hapticsEnabled);
@@ -253,7 +267,12 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const unopenedPacks = useFoilPackStore((s) => s.unopenedPacks);
   const awardFoilPack = useFoilPackStore((s) => s.awardPack);
 
-  const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? opponents[0];
+  const nextScheduled = seasonSchedule.nextSeries;
+  const scheduledOpponent = pendingLivePlayoff
+    ? (opponents.find((c) => c.id === pendingLivePlayoff.opponentClubId) ?? opponents[0])
+    : (nextScheduled?.opponent ?? opponents[0]);
+  const scheduledIsHome = pendingLivePlayoff ? true : (nextScheduled?.isHome ?? true);
+  const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? scheduledOpponent;
 
   const rivalryPreview = useMemo(() => {
     if (!humanClub || !activeOpponent) return null;
@@ -287,6 +306,9 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const finalizeSessionIfComplete = useCallback(
     (finalState: GameSessionState, eventsList: PlayEvent[], opponentId: string) => {
       if (finalState.status !== 'completed') return;
+      const isHumanHome = finalState.home.isHuman;
+      const humanSide = isHumanHome ? finalState.home : finalState.away;
+      const rivalSide = isHumanHome ? finalState.away : finalState.home;
       const result: GameSessionResult = {
         finalState,
         events: eventsList,
@@ -296,16 +318,16 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
         boxScore: finalState.boxScore,
         playerStatDeltas: buildPlayerStatDeltas(finalState.boxScore),
       };
-      const summary = commitCompletedGame(opponentId, result, true);
+      const summary = commitCompletedGame(opponentId, result, isHumanHome);
       if (pendingLivePlayoff && pendingLivePlayoff.opponentClubId === opponentId) {
         recordLivePlayoffResult(result.winnerClubId, result.awayScore, result.homeScore);
       }
-      if (result.winnerClubId === finalState.home.clubId) {
+      if (result.winnerClubId === humanSide.clubId) {
         awardFoilPack(
           pendingLivePlayoff ? 'championship_holo' : rivalryPreview ? 'rivalry_chrome' : 'sandlot_foil',
           pendingLivePlayoff
-            ? `Postseason Win vs ${finalState.away.name}`
-            : `Victory vs ${finalState.away.name} (${finalState.home.score}-${finalState.away.score})`,
+            ? `Postseason Win vs ${rivalSide.name}`
+            : `Victory ${isHumanHome ? 'vs' : '@'} ${rivalSide.name} (${humanSide.score}-${rivalSide.score})`,
         );
       }
       if (summary) {
@@ -317,20 +339,21 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   );
 
   const handleStartLiveGame = (autoPlay: boolean) => {
-    if (!humanClub) return;
-    const preferredOppId = pendingLivePlayoff?.opponentClubId ?? selectedOpponentId;
-    const opp = opponents.find((c) => c.id === preferredOppId) ?? opponents[0];
-    if (!opp) return;
+    if (!humanClub || !scheduledOpponent) return;
+    const opp = scheduledOpponent;
+    const isHumanHome = scheduledIsHome;
+    const awayClub = isHumanHome ? opp : humanClub;
+    const homeClub = isHumanHome ? humanClub : opp;
     const seed = worldSeed + humanClub.wins + humanClub.losses + 1;
     const pressure = pendingLivePlayoff?.pressureLevel ?? 'regular';
     const session = createGameSession(
-      opp,
-      humanClub,
+      awayClub,
+      homeClub,
       seed,
       pressure,
       gameLength,
-      'balanced',
-      activeGameplan,
+      isHumanHome ? 'balanced' : activeGameplan,
+      isHumanHome ? activeGameplan : 'balanced',
     );
     setActiveOpponentId(opp.id);
     setLiveSession(session);
@@ -352,10 +375,11 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setBoxScoreOpen(false);
+    setInspectedGamePlayerId(null);
     const park = getBallparkPreset(session.ballparkId);
     const rolledWeather = rollGameDayWeather(createSeededRng(seed + 41), {
       isDome: park.factors.isDome,
-      hasNightLights: humanClub.stadium.hasNightLights,
+      hasNightLights: homeClub.stadium.hasNightLights,
     });
     setGameWeather(rolledWeather);
     setWatchMode(autoPlay ? 'live' : 'paused');
@@ -429,6 +453,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           batterNow.name,
           pitcherNow.name,
         ) ?? undefined;
+      const humanIsBattingNow = (session.half === 'BOT') === session.home.isHuman;
+      const humanIsPitchingNow = !humanIsBattingNow;
       const opts: {
         requestedPitchType?: PitchType;
         requestedPowerId?: string;
@@ -440,14 +466,14 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
       } = {
         defensiveShift,
         weatherImpact: gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : undefined,
-        pitchTarget: session.half === 'TOP' ? pitchTarget : undefined,
-        batterGuess: session.half === 'BOT' ? batterGuess : 'none',
+        pitchTarget: humanIsPitchingNow ? pitchTarget : undefined,
+        batterGuess: humanIsBattingNow ? batterGuess : 'none',
         nemesisBonus,
       };
       if (armedPowerId) {
         opts.requestedPowerId = armedPowerId;
       }
-      if (session.half === 'TOP' && selectedPitchType) {
+      if (humanIsPitchingNow && selectedPitchType) {
         const ownsPitch = pitcherNow.pitchArsenal?.repertoire.some(
           (slot) => slot.pitchType === selectedPitchType,
         );
@@ -505,31 +531,53 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
 
   const handleSimToEnd = () => {
     if (!humanClub || !activeOpponent) return;
+    const isHumanHome = liveSession ? liveSession.home.isHuman : scheduledIsHome;
+    const awayClub = isHumanHome ? activeOpponent : humanClub;
+    const homeClub = isHumanHome ? humanClub : activeOpponent;
     const seed = liveSession?.rngSeed ?? worldSeed + humanClub.wins + humanClub.losses + 1;
     const innings = liveSession?.regulationInnings ?? gameLength;
-    const full = simFullGame(activeOpponent, humanClub, seed, innings);
+    const full = simFullGame(
+      awayClub,
+      homeClub,
+      seed,
+      innings,
+      'regular',
+      isHumanHome ? 'balanced' : activeGameplan,
+      isHumanHome ? activeGameplan : 'balanced',
+    );
     setLiveSession(full.finalState);
     setRecentEvents(full.events.slice(-8).reverse());
-    const summary = commitCompletedGame(activeOpponent.id, full, true);
+    const summary = commitCompletedGame(activeOpponent.id, full, isHumanHome);
     if (summary) setModalSummary(summary);
     setWatchMode('paused');
     soundEngine.play('crowd_cheer');
   };
 
   const handleInstantSimPreGame = () => {
-    if (!humanClub) return;
-    const opp = opponents.find((c) => c.id === selectedOpponentId) ?? opponents[0];
-    if (!opp) return;
+    if (!humanClub || !scheduledOpponent) return;
+    const opp = scheduledOpponent;
+    const isHumanHome = scheduledIsHome;
+    const awayClub = isHumanHome ? opp : humanClub;
+    const homeClub = isHumanHome ? humanClub : opp;
     const seed = worldSeed + humanClub.wins + humanClub.losses + 1;
-    const full = simFullGame(opp, humanClub, seed, gameLength);
-    const summary = commitCompletedGame(opp.id, full, true);
+    const full = simFullGame(
+      awayClub,
+      homeClub,
+      seed,
+      gameLength,
+      'regular',
+      isHumanHome ? 'balanced' : activeGameplan,
+      isHumanHome ? activeGameplan : 'balanced',
+    );
+    const summary = commitCompletedGame(opp.id, full, isHumanHome);
     if (summary) setModalSummary(summary);
     soundEngine.play('crowd_cheer');
   };
 
   const handleBullpenSwap = (relieverId: string) => {
     if (!liveSession) return;
-    const swapped = manualSwapPitcher(liveSession, 'home', relieverId);
+    const sideKey = liveSession.home.isHuman ? 'home' : 'away';
+    const swapped = manualSwapPitcher(liveSession, sideKey, relieverId);
     if (swapped.event) {
       setSelectedPitchType(null);
       applyStepResult(swapped.nextSession, [swapped.event], activeOpponentId);
@@ -645,122 +693,223 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           onActionClick={handleManagerJump}
         />
 
-        <ComicCard
-          title={
-            pendingLivePlayoff
-              ? `🏆 ${pendingLivePlayoff.seriesLabel.toUpperCase()} — GAME ${pendingLivePlayoff.gameNumber}`
-              : "CHOOSE TODAY'S MATCHUP"
-          }
-          subtitle={`${humanClub.city} ${humanClub.name} (${humanClub.wins}-${humanClub.losses}) • ${
-            pendingLivePlayoff ? 'POSTSEASON PRESSURE ON!' : 'Home Stand'
-          }`}
-          headerBg={pendingLivePlayoff ? '#9D0208' : '#1B4332'}
-        >
-          <div className="space-y-4">
-            {pendingLivePlayoff ? (
-              <div
-                data-testid="playoff-matchup-banner"
-                className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold text-[#181B2C]"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4 text-[#E63946]" />
-                  Postseason Series Queued: {pendingLivePlayoff.seriesLabel} Game{' '}
-                  {pendingLivePlayoff.gameNumber} ({pendingLivePlayoff.pressureLevel.toUpperCase()} Stakes)
-                </span>
-                <span>Tap “Start Live 3D Game” to take the field!</span>
-              </div>
-            ) : null}
-            <div className="flex flex-wrap gap-3">
-              <ComicButton
-                variant="turf"
-                size="lg"
-                icon={<Play className="w-4 h-4" />}
-                onClick={() => handleStartLiveGame(false)}
-              >
-                Start Live 3D Game
-              </ComicButton>
-              <ComicButton
-                variant="gold"
-                size="lg"
-                icon={<Zap className="w-4 h-4" />}
-                onClick={handleInstantSimPreGame}
-              >
-                Instant Sim Game
-              </ComicButton>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-extrabold uppercase text-[#181B2C]">
-                Game Length:
-              </span>
-              {GAME_LENGTH_OPTIONS.map((opt) => (
-                <ComicButton
-                  key={opt.innings}
-                  size="sm"
-                  variant={gameLength === opt.innings ? 'gold' : 'cream'}
-                  active={gameLength === opt.innings}
-                  onClick={() => setGameLength(opt.innings)}
+        <div data-testid="scheduled-matchup-card">
+          <ComicCard
+            title={
+              pendingLivePlayoff
+                ? `🏆 ${pendingLivePlayoff.seriesLabel.toUpperCase()} — GAME ${pendingLivePlayoff.gameNumber}`
+                : nextScheduled
+                  ? `SERIES ${nextScheduled.seriesNumber} OF 7 • GAME ${currentGameInSeries + 1} OF 3`
+                  : '🏆 REGULAR SEASON COMPLETE (21/21 GAMES)'
+            }
+            subtitle={
+              pendingLivePlayoff && scheduledOpponent
+                ? `${humanClub.city} ${humanClub.name} vs ${scheduledOpponent.city} ${scheduledOpponent.name} • POSTSEASON PRESSURE ON!`
+                : nextScheduled
+                  ? `${nextScheduled.isHome ? '🏠 HOME STAND vs' : '✈️ ROAD TRIP @'} ${nextScheduled.opponent.city} ${nextScheduled.opponent.name} • 🏟️ ${getBallparkPreset(nextScheduled.hostBallparkId).name}`
+                  : `${humanClub.city} ${humanClub.name} (${humanClub.wins}-${humanClub.losses}) • Ready for Best-of-3 League Playoffs!`
+            }
+            headerBg={
+              pendingLivePlayoff
+                ? '#9D0208'
+                : nextScheduled && !nextScheduled.isHome
+                  ? '#1D3557'
+                  : '#1B4332'
+            }
+          >
+            <div className="space-y-4">
+              {pendingLivePlayoff ? (
+                <div
+                  data-testid="playoff-matchup-banner"
+                  className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold text-[#181B2C]"
                 >
-                  {opt.label}
-                </ComicButton>
-              ))}
-            </div>
+                  <span className="flex items-center gap-1.5">
+                    <Trophy className="w-4 h-4 text-[#E63946]" />
+                    Postseason Series Queued: {pendingLivePlayoff.seriesLabel} Game{' '}
+                    {pendingLivePlayoff.gameNumber} ({pendingLivePlayoff.pressureLevel.toUpperCase()} Stakes)
+                  </span>
+                  <span>Tap “Start Live 3D Game” to take the field!</span>
+                </div>
+              ) : null}
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-extrabold uppercase text-[#181B2C] flex items-center gap-1">
-                <Sliders className="w-3.5 h-3.5" />
-                Play Style:
-              </span>
-              <ComicButton
-                size="sm"
-                variant={controlMode === 'simple' ? 'turf' : 'cream'}
-                active={controlMode === 'simple'}
-                onClick={() => setControlMode('simple')}
-              >
-                🎮 Arcade Mode (Simple)
-              </ComicButton>
-              <ComicButton
-                size="sm"
-                variant={controlMode === 'advanced' ? 'violet' : 'cream'}
-                active={controlMode === 'advanced'}
-                onClick={() => setControlMode('advanced')}
-              >
-                🧠 Pro Manager (All Controls)
-              </ComicButton>
-            </div>
+              {scheduledOpponent ? (
+                <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`px-2 py-1 rounded-lg border-2 border-[#181B2C] font-display text-[11px] shrink-0 ${
+                        scheduledIsHome
+                          ? 'bg-[#D8F3DC] text-[#1B4332]'
+                          : 'bg-[#E0FBFC] text-[#1D3557]'
+                      }`}
+                    >
+                      {scheduledIsHome ? '🏠 HOME' : '✈️ AWAY'}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-display text-sm text-[#181B2C] flex items-center gap-2 flex-wrap">
+                        <span>
+                          {scheduledIsHome ? 'vs' : '@'} {scheduledOpponent.city}{' '}
+                          {scheduledOpponent.name}
+                        </span>
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-[#181B2C] inline-block"
+                          style={{ backgroundColor: scheduledOpponent.colors.primary }}
+                        />
+                      </div>
+                      <div className="text-[11px] font-bold text-[#4A5068]">
+                        {scheduledOpponent.aiArchetype.replace('_', ' ')} • Record{' '}
+                        {scheduledOpponent.wins}-{scheduledOpponent.losses} •{' '}
+                        {scheduledIsHome ? 'You bat BOT (Home Field)' : 'You bat TOP (Road Ballpark)'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-extrabold text-[#1D3557] px-2.5 py-1 rounded-lg border border-[#181B2C]/30 bg-[#FBF4E4]">
+                    🏟️{' '}
+                    {
+                      getBallparkPreset(
+                        (scheduledIsHome ? humanClub : scheduledOpponent).stadium.ballparkId,
+                      ).name
+                    }
+                  </div>
+                </div>
+              ) : null}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {opponents.map((opp) => {
-                const selected = (selectedOpponentId || opponents[0]?.id) === opp.id;
-                return (
-                  <button
-                    key={opp.id}
-                    type="button"
-                    onClick={() => setSelectedOpponentId(opp.id)}
-                    className={`p-3 rounded-xl border-2 border-[#181B2C] text-left min-h-[64px] transition ${
-                      selected
-                        ? 'bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C]'
-                        : 'bg-[#FFFDF7]'
-                    }`}
+              <div className="flex flex-wrap gap-3">
+                {!pendingLivePlayoff && !nextScheduled && onJumpToTab ? (
+                  <ComicButton
+                    variant="gold"
+                    size="lg"
+                    icon={<Trophy className="w-4 h-4" />}
+                    onClick={() => {
+                      soundEngine.play('level_up');
+                      onJumpToTab('league');
+                    }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-display text-xs text-[#181B2C]">
-                        {opp.city} {opp.name}
-                      </span>
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border border-[#181B2C]"
-                        style={{ backgroundColor: opp.colors.primary }}
-                      />
+                    Enter League Playoffs
+                  </ComicButton>
+                ) : null}
+                <ComicButton
+                  variant="turf"
+                  size="lg"
+                  icon={<Play className="w-4 h-4" />}
+                  onClick={() => handleStartLiveGame(false)}
+                >
+                  Start Live 3D Game
+                </ComicButton>
+                <ComicButton
+                  variant="gold"
+                  size="lg"
+                  icon={<Zap className="w-4 h-4" />}
+                  onClick={handleInstantSimPreGame}
+                >
+                  Instant Sim Game
+                </ComicButton>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-extrabold uppercase text-[#181B2C]">
+                  Game Length:
+                </span>
+                {GAME_LENGTH_OPTIONS.map((opt) => (
+                  <ComicButton
+                    key={opt.innings}
+                    size="sm"
+                    variant={gameLength === opt.innings ? 'gold' : 'cream'}
+                    active={gameLength === opt.innings}
+                    onClick={() => setGameLength(opt.innings)}
+                  >
+                    {opt.label}
+                  </ComicButton>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-extrabold uppercase text-[#181B2C] flex items-center gap-1">
+                  <Sliders className="w-3.5 h-3.5" />
+                  Play Style:
+                </span>
+                <ComicButton
+                  size="sm"
+                  variant={controlMode === 'simple' ? 'turf' : 'cream'}
+                  active={controlMode === 'simple'}
+                  onClick={() => setControlMode('simple')}
+                >
+                  🎮 Arcade Mode (Simple)
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant={controlMode === 'advanced' ? 'violet' : 'cream'}
+                  active={controlMode === 'advanced'}
+                  onClick={() => setControlMode('advanced')}
+                >
+                  🧠 Pro Manager (All Controls)
+                </ComicButton>
+              </div>
+
+              {/* Predetermined 7-Series Home & Away Season Schedule Strip */}
+              <div className="space-y-1.5 pt-2 border-t-2 border-dashed border-[#181B2C]/20">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-extrabold uppercase text-[#181B2C]">
+                  <span>📅 Season Schedule (7 Predetermined 3-Game Series • Home &amp; Away)</span>
+                  <span className="text-[#4A5068]">
+                    {seasonSchedule.entries.filter((e) => e.isHome).length} Home •{' '}
+                    {seasonSchedule.entries.filter((e) => !e.isHome).length} Road
+                  </span>
+                </div>
+                <div
+                  data-testid="season-schedule-strip"
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
+                >
+                  {seasonSchedule.entries.map((entry) => (
+                    <div
+                      key={entry.seriesIndex}
+                      data-testid="schedule-series-pill"
+                      className={`p-2 rounded-xl border-2 border-[#181B2C] text-left transition ${
+                        entry.status === 'current'
+                          ? 'bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C]'
+                          : entry.status === 'completed'
+                            ? 'bg-[#E9F5EC] opacity-80'
+                            : 'bg-[#FFFDF7]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
+                        <span className="text-[#1D3557]">
+                          S{entry.seriesNumber} • {entry.isHome ? '🏠 HOME' : '✈️ AWAY'}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded border border-[#181B2C] ${
+                            entry.status === 'current'
+                              ? 'bg-[#FFC300] text-[#181B2C]'
+                              : entry.status === 'completed'
+                                ? 'bg-[#2FB356] text-white'
+                                : 'bg-[#F1E4C8] text-[#4A5068]'
+                          }`}
+                        >
+                          {entry.status === 'current'
+                            ? 'NEXT'
+                            : entry.status === 'completed'
+                              ? '✓ DONE'
+                              : '3G'}
+                        </span>
+                      </div>
+                      <div className="font-display text-xs text-[#181B2C] mt-1 flex items-center gap-1.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-[#181B2C] shrink-0"
+                          style={{ backgroundColor: entry.opponent.colors.primary }}
+                        />
+                        <span className="truncate">
+                          {entry.isHome ? 'vs' : '@'} {entry.opponent.city} {entry.opponent.name}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-bold text-[#4A5068] truncate mt-0.5">
+                        {entry.opponent.wins}-{entry.opponent.losses} •{' '}
+                        {getBallparkPreset(entry.hostBallparkId).name}
+                      </div>
                     </div>
-                    <div className="text-[11px] font-bold text-[#4A5068] mt-1">
-                      {opp.aiArchetype.replace('_', ' ')} • {opp.wins}-{opp.losses}
-                    </div>
-                  </button>
-                );
-              })}
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </ComicCard>
+          </ComicCard>
+        </div>
 
         {unopenedPacks.length > 0 ? (
           <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-r from-[#7209B7] via-[#F72585] to-[#FFC300] text-white flex flex-wrap items-center justify-between gap-2 shadow-[4px_4px_0_#181B2C]">
@@ -835,8 +984,12 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     'pitcher',
     fieldingHype,
   );
-  const availableRelievers = liveSession.home.bullpenIds.filter(
-    (id) => !liveSession.home.usedPitcherIds.includes(id),
+  const humanSideKey: 'away' | 'home' = liveSession.home.isHuman ? 'home' : 'away';
+  const humanIsBatting = (liveSession.half === 'BOT') === (humanSideKey === 'home');
+  const liveAwayClub = humanSideKey === 'home' ? activeOpponent : humanClub;
+  const liveHomeClub = humanSideKey === 'home' ? humanClub : activeOpponent;
+  const availableRelievers = liveSession[humanSideKey].bullpenIds.filter(
+    (id) => !liveSession[humanSideKey].usedPitcherIds.includes(id),
   );
   const liveCue = computeLiveActionCue({
     session: liveSession,
@@ -865,7 +1018,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
       return;
     }
     if (action.type === 'mound_visit' && !moundVisitUsed) {
-      const res = applyMoundVisit(liveSession, 'home', 'calm_breath');
+      const res = applyMoundVisit(liveSession, humanSideKey, 'calm_breath');
       if (res.applied && res.event) {
         setMoundVisitUsed(true);
         applyStepResult(res.nextSession, [res.event], activeOpponent.id);
@@ -877,6 +1030,73 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     }
   };
 
+  const formatTodayStatLine = (playerId: string, isAway: boolean): string | undefined => {
+    const batLine = isAway
+      ? liveSession.boxScore.awayBatters[playerId]
+      : liveSession.boxScore.homeBatters[playerId];
+    const pitLine = isAway
+      ? liveSession.boxScore.awayPitchers[playerId]
+      : liveSession.boxScore.homePitchers[playerId];
+    if (pitLine && (pitLine.pitchesThrown > 0 || pitLine.outsRecorded > 0)) {
+      const ip = `${Math.floor(pitLine.outsRecorded / 3)}.${pitLine.outsRecorded % 3}`;
+      return `${ip} IP • ${pitLine.strikeouts} K • ${pitLine.earnedRuns} ER • ${pitLine.hitsAllowed} H • ${pitLine.pitchesThrown} P`;
+    }
+    if (batLine) {
+      const parts = [`${batLine.hits}-for-${batLine.atBats}`];
+      if (batLine.homeRuns > 0) parts.push(`${batLine.homeRuns} HR`);
+      if (batLine.rbis > 0) parts.push(`${batLine.rbis} RBI`);
+      if (batLine.walks > 0) parts.push(`${batLine.walks} BB`);
+      if (batLine.stolenBases > 0) parts.push(`${batLine.stolenBases} SB`);
+      return parts.join(' • ');
+    }
+    return undefined;
+  };
+
+  const gameCardEntries: InspectableCardEntry[] = [];
+  const seenCardIds = new Set<string>();
+  const addGameCardEntry = (
+    playerId: string | null | undefined,
+    isAway: boolean,
+    roleTag?: string,
+  ) => {
+    if (!playerId || seenCardIds.has(playerId)) return;
+    const side = isAway ? liveSession.away : liveSession.home;
+    const club = isAway ? liveAwayClub : liveHomeClub;
+    const player = side.playersById[playerId];
+    if (!player) return;
+    seenCardIds.add(playerId);
+    gameCardEntries.push({
+      player,
+      club,
+      roleTag,
+      liveStatLine: formatTodayStatLine(playerId, isAway),
+    });
+  };
+
+  const battingIsAway = liveSession.half === 'TOP';
+  addGameCardEntry(currentBatter.id, battingIsAway, 'AT BAT');
+  addGameCardEntry(currentPitcher.id, !battingIsAway, 'PITCHING');
+  liveSession.bases.forEach((runnerId, idx) => {
+    addGameCardEntry(runnerId, battingIsAway, `ON ${idx + 1}B`);
+  });
+  addGameCardEntry(liveSession.away.activePitcherId, true, `${liveAwayClub.colors.monogram} PITCHER`);
+  liveSession.away.lineup.forEach((slot, idx) => {
+    addGameCardEntry(slot.playerId, true, `${liveAwayClub.colors.monogram} #${idx + 1} ${slot.defensivePosition}`);
+  });
+  addGameCardEntry(liveSession.home.activePitcherId, false, `${liveHomeClub.colors.monogram} PITCHER`);
+  liveSession.home.lineup.forEach((slot, idx) => {
+    addGameCardEntry(slot.playerId, false, `${liveHomeClub.colors.monogram} #${idx + 1} ${slot.defensivePosition}`);
+  });
+  const activeInspectedEntry = inspectedGamePlayerId
+    ? (gameCardEntries.find((e) => e.player.id === inspectedGamePlayerId) ?? gameCardEntries[0] ?? null)
+    : null;
+  const liveRunnerIds = liveSession.bases.filter((id): id is string => Boolean(id));
+  const openGamePlayerCard = (playerId: string) => {
+    if (watchMode === 'live') setWatchMode('paused');
+    setInspectedGamePlayerId(playerId);
+    soundEngine.play('card_flip');
+  };
+
   return (
     <div className="space-y-3">
       <div
@@ -884,17 +1104,26 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
         className="sticky top-[62px] md:top-2 z-20"
       >
         <ScoreboardStrip
-          awayAbbr={activeOpponent.colors.monogram}
+          awayAbbr={liveAwayClub.colors.monogram}
           awayScore={liveSession.away.score}
-          awayColor={activeOpponent.colors.primary}
-          homeAbbr={humanClub.colors.monogram}
+          awayHits={liveSession.away.hits}
+          awayErrors={liveSession.away.errors}
+          awayColor={liveAwayClub.colors.primary}
+          homeAbbr={liveHomeClub.colors.monogram}
           homeScore={liveSession.home.score}
-          homeColor={humanClub.colors.primary}
+          homeHits={liveSession.home.hits}
+          homeErrors={liveSession.home.errors}
+          homeColor={liveHomeClub.colors.primary}
           inning={liveSession.inning}
           half={liveSession.half}
           balls={liveSession.balls}
           strikes={liveSession.strikes}
           outs={liveSession.outs}
+          bases={[
+            Boolean(liveSession.bases[0]),
+            Boolean(liveSession.bases[1]),
+            Boolean(liveSession.bases[2]),
+          ]}
         />
       </div>
 
@@ -903,8 +1132,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           {/* Unified 3D Ballpark + Directly Attached Live Action Bar (always visible together!) */}
           <div className="space-y-2">
             <LiveGameCanvas
-              awayClub={activeOpponent}
-              homeClub={humanClub}
+              awayClub={liveAwayClub}
+              homeClub={liveHomeClub}
               session={liveSession}
               choreo={lastChoreo}
               lastEvent={playbackEvent}
@@ -930,11 +1159,13 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               cue={liveCue}
               matchupLabel={`${currentBatter.name} vs ${currentPitcher.name}`}
               basesLabel={`Bases: ${liveSession.bases.map((b, idx) => (b ? `${idx + 1}B` : '·')).join(' ')}`}
+              batterName={currentBatter.name}
+              pitcherName={currentPitcher.name}
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
               watchMode={watchMode}
               tacticalCall={tacticalCall}
-              isBatting={liveSession.half === 'BOT'}
+              isBatting={humanIsBatting}
               gameCompleted={liveSession.status === 'completed'}
               onNextPitch={handleNextPitch}
               onToggleWatchMode={() => setWatchMode((w) => (w === 'live' ? 'paused' : 'live'))}
@@ -951,6 +1182,9 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                 toggleControlMode();
                 soundEngine.play('ui_pop');
               }}
+              onInspectBatter={() => openGamePlayerCard(currentBatter.id)}
+              onInspectPitcher={() => openGamePlayerCard(currentPitcher.id)}
+              onInspectPlayers={() => openGamePlayerCard(currentBatter.id)}
             />
 
             {liveNemesis ? (
@@ -1144,10 +1378,10 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                     currentLeverage.leverageIndex,
                   );
                   const humanRole: 'pitcher' | 'batter' =
-                    liveSession.half === 'BOT' ? 'batter' : 'pitcher';
+                    humanIsBatting ? 'batter' : 'pitcher';
                   const humanActor = humanRole === 'batter' ? currentBatter : currentPitcher;
                   const humanAvail = humanRole === 'batter' ? batterSpecial : pitcherSpecial;
-                  const humanHypeNow = liveSession.home.hypeGauge;
+                  const humanHypeNow = liveSession[humanSideKey].hypeGauge;
                   const activatable = getActivatablePowersForPlayer(humanActor, humanRole);
 
                   return (
@@ -1224,12 +1458,12 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                   className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
                 >
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
-                    {liveSession.half === 'TOP'
+                    {!humanIsBatting
                       ? 'Pitch Target Intent (Trade Strikes vs Whiffs / Chase)'
                       : 'Guess Pitch Mind-Game (Guess Right: +14 CON/+12 PWR • Wrong: -8)'}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {liveSession.half === 'TOP'
+                    {!humanIsBatting
                       ? PITCH_TARGET_OPTIONS.map((opt) => (
                           <ComicButton
                             key={opt.id}
@@ -1261,7 +1495,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                   </div>
                 </div>
 
-                {liveSession.half === 'TOP' && currentPitcher.pitchArsenal ? (
+                {!humanIsBatting && currentPitcher.pitchArsenal ? (
                   <div
                     data-testid="pitch-selector-bar"
                     className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5"
@@ -1332,7 +1566,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                                 manager,
                                 powerId,
                                 liveSession,
-                                'home',
+                                humanSideKey,
                               );
                               if (res.used && res.event) {
                                 setPowerTracker(res.tracker);
@@ -1447,7 +1681,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                         variant={moundVisitUsed ? 'cream' : 'sky'}
                         disabled={moundVisitUsed || liveSession.status === 'completed'}
                         onClick={() => {
-                          const res = applyMoundVisit(liveSession, 'home', 'calm_breath');
+                          const res = applyMoundVisit(liveSession, humanSideKey, 'calm_breath');
                           if (res.applied && res.event) {
                             setMoundVisitUsed(true);
                             applyStepResult(res.nextSession, [res.event], activeOpponent.id);
@@ -1461,7 +1695,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                         variant={moundVisitUsed ? 'cream' : 'gold'}
                         disabled={moundVisitUsed || liveSession.status === 'completed'}
                         onClick={() => {
-                          const res = applyMoundVisit(liveSession, 'home', 'fire_up_crowd');
+                          const res = applyMoundVisit(liveSession, humanSideKey, 'fire_up_crowd');
                           if (res.applied && res.event) {
                             setMoundVisitUsed(true);
                             applyStepResult(res.nextSession, [res.event], activeOpponent.id);
@@ -1478,7 +1712,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                           const rng = createSeededRng(
                             liveSession.rngSeed + liveSession.stepCounter * 71 + 19,
                           );
-                          const gamble = resolveArgueCallGamble(rng, liveSession, 'home');
+                          const gamble = resolveArgueCallGamble(rng, liveSession, humanSideKey);
                           setArgueUsed(true);
                           if (gamble.ejected) setManagerEjected(true);
                           applyStepResult(gamble.nextSession, [gamble.event], activeOpponent.id);
@@ -1490,7 +1724,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                   </div>
 
                   {(() => {
-                    const bench = getAvailableBenchPlayers(liveSession, 'home');
+                    const bench = getAvailableBenchPlayers(liveSession, humanSideKey);
                     const occupiedBaseIdx = liveSession.bases.findIndex((b) => b !== null) as
                       | -1
                       | 0
@@ -1515,13 +1749,13 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                                 {sub.position} {sub.name} ({sub.bats}) • SPD {sub.ratings.speed}
                               </div>
                               <div className="flex gap-1">
-                                {liveSession.half === 'BOT' ? (
+                                {humanIsBatting ? (
                                   <ComicButton
                                     size="sm"
                                     variant="gold"
                                     disabled={liveSession.status === 'completed'}
                                     onClick={() => {
-                                      const res = applyPinchHitter(liveSession, 'home', sub.id);
+                                      const res = applyPinchHitter(liveSession, humanSideKey, sub.id);
                                       if (res.applied && res.event) {
                                         applyStepResult(
                                           res.nextSession,
@@ -1534,7 +1768,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                                     Pinch Hit
                                   </ComicButton>
                                 ) : null}
-                                {liveSession.half === 'BOT' && occupiedBaseIdx >= 0 ? (
+                                {humanIsBatting && occupiedBaseIdx >= 0 ? (
                                   <ComicButton
                                     size="sm"
                                     variant="turf"
@@ -1542,7 +1776,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                                     onClick={() => {
                                       const res = applyPinchRunner(
                                         liveSession,
-                                        'home',
+                                        humanSideKey,
                                         occupiedBaseIdx as 0 | 1 | 2,
                                         sub.id,
                                       );
@@ -1574,7 +1808,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                 ) : (
                   <div className="space-y-2">
                     {availableRelievers.map((relId) => {
-                      const rel = liveSession.home.playersById[relId];
+                      const rel = liveSession[humanSideKey].playersById[relId];
                       if (!rel) return null;
                       const warmup = evaluateBullpenWarmup(rel.id, warmupCounts[rel.id] ?? 0);
                       const isWarming = warmingRelieverIds.includes(rel.id);
@@ -1645,8 +1879,23 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
         open={boxScoreOpen}
         onClose={() => setBoxScoreOpen(false)}
         session={liveSession}
-        awayClub={activeOpponent}
-        homeClub={humanClub}
+        awayClub={liveAwayClub}
+        homeClub={liveHomeClub}
+        onInspectPlayer={(id) => {
+          setBoxScoreOpen(false);
+          openGamePlayerCard(id);
+        }}
+      />
+
+      <PlayerCardModal
+        open={inspectedGamePlayerId !== null}
+        entry={activeInspectedEntry}
+        allEntries={gameCardEntries}
+        batterId={currentBatter.id}
+        pitcherId={currentPitcher.id}
+        runnerIds={liveRunnerIds}
+        onSelectPlayerId={(id) => setInspectedGamePlayerId(id)}
+        onClose={() => setInspectedGamePlayerId(null)}
       />
 
       <PostGameSummaryModal

@@ -15,9 +15,15 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   // Soundboard lives exclusively in Design Lab (NOT cluttering Game Day)
   await expect(page.getByTestId('ballpark-soundboard')).toHaveCount(0);
   await expect(page.getByTestId('manager-action-inbox')).toBeVisible();
+  await expect(page.getByTestId('scheduled-matchup-card')).toBeVisible();
+  await expect(page.getByTestId('schedule-series-pill')).toHaveCount(7);
   await page.getByRole('button', { name: /start live 3d game/i }).click();
 
-  // Verify Sticky Scoreboard + 3D Ballpark Canvas + Next Pitch button are ALL visible on-screen together WITHOUT scrolling!
+  // Verify Sticky R/H/E Scoreboard + 3D Ballpark Canvas + Next Pitch button are ALL visible on-screen together WITHOUT scrolling!
+  await expect(page.getByTestId('scoreboard-away-rhe')).toBeVisible();
+  await expect(page.getByTestId('scoreboard-home-rhe')).toBeVisible();
+  await expect(page.getByTestId('scoreboard-count-text')).toBeVisible();
+  await expect(page.getByTestId('scoreboard-bases-diamond')).toBeVisible();
   const scoreBox = await page.getByTestId('sticky-live-scoreboard').boundingBox();
   const canvasBox = await page.getByTestId('live-game-3d-canvas').boundingBox();
   const nextPitchBtn = page.getByRole('button', { name: /next pitch/i });
@@ -33,6 +39,16 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('coach-action-cue')).toBeVisible();
   await nextPitchBtn.click();
   await expect(page.getByTestId('live-last-pitch-readout')).toContainText(/mph|ball|strike|out|hit|walk/i);
+
+  // Inspect Batter & Pitcher baseball cards right inside the 3D game (top-safe on Mobile!)
+  await page.getByTestId('inspect-batter-card-btn').click();
+  const liveCardDialog = page.getByRole('dialog', { name: /player baseball card/i });
+  await expect(liveCardDialog).toBeVisible();
+  const liveCardHeadingBox = await liveCardDialog.locator('h2').first().boundingBox();
+  expect(liveCardHeadingBox).not.toBeNull();
+  expect(liveCardHeadingBox!.y).toBeGreaterThanOrEqual(0);
+  await page.getByTestId('card-modal-pitcher-tab').click();
+  await page.getByRole('button', { name: /close player card/i }).click();
 
   // Verify Weather, Rivalry, Live Box Score, Broadcast HUD & Show Math Inspector
   await expect(page.getByTestId('broadcast-hud')).toBeVisible();
@@ -63,8 +79,14 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   expect(inboxBox).not.toBeNull();
   expect(inboxBox!.y).toBeGreaterThanOrEqual(0);
 
-  // Visit Roster -> verify Trainer's Table, Deep Scouting Dossier & 1-tap PNG Baseball Card export
+  // Visit Roster -> verify Mobile Roster Card Binder, 1-tap Card modal, Trainer's Table, Dossier & PNG export
   await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();
+  await page.getByTestId('roster-open-card-btn').first().click();
+  await expect(page.getByRole('dialog', { name: /player baseball card/i })).toBeVisible();
+  await page.getByRole('button', { name: /close player card/i }).click();
+  await page.getByTestId('roster-view-cards-btn').click();
+  await expect(page.getByTestId('roster-card-binder')).toBeVisible();
+  await page.getByTestId('roster-view-lineup-btn').click();
   await expect(page.getByTestId('trainers-table-panel')).toBeVisible();
   await page.getByRole('button', { name: /full scouting dossier/i }).click();
   await expect(page.getByTestId('player-dossier-modal')).toBeVisible();

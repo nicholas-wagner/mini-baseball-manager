@@ -52,6 +52,16 @@ export interface ScheduledSeriesRound {
   matchups: readonly SeriesMatchup[];
 }
 
+export interface HumanScheduledSeries {
+  seriesIndex: number; // 0..6
+  seriesNumber: number; // 1..7
+  opponent: Club;
+  isHome: boolean;
+  gamesCount: 3;
+  hostBallparkId: Club['stadium']['ballparkId'];
+  status: 'completed' | 'current' | 'upcoming';
+}
+
 export interface StandingsRow {
   rank: number;
   clubId: string;
@@ -189,6 +199,58 @@ export function generateTierSchedule(clubIds: readonly string[]): readonly Sched
   return rounds;
 }
 
+function resolveHumanSeriesStatus(
+  seriesIndex: number,
+  currentSeriesIndex: number,
+): HumanScheduledSeries['status'] {
+  if (seriesIndex < currentSeriesIndex) return 'completed';
+  if (seriesIndex === currentSeriesIndex) return 'current';
+  return 'upcoming';
+}
+
+function buildHumanSeriesEntry(
+  round: ScheduledSeriesRound,
+  byId: ReadonlyMap<string, Club>,
+  humanClub: Club,
+  currentSeriesIndex: number,
+): HumanScheduledSeries | null {
+  const match = round.matchups.find(
+    (m) => m.homeClubId === humanClub.id || m.awayClubId === humanClub.id,
+  );
+  if (!match) return null;
+  const isHome = match.homeClubId === humanClub.id;
+  const opponent = byId.get(isHome ? match.awayClubId : match.homeClubId);
+  if (!opponent) return null;
+  return {
+    seriesIndex: round.seriesIndex,
+    seriesNumber: round.seriesIndex + 1,
+    opponent,
+    isHome,
+    gamesCount: match.gamesCount,
+    hostBallparkId: (isHome ? humanClub : opponent).stadium.ballparkId,
+    status: resolveHumanSeriesStatus(round.seriesIndex, currentSeriesIndex),
+  };
+}
+
+/** Projects the predetermined 7-series (21-game) Home & Away schedule for the human club. */
+export function getHumanSeasonSchedule(
+  tierClubs: readonly Club[],
+  humanClubId: string,
+  currentSeriesIndex: number,
+): { entries: readonly HumanScheduledSeries[]; nextSeries: HumanScheduledSeries | null } {
+  const byId = new Map(tierClubs.map((c) => [c.id, c]));
+  const humanClub = byId.get(humanClubId);
+  if (!humanClub) return { entries: [], nextSeries: null };
+
+  const rounds = generateTierSchedule(tierClubs.map((c) => c.id));
+  const entries = rounds
+    .map((round) => buildHumanSeriesEntry(round, byId, humanClub, currentSeriesIndex))
+    .filter((entry): entry is HumanScheduledSeries => entry !== null);
+
+  const nextSeries = entries.find((entry) => entry.status === 'current') ?? null;
+  return { entries, nextSeries };
+}
+
 /** Computes sorted league standings with win percentage and games back. */
 export function computeTierStandings(clubs: readonly Club[]): readonly StandingsRow[] {
   const sorted = [...clubs].sort((a, b) => {
@@ -303,6 +365,44 @@ export function getTierLeagueLeaders(clubs: readonly Club[]): TierLeagueLeaders 
   };
 }
 
+function simulateMatchupGames(
+  map: Map<string, Club>,
+  match: SeriesMatchup,
+  matchIdx: number,
+  seed: number,
+  regulationInnings: GameLengthInnings,
+  humanGameplan: SeriesGameplanId,
+  humanGamesAlreadyPlayed: number,
+): number {
+  const initialAway = map.get(match.awayClubId);
+  const initialHome = map.get(match.homeClubId);
+  if (!initialAway || !initialHome) return 0;
+
+  const involvesHuman = initialAway.isHuman || initialHome.isHuman;
+  const startGame = involvesHuman ? Math.max(0, humanGamesAlreadyPlayed) : 0;
+  let simulated = 0;
+
+  for (let g = startGame; g < match.gamesCount; g += 1) {
+    const away = map.get(match.awayClubId)!;
+    const home = map.get(match.homeClubId)!;
+    const gameSeed = seed + matchIdx * 31 + g * 7;
+    const result = simFullGame(
+      away,
+      home,
+      gameSeed,
+      regulationInnings,
+      'regular',
+      away.isHuman ? humanGameplan : 'balanced',
+      home.isHuman ? humanGameplan : 'balanced',
+    );
+    const homeWon = result.winnerClubId === home.id;
+    map.set(home.id, applyGameStatDeltasToClub(home, result.playerStatDeltas, homeWon));
+    map.set(away.id, applyGameStatDeltasToClub(away, result.playerStatDeltas, !homeWon));
+    simulated += 1;
+  }
+  return simulated;
+}
+
 /** Simulates one full 3-game series round (4 matchups × 3 games) for an 8-club tier. */
 export function simulateSeriesRound(
   clubs: readonly Club[],
@@ -310,6 +410,7 @@ export function simulateSeriesRound(
   seed: number,
   regulationInnings: GameLengthInnings = 9,
   humanGameplan: SeriesGameplanId = 'balanced',
+  humanGamesAlreadyPlayed = 0,
 ): { clubs: Club[]; gamesSimulated: number } {
   const schedule = generateTierSchedule(clubs.map((c) => c.id));
   const round = schedule[seriesIndex % schedule.length];
@@ -319,26 +420,15 @@ export function simulateSeriesRound(
   let gamesSimulated = 0;
 
   round.matchups.forEach((match, matchIdx) => {
-    for (let g = 0; g < match.gamesCount; g += 1) {
-      const away = map.get(match.awayClubId);
-      const home = map.get(match.homeClubId);
-      if (!away || !home) continue;
-
-      const gameSeed = seed + matchIdx * 31 + g * 7;
-      const result = simFullGame(
-        away,
-        home,
-        gameSeed,
-        regulationInnings,
-        'regular',
-        away.isHuman ? humanGameplan : 'balanced',
-        home.isHuman ? humanGameplan : 'balanced',
-      );
-      const homeWon = result.winnerClubId === home.id;
-      map.set(home.id, applyGameStatDeltasToClub(home, result.playerStatDeltas, homeWon));
-      map.set(away.id, applyGameStatDeltasToClub(away, result.playerStatDeltas, !homeWon));
-      gamesSimulated += 1;
-    }
+    gamesSimulated += simulateMatchupGames(
+      map,
+      match,
+      matchIdx,
+      seed,
+      regulationInnings,
+      humanGameplan,
+      humanGamesAlreadyPlayed,
+    );
   });
 
   return {

@@ -27,7 +27,9 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       const user = userEvent.setup();
       render(<GameDayScreen />);
 
-      expect(screen.getByText(/choose today's matchup/i)).toBeInTheDocument();
+      expect(screen.queryByText(/choose today's matchup/i)).not.toBeInTheDocument();
+      expect(screen.getByTestId('scheduled-matchup-card')).toBeInTheDocument();
+      expect(screen.getByTestId('season-schedule-strip')).toBeInTheDocument();
       // Soundboard now lives exclusively in Design Lab
       expect(screen.queryByTestId('ballpark-soundboard')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: /5 inn \(blitz\)/i })).toBeInTheDocument();
