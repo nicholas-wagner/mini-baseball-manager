@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FastForward, Play, RefreshCw, SkipForward, Zap } from 'lucide-react';
+import { bgmEngine } from '../../audio/bgmEngine';
 import { soundEngine } from '../../audio/soundEngine';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
 import {
@@ -88,6 +89,7 @@ export function GameDayScreen() {
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const [recentEvents, setRecentEvents] = useState<PlayEvent[]>([]);
+  const [playbackEvent, setPlaybackEvent] = useState<PlayEvent | null>(null);
   const [lastChoreo, setLastChoreo] = useState<ChoreographedStep | null>(null);
   const [speed, setSpeed] = useState<1 | 2 | 4>(1);
   const [watchMode, setWatchMode] = useState<'live' | 'clutch' | 'paused'>('paused');
@@ -135,6 +137,7 @@ export function GameDayScreen() {
     setLiveSession(session);
     setRecentEvents([]);
     setLastChoreo(null);
+    setPlaybackEvent(null);
     setSelectedPitchType(null);
     setDefensiveShift('standard');
     setWinProbHistory([estimateHomeWinProbability(session)]);
@@ -143,6 +146,7 @@ export function GameDayScreen() {
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setWatchMode(autoPlay ? 'live' : 'paused');
+    bgmEngine.syncStadium(session.ballparkId);
     soundEngine.play('organ_charge');
   };
 
@@ -153,9 +157,17 @@ export function GameDayScreen() {
       if (warmingRelieverIds.length > 0) {
         setWarmupCounts((prev) => tickBullpenWarmups(prev, warmingRelieverIds));
       }
-      const lastEvent = emitted[emitted.length - 1] ?? null;
+      // An inning-ending out can be followed by administrative events in the same step.
+      const lastEvent = emitted.slice().reverse().find(e => e.outcome || e.type === 'stolen_base_attempt')
+        ?? emitted.at(-1);
+      setPlaybackEvent(lastEvent ?? null);
       if (lastEvent) {
         const choreo = choreographPlayEvent(lastEvent, speed);
+        if (choreo.infield === 'double_play') {
+          const before = emitted[emitted.indexOf(lastEvent) - 1];
+          choreo.leadRunnerId = (before?.half === lastEvent.half && before.inning === lastEvent.inning
+            ? before.basesAfter[0] : liveSession?.bases[0]) ?? undefined;
+        }
         setLastChoreo(choreo);
         if (choreo.soundCue) {
           soundEngine.play(choreo.soundCue);
@@ -164,7 +176,7 @@ export function GameDayScreen() {
       }
       finalizeSessionIfComplete(nextSession, emitted, oppId);
     },
-    [finalizeSessionIfComplete, speed, warmingRelieverIds],
+    [finalizeSessionIfComplete, speed, warmingRelieverIds, liveSession],
   );
 
   const resolvePitchCallOption = useCallback(
@@ -412,7 +424,7 @@ export function GameDayScreen() {
             homeClub={humanClub}
             session={liveSession}
             choreo={lastChoreo}
-            lastEvent={recentEvents[0] ?? null}
+            lastEvent={playbackEvent}
           />
 
           <BroadcastHud

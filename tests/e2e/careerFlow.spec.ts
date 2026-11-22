@@ -6,17 +6,17 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   test.setTimeout(60_000);
   await page.goto('/');
 
-  // Design Lab mounts the full 28-cue Ballpark Soundboard
-  await expect(page.getByTestId('ballpark-soundboard')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Stomp-Stomp-Clap!' })).toBeVisible();
-
-  // Navigate to Play Ball and found a new Rookie Sandlot club
-  await page.getByRole('button', { name: /play ball/i }).locator('visible=true').first().click();
+  // Production launch lands straight on Play Ball / Club Creator with Design Lab hidden
+  await expect(page.getByRole('button', { name: /design lab/i })).toHaveCount(0);
   const startBtn = page.getByRole('button', { name: /start sandlot dynasty/i });
   await expect(startBtn).toBeVisible();
   await startBtn.click();
 
-  // Start a Live 3D Game and verify Broadcast HUD (Win Probability + Defensive Shifts)
+  // Start a Live 3D Game and verify Broadcast HUD + 40-cue Soundboard & 10-track Per-Stadium Jukebox
+  await expect(page.getByTestId('ballpark-soundboard')).toBeVisible();
+  await expect(page.getByTestId('arcade-bgm-jukebox')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stomp-Stomp-Clap!' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stadium Airhorn!' })).toBeVisible();
   await page.getByRole('button', { name: /start live 3d game/i }).click();
   await expect(page.getByTestId('broadcast-hud')).toBeVisible();
   await page.getByRole('button', { name: /next pitch/i }).click();
@@ -68,4 +68,9 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /open 4 career save slots/i }).locator('visible=true').first().click();
   await expect(page.getByTestId('career-slot-1')).toBeVisible();
   await expect(page.getByTestId('career-slot-4')).toBeVisible();
+  await page.getByRole('button', { name: /close career slots/i }).click();
+
+  await page.getByRole('button', { name: /open 90s music jukebox/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('music-jukebox-modal')).toBeVisible();
+  await page.getByRole('button', { name: /close music jukebox/i }).click();
 });

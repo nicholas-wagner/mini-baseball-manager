@@ -29,7 +29,7 @@ Manage lineups, draft global prospects, develop branching player & manager skill
 - **Deep Baseball Strategy, Speed-Driven Base Stealing, Co-Ed Archetypes & 2–60 Min Pacing**: Exact `B/T` platoon chess, `2–3` RP / `4–5` SP pitch arsenals, pitcher endurance velocity/break drop-off, full **Base Stealing** (`Steal 2B`, `Steal 3B`, `Double Steal`, `Steal Home`, defensive `Pitchout/Hold`, `SB/CS`, AI steals, live speed-driven odds), Defensive Shifts, Bullpen Warmups, Win Probability HUD, `5 / 7 / 9`-inning game formats + 1st-extra-inning 2B Ghost Runner, asymmetric co-ed traits & clubhouse synergies, and full sabermetrics (`AVG/OBP/SLG/OPS/ERA/WHIP/K9/Strike%/FPCT`).
 - **Full GM Career, Sim-City Ballpark HQ, World Spectacles & Pass-and-Play Duels**: Start on a neighborhood **Rookie Sandlot (`500–1,500` fans)** with 6 fair-parity roster builds, evolve your 3D ballpark & capacity up to **Pro Major League Cathedrals (`28,000–45,000` fans)** across `10` retro venues with Park Factors, tune Ticket/Concession pricing, 90s Parody Sponsors, TV Deals & 4-Lot District Grid synergies, manage **The Sandlot Gazette**, **52 Narrative Surprise Cards**, **Trade Machine**, **6-Slot Prospect Farm Academy**, hireable **Coaching, Equipment & Specialty Medical Staff**, **Season Awards & Club Hall of Fame**, **All-Star Home Run Derby**, **Global Chibi Cup**, **199X Time Capsule Challenge Scenarios**, and offline `MBM1:` **Pass-and-Play Friend Boss Exhibition Duels**!
 - **4-Slot Auto-Save, Coach Pops' Dugout Guide & 8 Replayable CYOA Backstories**: Automatic local saving & instant resume across **4 independent Career Save Slots** (with safe 2-step delete/restart), an upbeat illustrated **Dugout Handbook**, and **8 replayable Manager Backstories** featuring 24 branching Choose-Your-Own-Adventure chapters, alignment titles, character bonds & a *Sandlot Gazette* Scrapbook.
-- **Procedural 90s Web Audio (28 Cues)**: Zero-dependency Web Audio synthesizer & soundboard featuring bat cracks, organ riffs, *Stomp-Stomp-Clap!*, bullpen phone rings, ump calls, fireworks, and multi-formant pink-noise stadium crowd roars.
+- **Procedural 90s Web Audio (40 SFX Cues + 10 Unique Stadium Soundtracks)**: Zero-dependency Web Audio synthesizer & soundboard featuring 40 ballpark cues (bat cracks, shattered bats, ump calls, steal bursts, organ riffs, *7th-Inning Stretch*, *Stomp-Stomp-Clap!*, airhorns, vendor bells, thunder, fireworks, and multi-formant pink-noise stadium crowds) plus a mutable **90s Arcade Stadium Jukebox** with a unique gentle background theme for every one of the 10 ballparks!
 
 ---
 
@@ -39,7 +39,7 @@ Manage lineups, draft global prospects, develop branching player & manager skill
 # Install dependencies
 npm install
 
-# Launch the interactive Design Lab & dev server
+# Launch the app & dev server (press "d" 5 times anywhere outside text inputs to toggle the hidden Design Lab!)
 npm run dev
 
 # Run the TDD unit & component test suite

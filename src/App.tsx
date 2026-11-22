@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   BookOpen,
   Building2,
+  Disc3,
   Gamepad2,
   GitBranch,
   HardDrive,
@@ -10,12 +11,14 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+import { bgmEngine } from './audio/bgmEngine';
 import { soundEngine } from './audio/soundEngine';
 import { getNextAvailableStoryChapter } from './engine/story/storyEngine';
 import { useCareerStoryStore } from './store/careerSlots';
 import { useGameStore } from './store/gameStore';
 import { CareerSlotsModal } from './ui/components/CareerSlotsModal';
 import { DugoutGuideModal } from './ui/components/DugoutGuideModal';
+import { MusicJukeboxModal } from './ui/components/MusicJukeboxModal';
 import { PwaInstallBanner } from './ui/components/PwaInstallBanner';
 import { StoryChapterModal } from './ui/components/StoryChapterModal';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
@@ -27,6 +30,13 @@ import { GameDayScreen } from './ui/screens/GameDayScreen';
 import { LeagueScreen } from './ui/screens/LeagueScreen';
 import { RosterLineupScreen } from './ui/screens/RosterLineupScreen';
 import { SkillTreeScreen } from './ui/screens/SkillTreeScreen';
+import {
+  createKeySequenceTracker,
+  DESIGN_LAB_SHORTCUT_COUNT,
+  DESIGN_LAB_SHORTCUT_KEY,
+  DESIGN_LAB_SHORTCUT_WINDOW_MS,
+  isEditableEventTarget,
+} from './ui/utils/designLabShortcut';
 
 type TabId = 'lab' | 'gameday' | 'roster' | 'league' | 'skills' | 'economy';
 
@@ -52,17 +62,79 @@ const UPCOMING_MILESTONES: Record<
 };
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('lab');
+  const [designLabVisible, setDesignLabVisible] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('lab') === '1';
+  });
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('lab') === '1') {
+      return 'lab';
+    }
+    return 'gameday';
+  });
   const [muted, setMuted] = useState(false);
+  const [bgmEnabled, setBgmEnabled] = useState(() => bgmEngine.getState().enabled);
   const [guideOpen, setGuideOpen] = useState(false);
   const [storyOpen, setStoryOpen] = useState(false);
   const [slotsOpen, setSlotsOpen] = useState(false);
+  const [jukeboxOpen, setJukeboxOpen] = useState(false);
   const humanClub = useGameStore((s) => s.getHumanClub());
   const seasonNumber = useGameStore((s) => s.seasonNumber);
   const storyState = useCareerStoryStore((s) => s.storyState);
   const lastAutoSavedIso = useCareerStoryStore((s) => s.lastAutoSavedIso);
   const resumeLastSavedCareer = useCareerStoryStore((s) => s.resumeLastSavedCareer);
   const autoSaveActiveCareer = useCareerStoryStore((s) => s.autoSaveActiveCareer);
+
+  // Secret developer/power-user shortcut: press "d" 5 times rapidly to show or hide Design Lab
+  useEffect(() => {
+    const tracker = createKeySequenceTracker({
+      targetKey: DESIGN_LAB_SHORTCUT_KEY,
+      requiredCount: DESIGN_LAB_SHORTCUT_COUNT,
+      windowMs: DESIGN_LAB_SHORTCUT_WINDOW_MS,
+    });
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isEditableEventTarget(event.target)) {
+        tracker.reset();
+        return;
+      }
+      if (tracker.recordKey(event.key)) {
+        setDesignLabVisible((wasVisible) => {
+          const nextVisible = !wasVisible;
+          if (nextVisible) {
+            setActiveTab('lab');
+            soundEngine.play('level_up');
+          } else {
+            setActiveTab((tab) => (tab === 'lab' ? 'gameday' : tab));
+            soundEngine.play('ui_pop');
+          }
+          return nextVisible;
+        });
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Keep UI synced with BGM Jukebox state & start gentle arcade music cleanly on first browser interaction
+  useEffect(() => {
+    const unsub = bgmEngine.subscribe((s) => setBgmEnabled(s.enabled));
+    const unlockBgm = () => {
+      bgmEngine.startIfAllowed();
+    };
+    window.addEventListener('pointerdown', unlockBgm, { once: true });
+    window.addEventListener('keydown', unlockBgm, { once: true });
+    return () => {
+      unsub();
+      window.removeEventListener('pointerdown', unlockBgm);
+      window.removeEventListener('keydown', unlockBgm);
+    };
+  }, []);
+
+  // Automatically sync stadium environmental soundtrack whenever the active club's home ballpark changes
+  useEffect(() => {
+    bgmEngine.syncStadium(humanClub?.stadium.ballparkId ?? 'sandlot_commons');
+  }, [humanClub?.stadium.ballparkId]);
 
   // Resume the last active saved career slot automatically on boot
   useEffect(() => {
@@ -142,22 +214,44 @@ export function App() {
         </span>
         <span className="md:hidden">Saves{lastAutoSavedIso ? '✓' : ''}</span>
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          soundEngine.play('ui_pop');
+          setJukeboxOpen(true);
+        }}
+        className={`comic-btn px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] ${
+          bgmEnabled && !muted ? 'bg-[#E0C3FC] text-[#181B2C]' : 'bg-[#FBF4E4] text-[#4A5068]'
+        }`}
+        aria-label="Open 90s Music Jukebox"
+      >
+        <Disc3 className="w-3.5 h-3.5 shrink-0" />
+        <span className="hidden md:inline">
+          {bgmEnabled && !muted ? 'Jukebox: ON' : 'Jukebox: OFF'}
+        </span>
+        <span className="md:hidden">BGM</span>
+      </button>
     </div>
   );
 
   const handleToggleMute = () => {
     const nextMuted = soundEngine.toggleMute();
+    bgmEngine.setMasterMuted(nextMuted);
     setMuted(nextMuted);
     if (!nextMuted) {
       soundEngine.play('ui_pop');
     }
   };
 
+  const visibleNavItems = designLabVisible
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => item.id !== 'lab');
+
   const renderMainContent = () => {
-    if (activeTab === 'lab') {
+    if (activeTab === 'lab' && designLabVisible) {
       return <DesignLabScreen />;
     }
-    if (activeTab === 'gameday') {
+    if (activeTab === 'gameday' || activeTab === 'lab') {
       return humanClub ? (
         <GameDayScreen />
       ) : (
@@ -209,7 +303,7 @@ export function App() {
           ? `${humanClub.leagueTier.toUpperCase()} LEAGUE • ${humanClub.wins}-${humanClub.losses}`
           : 'Rookie Sandlot League'
       }
-      navItems={NAV_ITEMS}
+      navItems={visibleNavItems}
       activeTab={activeTab}
       onSelectTab={(id) => {
         soundEngine.play('ui_pop');
@@ -232,6 +326,7 @@ export function App() {
         onClose={() => setSlotsOpen(false)}
         onStartNewInSlot={() => setActiveTab('gameday')}
       />
+      <MusicJukeboxModal open={jukeboxOpen} onClose={() => setJukeboxOpen(false)} />
     </AppShell>
   );
 }

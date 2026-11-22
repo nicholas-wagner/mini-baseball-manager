@@ -20,6 +20,18 @@ const EXPECTED_NEW_CUES: readonly SoundCue[] = [
   'clutch_stinger',
   'card_flip',
   'trophy_fanfare',
+  'ump_strike_call',
+  'ump_safe_call',
+  'steal_burst',
+  'broken_bat',
+  'wall_thud',
+  'walk_ball_four',
+  'organ_seventh_stretch',
+  'stadium_airhorn',
+  'vendor_bell',
+  'rain_thunder',
+  'heritage_power_surge',
+  'trade_gavel',
 ];
 
 describe('RetroSoundEngine', () => {
@@ -47,10 +59,10 @@ describe('RetroSoundEngine', () => {
     expect(engine.getState().volume).toBe(0);
   });
 
-  it('exposes all 28 ballpark, action, and RPG sound cues in ALL_SOUNDBOARD_CUES and plays each cleanly', () => {
-    expect(ALL_SOUNDBOARD_CUES).toHaveLength(28);
+  it('exposes all 40 ballpark, action, and RPG sound cues in ALL_SOUNDBOARD_CUES and plays each cleanly', () => {
+    expect(ALL_SOUNDBOARD_CUES).toHaveLength(40);
     const cueSet = new Set(ALL_SOUNDBOARD_CUES.map((item) => item.cue));
-    expect(cueSet.size).toBe(28);
+    expect(cueSet.size).toBe(40);
 
     for (const cue of EXPECTED_NEW_CUES) {
       expect(cueSet.has(cue)).toBe(true);

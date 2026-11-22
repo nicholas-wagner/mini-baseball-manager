@@ -30,7 +30,19 @@ export type PlaySoundCue =
   | 'trophy_fanfare'
   | 'level_up'
   | 'cash_chime'
-  | 'ui_pop';
+  | 'ui_pop'
+  | 'ump_strike_call'
+  | 'ump_safe_call'
+  | 'steal_burst'
+  | 'broken_bat'
+  | 'wall_thud'
+  | 'walk_ball_four'
+  | 'organ_seventh_stretch'
+  | 'stadium_airhorn'
+  | 'vendor_bell'
+  | 'rain_thunder'
+  | 'heritage_power_surge'
+  | 'trade_gavel';
 
 export type TacticalCall =
   | 'normal'

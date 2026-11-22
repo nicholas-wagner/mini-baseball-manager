@@ -26,7 +26,19 @@ export type SoundCue =
   | 'trophy_fanfare'
   | 'level_up'
   | 'cash_chime'
-  | 'ui_pop';
+  | 'ui_pop'
+  | 'ump_strike_call'
+  | 'ump_safe_call'
+  | 'steal_burst'
+  | 'broken_bat'
+  | 'wall_thud'
+  | 'walk_ball_four'
+  | 'organ_seventh_stretch'
+  | 'stadium_airhorn'
+  | 'vendor_bell'
+  | 'rain_thunder'
+  | 'heritage_power_surge'
+  | 'trade_gavel';
 
 export type SoundboardCategory = 'action' | 'atmosphere' | 'rpg';
 
@@ -36,11 +48,12 @@ export interface SoundboardCueSpec {
   category: SoundboardCategory;
 }
 
-/** Complete 27-cue procedural 90s ballpark soundboard catalog (100% offline Web Audio). */
+/** Complete 40-cue procedural 90s ballpark soundboard catalog (100% offline Web Audio). */
 export const ALL_SOUNDBOARD_CUES: readonly SoundboardCueSpec[] = [
-  // On-Field Action (13)
+  // On-Field Action (20)
   { cue: 'bat_crack', label: 'Bat Crack', category: 'action' },
   { cue: 'bomb_crack', label: 'Bomb Blast', category: 'action' },
+  { cue: 'broken_bat', label: 'Shattered Bat!', category: 'action' },
   { cue: 'bunt_tap', label: 'Bunt Tap', category: 'action' },
   { cue: 'glove_pop', label: 'Glove Pop', category: 'action' },
   { cue: 'pitch_whoosh', label: 'Pitch Whoosh', category: 'action' },
@@ -49,23 +62,34 @@ export const ALL_SOUNDBOARD_CUES: readonly SoundboardCueSpec[] = [
   { cue: 'tornado_whoosh', label: 'Tornado Slider', category: 'action' },
   { cue: 'spring_boing', label: 'High-Jump Boing', category: 'action' },
   { cue: 'strikeout_punch', label: 'Strikeout Punch', category: 'action' },
+  { cue: 'ump_strike_call', label: 'Ump: Strike Three!', category: 'action' },
+  { cue: 'ump_safe_call', label: 'Ump: Safe!', category: 'action' },
+  { cue: 'steal_burst', label: 'Base Steal Burst', category: 'action' },
   { cue: 'dirt_slide', label: 'Dusty Slide', category: 'action' },
+  { cue: 'wall_thud', label: 'Outfield Wall Thud', category: 'action' },
   { cue: 'foul_clank', label: 'Foul Backstop', category: 'action' },
   { cue: 'double_play_snap', label: 'Turn-Two DP', category: 'action' },
+  { cue: 'walk_ball_four', label: 'Ball Four Trot', category: 'action' },
   { cue: 'error_bonk', label: 'Error / Slump Bonk', category: 'action' },
-  // Ballpark Atmosphere & Organ (8)
+  // Ballpark Atmosphere & Organ (12)
   { cue: 'organ_charge', label: 'Organ: Charge!', category: 'atmosphere' },
   { cue: 'organ_homerun', label: 'Organ: Home Run!', category: 'atmosphere' },
   { cue: 'organ_rally', label: 'Organ: Rally Clap', category: 'atmosphere' },
+  { cue: 'organ_seventh_stretch', label: 'Organ: 7th-Inning Stretch', category: 'atmosphere' },
   { cue: 'stadium_stomp_clap', label: 'Stomp-Stomp-Clap!', category: 'atmosphere' },
+  { cue: 'stadium_airhorn', label: 'Stadium Airhorn!', category: 'atmosphere' },
   { cue: 'crowd_cheer', label: 'Crowd Roar', category: 'atmosphere' },
   { cue: 'crowd_gasp', label: 'Crowd Gasp', category: 'atmosphere' },
+  { cue: 'vendor_bell', label: 'Peanuts & Sodas Bell', category: 'atmosphere' },
+  { cue: 'rain_thunder', label: 'Rain Delay Rumble', category: 'atmosphere' },
   { cue: 'bullpen_phone', label: 'Bullpen Phone', category: 'atmosphere' },
   { cue: 'fireworks_boom', label: 'Walk-Off Fireworks', category: 'atmosphere' },
-  // RPG, Cards & Front Office (6)
+  // RPG, Cards & Front Office (8)
+  { cue: 'heritage_power_surge', label: 'Myth/Animal Power!', category: 'rpg' },
   { cue: 'clutch_stinger', label: 'Critical Moment', category: 'rpg' },
   { cue: 'level_up', label: 'RPG Level Up', category: 'rpg' },
   { cue: 'trophy_fanfare', label: 'Champ / Draft Fanfare', category: 'rpg' },
+  { cue: 'trade_gavel', label: 'Trade Deal Sealed!', category: 'rpg' },
   { cue: 'cash_chime', label: 'Sim-City Cash', category: 'rpg' },
   { cue: 'card_flip', label: 'Cardstock Flip', category: 'rpg' },
   { cue: 'ui_pop', label: 'UI Pop', category: 'rpg' },
@@ -424,6 +448,44 @@ export class RetroSoundEngine {
         this.tone(ctx, 392, 370, 0.14, 0.16, 'triangle', 0.24);
         this.tone(ctx, 349.23, 311.13, 0.32, 0.28, 'triangle', 0.24);
         return true;
+      case 'ump_strike_call':
+        this.playGlovePopAt(ctx, 0, 1.0);
+        this.tone(ctx, 185, 290, 0.08, 0.13, 'sawtooth', 0.26);
+        this.tone(ctx, 320, 145, 0.22, 0.22, 'sawtooth', 0.32);
+        this.noiseBurst(ctx, 0.22, 0.09, 1300, 'bandpass', 0.28);
+        return true;
+      case 'ump_safe_call':
+        this.playFilteredPinkSweep(ctx, 0, 0.18, 1250, 620, 1.5, 0.42);
+        this.tone(ctx, 440, 659.25, 0.08, 0.13, 'triangle', 0.28);
+        this.tone(ctx, 659.25, 880, 0.2, 0.16, 'triangle', 0.26);
+        return true;
+      case 'steal_burst':
+        [0, 0.07, 0.14, 0.21].forEach((offset) => {
+          this.noiseBurst(ctx, offset, 0.045, 1600, 'bandpass', 0.32);
+        });
+        this.playFilteredPinkSweep(ctx, 0.06, 0.3, 680, 2100, 2.2, 0.44);
+        this.tone(ctx, 320, 760, 0.08, 0.22, 'triangle', 0.2);
+        return true;
+      case 'broken_bat':
+        this.noiseBurst(ctx, 0, 0.07, 2600, 'bandpass', 0.58);
+        this.tone(ctx, 560, 220, 0, 0.06, 'square', 0.28);
+        [0.055, 0.11, 0.165, 0.22].forEach((offset, idx) => {
+          this.noiseBurst(ctx, offset, 0.035, 1950 + idx * 380, 'bandpass', 0.36 - idx * 0.05);
+          this.tone(ctx, 740 - idx * 90, 410 - idx * 50, offset, 0.045, 'triangle', 0.14);
+        });
+        return true;
+      case 'wall_thud':
+        this.tone(ctx, 135, 44, 0, 0.2, 'sine', 0.56);
+        this.noiseBurst(ctx, 0, 0.16, 260, 'lowpass', 0.64);
+        this.tone(ctx, 380, 210, 0.12, 0.12, 'triangle', 0.2);
+        return true;
+      case 'walk_ball_four':
+        this.playGlovePopAt(ctx, 0, 0.85);
+        this.tone(ctx, 340, 240, 0.1, 0.09, 'triangle', 0.18);
+        [0.2, 0.28, 0.36, 0.44].forEach((offset, idx) => {
+          this.noiseBurst(ctx, offset, 0.04, 1200 + idx * 140, 'bandpass', 0.22);
+        });
+        return true;
       default:
         return false;
     }
@@ -539,6 +601,60 @@ export class RetroSoundEngine {
         break;
       case 'ui_pop':
         this.tone(ctx, 520, 780, 0, 0.065, 'triangle', 0.22);
+        break;
+      case 'organ_seventh_stretch':
+        // Classic upbeat 3/4 ballpark waltz phrase!
+        this.playOrganNotes(
+          ctx,
+          [
+            [523.25, 0.0, 0.24],
+            [1046.5, 0.26, 0.16],
+            [880.0, 0.44, 0.16],
+            [783.99, 0.62, 0.16],
+            [659.25, 0.8, 0.18],
+            [783.99, 1.0, 0.36],
+            [587.33, 1.38, 0.44],
+          ],
+          0.5,
+        );
+        this.playCrowdLayer(ctx, 0.35, 1.45, 0.32);
+        break;
+      case 'stadium_airhorn':
+        [
+          [0, 0.2],
+          [0.26, 0.56],
+        ].forEach(([offset, dur]) => {
+          this.tone(ctx, 415.3, 418, offset, dur, 'sawtooth', 0.22);
+          this.tone(ctx, 523.25, 526, offset, dur, 'sawtooth', 0.18);
+          this.tone(ctx, 622.25, 625, offset, dur, 'triangle', 0.15);
+        });
+        break;
+      case 'vendor_bell':
+        [0, 0.15].forEach((offset) => {
+          this.tone(ctx, 1567.98, 1567.98, offset, 0.2, 'sine', 0.24);
+          this.tone(ctx, 3135.96, 3135.96, offset, 0.14, 'triangle', 0.12);
+        });
+        this.playFilteredPinkSweep(ctx, 0.32, 0.22, 2400, 1400, 1.8, 0.26);
+        break;
+      case 'rain_thunder':
+        this.playFilteredPinkSweep(ctx, 0, 1.45, 210, 75, 1.1, 0.72);
+        this.tone(ctx, 84, 38, 0.06, 0.85, 'sine', 0.32);
+        [0.4, 0.62, 0.85, 1.08].forEach((offset, idx) => {
+          this.tone(ctx, 1220 + idx * 190, 960 + idx * 140, offset, 0.06, 'sine', 0.09);
+        });
+        break;
+      case 'heritage_power_surge':
+        [392.0, 523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((freq, idx) => {
+          this.tone(ctx, freq, freq * 1.04, idx * 0.055, 0.28, 'triangle', 0.22);
+          this.tone(ctx, freq * 0.5, freq * 0.5, idx * 0.055, 0.24, 'sawtooth', 0.09);
+        });
+        this.playFilteredPinkSweep(ctx, 0.05, 0.45, 900, 3200, 2.5, 0.35);
+        break;
+      case 'trade_gavel':
+        this.tone(ctx, 180, 68, 0, 0.12, 'sine', 0.45);
+        this.noiseBurst(ctx, 0, 0.08, 650, 'lowpass', 0.48);
+        this.tone(ctx, 783.99, 783.99, 0.14, 0.12, 'triangle', 0.24);
+        this.tone(ctx, 1046.5, 1046.5, 0.25, 0.3, 'triangle', 0.28);
         break;
       default:
         break;
