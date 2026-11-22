@@ -193,8 +193,9 @@ Every player carries **both** their **National Cultural Heritage Power** (22+ na
   - **Pitch Target Intent (Pitching)**: `Attack Zone` (`+9%` zone strike prob), `Paint Corners` (`+5` control / `+4%` whiff), `High Heat` (`+2 mph` / `+7%` whiff on fastballs with slightly higher HR carry), and `Bury Chase` (`+11%` chase rate / `+8%` whiff on offspeed pitches at the cost of fewer zone strikes).
   - **Guess Pitch (Batting)**: `Sit Fastball` or `Sit Offspeed` — guessing the pitch family correctly triggers **🎯 LOCKED IN** (`+14 CON / +12 PWR / +6% Hit`), while guessing wrong triggers **😵 FOOLED** (`-8 CON` & `+8%` whiff penalty).
   - **Persistent Nemesis Grudges**: Tracks career batter-vs-pitcher plate appearances across games & seasons — **`🔥 OWNS HIM`** grants `+4 CON / +4 PWR` (`-1 STU / -1 CTL`), **`❄️ REVENGE SPOT`** grants `+4 STU / +3 CTL` (`-1 CON`), and **`⚔️ HEATED GRUDGE`** (4+ career battles) amps both sides (`+2 CON / +1 PWR` vs `+2 STU / +1 CTL`).
-- **Automatic Player & Manager Progression (`rewards.ts`, `managerActionInbox.ts`)**:
-  - Both single played/simmed games (`commitCompletedGame`) and fast-simmed 3-game series (`simNextSeriesRound`, plus 1-tap `Quick Team Practice`) automatically award XP, auto-level players (`level * 200` XP curve), auto-bump core role ratings within `statCaps` & `totalRatingBudget`, and grant **Skill Points (`+1 SP`)** specifically for Player & Manager **Special Skill Trees**.
+- **Automatic Player & Manager Progression & Series Gameplans (`rewards.ts`, `managerActionInbox.ts`, `gmSeasonPulse.ts`)**:
+  - Both single played/simmed games (`commitCompletedGame`) and fast-simmed 3-game series (`simNextSeriesRound`, plus 1-per-game focused **Team Practice** with 4 trade-off focuses) automatically award XP, auto-level players (`level * 200` XP curve), auto-bump core role ratings within `statCaps` & `totalRatingBudget`, and grant **Skill Points (`+1 SP`)** specifically for Player & Manager **Special Skill Trees**.
+  - **Pre-Series Gameplans** apply live rating & HR-carry trade-offs across both Live 3D Games and Simmed Series (`Swing for the Fences`: `+6 PWR / +18% HR / -5 CON / +5% Whiffs`; `Small-Ball Chaos`: `+6 CON / -6 PWR / -16% HR`; `Bullpen Lockdown`: `+5 CTL / +4 STU / -3 CON`).
 
 ---
 

@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import {
+  applySpotlightLineupMove,
+  evaluatePromotionChase,
+  resolveGmInboxDecision,
+  rollGmInboxEvent,
+  type GmInboxEvent,
+  type SeriesGameplanId,
+} from '../engine/gm/gmSeasonPulse';
+import {
   applySeriesAutoProgression,
   diffClubLevelUps,
   runQuickTeamPractice,
@@ -113,6 +121,10 @@ export interface GameStoreState {
   currentSeriesIndex: number;
   practiceAvailable: boolean;
   lastPracticeFocusLabel: string | null;
+  activeGameplan: SeriesGameplanId;
+  activeGmInboxEvent: GmInboxEvent | null;
+  spotlightUsedThisSeries: boolean;
+  ownerGoalClaimedSeason: number;
   rosterActionNonce: number;
   humanClubId: string | null;
   manager: ManagerProfile | null;
@@ -136,6 +148,10 @@ export interface GameStoreState {
     levelUps?: readonly PlayerLevelUpEvent[];
   };
   runQuickTeamPracticeAction: (focusId?: TeamPracticeFocusId) => QuickTeamPracticeResult | null;
+  setSeriesGameplan: (plan: SeriesGameplanId) => void;
+  resolveActiveGmInboxDecision: (choiceIndex: 0 | 1) => { summary: string } | null;
+  spotlightBreakoutPlayer: (playerId: string) => { applied: boolean; summary: string };
+  swapTiredStarterToFresh: (freshPitcherId: string) => boolean;
   runPlayoffsAndAdvanceSeason: (
     regulationInnings?: GameLengthInnings,
   ) => {
@@ -228,6 +244,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     currentSeriesIndex: 0,
     practiceAvailable: true,
     lastPracticeFocusLabel: null,
+    activeGameplan: 'balanced',
+    activeGmInboxEvent: null,
+    spotlightUsedThisSeries: false,
+    ownerGoalClaimedSeason: 0,
     rosterActionNonce: 1,
     humanClubId: null,
     manager: null,
@@ -252,6 +272,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentSeriesIndex: 0,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
+        activeGameplan: 'balanced',
+        activeGmInboxEvent: null,
+        spotlightUsedThisSeries: false,
+        ownerGoalClaimedSeason: 0,
         rosterActionNonce: 1,
         humanClubId: world.humanClubId,
         manager: createManagerProfile({
@@ -292,6 +316,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           state.currentSeriesIndex,
           roundSeed,
           regulationInnings,
+          state.activeGameplan,
         ).clubs;
       });
 
@@ -302,6 +327,8 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       let lossesGained = 0;
       let cashEarned = 0;
       let levelUps: PlayerLevelUpEvent[] = [];
+      let nextOwnerGoalClaimed = state.ownerGoalClaimedSeason;
+      let nextInboxEvent = state.activeGmInboxEvent;
 
       if (prevHumanClub && postHumanClub && state.manager) {
         winsGained = Math.max(0, postHumanClub.wins - prevHumanClub.wins);
@@ -312,12 +339,43 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           winsGained,
           lossesGained,
         );
-        nextLeagues[autoProg.club.leagueTier] = nextLeagues[autoProg.club.leagueTier].map((c) =>
-          c.id === autoProg.club.id ? autoProg.club : c,
+        let finalClub = autoProg.club;
+        const tierClubs = nextLeagues[finalClub.leagueTier].map((c) =>
+          c.id === finalClub.id ? finalClub : c,
+        );
+
+        // Award one-time Season Owner Goal bonus ($6,000) when hitting Top-4 + 10 Wins!
+        if (nextOwnerGoalClaimed < state.seasonNumber) {
+          const chase = evaluatePromotionChase(tierClubs, finalClub.id, nextIndex);
+          if (chase.ownerGoalCompleted) {
+            nextOwnerGoalClaimed = state.seasonNumber;
+            cashEarned += 6_000;
+            finalClub = {
+              ...finalClub,
+              economy: { ...finalClub.economy, cash: finalClub.economy.cash + 6_000 },
+            };
+          }
+        }
+
+        nextLeagues[finalClub.leagueTier] = nextLeagues[finalClub.leagueTier].map((c) =>
+          c.id === finalClub.id ? finalClub : c,
         );
         nextManager = autoProg.manager;
-        cashEarned = autoProg.cashEarned;
+        cashEarned += autoProg.cashEarned;
         levelUps = autoProg.levelUps;
+
+        // Roll 1 crisp incoming GM Inbox Event (AI Trade Offer or Clubhouse Dilemma) when inbox is clear
+        if (!nextInboxEvent && nextIndex < 7) {
+          const inboxRng = createSeededRng(
+            state.worldSeed + state.seasonNumber * 997 + nextIndex * 131,
+          );
+          nextInboxEvent = rollGmInboxEvent(
+            inboxRng,
+            nextLeagues[finalClub.leagueTier],
+            finalClub.id,
+            nextIndex,
+          );
+        }
       }
 
       set({
@@ -326,6 +384,9 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentSeriesIndex: nextIndex,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
+        spotlightUsedThisSeries: false,
+        ownerGoalClaimedSeason: nextOwnerGoalClaimed,
+        activeGmInboxEvent: nextInboxEvent,
       });
       return {
         seriesCompleted: nextIndex,
@@ -349,6 +410,59 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         lastPracticeFocusLabel: res.focusLabel,
       });
       return res;
+    },
+
+    setSeriesGameplan: (plan) => {
+      set({ activeGameplan: plan });
+    },
+
+    resolveActiveGmInboxDecision: (choiceIndex) => {
+      const state = get();
+      const humanClub = get().getHumanClub();
+      const event = state.activeGmInboxEvent;
+      if (!humanClub || !state.manager || !event) return null;
+      const resolved = resolveGmInboxDecision(
+        state.leagues[humanClub.leagueTier],
+        humanClub.id,
+        state.manager,
+        event,
+        choiceIndex,
+      );
+      set({
+        leagues: {
+          ...state.leagues,
+          [humanClub.leagueTier]: resolved.clubs,
+        },
+        manager: resolved.manager,
+        activeGmInboxEvent: null,
+      });
+      return { summary: resolved.summary };
+    },
+
+    spotlightBreakoutPlayer: (playerId) => {
+      const state = get();
+      const humanClub = get().getHumanClub();
+      if (!humanClub || state.spotlightUsedThisSeries) {
+        return { applied: false, summary: 'Lineup spotlight already used this series.' };
+      }
+      const res = applySpotlightLineupMove(humanClub, playerId);
+      if (!res.applied) return { applied: false, summary: res.summary };
+      set({
+        leagues: updateHumanClubInLeagues(state.leagues, res.club),
+        spotlightUsedThisSeries: true,
+      });
+      return { applied: true, summary: res.summary };
+    },
+
+    swapTiredStarterToFresh: (freshPitcherId) => {
+      const state = get();
+      const humanClub = get().getHumanClub();
+      if (!humanClub) return false;
+      const idx = humanClub.rotationIds.indexOf(freshPitcherId);
+      if (idx < 0) return false;
+      const updatedClub: Club = { ...humanClub, rotationCursor: idx };
+      set({ leagues: updateHumanClubInLeagues(state.leagues, updatedClub) });
+      return true;
     },
 
     runPlayoffsAndAdvanceSeason: (regulationInnings = 5) => {
@@ -805,6 +919,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         lastPostGameSummary: summary,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
+        spotlightUsedThisSeries: false,
       });
 
       return summary;
@@ -816,7 +931,15 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       if (!humanClub || !opponentClub) return null;
 
       const seed = gameSeed ?? get().worldSeed + humanClub.wins + humanClub.losses + 1;
-      const result = simFullGame(opponentClub, humanClub, seed);
+      const result = simFullGame(
+        opponentClub,
+        humanClub,
+        seed,
+        9,
+        'regular',
+        'balanced',
+        get().activeGameplan,
+      );
       return get().commitCompletedGame(opponentClub.id, result, true);
     },
 

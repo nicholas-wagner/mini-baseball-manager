@@ -1,4 +1,5 @@
 import { createCatalogDraw } from '../catalog/playerCatalog';
+import type { SeriesGameplanId } from '../gm/gmSeasonPulse';
 import { generateMarketPool } from '../gm/marketTiers';
 import type { Player } from '../models/player';
 import { createClub } from '../gm/rosterFactory';
@@ -308,6 +309,7 @@ export function simulateSeriesRound(
   seriesIndex: number,
   seed: number,
   regulationInnings: GameLengthInnings = 9,
+  humanGameplan: SeriesGameplanId = 'balanced',
 ): { clubs: Club[]; gamesSimulated: number } {
   const schedule = generateTierSchedule(clubs.map((c) => c.id));
   const round = schedule[seriesIndex % schedule.length];
@@ -323,7 +325,15 @@ export function simulateSeriesRound(
       if (!away || !home) continue;
 
       const gameSeed = seed + matchIdx * 31 + g * 7;
-      const result = simFullGame(away, home, gameSeed, regulationInnings);
+      const result = simFullGame(
+        away,
+        home,
+        gameSeed,
+        regulationInnings,
+        'regular',
+        away.isHuman ? humanGameplan : 'balanced',
+        home.isHuman ? humanGameplan : 'balanced',
+      );
       const homeWon = result.winnerClubId === home.id;
       map.set(home.id, applyGameStatDeltasToClub(home, result.playerStatDeltas, homeWon));
       map.set(away.id, applyGameStatDeltasToClub(away, result.playerStatDeltas, !homeWon));

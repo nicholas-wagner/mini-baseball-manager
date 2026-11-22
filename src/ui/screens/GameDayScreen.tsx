@@ -16,6 +16,11 @@ import { bgmEngine } from '../../audio/bgmEngine';
 import { soundEngine } from '../../audio/soundEngine';
 import { getBallparkPreset } from '../../engine/ballparks/stadiumCatalog';
 import {
+  detectTiredScheduledStarter,
+  evaluatePromotionChase,
+  evaluateRosterSpotlight,
+} from '../../engine/gm/gmSeasonPulse';
+import {
   buildManagerActionInbox,
   recommendTeamPracticeFocus,
   type ManagerJumpTarget,
@@ -190,9 +195,16 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const practiceAvailable = useGameStore((s) => s.practiceAvailable);
   const lastPracticeFocusLabel = useGameStore((s) => s.lastPracticeFocusLabel);
+  const activeGameplan = useGameStore((s) => s.activeGameplan);
+  const activeGmInboxEvent = useGameStore((s) => s.activeGmInboxEvent);
+  const spotlightUsedThisSeries = useGameStore((s) => s.spotlightUsedThisSeries);
   const commitCompletedGame = useGameStore((s) => s.commitCompletedGame);
   const simNextSeriesRound = useGameStore((s) => s.simNextSeriesRound);
   const runQuickTeamPracticeAction = useGameStore((s) => s.runQuickTeamPracticeAction);
+  const setSeriesGameplan = useGameStore((s) => s.setSeriesGameplan);
+  const resolveActiveGmInboxDecision = useGameStore((s) => s.resolveActiveGmInboxDecision);
+  const spotlightBreakoutPlayer = useGameStore((s) => s.spotlightBreakoutPlayer);
+  const swapTiredStarterToFresh = useGameStore((s) => s.swapTiredStarterToFresh);
   const [gmQuickFeedback, setGmQuickFeedback] = useState<string | null>(null);
 
   const opponents = humanClub
@@ -311,7 +323,15 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     if (!opp) return;
     const seed = worldSeed + humanClub.wins + humanClub.losses + 1;
     const pressure = pendingLivePlayoff?.pressureLevel ?? 'regular';
-    const session = createGameSession(opp, humanClub, seed, pressure, gameLength);
+    const session = createGameSession(
+      opp,
+      humanClub,
+      seed,
+      pressure,
+      gameLength,
+      'balanced',
+      activeGameplan,
+    );
     setActiveOpponentId(opp.id);
     setLiveSession(session);
     setRecentEvents([]);
@@ -570,6 +590,13 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     };
 
     const recommendedPractice = recommendTeamPracticeFocus(humanClub);
+    const promotionChase = evaluatePromotionChase(
+      leagues[humanClub.leagueTier],
+      humanClub.id,
+      currentSeriesIndex,
+    );
+    const tiredStarter = detectTiredScheduledStarter(humanClub);
+    const rosterSpotlight = evaluateRosterSpotlight(humanClub);
 
     return (
       <div className="space-y-4">
@@ -579,12 +606,42 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           cash={humanClub.economy.cash}
           seriesIndex={currentSeriesIndex}
           inbox={inbox}
+          promotionChase={promotionChase}
+          activeGameplan={activeGameplan}
+          tiredStarter={tiredStarter}
+          gmInboxEvent={activeGmInboxEvent}
+          rosterSpotlight={rosterSpotlight}
+          spotlightUsedThisSeries={spotlightUsedThisSeries}
           practiceAvailable={practiceAvailable}
           lastPracticeFocusLabel={lastPracticeFocusLabel}
           recommendedPractice={recommendedPractice}
           quickFeedback={gmQuickFeedback}
           onSimNextSeries={handleFastSimSeries}
           onSelectPractice={handleQuickPractice}
+          onSelectGameplan={(plan) => {
+            setSeriesGameplan(plan);
+            soundEngine.play('ui_pop');
+          }}
+          onSwapFreshStarter={(freshId) => {
+            if (swapTiredStarterToFresh(freshId)) {
+              soundEngine.play('bullpen_phone');
+              setGmQuickFeedback('Rotation updated — fresh arm scheduled to start next!');
+            }
+          }}
+          onResolveGmInboxChoice={(choiceIdx) => {
+            const res = resolveActiveGmInboxDecision(choiceIdx);
+            if (res) {
+              soundEngine.play('cash_chime');
+              setGmQuickFeedback(res.summary);
+            }
+          }}
+          onSpotlightBreakout={(playerId) => {
+            const res = spotlightBreakoutPlayer(playerId);
+            if (res.applied) {
+              soundEngine.play('level_up');
+              setGmQuickFeedback(res.summary);
+            }
+          }}
           onActionClick={handleManagerJump}
         />
 

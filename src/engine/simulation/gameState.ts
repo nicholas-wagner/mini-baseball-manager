@@ -1,5 +1,6 @@
 import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
 import { evaluateClubStaffBonuses, type ClubStaffBonuses } from '../gm/coaches';
+import type { SeriesGameplanId } from '../gm/gmSeasonPulse';
 import type { FieldPosition } from '../handedness/types';
 import type { AiArchetype, Club, LineupSlot } from '../models/club';
 import type { PlayEvent } from '../models/playEvent';
@@ -107,6 +108,7 @@ export interface TeamGameSide {
   coEdSynergy: CoEdClubhouseSynergy;
   staffBonuses: ClubStaffBonuses;
   chemistryBonuses: ClubhouseChemistryReport['totalTeamRatingBonus'];
+  activeGameplan?: SeriesGameplanId;
 }
 
 export interface GameSessionState {

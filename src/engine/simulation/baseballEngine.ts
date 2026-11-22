@@ -1,3 +1,4 @@
+import type { SeriesGameplanId } from '../gm/gmSeasonPulse';
 import type { Club } from '../models/club';
 import type { PlayEvent, TacticalCall } from '../models/playEvent';
 import {
@@ -65,9 +66,11 @@ export function createGameSession(
   seed: number,
   gamePressureLevel: GamePressureLevel = 'regular',
   regulationInnings: GameLengthInnings = 9,
+  awayGameplan: SeriesGameplanId = 'balanced',
+  homeGameplan: SeriesGameplanId = 'balanced',
 ): GameSessionState {
-  const away = createTeamGameSide(awayClub);
-  const home = createTeamGameSide(homeClub);
+  const away = { ...createTeamGameSide(awayClub), activeGameplan: awayGameplan };
+  const home = { ...createTeamGameSide(homeClub), activeGameplan: homeGameplan };
   return {
     rngSeed: seed >>> 0,
     stepCounter: 0,
@@ -903,6 +906,8 @@ export function stepPitch(
     pitchTarget: options.pitchTarget,
     batterGuess: options.batterGuess,
     nemesisBonus: options.nemesisBonus,
+    battingGameplan: batting.activeGameplan,
+    fieldingGameplan: fielding.activeGameplan,
     battingPlayersById: batting.playersById,
     catcherPopTimeBonus: fielding.catcherPopTimeBonus,
     stealDefenseCall: resolveStealDefenseCall(tacticalCall),
@@ -1061,8 +1066,18 @@ export function simFullGame(
   seed: number,
   regulationInnings: GameLengthInnings = 9,
   gamePressureLevel: GamePressureLevel = 'regular',
+  awayGameplan: SeriesGameplanId = 'balanced',
+  homeGameplan: SeriesGameplanId = 'balanced',
 ): GameSessionResult {
-  let state = createGameSession(awayClub, homeClub, seed, gamePressureLevel, regulationInnings);
+  let state = createGameSession(
+    awayClub,
+    homeClub,
+    seed,
+    gamePressureLevel,
+    regulationInnings,
+    awayGameplan,
+    homeGameplan,
+  );
   const events: PlayEvent[] = [];
 
   for (let i = 0; i < 1200 && state.status === 'in_progress'; i += 1) {

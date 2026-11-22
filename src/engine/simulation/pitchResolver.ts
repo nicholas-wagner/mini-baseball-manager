@@ -2,6 +2,10 @@ import {
   evaluateParkHitMultipliers,
   type BallparkPresetId,
 } from '../ballparks/stadiumCatalog';
+import {
+  evaluateGameplanEffects,
+  type SeriesGameplanId,
+} from '../gm/gmSeasonPulse';
 import type { ClubStaffBonuses } from '../gm/coaches';
 import { evaluatePlatoonMatchup } from '../handedness/handedness';
 import type { FieldPosition } from '../handedness/types';
@@ -586,6 +590,8 @@ export interface PitchResolverContext {
   pitchTarget?: PitchTargetIntent;
   batterGuess?: BatterPitchGuess;
   nemesisBonus?: NemesisMatchupEvaluation;
+  battingGameplan?: SeriesGameplanId;
+  fieldingGameplan?: SeriesGameplanId;
   battingPlayersById?: Readonly<Record<string, Player>>;
   catcherPopTimeBonus?: number;
   stealDefenseCall?: StealDefenseCall;
@@ -698,19 +704,23 @@ function computeMindGameAndNemesis(
   const guess = evaluateBatterGuessEffect(ctx.batterGuess ?? 'none', pitchType);
   const target = evaluatePitchTargetEffect(ctx.pitchTarget, pitchType) ?? ZERO_TARGET_EFFECT;
   const nem = ctx.nemesisBonus ?? ZERO_NEMESIS_DELTA;
-  const tags = [guess.label, target.label, nem.badgeText].filter((t): t is string => Boolean(t));
+  const batPlan = evaluateGameplanEffects(ctx.battingGameplan);
+  const fldPlan = evaluateGameplanEffects(ctx.fieldingGameplan);
+  const tags = [guess.label, target.label, nem.badgeText, batPlan.label, fldPlan.label].filter(
+    (t): t is string => Boolean(t),
+  );
 
   return {
-    contactDelta: guess.contactDelta + nem.batterContactDelta,
-    powerDelta: guess.powerDelta + nem.batterPowerDelta,
-    stuffDelta: target.stuffDelta + nem.pitcherStuffDelta,
-    controlDelta: target.controlDelta + nem.pitcherControlDelta,
+    contactDelta: guess.contactDelta + nem.batterContactDelta + batPlan.batterContactDelta,
+    powerDelta: guess.powerDelta + nem.batterPowerDelta + batPlan.batterPowerDelta,
+    stuffDelta: target.stuffDelta + nem.pitcherStuffDelta + fldPlan.pitcherStuffDelta,
+    controlDelta: target.controlDelta + nem.pitcherControlDelta + fldPlan.pitcherControlDelta,
     mphBonus: target.mphBonus,
     zoneProbDelta: target.zoneProbDelta,
     chaseRateDelta: target.chaseRateDelta,
-    whiffBonus: target.whiffBonus + guess.whiffPenalty,
+    whiffBonus: target.whiffBonus + guess.whiffPenalty + batPlan.whiffBonus + fldPlan.whiffBonus,
     hitProbBonus: guess.hitProbBonus,
-    hrCarryMultiplier: target.hrCarryMultiplier,
+    hrCarryMultiplier: target.hrCarryMultiplier * batPlan.hrCarryMultiplier,
     tags,
   };
 }
