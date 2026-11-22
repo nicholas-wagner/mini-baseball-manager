@@ -141,7 +141,8 @@ function syncClubDepthIds(club: Club, nextRoster: Player[]): Club {
     .filter((p) => p.position === 'RP')
     .map((p) => p.id);
   const hitters = nextRoster.filter((p) => !isPitcherPosition(p.position));
-  const keepLineup = club.lineup.every((s) => rosterIds.has(s.playerId));
+  const keepLineup =
+    club.lineup.length === 9 && club.lineup.every((s) => rosterIds.has(s.playerId));
   const nextLineup = keepLineup
     ? club.lineup
     : hitters.length >= 9
@@ -492,10 +493,12 @@ function ensureMinimumLegalClubRoster(rng: SeededRng, club: Club): Club {
   const finalRoster = roster.slice(0, MAX_ACTIVE_ROSTER_SIZE);
   const hitterPositions: FieldPosition[] = ['LF', 'RF', '1B', '3B', '2B', 'CF', 'SS', 'C'];
   let extraBatIdx = 0;
-  while (
-    finalRoster.filter((p) => !isPitcherPosition(p.position)).length < 9 &&
-    finalRoster.length < MAX_ACTIVE_ROSTER_SIZE
-  ) {
+  while (finalRoster.filter((p) => !isPitcherPosition(p.position)).length < 9) {
+    if (finalRoster.length >= MAX_ACTIVE_ROSTER_SIZE) {
+      const dropPitcherIdx = finalRoster.findIndex((p) => isPitcherPosition(p.position));
+      if (dropPitcherIdx === -1) break;
+      finalRoster.splice(dropPitcherIdx, 1);
+    }
     const emergencyBat = createPlayer(rng, {
       position: hitterPositions[extraBatIdx % hitterPositions.length],
       tier: club.leagueTier,
