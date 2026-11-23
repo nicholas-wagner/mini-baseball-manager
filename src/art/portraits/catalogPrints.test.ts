@@ -17,6 +17,12 @@ it.each([
   expect(playerIllustration('legacy-procedural-player')).toBeUndefined();
 });
 
+it('gives every fixed catalog player a distinct portrait, including the showcase players', () => {
+  const prints = PLAYER_CATALOG.map(player => playerIllustration(player.id));
+  expect(prints).not.toContain(undefined);
+  expect(new Set(prints).size).toBe(PLAYER_CATALOG.length);
+});
+
 it('ties every shipped batch print to an existing player', () => {
   const paths = Object.keys(import.meta.glob('./illustrations/batch-*/*.png'));
   const ids = paths.map(path => path.slice(path.lastIndexOf('/') + 1, -4));
