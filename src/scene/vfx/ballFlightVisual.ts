@@ -84,7 +84,7 @@ export function createBallFlightVisual() {
   let lastPrimary = '';
   let lastAccent = '';
 
-  function draw(spec: BallTrajectorySpec, progress: number, primary = spec.trailColor, scale = 1, sample = sampleBallTrajectory) {
+  function draw(spec: BallTrajectorySpec, progress: number, primary = spec.trailColor, scale = 1, sample = sampleBallTrajectory, trailStrength = 1) {
     ballScale = scale;
     ball.scale.setScalar(scale);
     group.visible = true;
@@ -101,7 +101,8 @@ export function createBallFlightVisual() {
     const repaint = lastPrimary !== primary || lastAccent !== spec.secondaryColor;
     const main = repaint ? new THREE.Color(primary) : null;
     const accent = repaint ? new THREE.Color(spec.secondaryColor) : null;
-    const trailLength = Math.min(progress, 0.22, 0.095 / spec.durationSec);
+    trail.material.opacity = .86 * trailStrength;
+    const trailLength = trailStrength * Math.min(progress, 0.22, 0.095 / spec.durationSec);
     for (let r = 0; r < rings; r++) {
       const u = r / (rings - 1);
       const point = sample(spec, progress - u * trailLength);

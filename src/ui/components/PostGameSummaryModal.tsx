@@ -11,6 +11,8 @@ import type { PostGameSummary } from '../../store/gameStore';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { toBaseballCardPlayer } from '../utils/playerCardAdapter';
+import { ScorebookPrint } from './ScorebookPrint';
+import { useGameStore } from '../../store/gameStore';
 import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { FlipBaseballCard } from './FlipBaseballCard';
 
@@ -39,6 +41,7 @@ export function PostGameSummaryModal({
   onOpenFoilPacks,
   onSpendSkillPoints,
 }: PostGameSummaryModalProps) {
+  const keepMoment = useGameStore(s=>s.keepScorebookMoment);
   if (!summary) return null;
 
   const isHumanMvp = summary.mvp.clubId === humanClub.id;
@@ -92,6 +95,7 @@ export function PostGameSummaryModal({
             <h3 className="font-display text-lg leading-tight text-[#173f3a] max-w-sm">{story}</h3>
             {onPlayAgain && <button type="button" className="recap-rematch" onClick={onPlayAgain}>{playAgainLabel ?? 'Play Next Game'}</button>}
           </div>
+          <ScorebookPrint moments={summary.moments ?? []} kept={humanClub.keepsakes} onKeep={keepMoment} />
           <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
             <div className="mx-auto w-full max-w-[260px]">
               <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[#9E1B32]">

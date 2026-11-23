@@ -12,20 +12,26 @@ Manage lineups, draft global prospects, develop branching player & manager skill
 
 ## Your first game
 
-Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Tap the gold button to take over there, or choose a full game farther down the schedule.
+Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Tap the gold button to take over. Coach Pops gives you one job for this hitter. On the mound, choose a target and watch the catcher set up. At bat, try the compact swing or the power swing before you commit. **More controls** opens the full dugout immediately.
 
-| Opening Day | A pitch on the field | The final and the rematch |
+| Meet your player | Call your first pitch | Keep a play from the game |
 | :---: | :---: | :---: |
-| ![Opening Day on a phone with the starting player's manga card and the situation](./docs/screenshots/opening-day.webp) | ![A single, the occupied first base and both matchup cards on a phone](./docs/screenshots/live-call.webp) | ![A game MVP print and the next scheduled game on a phone](./docs/screenshots/mvp-rematch.webp) |
+| ![Opening Day on a phone with the starting player's manga card and the situation](./docs/screenshots/opening-day.webp) | ![Coach Pops asks for an out and the catcher sets up on the corner](./docs/screenshots/first-at-bat.webp) | ![A scorebook print saved from a real game](./docs/screenshots/scorebook-print.webp) |
+
+With two runners aboard, Marcus Baker gets the call to bring one home. [See his power swing preview on a phone](./docs/screenshots/batting-preview.webp).
 
 <details>
-<summary>Watch a called strike at field level (4 seconds)</summary>
+<summary>Watch a third strike and a force at first</summary>
 
-![A live pitch from set and release through the catcher’s return throw](./docs/screenshots/called-strike.webp)
+![Pitcher and catcher in one shot through strike three](./docs/screenshots/called-strike.webp)
+
+![The shortstop throws to first as the batter runs through the bag](./docs/screenshots/force-at-first.webp)
 
 </details>
 
 ### The card collection
+
+After a win or a loss, **Keep this moment** saves the illustrated player, opponent, inning, play and score to the club’s Trophy Album. The most recently saved play for that player appears beside their next live matchup card.
 
 Each of the 3,000 players keeps their illustration when they change clubs. Open either live matchup card to inspect the hitter or pitcher. In the roster binder, choose **Print gallery** to browse a wall of illustrations. Tap a print to enlarge it. Switch back to **Stat cards** and flip one for the player’s role-specific ratings. The MVP gets a foil front and a headline drawn from that game’s box score.
 

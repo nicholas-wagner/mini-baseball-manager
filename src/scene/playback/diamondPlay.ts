@@ -42,6 +42,7 @@ export interface DiamondPlay {
   leadArrival: number;
   duration: number;
   unassisted: boolean;
+  reliefStrikeout?: boolean;
   scorerBase?: 1 | 2 | 3;
   ending?: {kind: 'third_out' | 'walkoff'; start: number; scorer: 'BAT' | 'RUN'};
   close?: CloseAction;
@@ -241,6 +242,10 @@ export function actorAt(play: DiamondPlay, actor: Actor, time: number, bats: Eff
       if (u<.52) base={...base,clip:'runner_push',local:time-go};
     }
   }
+  const salute = time - play.finish - .36;
+  if (play.reliefStrikeout && actor === 'P' && salute >= 0 && salute < CLIP_DURATIONS.pitch_salute && (!play.ending || time < play.ending.start)) {
+    return {...base,clip:'pitch_salute',local:salute};
+  }
   return reactionPose(play,actor,time,base,bats) ?? base;
 }
 
@@ -248,6 +253,10 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
   const reaction = reactionCamera(play,t,bats);
   if (reaction) return reaction;
   const plate = play.legs[0].end;
+  if (play.reliefStrikeout && t > play.finish+.36) {
+    const mound = actorAt(play,'P',t,bats).pos;
+    return {position:{x:mound.x+1.8,y:1.85,z:mound.z+3.8},lookAt:{...mound,y:1.02},fov:36};
+  }
   if (play.close) return closeCamera(play, play.close, t, bats, throws);
   if (t < plate + 0.10) return {
     position: { x: bats === 'R' ? -2.25 : 2.25, y: 2.7, z: 4.8 },
@@ -274,6 +283,12 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
       x: point.x + 1.9, y: lookAt.y + (play.kind === 'home_run' ? 6 : atWall ? 4.2 : 3.0 - zoom),
       z: point.z + (atWall ? 10.4 : 9.5 - 4 * zoom),
     } };
+  }
+  const forceAtFirst = play.kind === 'ground_out' || play.kind === 'double_play' || play.kind === 'bunt_out';
+  if (forceAtFirst && t >= play.finish-.36) {
+    const runner = actorAt(play,'BAT',t,bats).pos;
+    const focus = between(first,runner,.45);
+    return {position:{x:focus.x+4.2,y:2.25,z:focus.z+3.6},lookAt:{...focus,y:.76},fov:39};
   }
   const start = actorAt(play, leg.from, leg.start, bats).pos;
   const end = actorAt(play, leg.to, leg.end, bats).pos;

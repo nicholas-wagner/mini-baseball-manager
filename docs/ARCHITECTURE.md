@@ -649,6 +649,8 @@ export interface PlayEvent {
 }
 ```
 
+The optional `Club.keepsakes` collection travels with each career slot and portable save. Each entry retains a stable game/event key, credited player ID and name, opponent, inning, half, play and score at the time. The full event log feeds the selector even when the manager enters mid-game or fast-forwards. The shorter live ticker remains a presentation history.
+
 The Opening Day card previews the same seeded clutch session passed to live playback. The scoreboard holds the preceding game state until the choreographed decision. The field call, scoreboard and runner highlight all use the selected play event. Postgame headlines use that game's player stat deltas.
 
 ### 2.4 Local Persistence Schema (`src/store/persistence.ts`)

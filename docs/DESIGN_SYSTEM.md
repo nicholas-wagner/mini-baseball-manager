@@ -62,6 +62,8 @@
   - Outfield wall arc radius: `~46` units (left/right corners `38`, center `48`).
 - Live mini players use shared painted body cels, a registered head and player-specific details. Align the mitt, bat and ball with the painted grip in both camera directions. Idle mannerisms rotate around that grip.
 - Use the player's catalog ID for card art in every club. Show the full 4:5 illustration on card fronts. Keep enlargement keyboard-accessible and preserve the original aspect ratio.
+- Give the opening hitter one objective. Show the chosen pitch target or rehearsal on the field before the manager commits. Keep the advanced dugout one tap away. During a routine pitch hold the camera through reception. Show the runner and first baseman in one frame for the force.
+- For a first-use playtest, hand someone a fresh, muted game on a phone. Let them play one at-bat unaided, then ask what they were trying to do, what decided the play and which player they remember. Ask an experienced fan to find the fuller controls and a returning player to find their saved print.
 - Show the count change on the catch and the base highlight on the play. Keep the named Opening Day action and the postgame next action within a 390×844 viewport. Reserve at least 44px for pitch calls and camera controls.
 - **Over-the-Shoulder 3D Camera Presets**:
   - `behind_pitcher`: Positioned behind pitcher's throwing shoulder looking down the lane toward home plate (`pos ≈ [1.8, 3.0, -14.2]`, `lookAt ≈ [0, 1.1, 2.0]`).

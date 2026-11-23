@@ -69,7 +69,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const progress = (t - flying.start) / durationSec;
     const scale = flying.kind === 'pitch' ? pitchFlightScale(progress, .55) : flying.kind==='handoff' ? pitchFlightScale(0,.55) : .55;
     vfx.ball.draw(spec, progress, homer ? '#FFD166' : '#FFF1C9', scale,
-      (_, u) => sampleLeg(flying, a, b, u, throws));
+      (_, u) => sampleLeg(flying, a, b, u, throws), play.close && flying.from === 'C' && flying.to === 'P' ? .23 : 1);
     vfx.ball.sizeForCamera(camera, heightPx);
   }
   if (play.unassisted && previous < play.finish && seconds >= play.finish) {
@@ -80,6 +80,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   for (const leg of play.legs) {
     if (previous >= leg.end || seconds < leg.end) continue;
     const at = leg.endPoint ?? contact(leg.to, leg.end);
+    if (play.close && leg.from === 'C' && leg.to === 'P') continue;
     vfx.impact(at, leg.to === 'BAT' ? '#FFE499' : '#A9EDDC');
     if (play.close || play.kind==='bullpen') continue;
     if (play.outfield) {

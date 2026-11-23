@@ -79,6 +79,32 @@ export function createFaceDetails() {
       texture.needsUpdate = true;
       return;
     }
+    // The mask openings are narrower than the face. The lens bottoms tuck
+    // behind the horizontal cage bar and the temples disappear under padding.
+    if (sheet.startsWith('gear-head-') && cell >= 4) {
+      if (cell < 8 && (a.glasses !== 'none' || shade)) {
+        const eyes = sheet.endsWith('-f')
+          ? [[142,148,174,143],[134,141,166,134],[129,120,163,116],[131,146,159,144]]
+          : [[138,129,171,125],[140,125,170,128],[136,130,167,126],[139,124,170,126]];
+        const [x,y,farX,farY] = eyes[cell-4];
+        c.save();
+        c.translate(x,y);
+        c.rotate(Math.atan2(farY-y,farX-x));
+        const dx = Math.hypot(farX-x,farY-y);
+        c.beginPath(); c.rect(-19,-12,dx+32,20); c.clip();
+        const color = a.accessory === 'pinkShades' ? '#d84287' : ink;
+        for (const [center,r] of [[0,14],[dx,10]]) {
+          c.beginPath(); c.ellipse(center,0,r,r*.73,0,0,Math.PI*2);
+          c.fillStyle = shade ? '#273046e8' : '#cfecff25'; c.fill();
+          c.lineWidth=2.7; c.strokeStyle=color; c.stroke();
+          line('M'+(center-r*.55)+' -4l5 -2','#fff4cb',1.6);
+        }
+        line('M14 -1q4 -4 '+(dx-24)+' 0',color,2.5);
+        c.restore();
+      }
+      texture.needsUpdate = true;
+      return;
+    }
     const face = (marks as Record<string, FaceMarks[]>)[sheet][cell];
     const [lx, ly, rx, ry] = face.eyes;
     const mid = (lx + rx) / 2, eye = (ly + ry) / 2;

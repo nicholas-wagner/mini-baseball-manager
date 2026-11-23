@@ -1,3 +1,4 @@
+import { selectScorebookMoments, type ScorebookMoment } from '../engine/gm/scorebookMoments';
 import { create } from 'zustand';
 import {
   applySpotlightLineupMove,
@@ -117,6 +118,7 @@ export interface StartNewCareerInput {
 }
 
 export interface PostGameSummary {
+  moments?: ScorebookMoment[];
   opponentClubId: string;
   opponentName: string;
   isHomeGame: boolean;
@@ -178,6 +180,7 @@ export interface GameStoreState {
   swapTiredStarterToFresh: (freshPitcherId: string) => boolean;
   autoTuneHumanLineupForStarter: (starterThrows: 'L' | 'R') => { tuned: boolean; summary: string };
   clearLastSeriesRecap: () => void;
+  keepScorebookMoment: (id: string) => void;
   toggleFavoritePlayer: (playerId: string) => void;
   customizePlayerProfile: (
     playerId: string,
@@ -587,6 +590,13 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       set({ lastSeriesRecap: null });
     },
 
+    keepScorebookMoment: (id) => {
+      const state = get();
+      const club = state.getHumanClub();
+      const moment = state.lastPostGameSummary?.moments?.find(item => item.id === id);
+      if (!club || !moment || club.keepsakes?.some(item => item.id === id)) return;
+      set({leagues:updateHumanClubInLeagues(state.leagues, {...club, keepsakes:[moment, ...(club.keepsakes ?? [])]})});
+    },
     toggleFavoritePlayer: (playerId) => {
       set((state) => ({
         favoritePlayerIds: state.favoritePlayerIds.includes(playerId)
@@ -1192,7 +1202,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
 
       const levelUps = diffClubLevelUps(humanClub.roster, progressed.club.roster);
 
+      const side = isHomeGame ? result.finalState.home : result.finalState.away;
+      const gameId = [state.seasonNumber,humanClub.id,opponentClub.id,humanClub.wins + humanClub.losses,result.finalState.rngSeed].join('/');
       const summary: PostGameSummary = {
+        moments: selectScorebookMoments(result.events, side.playersById, isHomeGame, opponentClub.name, gameId),
         opponentClubId: opponentClub.id,
         opponentName: `${opponentClub.city} ${opponentClub.name}`,
         isHomeGame,

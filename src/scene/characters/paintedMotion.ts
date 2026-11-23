@@ -49,6 +49,11 @@ export function paintedMotion(
     lean = -0.045 * load + 0.059 * drive;
     tilt = 0.065 * load - 0.055 * drive;
     squash = 0.025 + 0.035 * load - 0.025 * drive;
+    if (clip === 'bat_bomb') {
+      lean -= .10 * load;
+      shift += .11 * (drive-load);
+      tilt += .06 * load;
+    }
   } else if (role === 'catcher') {
     cel = clip === 'catch_receive' && phase > 0.18 && phase < 0.9 ? 5 : 4;
     squash += 0.055 * pulse(phase, 0.18, 0.65);

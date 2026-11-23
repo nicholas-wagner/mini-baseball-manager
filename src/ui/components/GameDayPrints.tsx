@@ -1,3 +1,4 @@
+import type { ScorebookMoment } from '../../engine/gm/scorebookMoments';
 import { useState } from 'react';
 import { EnlargePrint } from './EnlargePrint';
 import { ArrowRight } from 'lucide-react';
@@ -133,10 +134,12 @@ export function BatterEntrance({ player }: { player: Player }) {
 export function MatchupPrints({
   batter,
   pitcher,
+  memories = [],
   onInspect,
 }: {
   batter: Player;
   pitcher: Player;
+  memories?: readonly ScorebookMoment[];
   onInspect: (id: string) => void;
 }) {
   return (
@@ -144,7 +147,9 @@ export function MatchupPrints({
       {[
         { player: batter, role: 'At bat' },
         { player: pitcher, role: 'On the mound' },
-      ].map(({ player, role }) => (
+      ].map(({ player, role }) => {
+        const memory = memories.find(m => m.playerId === player.id);
+        return (
         <button
           key={role}
           onClick={() => onInspect(player.id)}
@@ -154,9 +159,10 @@ export function MatchupPrints({
           <span>
             <small>{role}</small>
             <strong>{player.name}</strong>
+            {memory && <em className="matchup-memory-line">{memory.caption} · last kept play</em>}
           </span>
         </button>
-      ))}
+      );})}
     </div>
   );
 }

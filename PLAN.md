@@ -30,7 +30,7 @@
 
 **Overall 10X Progress**: `73 / 73` feature slices completed (**100% of 10X Master Roadmap Complete!**)
 
-Post-roadmap Game Day polish is complete (TASK-074). The Opening Day, live matchup, print gallery and recap previews are in the [README](README.md#your-first-game).
+Post-roadmap Game Day work covers card-led entry (TASK-074) and first-at-bat guidance, field reactions and scorebook prints (TASK-075). The Opening Day, live matchup, print gallery and recap previews are in the [README](README.md#your-first-game).
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
@@ -214,6 +214,7 @@ Grow the permanent catalog to **3,000 distinct players across all six tiers**, w
 
 | Date | Area | Change / Decision | Rationale |
 | :--- | :--- | :--- | :--- |
+| 2026-11-23 | First at-bat and scorebook | Offer one objective with field previews for the opening hitter, then save credited plays in the career album. | A first-time manager can see what a call means and remember a player through an actual play. |
 | 2026-11-23 | First game and player cards | Preview the actual late-inning session, show both matchup prints, and lead the final with the MVP and rematch. Allow full-size art inspection throughout the card collection. | Give the manager a player to recognize and a decision to make on the first screen. |
 | 2026-11-21 | Visuals & Stack | Locked Vite + React + TS + Tailwind v4 + imperative Three.js + Zustand + Vitest + Playwright + PWA + Web Audio synth | Balances 60 FPS Android performance, 90s charm, and clean TDD separation |
 | 2026-11-21 | League Pacing | Locked 6 tiers × 8 teams, 21-game regular season + 4-team playoffs | Makes 3-game series ideal for 5–15 min runs while keeping seasons meaty |

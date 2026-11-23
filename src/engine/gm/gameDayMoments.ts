@@ -35,6 +35,7 @@ export interface ClutchMomentInput {
 }
 
 export interface ClutchMomentLaunch {
+  gameEvents: readonly PlayEvent[];
   session: GameSessionState;
   events: readonly PlayEvent[];
   recapHeadline: string;
@@ -142,9 +143,11 @@ export function createClutchMomentSession(input: ClutchMomentInput): ClutchMomen
   const outsText = `${finalSession.outs} Out${finalSession.outs === 1 ? '' : 's'}`;
   const recapHeadline = `Clutch Jump-In: ${finalSession.half} ${finalSession.inning} (${scoreText} • ${outsText}${basesText}) — Take over!`;
 
+  const gameEvents = allEvents.filter(e => e.seq <= finalSession.eventSeq);
   return {
     session: finalSession,
-    events: allEvents.slice(-8),
+    gameEvents,
+    events: gameEvents.slice(-8),
     recapHeadline,
   };
 }

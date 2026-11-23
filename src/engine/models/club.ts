@@ -1,3 +1,4 @@
+import type { ScorebookMoment } from '../gm/scorebookMoments';
 import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
 import type { FieldPosition } from '../handedness/types';
 import type { CoachStaffState } from './manager';
@@ -115,6 +116,7 @@ export const MIN_ACTIVE_ROSTER_SIZE = 15;
 export const MAX_ACADEMY_ROSTER_SIZE = 6;
 
 export interface Club {
+  keepsakes?: ScorebookMoment[];
   id: string;
   isHuman: boolean;
   city: string;

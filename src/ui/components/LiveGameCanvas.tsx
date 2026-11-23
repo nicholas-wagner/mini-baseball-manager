@@ -8,6 +8,8 @@ import type { CameraPresetId } from '../../scene/camera/cameraRig';
 import type { ChoreographedStep } from '../../scene/playback/eventChoreographer';
 import { GameSceneController } from '../../scene/playback/gameSceneController';
 
+import type { AtBatPreview } from '../../scene/playback/firstAtBatPresentation';
+
 export type LiveCameraMode = 'auto' | 'over_shoulder_pitcher' | 'over_shoulder_batter' | 'broadcast_diamond';
 
 const CAMERA_MODE_OPTIONS: readonly { id: LiveCameraMode; label: string; ariaLabel: string }[] = [
@@ -22,6 +24,7 @@ interface LiveGameCanvasProps {
   homeClub: Club;
   session: GameSessionState;
   choreo?: ChoreographedStep | null;
+  preview?: AtBatPreview | null;
   lastEvent?: PlayEvent | null;
   cameraMode?: LiveCameraMode;
   onChangeCameraMode?: (mode: LiveCameraMode) => void;
@@ -36,6 +39,7 @@ export function LiveGameCanvas({
   session,
   choreo = null,
   lastEvent = null,
+  preview = null,
   cameraMode = 'auto',
   onChangeCameraMode,
   celebrateConfetti = false,
@@ -65,6 +69,8 @@ export function LiveGameCanvas({
       return undefined;
     }
   }, []);
+
+  useEffect(() => { controllerRef.current?.setPreview(preview); }, [preview]);
 
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');

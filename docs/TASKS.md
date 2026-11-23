@@ -255,3 +255,4 @@
 | Task ID | Status | Scope |
 | --- | --- | --- |
 | TASK-074 | DONE | Card-led Opening Day, timed field calls, signature motions, a roster print gallery and an illustrated rematch recap. [Screenshots and pitch preview](../README.md#your-first-game) |
+| TASK-075 | DONE | Guided first at-bat, legible catches and force plays, signature player reactions and collectible game moments. |

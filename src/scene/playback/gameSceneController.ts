@@ -1,3 +1,4 @@
+import { previewShot, rehearsalPose, targetOffset, type AtBatPreview } from './firstAtBatPresentation';
 import { playReadout } from './playReadout';
 import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
@@ -82,6 +83,13 @@ export class GameSceneController {
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
   private bats: EffectiveBatSide = 'R';
   private throws: ThrowsHand = 'R';
+  private preview: AtBatPreview | null = null;
+  private previewStart = 0;
+  public setPreview(intent: AtBatPreview | null) {
+    if (intent === this.preview) return;
+    this.preview = intent;
+    this.previewStart = this.elapsedSec;
+  }
   private cameraPreset: CameraPresetId = 'over_shoulder_pitcher';
   private steadyCamera = false;
   private cameraOverride: CameraPresetId | null = null;
@@ -132,6 +140,7 @@ export class GameSceneController {
       );
       rig.root.position.set(coord.x, coord.y, coord.z);
       rig.logicalYaw = coord.yaw;
+      rig.root.scale.y = 1;
       this.defenders.set(coord.pos, rig);
       this.scene.add(rig.root);
     }
@@ -260,6 +269,7 @@ export class GameSceneController {
           jerseyNumber: runner.jerseyNumber,
           role: 'fielder',
           throwsHand: runner.throws,
+          sprintSpeed: runner.ratings.speed,
         });
         rig.preparePlayback();
       }
@@ -284,7 +294,9 @@ export class GameSceneController {
         this.welcome.set(teammates.map(p=>({traits:p.traits,jerseyNumber:p.jerseyNumber,throwsHand:p.throws,team:battingTeam,role:'fielder'})));
       }
       const at = (pos: DiamondDefenderPos) => this.defenders.get(pos)!;
-      this.replay = { play, readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
+      const reliefStrikeout = pitcher.position === 'RP' && event?.outcome === 'strikeout'
+        && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
+      this.replay = { play: reliefStrikeout ? {...play,reliefStrikeout:true} : play, readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
         BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
         runnerDestinations: (play.outfield || play.close || play.kind === 'bunt_single' || play.kind === 'fielding_error') && event ? bases.map((id, i) => {
@@ -405,10 +417,13 @@ export class GameSceneController {
       this.ballpark.update(dt, 0.57);
       return;
     }
+    const swing = this.preview === 'contact' || this.preview === 'power' ? this.preview : null;
     const activePreset = this.cameraOverride ?? this.cameraPreset;
-    const targetPose = getCameraPresetPose(activePreset, this.elapsedSec, 0, this.throws, this.bats);
+    const preview = this.cameraOverride ? null : this.preview;
+    const targetPose = preview ? previewShot(preview,this.bats)
+      : getCameraPresetPose(activePreset, this.elapsedSec, 0, this.throws, this.bats);
     if (this.camera.fov !== targetPose.fov) { this.camera.fov = targetPose.fov; this.camera.updateProjectionMatrix(); }
-    this.cameraPose = dampCameraPose(this.cameraPose, targetPose, dt, 6);
+    this.cameraPose = preview ? targetPose : dampCameraPose(this.cameraPose, targetPose, dt, 6);
     this.trauma = Math.max(0, this.trauma - dt * 1.4);
     const shake = computeShakeOffset(this.steadyCamera ? 0 : this.trauma, this.elapsedSec);
 
@@ -431,13 +446,23 @@ export class GameSceneController {
           : this.highlightPos === pos
             ? this.fielderClip
             : 'field_ready';
-      rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
+      if (pos === 'C') {
+        const home = DIAMOND_DEFENDER_COORDS.find(coord => coord.pos === 'C')!;
+        const offset = targetOffset(this.preview ?? 'attack_zone', this.bats);
+        rig.root.position.set(home.x+offset.x,home.y,home.z);
+        rig.updatePose(this.preview && !swing ? 'catch_target' : clip,this.elapsedSec,undefined,this.camera.position);
+        // Keep both cleats planted as the catcher sets a high or low target.
+        rig.root.scale.y = 1 + offset.y;
+      } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
     }
     if (this.pitch) this.drawPitch(this.pitch);
-    else this.batterRig.updatePose(this.batterClip, this.elapsedSec, undefined, this.camera.position);
+    else if (swing) {
+      const pose = rehearsalPose(swing,this.elapsedSec-this.previewStart,this.steadyCamera);
+      this.batterRig.updatePose(pose.clip,pose.time,undefined,this.camera.position);
+    } else this.batterRig.updatePose(this.batterClip, this.elapsedSec, undefined, this.camera.position);
     for (const runner of this.runnerRigs) {
       if (runner.root.visible) {
-        runner.updatePose('idle', this.elapsedSec, undefined, this.camera.position);
+        runner.updatePose('runner_lead', this.elapsedSec, undefined, this.camera.position);
       }
     }
 

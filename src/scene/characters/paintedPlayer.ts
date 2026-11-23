@@ -22,6 +22,7 @@ export interface PaintedPlayerOptions {
   role: Exclude<PaintedRole, 'runner'>;
   throwsHand?: ThrowsHand;
   batSide?: EffectiveBatSide;
+  sprintSpeed?: number;
 }
 
 export interface PaintedPlayerRig {
@@ -212,12 +213,34 @@ export function createPaintedPlayerRig(
     if (clip==='slide_safe') rear=false;
     const homeTag = clip === 'field_tag' && role === 'catcher';
     const frame = paintedMotion(motionRole, homeTag ? 'catch_receive' : clip, homeTag ? .22 : time);
-    if (clip==='catch_target') { frame.cel=5; frame.squash=.018; }
+    if (clip==='catch_target') {
+      frame.cel=5;
+      frame.squash=.018;
+      if (a.glasses !== 'none') {
+        // A brief nod into the mask as the receiver sets the target.
+        const beat = Math.min(1,((time + opt.traits.seed % 5 * .13) % 3.8) / .52);
+        frame.tilt -= .14*Math.sin(Math.PI*beat);
+      }
+    }
+    if (clip === 'pitch_salute') {
+      const lift = Math.sin(Math.PI * Math.min(1,time/CLIP_DURATIONS.pitch_salute));
+      frame.cel = lift > .38 ? 6 : 8;
+      frame.shift = -.035*lift;
+      frame.lean = .055*lift;
+      frame.tilt = -.075*lift;
+    }
     if (stride) frame.cel = runnerRow[a.bottoms] + (rear?2:0) + Number(time%CLIP_DURATIONS.field_run >= CLIP_DURATIONS.field_run/2);
     if (homeTag) frame.squash = .20;
     const plantedRunner = motionRole === 'runner' && !running && !sliding;
     if (plantedRunner) {
       frame.cel += (rear ? 2 : 0) + runnerRow[a.bottoms];
+      if (clip==='runner_lead' && (opt.sprintSpeed ?? 0) >= 65) {
+        const cycle = (time + opt.traits.seed % 8 * .19) % 3.2;
+        const tap = Math.sin(Math.PI * Math.min(1,cycle/.50)) ** 2;
+        frame.lean -= .14 + .055*tap;
+        frame.cel = runnerRow[a.bottoms] + (rear ? 2 : 0) + Number(tap>.4);
+        frame.shift += .06*tap;
+      }
       if (clip==='runner_push') {
         const push=Math.min(1,time/.19);
         frame.lean=-.18+.09*push; frame.squash=.08*(1-push); frame.shift=.095*push;
@@ -337,7 +360,7 @@ export function createPaintedPlayerRig(
 
     head.scale.set(256 * headUnit, 256 * headUnit, 1);
     head.position.set(0, 72 * headUnit, 0);
-    const showDetails = (!rear || headSheet === 'helmet-quarter') && role !== 'catcher';
+    const showDetails = !rear || headSheet === 'helmet-quarter';
     headMat.uniforms.showDetails.value = Number(showDetails);
     if (showDetails) detail.paint(a, headSheet, faceCell, clip==='slide_safe' ? 3 : emotion, opt.team.accent);
     number.visible =

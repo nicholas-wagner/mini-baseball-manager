@@ -16,17 +16,25 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   await start.click();
   const matchup = page.getByRole('group', { name: 'Matchup cards' });
   await expect(matchup.getByRole('button', { name: 'Inspect ' + name + ' card' })).toBeVisible();
-  const pitch = page.getByRole('button', { name: /next pitch|throw pitch/i }).first();
+  const guide = page.getByRole('region',{name:'First at-bat'});
+  const corner = guide.getByRole('button',{name:'Corner',exact:true});
+  await (await corner.count() ? corner : guide.getByRole('button',{name:'Swing big'})).click();
+  const pitch = guide.getByRole('button',{name:/Pitch to the corner|Swing for power/});
   await expect(pitch).toBeInViewport();
   await pitch.click();
   await expect(
     page.locator('.plate-verdict, [data-testid="comic-callout-banner"]').first(),
-  ).toBeVisible();
+  ).toBeVisible({timeout:15000});
+  if (await guide.count()) await guide.getByRole('button',{name:'More controls'}).click();
   await page.getByTestId('fast-sim-toggle').click();
   await page.getByRole('button', { name: /sim to end/i }).click();
   const recap = page.getByRole('dialog', { name: /post-game box score/i });
   const again = recap.getByRole('button', { name: /rematch/i });
   await expect(again).toBeInViewport({ ratio: 1 });
+  const keepsake = recap.getByRole('region',{name:'Scorebook prints'});
+  const scorer = await keepsake.getByRole('heading').innerText();
+  await keepsake.getByRole('button',{name:'Keep this moment'}).click();
+  await expect(recap.getByRole('button',{name:/In your album/})).toBeDisabled();
   await again.click();
   await expect(recap).toHaveCount(0);
   await expect(page.getByTestId('live-game-3d-canvas')).toBeVisible();
@@ -39,4 +47,9 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   await expect(enlarged.locator('img')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(enlarged).toHaveCount(0);
+  await page.reload();
+  const albumButton = page.getByRole('button',{name:/Trophy and Sticker Album|Trophy & Sticker Album/i}).locator('visible=true').first();
+  if (!await albumButton.count()) await page.getByRole('button',{name:'Open clubhouse menu'}).click();
+  await albumButton.click();
+  await expect(page.getByRole('region',{name:'Scorebook prints'}).getByRole('heading')).toHaveText(scorer);
 });

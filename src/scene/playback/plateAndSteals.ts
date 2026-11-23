@@ -129,12 +129,11 @@ export function closeCamera(play: DiamondPlay, close: CloseAction, t: number, ba
   const plate = play.legs[0].end;
   const sign = bats === 'R' ? 1 : -1;
   const atPlate = { position: { x: sign*3.75, y: 1.83, z: -3.95 }, lookAt: { x: -sign*.17, y: 1.06, z: .35 }, fov: 36 };
-  if (!close.steal && t < play.legs[0].start + .12) return getCameraPresetPose('over_shoulder_pitcher',t,0,throws,bats);
-  if (close.kind.endsWith('_pitch') && t>plate+.65) {
-    const u=fraction(t,plate+.72,plate+1.46);
-    const z=1.02-11.22*u;
-    return {position:{x:3.2,y:2.45,z:z+4.2},lookAt:{x:0,y:1.06,z},fov:41};
+  if (close.kind.endsWith('_pitch') || close.kind.endsWith('_third')) {
+    // Keep both endpoints visible while the viewer follows the small moving ball.
+    return {position:{x:sign*4.8,y:2.8,z:-16.8}, lookAt:{x:0,y:.94,z:-7}, fov:36};
   }
+  if (!close.steal && t < play.legs[0].start + .12) return getCameraPresetPose('over_shoulder_pitcher',t,0,throws,bats);
   if (close.kind === 'ball_four' && t > plate+.85) {
     const p = closeActorAt(play,close,'BAT',t,bats,bags[0]).pos;
     return { position:{x:p.x+2.6,y:2.9,z:p.z+5},lookAt:{x:p.x,y:.91,z:p.z},fov:39 };
