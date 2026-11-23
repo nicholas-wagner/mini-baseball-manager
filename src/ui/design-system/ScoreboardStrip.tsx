@@ -16,6 +16,7 @@ interface ScoreboardStripProps {
   outs: number;
   bases?: readonly [boolean, boolean, boolean];
   rivalryLabel?: string;
+  flash?: { seq: number; lamp: string | null; base: number } | null;
 }
 
 function LedDots({ count, max, activeColor }: { count: number; max: number; activeColor: string }) {
@@ -35,7 +36,7 @@ function LedDots({ count, max, activeColor }: { count: number; max: number; acti
   );
 }
 
-function MiniBasesDiamond({ bases }: { bases: readonly [boolean, boolean, boolean] }) {
+function MiniBasesDiamond({ bases, highlight }: { bases: readonly [boolean, boolean, boolean]; highlight?: number }) {
   return (
     <svg
       data-testid="scoreboard-bases-diamond"
@@ -45,6 +46,7 @@ function MiniBasesDiamond({ bases }: { bases: readonly [boolean, boolean, boolea
     >
       {/* 2B (top) */}
       <rect
+        className={highlight === 2 ? 'count-flash' : undefined}
         x="14"
         y="3"
         width="8"
@@ -56,6 +58,7 @@ function MiniBasesDiamond({ bases }: { bases: readonly [boolean, boolean, boolea
       />
       {/* 3B (left) */}
       <rect
+        className={highlight === 3 ? 'count-flash' : undefined}
         x="5"
         y="12"
         width="8"
@@ -67,6 +70,7 @@ function MiniBasesDiamond({ bases }: { bases: readonly [boolean, boolean, boolea
       />
       {/* 1B (right) */}
       <rect
+        className={highlight === 1 ? 'count-flash' : undefined}
         x="23"
         y="12"
         width="8"
@@ -98,6 +102,7 @@ export function ScoreboardStrip({
   outs,
   bases = [false, false, false],
   rivalryLabel,
+  flash,
 }: ScoreboardStripProps) {
   return (
     <div
@@ -154,7 +159,7 @@ export function ScoreboardStrip({
         </div>
 
         <div className="px-1.5 py-0.5 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] flex items-center gap-1.5">
-          <MiniBasesDiamond bases={bases} />
+          <MiniBasesDiamond key={flash?.seq} bases={bases} highlight={flash?.base} />
           <div className="flex flex-col leading-tight">
             <span
               data-testid="scoreboard-count-text"
@@ -169,13 +174,13 @@ export function ScoreboardStrip({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] font-extrabold tracking-wider text-[#B8DEC9] bg-[#122D21] px-2 py-1 rounded-xl border-2 border-[#0B1E16]">
-          <span className="flex items-center gap-1" aria-label={`Balls ${balls}`}>
+          <span key={'Balls' + flash?.seq} className={'flex items-center gap-1 rounded ' + (flash?.lamp === 'balls' ? 'count-flash' : '')} aria-label={`Balls ${balls}`}>
             B <LedDots count={balls} max={3} activeColor="#2FB356" />
           </span>
-          <span className="flex items-center gap-1" aria-label={`Strikes ${strikes}`}>
+          <span key={'Strikes' + flash?.seq} className={'flex items-center gap-1 rounded ' + (flash?.lamp === 'strikes' ? 'count-flash' : '')} aria-label={`Strikes ${strikes}`}>
             S <LedDots count={strikes} max={2} activeColor="#FFC300" />
           </span>
-          <span className="flex items-center gap-1" aria-label={`Outs ${outs}`}>
+          <span key={'Outs' + flash?.seq} className={'flex items-center gap-1 rounded ' + (flash?.lamp === 'outs' ? 'count-flash' : '')} aria-label={`Outs ${outs}`}>
             O <LedDots count={outs} max={2} activeColor="#FF4D6D" />
           </span>
         </div>

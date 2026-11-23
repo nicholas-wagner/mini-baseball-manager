@@ -649,6 +649,8 @@ export interface PlayEvent {
 }
 ```
 
+The Opening Day card previews the same seeded clutch session passed to live playback. The scoreboard holds the preceding game state until the choreographed decision. The field call, scoreboard and runner highlight all use the selected play event. Postgame headlines use that game's player stat deltas.
+
 ### 2.4 Local Persistence Schema (`src/store/persistence.ts`)
 
 ```ts

@@ -30,6 +30,8 @@
 
 **Overall 10X Progress**: `73 / 73` feature slices completed (**100% of 10X Master Roadmap Complete!**)
 
+Post-roadmap Game Day polish is complete (TASK-074). The Opening Day, live matchup, print gallery and recap previews are in the [README](README.md#your-first-game).
+
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
 ---
@@ -40,7 +42,7 @@
 
 1. **Iconic Retro-90s Cartoon & Volumetric 2.5D Chibi Art (Design-First)**:
    - Collectible **90s Baseball Cards** (3D-flippable *1994 Rookie*, *All-Star Chrome*, and *MVP Holo Foil*) feature original manga portraits in neutral uniforms. The frame carries club colors and jersey numbers alongside country flags, `B/T` handedness and Cultural Heritage badges. Players awaiting a catalog illustration use seeded SVG art.
-   - **True ~1.8-Head Volumetric 2.5D Chibi Mini Players** with animated articulated SVG limbs, mirrored southpaw/righty gloves, palm-gripped baseballs, two-handed bat swings, and 2.5D standee depth + 3D hop physics inside a sunlit **Over-the-Shoulder 3D Ballpark** featuring all 9 live defenders, baserunners, instanced cheering fans, sponsor billboards, retired-number wall plaques, and dynamic weather/night lights.
+   - Shared painted minis carry team colors, batting and throwing sides, gear and signature motions onto the 3D field. Fixed manga prints identify the same players in the binder, matchup and recap.
    - **Procedural 90s Web Audio Synth & Ballpark Organ**: Multi-formant stadium crowd roars + hand-claps, bat cracks, super-pitch whooshes, spring boings, cash chimes, RPG level-ups, and classic ballpark organ riffs — 100% offline.
 
 2. **10X RPG Progression, Specialists, Positional Craft & Clubhouse Chemistry**:
@@ -212,6 +214,7 @@ Grow the permanent catalog to **3,000 distinct players across all six tiers**, w
 
 | Date | Area | Change / Decision | Rationale |
 | :--- | :--- | :--- | :--- |
+| 2026-11-23 | First game and player cards | Preview the actual late-inning session, show both matchup prints, and lead the final with the MVP and rematch. Allow full-size art inspection throughout the card collection. | Give the manager a player to recognize and a decision to make on the first screen. |
 | 2026-11-21 | Visuals & Stack | Locked Vite + React + TS + Tailwind v4 + imperative Three.js + Zustand + Vitest + Playwright + PWA + Web Audio synth | Balances 60 FPS Android performance, 90s charm, and clean TDD separation |
 | 2026-11-21 | League Pacing | Locked 6 tiers × 8 teams, 21-game regular season + 4-team playoffs | Makes 3-game series ideal for 5–15 min runs while keeping seasons meaty |
 | 2026-11-21 | Gameplay / League | Added **Dynamic Team Rivalries** (heat meter, organic triggers, poached-player revenge games, comic VS cards, boosted hype/attendance, traveling Rivalry Cup) | Deepens multi-season drama and ties together visuals, RPG, economy, and trophies |

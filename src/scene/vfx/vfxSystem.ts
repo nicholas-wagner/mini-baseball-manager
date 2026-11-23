@@ -11,7 +11,7 @@ interface ActiveCallout {
   elapsed: number;
   duration: number;
   startY: number;
-  inCorner: boolean;
+  inCorner: boolean | 'contact';
 }
 
 export interface BallparkVfxSystem {
@@ -23,7 +23,7 @@ export interface BallparkVfxSystem {
   ball: ReturnType<typeof createBallFlightVisual>;
   impact: (position: Vec3, color: string) => void;
   clear: () => void;
-  spawnComicCallout: (text: string, pos: Vec3, bgColor?: string, inCorner?: boolean) => void;
+  spawnComicCallout: (text: string, pos: Vec3, bgColor?: string, inCorner?: boolean | 'contact') => void;
   update: (dtSec: number, camera?: THREE.PerspectiveCamera) => void;
   dispose: () => void;
 }
@@ -109,7 +109,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     text: string,
     pos: { x: number; y: number; z: number },
     bgColor = '#FFC300',
-    inCorner = false,
+    inCorner: boolean | 'contact' = false,
   ) => {
     if (!captions) return;
     const texture = createComicCalloutTexture(text, bgColor);
@@ -163,7 +163,12 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
       } else {
         // Elastic comic pop-in + gentle upward drift
         const pop = t < 0.18 ? (t / 0.18) * 1.18 : 1.18 - Math.min(0.18, (t - 0.18) * 0.9);
-        if (c.inCorner && camera) {
+        if (c.inCorner === 'contact' && camera) {
+          const depth = camera.position.distanceTo(c.sprite.position);
+          const width = Math.min(2, depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * .49);
+          c.sprite.scale.set(width * pop, width * pop * .375, 1);
+          c.sprite.position.y = c.startY + .26 * t;
+        } else if (c.inCorner && camera) {
           // Keep the play name inside the frame and clear of the pitch lane.
           const depth = 3;
           const height = 2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));

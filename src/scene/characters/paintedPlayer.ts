@@ -194,7 +194,7 @@ export function createPaintedPlayerRig(
     const popping = clip === 'catch_throw' || clip === 'catch_point' || clip==='catch_handoff';
     const basePlayPose = sliding || tagging || popping;
     const leading = clip === 'runner_lead' || clip==='runner_push' || (role==='batter' && clip==='celebrate_hr');
-    const pitching = role==='pitcher' && ['idle','field_ready','pitch_windup','pitch_super','practice_bullpen'].includes(clip);
+    const pitching = role==='pitcher' && ['idle','field_ready','pitch_set','pitch_windup','pitch_super','practice_bullpen'].includes(clip);
     const motionRole = running || leading || sliding ? 'runner' : role==='pitcher' && !pitching && clip!=='celebrate_hr' ? 'fielder' : role;
     const stride = clip==='field_run' && !running;
     if (delivery) {
@@ -318,8 +318,20 @@ export function createPaintedPlayerRig(
       // Each player keeps a quiet pre-pitch habit through changes of club or uniform.
       const beat = Math.pow(Math.max(0,Math.sin(time*3.6 + (opt.traits.seed % 13))),4);
       if (opt.traits.seed % 3 === 0) headJoint.rotation.z += .085 * beat;
-      else if (opt.traits.seed % 3 === 1 && bat.barrel.visible) bat.barrel.rotation.z += .17 * beat * rotationSign;
+      else if (opt.traits.seed % 3 === 1 && bat.barrel.visible) {
+        // Two taps from the painted grip, then a pause in the loaded stance.
+        const cycle = (time + Math.abs(opt.traits.seed % 5) * .17) % 3.6;
+        const tap = (start: number) => Math.sin(Math.PI * Math.min(1, Math.max(0, (cycle - start) / .52))) ** 2;
+        bat.barrel.rotation.z += (rear ? 1 : -1) * 2.72 * (tap(.10) + tap(.70));
+      }
       else actor.position.x += .032 * beat * actorFlip;
+    }
+    const roll = clip === 'pitch_set' && opt.traits.seed % 3 === 0;
+    if (pitching) {
+      const gather = Math.min(1, frame.pitchPhase / .24);
+      headJoint.position.y -= .038 * Math.sin(Math.PI * gather);
+      const rollPhase = roll ? Math.min(time % CLIP_DURATIONS.pitch_set, 1.3) : Math.min(frame.pitchPhase, .58);
+      ball.rotation.z = (opt.traits.seed % 2 ? 1 : -1) * rollPhase * 9;
     }
     if (sliding) headJoint.rotation.z = actorFlip * (clip==='slide_safe' ? -.14 : .12);
 
@@ -357,7 +369,7 @@ export function createPaintedPlayerRig(
       }
       ball.position.set(swingMirror*(handX-128)*unit*width,(249-handY)*unit,rear ? -.045 : .075);
     }
-    ball.visible = frame.held || (caught && !pitching);
+    ball.visible = (roll && time % CLIP_DURATIONS.pitch_set < 1.3) || frame.held || (caught && !pitching);
     shadow.scale.set((0.8 - frame.hop * 0.33) * width * height, (0.42 - frame.hop * 0.2) * height, 1);
   }
   const rig: PaintedPlayerRig = {

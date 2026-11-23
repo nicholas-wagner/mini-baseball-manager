@@ -129,7 +129,7 @@ export function closeCamera(play: DiamondPlay, close: CloseAction, t: number, ba
   const plate = play.legs[0].end;
   const sign = bats === 'R' ? 1 : -1;
   const atPlate = { position: { x: sign*3.75, y: 1.83, z: -3.95 }, lookAt: { x: -sign*.17, y: 1.06, z: .35 }, fov: 36 };
-  if (!close.steal && t < play.legs[0].start-.06) return getCameraPresetPose('over_shoulder_pitcher',t,0,throws,bats);
+  if (!close.steal && t < play.legs[0].start + .12) return getCameraPresetPose('over_shoulder_pitcher',t,0,throws,bats);
   if (close.kind.endsWith('_pitch') && t>plate+.65) {
     const u=fraction(t,plate+.72,plate+1.46);
     const z=1.02-11.22*u;

@@ -48,7 +48,7 @@ describe('Ballpark Economy, Medical Hiring, Gazette, Trade Machine, Global Cup &
 
     render(<ClubHubScreen />);
 
-    await user.click(screen.getByRole('button', { name: /coaches & staff/i }));
+    await user.click(screen.getByRole('button', { name: /staff & front office/i }));
     expect(screen.getByText(/active staff slots: 0 \/ 2/i)).toBeInTheDocument();
 
     const hireDocButtons = screen.getAllByRole('button', { name: /hire doctor/i });
@@ -66,6 +66,7 @@ describe('Ballpark Economy, Medical Hiring, Gazette, Trade Machine, Global Cup &
 
     render(<ClubHubScreen />);
 
+    await user.click(screen.getByRole('button', { name: /staff & front office/i }));
     await user.click(screen.getByRole('button', { name: /gazette & front office/i }));
     expect(screen.getByTestId('front-office-gazette-panel')).toBeInTheDocument();
     expect(screen.getByText(/the sandlot gazette/i)).toBeInTheDocument();
@@ -91,7 +92,7 @@ describe('Ballpark Economy, Medical Hiring, Gazette, Trade Machine, Global Cup &
 
     render(<ClubHubScreen />);
 
-    await user.click(screen.getByRole('button', { name: /derby & sharing/i }));
+    await user.click(screen.getByRole('button', { name: /events & duels/i }));
     expect(screen.getByTestId('world-spectacles-panel')).toBeInTheDocument();
 
     // Launch Global Chibi Cup across all 48 clubs

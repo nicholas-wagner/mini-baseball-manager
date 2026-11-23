@@ -60,11 +60,9 @@
   - Basepath distance: `14` units (stylized mini diamond — feels snappy and keeps all fielders readable on phone screens!).
   - Pitcher's mound: `(0, 0.25, -9.8)` facing Home Plate at `(0, 0, 0)`.
   - Outfield wall arc radius: `~46` units (left/right corners `38`, center `48`).
-- **Chibi Mini Player Height**: `~1.65` units tall:
-  - Oversized head sphere/egg: `r = 0.42` (~45% of visual silhouette!) with live 256×256 canvas facial texture.
-  - Rounded capsule jersey torso: height `0.55`, radius `0.28`, team color + stripe + jersey number decal.
-  - Buoyant floating gloved hands & cleated stubby feet (allows snappy cartoon swings, diving stretches, and spring jumps).
-  - Cel shading via 3-band nearest-neighbor `DataTexture` on `MeshToonMaterial` + inverted-hull outline (`THREE.BackSide`, `#181B2C`, scale `1.06`).
+- Live mini players use shared painted body cels, a registered head and player-specific details. Align the mitt, bat and ball with the painted grip in both camera directions. Idle mannerisms rotate around that grip.
+- Use the player's catalog ID for card art in every club. Show the full 4:5 illustration on card fronts. Keep enlargement keyboard-accessible and preserve the original aspect ratio.
+- Show the count change on the catch and the base highlight on the play. Keep the named Opening Day action and the postgame next action within a 390×844 viewport. Reserve at least 44px for pitch calls and camera controls.
 - **Over-the-Shoulder 3D Camera Presets**:
   - `behind_pitcher`: Positioned behind pitcher's throwing shoulder looking down the lane toward home plate (`pos ≈ [1.8, 3.0, -14.2]`, `lookAt ≈ [0, 1.1, 2.0]`).
   - `behind_batter`: Positioned behind catcher/batter's shoulder looking out at the pitcher (`pos ≈ [-1.5, 2.5, 5.8]`, `lookAt ≈ [0, 1.3, -10.5]`).

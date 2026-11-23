@@ -1,3 +1,5 @@
+import type { playReadout } from './playReadout';
+import { BASE_PATH_VERTICES } from './diamondLayout';
 import { welcomePose } from './teamReactions';
 import type { CameraPose } from '../camera/cameraRig';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
@@ -12,7 +14,7 @@ export type DiamondCast = Record<Actor, PaintedPlayerRig>;
 const actors: Actor[] = ['C', 'P', 'BAT', 'SS', '2B', '1B', '3B', 'LF', 'CF', 'RF', 'RUN'];
 
 export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: EffectiveBatSide,
-  seconds: number, previous: number, camera: PerspectiveCamera, heightPx: number, vfx: BallparkVfxSystem, throws: ThrowsHand = 'R', fixedShot?: CameraPose, teammates:readonly PaintedPlayerRig[] = []) {
+  seconds: number, previous: number, camera: PerspectiveCamera, heightPx: number, vfx: BallparkVfxSystem, throws: ThrowsHand = 'R', fixedShot?: CameraPose, teammates:readonly PaintedPlayerRig[] = [], readout?: ReturnType<typeof playReadout>) {
   const t = Math.min(seconds, play.duration);
   const shot = fixedShot ?? diamondCamera(play, t, side, throws);
   camera.position.copy(shot.position);
@@ -102,6 +104,9 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       vfx.spawnComicCallout(play.outfield.call, base, play.outfield.callColor, true);
     }
   }
+  if (readout?.base && previous < play.batterArrival && seconds >= play.batterArrival) {
+    vfx.impact(BASE_PATH_VERTICES[readout.base], '#FFCE54');
+  }
   const dropAt = play.legs[0].end+(play.kind==='ball_four'?.48:.20);
   vfx.droppedBat.visible=false;
   if ((!play.close && play.kind!=='bullpen' || play.kind==='ball_four') && t>=dropAt) {
@@ -120,7 +125,8 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       const call = { foul_back:'FOUL!', called_third:'STRIKE THREE!', swinging_third:'SWING AND MISS!',
         called_pitch:'STRIKE!', missed_pitch:'SWING AND MISS!', ball_pitch:'BALL!', ball_four:'BALL FOUR!', steal_safe:'SAFE!', steal_out:'OUT!' }[kind];
       const at = play.close.steal ? contact(play.pickup,decisionAt) : contact(play.legs[0].to,decisionAt);
-      vfx.spawnComicCallout(call,at,kind === 'steal_out' ? '#FF4D6D' : '#167457',true);
+      vfx.spawnComicCallout(readout?.label.toUpperCase() ?? call, {...at,y:at.y+.55},
+        kind === 'steal_out' ? '#C1394C' : '#167457', 'contact');
     }
   }
   const ump = vfx.umpire;

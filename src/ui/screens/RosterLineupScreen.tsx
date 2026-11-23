@@ -47,6 +47,7 @@ import {
 } from '../../engine/rpg/specialistsAndPositions';
 import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises';
 import { useGameStore } from '../../store/gameStore';
+import { RosterPrintGallery } from '../components/GameDayPrints';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
 import {
   PlayerCardModal,
@@ -113,6 +114,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const [selectedSlotIdx, setSelectedSlotIdx] = useState<number | null>(null);
   const [selectedRotationIdx, setSelectedRotationIdx] = useState<number | null>(null);
   const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
+  const [printGallery, setPrintGallery] = useState(false);
   const [rosterView, setRosterView] = useState<'lineup' | 'cards'>('lineup');
   const [cardFilter, setCardFilter] = useState<'all' | 'lineup' | 'pitchers' | 'bench'>('all');
   const [cardModalOpen, setCardModalOpen] = useState(false);
@@ -370,7 +372,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           </div>
           <span className="text-[11px] font-bold text-[#4A5068]">
             {rosterView === 'cards'
-              ? 'Tap any card to flip front & back!'
+              ? (printGallery ? 'Tap a print to enlarge it.' : 'Choose Stats to flip a card.')
               : 'Tap 🃏 Card on any player to inspect instantly'}
           </span>
         </div>
@@ -399,8 +401,11 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                   {tab.label}
                 </ComicButton>
               ))}
+              <button type="button" className="ml-auto min-h-11 px-3 text-sm font-bold underline cursor-pointer" aria-pressed={printGallery}
+                onClick={() => setPrintGallery(v => !v)}>{printGallery ? 'Stat cards' : 'Print gallery'}</button>
             </div>
 
+            {printGallery ? <RosterPrintGallery club={humanClub.name} players={filteredBinderEntries.map(e => e.player)} /> :
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredBinderEntries.map(({ player, roleTag }) => (
                 <div
@@ -442,7 +447,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                   </div>
                 </div>
               ))}
-            </div>
+            </div>}
           </div>
         ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">

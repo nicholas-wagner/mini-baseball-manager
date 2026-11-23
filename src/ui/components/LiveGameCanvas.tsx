@@ -1,3 +1,5 @@
+import { useUserPreferencesStore } from '../../store/userPreferences';
+import { Camera } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Club } from '../../engine/models/club';
 import type { PlayEvent } from '../../engine/models/playEvent';
@@ -25,6 +27,7 @@ interface LiveGameCanvasProps {
   onChangeCameraMode?: (mode: LiveCameraMode) => void;
   celebrateConfetti?: boolean;
   overlay?: ReactNode;
+  entrance?: ReactNode;
 }
 
 export function LiveGameCanvas({
@@ -37,7 +40,11 @@ export function LiveGameCanvas({
   onChangeCameraMode,
   celebrateConfetti = false,
   overlay = null,
+  entrance,
 }: LiveGameCanvasProps) {
+  const reducedMotion = useUserPreferencesStore(s => s.reducedMotion);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraButton = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<GameSceneController | null>(null);
   const [webglUnavailable, setWebglUnavailable] = useState(false);
@@ -60,10 +67,16 @@ export function LiveGameCanvas({
   }, []);
 
   useEffect(() => {
-    controllerRef.current?.setCameraOverride(
-      cameraMode === 'auto' ? null : (cameraMode as CameraPresetId),
-    );
-  }, [cameraMode]);
+    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const apply = () => {
+      const steady = reducedMotion || Boolean(media?.matches);
+      const automatic = steady ? 'broadcast_diamond' : null;
+      controllerRef.current?.setCameraOverride(cameraMode === 'auto' ? automatic : cameraMode as CameraPresetId, steady);
+    };
+    apply();
+    media?.addEventListener?.('change', apply);
+    return () => media?.removeEventListener?.('change', apply);
+  }, [cameraMode, reducedMotion]);
 
   useEffect(() => {
     controllerRef.current?.syncMatchup(awayClub, homeClub, session, choreo, lastEvent);
@@ -98,6 +111,7 @@ export function LiveGameCanvas({
         </div>
       ) : null}
 
+      {entrance}
       {overlay ? (
         <div className="pointer-events-none absolute inset-x-2 top-2 z-20 flex justify-center">
           {overlay}
@@ -107,15 +121,22 @@ export function LiveGameCanvas({
       {onChangeCameraMode ? (
         <div
           data-testid="camera-angle-switcher"
-          className="absolute bottom-2 right-2 z-20 flex items-center gap-1 bg-[#181B2C]/85 px-1.5 py-1 rounded-xl border-2 border-[#FFD166]"
+          className="absolute bottom-1 right-1 z-20 flex flex-col items-end text-white"
+          onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setCameraOpen(false); }}
+          onKeyDown={e => { if (e.key === 'Escape') { setCameraOpen(false); cameraButton.current?.focus(); } }}
         >
+          <button type="button" ref={cameraButton} aria-expanded={cameraOpen} aria-label="Camera angles"
+            className="order-last flex h-11 w-11 items-center justify-center rounded-full bg-[#132c36]/90 cursor-pointer"
+            onClick={() => setCameraOpen(v => !v)}><Camera size={19} /></button>
+          {cameraOpen && <div className="grid grid-cols-2 rounded-lg border-2 border-[#F2CB75] bg-[#132c36] p-1">
           {CAMERA_MODE_OPTIONS.map((opt) => (
             <button
               key={opt.id}
               type="button"
               aria-label={opt.ariaLabel}
-              onClick={() => onChangeCameraMode(opt.id)}
-              className={`px-1.5 py-0.5 rounded-lg text-[10px] font-extrabold cursor-pointer transition ${
+              aria-pressed={cameraMode === opt.id}
+              onClick={() => { onChangeCameraMode(opt.id); setCameraOpen(false); cameraButton.current?.focus(); }}
+              className={`min-h-11 px-2 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer transition ${
                 cameraMode === opt.id
                   ? 'bg-[#FFC300] text-[#181B2C]'
                   : 'text-[#FBF4E4] hover:bg-white/15'
@@ -123,7 +144,7 @@ export function LiveGameCanvas({
             >
               {opt.label}
             </button>
-          ))}
+          ))}</div>}
         </div>
       ) : null}
 

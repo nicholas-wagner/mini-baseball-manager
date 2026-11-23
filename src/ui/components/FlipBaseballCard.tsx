@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RotateCw, Sparkles, Star } from 'lucide-react';
+import { EnlargePrint } from './EnlargePrint';
 import { FlagBadge } from '../../art/flags/FlagBadge';
 import { playerIllustration } from '../../art/portraits/illustratedPlayerPool';
 import pendingPortrait from '../../art/portraits/illustrations/portrait-pending.svg';
@@ -139,6 +140,7 @@ export function FlipBaseballCard({
               <img src={illustration ?? pendingPortrait} alt={illustration ? `${player.name} manga illustration` : 'Portrait pending'}
                 width={560} height={700} className="block w-full h-full object-cover"
                 onError={illustration ? () => setFailedIllustration(illustration) : undefined} />
+              {illustration && <EnlargePrint name={player.name} src={illustration} />}
             </div>
 
             {/* Nameplate, Cultural Heritage Ability & Special Powers */}
@@ -276,6 +278,7 @@ export function FlipBaseballCard({
           </div>
         </article>
       </div>
+
     </div>
   );
 }

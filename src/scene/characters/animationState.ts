@@ -1,5 +1,6 @@
 export type CharacterAnimClip =
   | 'idle'
+  | 'pitch_set'
   | 'pitch_windup'
   | 'pitch_super'
   | 'bat_stance'
@@ -34,6 +35,7 @@ export const GLOVE_CONTACT_PHASE = { field_dive: 8 / 16, field_high_jump: 10 / 1
 
 export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   idle: 2.0,
+  pitch_set: 3.2,
   pitch_windup: 1.35,
   pitch_super: 1.65,
   bat_stance: 1.8,

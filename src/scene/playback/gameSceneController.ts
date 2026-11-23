@@ -1,3 +1,4 @@
+import { playReadout } from './playReadout';
 import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import { batterBox, headingToward } from './diamondLayout';
@@ -77,14 +78,15 @@ export class GameSceneController {
   private elapsedSec = 0;
   private trauma = 0;
 
-  private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; runnerDestinations?: number[] } | null = null;
+  private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
   private bats: EffectiveBatSide = 'R';
   private throws: ThrowsHand = 'R';
   private cameraPreset: CameraPresetId = 'over_shoulder_pitcher';
+  private steadyCamera = false;
   private cameraOverride: CameraPresetId | null = null;
   private cameraPose: CameraPose;
-  private pitcherClip: CharacterAnimClip = 'idle';
+  private pitcherClip: CharacterAnimClip = 'pitch_set';
   private batterClip: CharacterAnimClip = 'bat_stance';
   private fielderClip: CharacterAnimClip = 'field_ready';
   private highlightPos: DiamondDefenderPos | null = null;
@@ -160,7 +162,8 @@ export class GameSceneController {
     this.startLoop();
   }
 
-  public setCameraOverride(preset: CameraPresetId | null): void {
+  public setCameraOverride(preset: CameraPresetId | null, steady = false): void {
+    this.steadyCamera = steady;
     this.cameraOverride = preset;
   }
 
@@ -266,6 +269,13 @@ export class GameSceneController {
     this.pitch = null;
     this.vfx.clear();
     this.welcome.hide();
+    if (!choreo) {
+      this.cameraPreset = 'over_shoulder_pitcher';
+      this.pitcherClip = 'pitch_set';
+      this.batterClip = 'bat_stance';
+      this.fielderClip = 'field_ready';
+      this.highlightPos = null;
+    }
     const play = choreo?.play ?? choreo?.close ?? choreo?.outfield ?? (choreo?.infield ? diamondPlay(choreo.infield, choreo.highlightFielderPos) : undefined);
     if (play && choreo) {
       if (play.ending?.kind==='walkoff') {
@@ -274,7 +284,7 @@ export class GameSceneController {
         this.welcome.set(teammates.map(p=>({traits:p.traits,jerseyNumber:p.jerseyNumber,throwsHand:p.throws,team:battingTeam,role:'fielder'})));
       }
       const at = (pos: DiamondDefenderPos) => this.defenders.get(pos)!;
-      this.replay = { play, cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
+      this.replay = { play, readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
         BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
         runnerDestinations: (play.outfield || play.close || play.kind === 'bunt_single' || play.kind === 'fielding_error') && event ? bases.map((id, i) => {
@@ -374,7 +384,7 @@ export class GameSceneController {
       const fixedShot = this.cameraOverride
         ? getCameraPresetPose(this.cameraOverride,this.elapsedSec,0,this.throws,this.bats) : undefined;
       renderDiamondPlay(play, cast, this.bats, t, t - elapsed * rate, this.camera, this.container.clientHeight,
-        this.vfx, this.throws, fixedShot, this.welcome.rigs);
+        this.vfx, this.throws, fixedShot, this.welcome.rigs, this.replay.readout);
       this.runnerRigs.forEach((runner, i) => {
         if (!runner.root.visible || ((play.scorerBase || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
         const destination = runnerDestinations?.[i];
@@ -400,7 +410,7 @@ export class GameSceneController {
     if (this.camera.fov !== targetPose.fov) { this.camera.fov = targetPose.fov; this.camera.updateProjectionMatrix(); }
     this.cameraPose = dampCameraPose(this.cameraPose, targetPose, dt, 6);
     this.trauma = Math.max(0, this.trauma - dt * 1.4);
-    const shake = computeShakeOffset(this.trauma, this.elapsedSec);
+    const shake = computeShakeOffset(this.steadyCamera ? 0 : this.trauma, this.elapsedSec);
 
     this.camera.position.set(
       this.cameraPose.position.x + shake.x,

@@ -162,7 +162,7 @@ export function LiveActionBar({
                     title={opt.hint}
                     disabled={gameCompleted}
                     onClick={() => onSelectTacticalCall(opt.id)}
-                    className={`px-2 py-1 min-h-[34px] rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                    className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
                       tacticalCall === opt.id
                         ? 'bg-[#FF4D6D] text-white shadow-[2px_2px_0_#181B2C]'
                         : 'bg-[#FBF4E4] text-[#181B2C] hover:bg-[#FFF3BF]'
@@ -178,7 +178,7 @@ export function LiveActionBar({
                     title={opt.hint}
                     disabled={gameCompleted}
                     onClick={() => onSelectPitchTarget?.(opt.id)}
-                    className={`px-2 py-1 min-h-[34px] rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                    className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
                       pitchTarget === opt.id
                         ? 'bg-[#1D3557] text-[#FFD166] shadow-[2px_2px_0_#181B2C]'
                         : 'bg-[#E0FBFC] text-[#1D3557] hover:bg-[#FFF3BF]'
@@ -197,7 +197,7 @@ export function LiveActionBar({
                     tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
                   )
                 }
-                className={`px-2 py-1 min-h-[34px] rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
                   tacticalCall === quickStealOption.call
                     ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
                     : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFC300]'

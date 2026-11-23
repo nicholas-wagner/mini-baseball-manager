@@ -46,21 +46,28 @@ export function PostGameSummaryModal({
   const mvpDomainPlayer =
     mvpClub.roster.find((p) => p.id === summary.mvp.playerId) ??
     humanClub.roster.find((p) => p.id === summary.mvp.playerId) ??
-    mvpClub.roster[0];
+    summary.result.finalState.home.playersById[summary.mvp.playerId] ??
+    summary.result.finalState.away.playersById[summary.mvp.playerId];
   const mvpCardPlayer = toBaseballCardPlayer(mvpDomainPlayer, 'mvp');
+  const game = summary.result.playerStatDeltas[summary.mvp.playerId];
+  const who = summary.mvp.playerName;
+  const story = game?.homeRuns ? who + ' homered ' + (game.homeRuns === 1 ? 'once' : game.homeRuns + ' times') + '.'
+    : game?.pitchingStrikeouts ? who + ' struck out ' + game.pitchingStrikeouts + (game.pitchingStrikeouts === 1 ? ' batter.' : ' batters.')
+    : game?.rbis ? who + ' drove in ' + game.rbis + (game.rbis === 1 ? ' run.' : ' runs.')
+    : game?.hits ? who + ' collected ' + game.hits + (game.hits === 1 ? ' hit.' : ' hits.')
+    : who + ' earned player of the game.';
   const humanWon = summary.won;
   const humanScore = summary.isHomeGame ? summary.homeScore : summary.awayScore;
   const rivalScore = summary.isHomeGame ? summary.awayScore : summary.homeScore;
   const levelUps = summary.levelUps ?? [];
   const totalUnspentSp = humanClub.roster.reduce((sum, p) => sum + p.skillPoints, 0);
-  const mvpDelta = summary.result.playerStatDeltas[mvpDomainPlayer.id];
   const mvpQuote = buildMvpDugoutQuote({
     playerName: mvpDomainPlayer.name,
     nickname: mvpDomainPlayer.nickname,
-    won: humanWon,
+    won: isHumanMvp === humanWon,
     isPitcher: isPitcherPosition(mvpDomainPlayer.position),
-    homeRuns: mvpDelta?.homeRuns ?? 0,
-    strikeouts: mvpDelta?.pitchingStrikeouts ?? 0,
+    homeRuns: game?.homeRuns ?? 0,
+    strikeouts: game?.pitchingStrikeouts ?? 0,
   });
 
   return (
@@ -81,6 +88,10 @@ export function PostGameSummaryModal({
             </span>
           }
         >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#d6bea0] pb-3">
+            <h3 className="font-display text-lg leading-tight text-[#173f3a] max-w-sm">{story}</h3>
+            {onPlayAgain && <button type="button" className="recap-rematch" onClick={onPlayAgain}>{playAgainLabel ?? 'Play Next Game'}</button>}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
             <div className="mx-auto w-full max-w-[260px]">
               <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[#9E1B32]">
@@ -259,11 +270,7 @@ export function PostGameSummaryModal({
                     ⚡ Spend Skill Points ({totalUnspentSp} SP)
                   </ComicButton>
                 ) : null}
-                {onPlayAgain ? (
-                  <ComicButton variant="gold" onClick={onPlayAgain}>
-                    {playAgainLabel ?? 'Play Next Game'}
-                  </ComicButton>
-                ) : null}
+
                 <ComicButton variant="turf" onClick={onClose}>
                   Back to Clubhouse
                 </ComicButton>

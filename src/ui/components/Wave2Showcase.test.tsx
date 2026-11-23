@@ -26,7 +26,7 @@ describe('100X Wave 2: Uniform Designer, Prospect Academy, MBM1 Boss Duel & Seas
 
     render(<ClubHubScreen />);
 
-    await user.click(screen.getByRole('button', { name: /uniform studio/i }));
+    await user.click(screen.getByRole('button', { name: /uniforms & gear/i }));
     expect(screen.getByTestId('uniform-designer-panel')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /vintage pinstripes/i }));
@@ -48,6 +48,7 @@ describe('100X Wave 2: Uniform Designer, Prospect Academy, MBM1 Boss Duel & Seas
 
     render(<ClubHubScreen />);
 
+    await user.click(screen.getByRole('button', { name: /staff & front office/i }));
     await user.click(screen.getByRole('button', { name: /gazette & front office/i }));
     expect(screen.getByTestId('prospect-academy-panel')).toBeInTheDocument();
 
@@ -69,7 +70,7 @@ describe('100X Wave 2: Uniform Designer, Prospect Academy, MBM1 Boss Duel & Seas
 
     render(<ClubHubScreen />);
 
-    await user.click(screen.getByRole('button', { name: /derby & sharing/i }));
+    await user.click(screen.getByRole('button', { name: /events & duels/i }));
     expect(screen.getByTestId('friend-duel-panel')).toBeInTheDocument();
 
     // Load built-in 90s Boss Club MBM1 code with 1 click

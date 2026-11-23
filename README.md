@@ -4,21 +4,32 @@
 [![CI](https://github.com/nicholas-wagner/mini-baseball-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/nicholas-wagner/mini-baseball-manager/actions/workflows/ci.yml)
 [![PWA Ready](https://img.shields.io/badge/Android_PWA-Offline_First-2FB356?style=flat-square&labelColor=181B2C)](./vite.config.ts)
 
-**Mini Baseball Manager** is an open-source, offline-first **retro 90s cartoon & volumetric 2.5D chibi baseball GM / Manager RPG** built for desktop and Android PWA.
+**Mini Baseball Manager** is an open-source, offline-first **baseball management RPG with painted miniature players and 3,000 illustrated manga cards** built for desktop and Android PWA.
 
 Manage lineups, draft global prospects, develop branching player & manager skill trees, unleash cultural myth & animal Special Powers, build a Sim-City ballpark district, fuel multi-season team rivalries, and watch games unfold in **over-the-shoulder 3D**—all stored locally on your device with zero centralized backend.
 
 ---
 
-## Visual Preview (Milestone 1 — Design-First Lab)
+## Your first game
 
-| Over-the-Shoulder 3D (RHP vs RHB) | Southpaw Matchup (LHP vs LHB) |
-| :---: | :---: |
-| ![Pitcher Over-the-Shoulder 3D](./docs/screenshots/lab_pitcher_ots.png) | ![Lefty-on-Lefty 3D Matchup](./docs/screenshots/lab_lefty_matchup.png) |
+Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Tap the gold button to take over there, or choose a full game farther down the schedule.
 
-| 2.5D Volumetric Chibi SVG Rig Inspector | Retro 90s Baseball Cards & Cultural Powers |
-| :---: | :---: |
-| ![2.5D Chibi SVG Rig Inspector](./docs/screenshots/lab_svg_inspector.png) | ![Retro 90s Baseball Cards](./docs/screenshots/lab_baseball_cards.png) |
+| Opening Day | A pitch on the field | The final and the rematch |
+| :---: | :---: | :---: |
+| ![Opening Day on a phone with the starting player's manga card and the situation](./docs/screenshots/opening-day.webp) | ![A single, the occupied first base and both matchup cards on a phone](./docs/screenshots/live-call.webp) | ![A game MVP print and the next scheduled game on a phone](./docs/screenshots/mvp-rematch.webp) |
+
+<details>
+<summary>Watch a called strike at field level (4 seconds)</summary>
+
+![A live pitch from set and release through the catcher’s return throw](./docs/screenshots/called-strike.webp)
+
+</details>
+
+### The card collection
+
+Each of the 3,000 players keeps their illustration when they change clubs. Open either live matchup card to inspect the hitter or pitcher. In the roster binder, choose **Print gallery** to browse a wall of illustrations. Tap a print to enlarge it. Switch back to **Stat cards** and flip one for the player’s role-specific ratings. The MVP gets a foil front and a headline drawn from that game’s box score.
+
+![A page of illustrated cards in the desktop roster binder](./docs/screenshots/roster-prints.webp)
 
 ---
 
@@ -78,7 +89,7 @@ This repository is structured so both **human contributors** and **AI coding age
 ## Tech Stack
 
 - **Frontend**: Vite 6, React 19, TypeScript (strict), Tailwind CSS v4, Zustand
-- **3D & Art**: Imperative Three.js (`src/scene/`) + Procedural Vector SVG Portraits, Flags & 2.5D Chibi Rigs (`src/art/`)
+- **3D & Art**: Imperative Three.js (`src/scene/`) + illustrated PNG player cards, SVG flags and shared painted 2.5D rigs (`src/art/`)
 - **Audio**: Procedural Web Audio API (`src/audio/`)
 - **Testing (Strict TDD)**: Vitest, React Testing Library, jsdom, Playwright (Desktop & Android Pixel 7)
 - **Offline & Mobile**: `vite-plugin-pwa` (Workbox Service Worker + Android adaptive/maskable icons) + local-only IndexedDB persistence

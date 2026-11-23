@@ -52,6 +52,22 @@ describe('shared painted minis', () => {
       }
     }
   });
+  it('rolls the seams in the same registered hand between pitches', () => {
+    const rig = createPaintedPlayerRig({team: SAMPLE_TEAM_PALETTES[0], jerseyNumber:18,
+      role:'pitcher', throwsHand:'L', traits:{...PLAYER_CATALOG[0].traits, seed:6}});
+    const view = new Vector3(1,2,5);
+    const ball = rig.root.getObjectByName('held baseball')!;
+    rig.updatePose('pitch_set',.55,undefined,view);
+    const angle = ball.rotation.z;
+    const hand = ball.parent;
+    expect(ball.visible).toBe(true);
+    rig.updatePose('pitch_set',.75,undefined,view);
+    expect(ball.parent).toBe(hand);
+    expect(ball.rotation.z).not.toBe(angle);
+    rig.updatePose('pitch_windup',.8 * CLIP_DURATIONS.pitch_windup,undefined,view);
+    expect(ball.visible).toBe(false);
+    rig.dispose();
+  });
   it('receives the ball on the glove side through camera changes in every uniform', () => {
     const options = {
       traits: PLAYER_CATALOG[0].traits,

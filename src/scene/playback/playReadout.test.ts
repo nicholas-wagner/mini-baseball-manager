@@ -1,0 +1,41 @@
+import { expect, it } from 'vitest';
+import type { PlayEvent } from '../../engine/models/playEvent';
+import { choreographPlayEvent } from './eventChoreographer';
+import { playReadout, decisionDelayMs } from './playReadout';
+
+const event: PlayEvent = {
+  seq: 9,
+  type: 'pitch_thrown',
+  inning: 1,
+  half: 'TOP',
+  outsBefore: 0,
+  outsAfter: 0,
+  balls: 2,
+  strikes: 2,
+  awayScore: 0,
+  homeScore: 0,
+  basesAfter: [null, null, null],
+  isClutchMoment: false,
+  commentary: '',
+  outcome: 'called_strike',
+};
+
+it('reveals the actual numbered call at the catch, scaled with watch speed', () => {
+  expect(playReadout(event)).toMatchObject({ label: 'Strike two', lamp: 'strikes' });
+  const slow = choreographPlayEvent(event, 1),
+    fast = choreographPlayEvent(event, 4);
+  expect(decisionDelayMs(slow)).toBeGreaterThan(0);
+  expect(decisionDelayMs(slow)).toBeLessThan(slow.durationMs);
+  expect(decisionDelayMs(fast)).toBeLessThan(decisionDelayMs(slow));
+});
+
+it('marks the actual batter destination even when a single advances on a throw', () => {
+  expect(
+    playReadout({ ...event, outcome: 'single', batterId: 'b', basesAfter: [null, 'b', null] }),
+  ).toMatchObject({ label: 'Single', base: 2 });
+  expect(playReadout({ ...event, outcome: 'fly_out' })).toMatchObject({
+    label: 'Fly out',
+    lamp: 'outs',
+  });
+  expect(playReadout({ ...event, outcome: undefined, type: 'pitching_change' })).toBeNull();
+});

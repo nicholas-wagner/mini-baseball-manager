@@ -76,7 +76,9 @@ describe('Cute, Clean & Balanced Gameplay Polish (Drill Quota, Portraits, 4-Room
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
     expect(screen.getByTestId('camera-angle-switcher')).toBeInTheDocument();
     expect(screen.getByTestId('smart-watch-toggle')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Camera angles' }));
     fireEvent.click(screen.getByRole('button', { name: /batter cam/i }));
+    expect(screen.getByRole('button', { name: 'Camera angles' })).toHaveAttribute('aria-expanded', 'false');
     unmount();
 
     render(<SkillTreeScreen />);

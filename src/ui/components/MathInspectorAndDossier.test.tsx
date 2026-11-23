@@ -55,6 +55,8 @@ describe('Pitch Math / Dice-Roll Inspector & Deep Player Scouting Dossier Modal'
     const leaderButtons = screen.getAllByRole('button', { name: /inspect leader/i });
     expect(leaderButtons.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(leaderButtons[0]);
+    expect(screen.getByRole('dialog', {name: /player baseball card/i})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /full scouting dossier/i}));
     expect(screen.getByTestId('player-dossier-modal')).toBeInTheDocument();
   });
 });
