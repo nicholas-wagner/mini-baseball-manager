@@ -24,6 +24,7 @@ import {
 } from '../../engine/rpg/skillTrees';
 import { unlockHumanManagerNode } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
+import { PlayerPortraitBadge } from '../components/PlayerPortraitBadge';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
@@ -225,6 +226,12 @@ export function SkillTreeScreen() {
                   }`}
                 >
                   <div className="flex items-center gap-1.5 font-display text-xs text-[#181B2C]">
+                    <PlayerPortraitBadge
+                      player={p}
+                      primaryColor={humanClub.colors.primary}
+                      accentColor={humanClub.colors.accent}
+                      size="xs"
+                    />
                     <FlagBadge nationalityId={p.nationalityId} size="sm" />
                     <span>
                       {p.position} {p.name}
@@ -252,22 +259,31 @@ export function SkillTreeScreen() {
             </div>
           ) : null}
 
-          {/* Selected Player Summary Header */}
-          <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <FlagBadge nationalityId={player.nationalityId} />
-                <span className="font-display text-sm text-[#181B2C]">
-                  {player.name} ({player.position})
-                </span>
-                <span className="px-2 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-xs">
-                  {player.skillPoints} SP Available
-                </span>
-              </div>
-              <div className="text-xs font-bold text-[#4A5068] mt-1">
-                {SPECIALIST_LABELS[player.specialistArchetype]} • Equipped Special Powers:{' '}
-                {player.equippedPowerIds.length}/{maxPowerSlots} • Heritage Tier:{' '}
-                {player.heritageTierUnlocked}/3
+          {/* Selected Player Summary Header with Cute Manga Portrait */}
+          <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <PlayerPortraitBadge
+                player={player}
+                primaryColor={humanClub.colors.primary}
+                accentColor={humanClub.colors.accent}
+                size="lg"
+                testId="skill-tree-player-portrait"
+              />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <FlagBadge nationalityId={player.nationalityId} />
+                  <span className="font-display text-sm text-[#181B2C]">
+                    {player.name} ({player.position})
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-xs">
+                    {player.skillPoints} SP Available
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-[#4A5068] mt-1">
+                  {SPECIALIST_LABELS[player.specialistArchetype]} • Equipped Special Powers:{' '}
+                  {player.equippedPowerIds.length}/{maxPowerSlots} • Heritage Tier:{' '}
+                  {player.heritageTierUnlocked}/3
+                </div>
               </div>
             </div>
             <ComicButton

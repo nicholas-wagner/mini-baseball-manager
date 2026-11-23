@@ -125,6 +125,8 @@ export interface PostGameSummary {
   sweepBonusAwarded?: boolean;
 }
 
+export const MAX_INDIVIDUAL_DRILLS_PER_ROUND = 2;
+
 export interface GameStoreState {
   worldSeed: number;
   seasonNumber: number;
@@ -132,6 +134,7 @@ export interface GameStoreState {
   currentGameInSeries: number;
   seriesResults: Partial<Record<number, { wins: number; losses: number }>>;
   practiceAvailable: boolean;
+  individualDrillsRemaining: number;
   lastPracticeFocusLabel: string | null;
   activeGameplan: SeriesGameplanId;
   activeGmInboxEvent: GmInboxEvent | null;
@@ -260,6 +263,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     currentGameInSeries: 0,
     seriesResults: {},
     practiceAvailable: true,
+    individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
     lastPracticeFocusLabel: null,
     activeGameplan: 'balanced',
     activeGmInboxEvent: null,
@@ -291,6 +295,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentGameInSeries: 0,
         seriesResults: {},
         practiceAvailable: true,
+        individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
         lastPracticeFocusLabel: null,
         activeGameplan: 'balanced',
         activeGmInboxEvent: null,
@@ -454,6 +459,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seriesResults: nextSeriesResults,
         lastSeriesRecap: nextSeriesRecap,
         practiceAvailable: true,
+        individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
         lastPracticeFocusLabel: null,
         spotlightUsedThisSeries: false,
         ownerGoalClaimedSeason: nextOwnerGoalClaimed,
@@ -594,6 +600,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentGameInSeries: 0,
         seriesResults: {},
         leagues: offseason.leagues,
+        individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
         freeAgents: nextFreeAgents,
         lastPlayoffResult: humanPlayoffs,
         lastOffseasonTransitions: offseason.transitions,
@@ -673,6 +680,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentGameInSeries: 0,
         seriesResults: {},
         practiceAvailable: true,
+        individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
         lastPracticeFocusLabel: null,
         leagues: done.leagues,
         freeAgents: done.freeAgents,
@@ -753,6 +761,13 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     },
 
     crossTrainPlayerPosition: (playerId, targetPos) => {
+      const state = get();
+      if (state.individualDrillsRemaining <= 0) {
+        return {
+          trained: false,
+          reason: 'Clubhouse drill quota used (0/2 left) — play or sim a game to refresh!',
+        };
+      }
       const club = get().getHumanClub();
       if (!club) return { trained: false, reason: 'No active club found.' };
       const target = club.roster.find((p) => p.id === playerId);
@@ -772,9 +787,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         ...club,
         roster: club.roster.map((p) => (p.id === playerId ? result.player : p)),
       };
-      set((state) => ({
-        rosterActionNonce: state.rosterActionNonce + 1,
-        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      set((s) => ({
+        rosterActionNonce: s.rosterActionNonce + 1,
+        individualDrillsRemaining: Math.max(0, s.individualDrillsRemaining - 1),
+        leagues: updateHumanClubInLeagues(s.leagues, nextClub),
       }));
       return {
         trained: true,
@@ -784,6 +800,11 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     },
 
     runCompromiseTrainingDrill: (playerId, request) => {
+      const state = get();
+      if (state.individualDrillsRemaining <= 0) {
+        const msg = 'Clubhouse drill quota used (0/2 left) — play or sim a game to refresh!';
+        return { trained: false, reason: msg, summary: msg };
+      }
       const club = get().getHumanClub();
       if (!club) return { trained: false, reason: 'No active club found.', summary: 'No active club found.' };
       const target = club.roster.find((p) => p.id === playerId);
@@ -805,9 +826,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         ...club,
         roster: club.roster.map((p) => (p.id === playerId ? result.player : p)),
       };
-      set((state) => ({
-        rosterActionNonce: state.rosterActionNonce + 1,
-        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      set((s) => ({
+        rosterActionNonce: s.rosterActionNonce + 1,
+        individualDrillsRemaining: Math.max(0, s.individualDrillsRemaining - 1),
+        leagues: updateHumanClubInLeagues(s.leagues, nextClub),
       }));
       return { trained: true, summary: result.summary };
     },
@@ -1095,6 +1117,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         activeGmInboxEvent: nextInboxEvent,
         lastPostGameSummary: summary,
         practiceAvailable: true,
+        individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
         lastPracticeFocusLabel: null,
         spotlightUsedThisSeries: false,
       });
@@ -1151,6 +1174,9 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentSeriesIndex: save.currentSeriesIndex,
         currentGameInSeries: 0,
         seriesResults: {},
+        practiceAvailable: true,
+        individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
+        lastPracticeFocusLabel: null,
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,
@@ -1192,6 +1218,9 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentSeriesIndex: save.currentSeriesIndex,
         currentGameInSeries: 0,
         seriesResults: {},
+        practiceAvailable: true,
+        individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
+        lastPracticeFocusLabel: null,
         humanClubId: save.humanClubId,
         manager: save.manager,
         leagues: save.leagues,

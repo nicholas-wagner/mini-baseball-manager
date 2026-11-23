@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Award,
   Building2,
   Coins,
   Dumbbell,
@@ -32,7 +31,6 @@ import {
   generateMedicalStaffMarket,
   TRAINER_SPECIALTY_LABELS,
 } from '../../engine/health/medicalStaff';
-import { MANAGER_SKILL_NODES } from '../../engine/manager/managerTree';
 import { isPitcherPosition } from '../../engine/models/player';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import { evaluateClubhouseChemistry } from '../../engine/rpg/chemistry';
@@ -51,7 +49,6 @@ import {
   runHumanPracticeActivity,
   runHumanStaffClinic,
   unequipHumanPlayerRelic,
-  unlockHumanManagerNode,
   upgradeHumanStadium,
 } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
@@ -63,23 +60,38 @@ import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
+type HubRoomId = 'ballpark_room' | 'gear_room' | 'staff_room' | 'events_room';
+
 type HubSubTab =
   | 'stadiums'
   | 'economy'
   | 'uniforms'
+  | 'relics'
   | 'staff'
   | 'practice'
-  | 'manager'
-  | 'relics'
   | 'frontoffice'
   | 'spectacles';
+
+const ROOM_TO_DEFAULT_SUBTAB: Readonly<Record<HubRoomId, HubSubTab>> = {
+  ballpark_room: 'stadiums',
+  gear_room: 'uniforms',
+  staff_room: 'staff',
+  events_room: 'spectacles',
+};
+
+function getRoomForSubTab(tab: HubSubTab): HubRoomId {
+  if (tab === 'stadiums' || tab === 'economy') return 'ballpark_room';
+  if (tab === 'uniforms' || tab === 'relics') return 'gear_room';
+  if (tab === 'staff' || tab === 'practice' || tab === 'frontoffice') return 'staff_room';
+  return 'events_room';
+}
 
 export function ClubHubScreen() {
   const club = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
-  const manager = useGameStore((s) => s.manager);
   const worldSeed = useGameStore((s) => s.worldSeed);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
+  const individualDrillsRemaining = useGameStore((s) => s.individualDrillsRemaining);
 
   const [subTab, setSubTab] = useState<HubSubTab>('stadiums');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
@@ -135,6 +147,8 @@ export function ClubHubScreen() {
     soundEngine.play(res.trained ? 'level_up' : 'ui_pop');
   };
 
+  const activeRoom = getRoomForSubTab(subTab);
+
   return (
     <div className="space-y-4">
       <ComicCard
@@ -142,91 +156,126 @@ export function ClubHubScreen() {
         subtitle={`Cash $${club.economy.cash.toLocaleString()} • Home: ${activePark.name} • Staff ${activeStaff.length}/${staffSlotCap}`}
         headerBg="#1B4332"
         badge={
-          <div className="flex flex-wrap gap-1.5">
+          <div data-testid="hub-room-tabs" className="flex flex-wrap gap-1.5">
             <ComicButton
               size="sm"
-              variant={subTab === 'stadiums' ? 'gold' : 'cream'}
-              active={subTab === 'stadiums'}
+              variant={activeRoom === 'ballpark_room' ? 'gold' : 'cream'}
+              active={activeRoom === 'ballpark_room'}
               icon={<Building2 className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('stadiums')}
+              onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.ballpark_room)}
             >
-              Ballparks ({BALLPARK_CATALOG.length})
+              🏟️ Ballpark &amp; Economy
             </ComicButton>
             <ComicButton
               size="sm"
-              variant={subTab === 'economy' ? 'gold' : 'cream'}
-              active={subTab === 'economy'}
-              icon={<Coins className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('economy')}
-            >
-              Economy &amp; District
-            </ComicButton>
-            <ComicButton
-              size="sm"
-              variant={subTab === 'uniforms' ? 'gold' : 'cream'}
-              active={subTab === 'uniforms'}
+              variant={activeRoom === 'gear_room' ? 'gold' : 'cream'}
+              active={activeRoom === 'gear_room'}
               icon={<Palette className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('uniforms')}
+              onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.gear_room)}
             >
-              Uniform Studio
+              👕 Uniforms &amp; Gear
             </ComicButton>
             <ComicButton
               size="sm"
-              variant={subTab === 'staff' ? 'gold' : 'cream'}
-              active={subTab === 'staff'}
+              variant={activeRoom === 'staff_room' ? 'gold' : 'cream'}
+              active={activeRoom === 'staff_room'}
               icon={<Users className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('staff')}
+              onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.staff_room)}
             >
-              Coaches &amp; Staff
+              👥 Staff &amp; Front Office
             </ComicButton>
             <ComicButton
               size="sm"
-              variant={subTab === 'practice' ? 'gold' : 'cream'}
-              active={subTab === 'practice'}
-              icon={<Dumbbell className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('practice')}
-            >
-              Practice Complex
-            </ComicButton>
-            <ComicButton
-              size="sm"
-              variant={subTab === 'manager' ? 'gold' : 'cream'}
-              active={subTab === 'manager'}
-              icon={<Award className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('manager')}
-            >
-              Manager RPG ({manager?.skillPoints ?? 0} SP)
-            </ComicButton>
-            <ComicButton
-              size="sm"
-              variant={subTab === 'relics' ? 'gold' : 'cream'}
-              active={subTab === 'relics'}
-              icon={<Sparkles className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('relics')}
-            >
-              Relics &amp; Chemistry
-            </ComicButton>
-            <ComicButton
-              size="sm"
-              variant={subTab === 'frontoffice' ? 'gold' : 'cream'}
-              active={subTab === 'frontoffice'}
-              icon={<Newspaper className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('frontoffice')}
-            >
-              Gazette &amp; Front Office
-            </ComicButton>
-            <ComicButton
-              size="sm"
-              variant={subTab === 'spectacles' ? 'gold' : 'cream'}
-              active={subTab === 'spectacles'}
+              variant={activeRoom === 'events_room' ? 'gold' : 'cream'}
+              active={activeRoom === 'events_room'}
               icon={<Trophy className="w-3.5 h-3.5" />}
-              onClick={() => setSubTab('spectacles')}
+              onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.events_room)}
             >
-              Derby &amp; Sharing
+              🏆 Events &amp; Duels
             </ComicButton>
           </div>
         }
       >
+        {/* Clean Contextual Sub-Room Switcher (2–3 choices per room instead of 9 cramped tabs!) */}
+        {activeRoom !== 'events_room' ? (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5 pb-2 border-b-2 border-dashed border-[#181B2C]/20">
+            {activeRoom === 'ballpark_room' ? (
+              <>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'stadiums' ? 'sky' : 'cream'}
+                  active={subTab === 'stadiums'}
+                  icon={<Building2 className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('stadiums')}
+                >
+                  Ballparks ({BALLPARK_CATALOG.length})
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'economy' ? 'sky' : 'cream'}
+                  active={subTab === 'economy'}
+                  icon={<Coins className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('economy')}
+                >
+                  Economy &amp; District
+                </ComicButton>
+              </>
+            ) : null}
+            {activeRoom === 'gear_room' ? (
+              <>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'uniforms' ? 'sky' : 'cream'}
+                  active={subTab === 'uniforms'}
+                  icon={<Palette className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('uniforms')}
+                >
+                  Uniform Studio
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'relics' ? 'sky' : 'cream'}
+                  active={subTab === 'relics'}
+                  icon={<Sparkles className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('relics')}
+                >
+                  Relics &amp; Chemistry
+                </ComicButton>
+              </>
+            ) : null}
+            {activeRoom === 'staff_room' ? (
+              <>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'staff' ? 'sky' : 'cream'}
+                  active={subTab === 'staff'}
+                  icon={<Users className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('staff')}
+                >
+                  Coaches &amp; Staff
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'practice' ? 'sky' : 'cream'}
+                  active={subTab === 'practice'}
+                  icon={<Dumbbell className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('practice')}
+                >
+                  Practice Complex ({individualDrillsRemaining}/2)
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'frontoffice' ? 'sky' : 'cream'}
+                  active={subTab === 'frontoffice'}
+                  icon={<Newspaper className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('frontoffice')}
+                >
+                  Gazette &amp; Front Office
+                </ComicButton>
+              </>
+            ) : null}
+          </div>
+        ) : null}
         {notice ? (
           <div className="mb-3 p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]">
             {notice}
@@ -536,6 +585,9 @@ export function ClubHubScreen() {
               <div className="text-xs font-extrabold text-[#181B2C]">
                 Form: {selectedPlayer.formState.toUpperCase()} ({selectedPlayer.formScore}) • Fatigue {selectedPlayer.fatigue}/100
               </div>
+              <div className="text-[11px] font-extrabold text-[#1B4332]">
+                🏋️ Clubhouse Drills Remaining: {individualDrillsRemaining}/2 (Refreshes every game/series)
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -544,6 +596,7 @@ export function ClubHubScreen() {
                 const roleMismatch =
                   (act.roleScope === 'pitcher' && !isPitcher) ||
                   (act.roleScope === 'hitter' && isPitcher);
+                const outOfDrills = individualDrillsRemaining <= 0;
                 return (
                   <div
                     key={act.id}
@@ -556,8 +609,8 @@ export function ClubHubScreen() {
                     </div>
                     <ComicButton
                       size="sm"
-                      variant={roleMismatch ? 'cream' : 'sky'}
-                      disabled={roleMismatch}
+                      variant={roleMismatch || outOfDrills ? 'cream' : 'sky'}
+                      disabled={roleMismatch || outOfDrills}
                       onClick={() => handleRunPractice(act.id, act.chibiClip)}
                     >
                       Run {act.label}
@@ -565,55 +618,6 @@ export function ClubHubScreen() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        ) : null}
-
-        {subTab === 'manager' && manager ? (
-          <div className="space-y-3">
-            <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold">
-              <span>
-                Manager {manager.name} • Lv.{manager.level} ({manager.xp} XP)
-              </span>
-              <span className="px-2 py-0.5 rounded bg-[#FFC300] border border-[#181B2C]">
-                Available Manager SP: {manager.skillPoints}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {(['skipper', 'coach', 'mogul'] as const).map((branch) => (
-                <div key={branch} className="space-y-2">
-                  <div className="font-display text-xs uppercase px-2 py-1 rounded-lg bg-[#181B2C] text-[#FFD166]">
-                    {branch} Branch
-                  </div>
-                  {MANAGER_SKILL_NODES.filter((n) => n.branch === branch).map((node) => {
-                    const unlocked = manager.unlockedNodeIds.includes(node.id);
-                    return (
-                      <div
-                        key={node.id}
-                        className={`p-2.5 rounded-xl border-2 border-[#181B2C] space-y-1 ${
-                          unlocked ? 'bg-[#D8F3DC]' : 'bg-[#FFFDF7]'
-                        }`}
-                      >
-                        <div className="font-display text-xs text-[#181B2C]">{node.name}</div>
-                        <div className="text-[11px] font-bold text-[#4A5068]">{node.description}</div>
-                        <ComicButton
-                          size="sm"
-                          variant={unlocked ? 'turf' : 'gold'}
-                          disabled={unlocked}
-                          onClick={() => {
-                            const res = unlockHumanManagerNode(node.id);
-                            setNotice(res.unlocked ? `Unlocked Manager skill: ${node.name}!` : (res.reason ?? 'Locked.'));
-                            soundEngine.play(res.unlocked ? 'level_up' : 'ui_pop');
-                          }}
-                        >
-                          {unlocked ? 'Unlocked ✓' : `Unlock (${node.spCost} SP)`}
-                        </ComicButton>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
             </div>
           </div>
         ) : null}

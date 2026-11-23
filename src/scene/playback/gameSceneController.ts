@@ -79,6 +79,7 @@ export class GameSceneController {
   private bats: EffectiveBatSide = 'R';
   private throws: ThrowsHand = 'R';
   private cameraPreset: CameraPresetId = 'over_shoulder_pitcher';
+  private cameraOverride: CameraPresetId | null = null;
   private cameraPose: CameraPose;
   private pitcherClip: CharacterAnimClip = 'idle';
   private batterClip: CharacterAnimClip = 'bat_stance';
@@ -153,6 +154,10 @@ export class GameSceneController {
     this.resizeObserver.observe(container);
     this.lastTimestamp = performance.now();
     this.startLoop();
+  }
+
+  public setCameraOverride(preset: CameraPresetId | null): void {
+    this.cameraOverride = preset;
   }
 
   public syncMatchup(
@@ -353,7 +358,8 @@ export class GameSceneController {
       this.ballpark.update(dt, 0.57);
       return;
     }
-    const targetPose = getCameraPresetPose(this.cameraPreset, this.elapsedSec, 0, this.throws, this.bats);
+    const activePreset = this.cameraOverride ?? this.cameraPreset;
+    const targetPose = getCameraPresetPose(activePreset, this.elapsedSec, 0, this.throws, this.bats);
     if (this.camera.fov !== targetPose.fov) { this.camera.fov = targetPose.fov; this.camera.updateProjectionMatrix(); }
     this.cameraPose = dampCameraPose(this.cameraPose, targetPose, dt, 6);
     this.trauma = Math.max(0, this.trauma - dt * 1.4);

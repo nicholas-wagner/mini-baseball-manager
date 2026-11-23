@@ -96,6 +96,10 @@ import {
   type SuggestedQuickAction,
 } from '../../engine/simulation/liveActionAdvisor';
 import {
+  buildComicPopArtBanner,
+  shouldSmartAutoPause,
+} from '../../engine/simulation/liveWatchPacing';
+import {
   BATTER_GUESS_OPTIONS,
   PITCH_TARGET_OPTIONS,
   type BatterPitchGuess,
@@ -124,12 +128,13 @@ import { BroadcastHud } from '../components/BroadcastHud';
 import { FoilPackModal } from '../components/FoilPackModal';
 import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
-import { LiveGameCanvas } from '../components/LiveGameCanvas';
+import { LiveGameCanvas, type LiveCameraMode } from '../components/LiveGameCanvas';
 import { ManagerClipboardBanner } from '../components/ManagerClipboardBanner';
 import {
   PlayerCardModal,
   type InspectableCardEntry,
 } from '../components/PlayerCardModal';
+import { PlayerPortraitBadge } from '../components/PlayerPortraitBadge';
 import { PostGameSummaryModal } from '../components/PostGameSummaryModal';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -150,41 +155,6 @@ const GAME_LENGTH_OPTIONS: readonly { innings: GameLengthInnings; label: string 
   { innings: 7, label: '7 Inn (Quick)' },
   { innings: 9, label: '9 Inn (Classic)' },
 ];
-
-function buildComicCallout(
-  event: PlayEvent | null,
-): { title: string; subtitle: string; bg: string; text: string } | null {
-  if (!event) return null;
-  if (event.specialPowerTriggered) {
-    return {
-      title: `⚡ ${event.specialPowerTriggered.calloutText}`,
-      subtitle: event.commentary,
-      bg: event.specialPowerTriggered.vfxColor,
-      text: '#181B2C',
-    };
-  }
-  if (event.outcome === 'home_run') {
-    return { title: '💥 MOONSHOT HOME RUN!!', subtitle: event.commentary, bg: '#FFC300', text: '#181B2C' };
-  }
-  if (event.outcome === 'triple') {
-    return { title: '⚡ TRIPLE INTO THE GAP!', subtitle: event.commentary, bg: '#00E5FF', text: '#181B2C' };
-  }
-  if (event.outcome === 'double_play') {
-    return { title: '🔥 6-4-3 DOUBLE PLAY!', subtitle: event.commentary, bg: '#1D3557', text: '#FFD166' };
-  }
-  if (event.outcome === 'strikeout') {
-    return { title: '🔥 STRIKE THREE — SIT DOWN!', subtitle: event.commentary, bg: '#FF4D6D', text: '#FFFFFF' };
-  }
-  if (event.type === 'stolen_base_attempt') {
-    return {
-      title: event.outsAfter > event.outsBefore ? '🚨 CAUGHT STEALING!' : '⚡ SAFE! STOLEN BASE!',
-      subtitle: event.commentary,
-      bg: event.outsAfter > event.outsBefore ? '#E63946' : '#2FB356',
-      text: '#FFFFFF',
-    };
-  }
-  return null;
-}
 
 function safeScrollTop(): void {
   try {
@@ -242,9 +212,12 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const [recentEvents, setRecentEvents] = useState<PlayEvent[]>([]);
   const [playbackEvent, setPlaybackEvent] = useState<PlayEvent | null>(null);
+  const [revealedPlay, setRevealedPlay] = useState<ChoreographedStep | null>(null);
   const [lastChoreo, setLastChoreo] = useState<ChoreographedStep | null>(null);
   const [speed, setSpeed] = useState<1 | 2 | 4>(1);
-  const [watchMode, setWatchMode] = useState<'live' | 'clutch' | 'paused'>('paused');
+  const [watchMode, setWatchMode] = useState<'live' | 'smart' | 'clutch' | 'paused'>('paused');
+  const [smartPauseReason, setSmartPauseReason] = useState<string | null>(null);
+  const [cameraMode, setCameraMode] = useState<LiveCameraMode>('auto');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
   const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('attack_zone');
@@ -295,6 +268,18 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   }, [humanClub, activeOpponent]);
 
   const hasLiveSession = liveSession !== null;
+  useEffect(() => {
+    const play = lastChoreo?.close;
+    if (!play || !lastChoreo) return;
+    const decisionMs = lastChoreo.durationMs * play.finish / play.duration;
+    const timer = window.setTimeout(() => {
+      setRevealedPlay(lastChoreo);
+      if (lastChoreo.soundCue && !playbackEvent?.specialPowerTriggered) soundEngine.play(lastChoreo.soundCue);
+      if (hapticsEnabled && playbackEvent?.outcome === 'strikeout') triggerHapticPulse('strikeout');
+    }, decisionMs);
+    return () => window.clearTimeout(timer);
+  }, [lastChoreo, playbackEvent, hapticsEnabled]);
+
   useEffect(() => {
     safeScrollTop();
   }, [hasLiveSession]);
@@ -402,6 +387,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     });
     setGameWeather(rolledWeather);
     setWatchMode(autoPlay ? 'live' : 'paused');
+    setSmartPauseReason(null);
+    setCameraMode('auto');
     bgmEngine.syncStadium(session.ballparkId);
     soundEngine.play(rolledWeather.condition === 'drizzle' ? 'rain_thunder' : 'organ_charge');
   };
@@ -469,16 +456,17 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
         ?? emitted.at(-1);
       setPlaybackEvent(lastEvent ?? null);
       if (lastEvent) {
-        const choreo = choreographPlayEvent(lastEvent, speed);
-        if (choreo.infield === 'double_play') {
-          const before = emitted[emitted.indexOf(lastEvent) - 1];
-          choreo.leadRunnerId = (before?.half === lastEvent.half && before.inning === lastEvent.inning
-            ? before.basesAfter[0] : liveSession?.bases[0]) ?? undefined;
-        }
+        const before = emitted[emitted.indexOf(lastEvent) - 1];
+        const prior = before ?? liveSession;
+        const basesBefore = prior?.half === lastEvent.half && prior.inning === lastEvent.inning
+          ? before?.basesAfter ?? liveSession?.bases : undefined;
+        const choreo = choreographPlayEvent(lastEvent, speed, basesBefore);
+        if (watchMode === 'smart' && choreo.close) choreo.durationMs = Math.min(choreo.durationMs, 580);
+        choreo.leadRunnerId = basesBefore?.[0] ?? undefined;
         setLastChoreo(choreo);
         if (lastEvent.specialPowerTriggered) {
           soundEngine.play('heritage_power_surge');
-        } else if (choreo.soundCue) {
+        } else if (choreo.soundCue && !choreo.close) {
           soundEngine.play(choreo.soundCue);
         }
         if (emitted.some((ev) => ev.soundCue === 'organ_seventh_stretch')) {
@@ -486,7 +474,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
         }
         if (hapticsEnabled) {
           if (lastEvent.outcome === 'home_run') triggerHapticPulse('home_run');
-          else if (lastEvent.outcome === 'strikeout') triggerHapticPulse('strikeout');
+          else if (lastEvent.outcome === 'strikeout' && !choreo.close) triggerHapticPulse('strikeout');
           else if (
             lastEvent.outcome === 'single' ||
             lastEvent.outcome === 'double' ||
@@ -508,7 +496,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
       }
       finalizeSessionIfComplete(nextSession, emitted, oppId);
     },
-    [finalizeSessionIfComplete, speed, warmingRelieverIds, liveSession, hapticsEnabled, recordNemesisEvents],
+    [finalizeSessionIfComplete, speed, watchMode, warmingRelieverIds, liveSession, hapticsEnabled, recordNemesisEvents],
   );
 
   const resolvePitchCallOption = useCallback(
@@ -655,15 +643,46 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   };
 
   useEffect(() => {
-    if (watchMode !== 'live' || !liveSession || liveSession.status === 'completed') {
+    if (
+      (watchMode !== 'live' && watchMode !== 'smart') ||
+      !liveSession ||
+      liveSession.status === 'completed'
+    ) {
       return undefined;
     }
-    const delayMs = lastChoreo?.durationMs ?? Math.round(900 / speed);
+    if (watchMode === 'smart') {
+      const cueNow = computeLiveActionCue({
+        session: liveSession,
+        tacticalCall,
+        armedPowerId,
+        moundVisitUsed,
+      });
+      const decision = shouldSmartAutoPause(liveSession, playbackEvent, cueNow);
+      if (decision.pause && playbackEvent) {
+        setWatchMode('paused');
+        setSmartPauseReason(decision.reason);
+        return undefined;
+      }
+    }
+    const delayMs =
+      watchMode === 'smart'
+        ? Math.min(lastChoreo?.durationMs ?? 550, 580)
+        : (lastChoreo?.durationMs ?? Math.round(900 / speed));
     const timer = window.setTimeout(() => {
       handleNextPitch();
     }, delayMs);
     return () => window.clearTimeout(timer);
-  }, [handleNextPitch, lastChoreo, liveSession, speed, watchMode]);
+  }, [
+    armedPowerId,
+    handleNextPitch,
+    lastChoreo,
+    liveSession,
+    moundVisitUsed,
+    playbackEvent,
+    speed,
+    tacticalCall,
+    watchMode,
+  ]);
 
   if (!humanClub) return null;
 
@@ -823,10 +842,20 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                   setPreGameScoutPlayerId(lastSeriesRecap.seriesMvp.playerId);
                   soundEngine.play('card_flip');
                 }}
-                className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FFC300] hover:bg-[#FFD166] text-xs font-extrabold text-[#181B2C] cursor-pointer"
+                className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FFC300] hover:bg-[#FFD166] text-xs font-extrabold text-[#181B2C] cursor-pointer flex items-center gap-2"
               >
-                🃏 Series MVP: {lastSeriesRecap.seriesMvp.playerName} (
-                {lastSeriesRecap.seriesMvp.tagLine})
+                {recapMvpPlayer ? (
+                  <PlayerPortraitBadge
+                    player={recapMvpPlayer}
+                    primaryColor={humanClub.colors.primary}
+                    accentColor={humanClub.colors.accent}
+                    size="xs"
+                  />
+                ) : null}
+                <span>
+                  🃏 Series MVP: {lastSeriesRecap.seriesMvp.playerName} (
+                  {lastSeriesRecap.seriesMvp.tagLine})
+                </span>
               </button>
               {lastSeriesRecap.levelUps.length > 0 && onJumpToTab ? (
                 <ComicButton
@@ -986,8 +1015,66 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               {probableMatchup && scheduledOpponent ? (
                 <div
                   data-testid="probable-matchup-strip"
-                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-1.5"
+                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2"
                 >
+                  {/* Cute 90s Manga Pitcher Face-Off Avatars (Tap Either to Flip Their Baseball Card!) */}
+                  <div
+                    data-testid="matchup-faceoff-portraits"
+                    className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7]"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreGameScoutPlayerId(probableMatchup.humanStarter.id);
+                        soundEngine.play('card_flip');
+                      }}
+                      className="flex items-center gap-2 text-left cursor-pointer hover:opacity-90"
+                    >
+                      <PlayerPortraitBadge
+                        player={probableMatchup.humanStarter}
+                        primaryColor={humanClub.colors.primary}
+                        accentColor={humanClub.colors.accent}
+                        size="sm"
+                      />
+                      <div>
+                        <div className="text-[9px] font-extrabold uppercase text-[#1B4332]">
+                          Your Starter ({humanClub.colors.monogram})
+                        </div>
+                        <div className="font-display text-xs text-[#181B2C]">
+                          {probableMatchup.humanStarter.name}
+                        </div>
+                      </div>
+                    </button>
+
+                    <span className="px-2 py-0.5 rounded-full bg-[#FFC300] border-2 border-[#181B2C] font-display text-xs text-[#181B2C]">
+                      VS
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreGameScoutPlayerId(probableMatchup.opponentStarter.id);
+                        soundEngine.play('card_flip');
+                      }}
+                      className="flex items-center gap-2 text-right cursor-pointer hover:opacity-90"
+                    >
+                      <div>
+                        <div className="text-[9px] font-extrabold uppercase text-[#1D3557]">
+                          Rival Starter ({scheduledOpponent.colors.monogram})
+                        </div>
+                        <div className="font-display text-xs text-[#181B2C]">
+                          {probableMatchup.opponentStarter.name}
+                        </div>
+                      </div>
+                      <PlayerPortraitBadge
+                        player={probableMatchup.opponentStarter}
+                        primaryColor={scheduledOpponent.colors.primary}
+                        accentColor={scheduledOpponent.colors.accent}
+                        size="sm"
+                      />
+                    </button>
+                  </div>
+
                   <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold uppercase text-[#1D3557]">
                     <span>⚾ Probable Pitching Matchup &amp; Rival Scout Cards</span>
                     <span className="text-[#4A5068] normal-case font-bold">
@@ -1321,7 +1408,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     armedPowerId,
     moundVisitUsed,
   });
-  const liveCallout = buildComicCallout(playbackEvent);
+  const liveCallout = lastChoreo?.close && revealedPlay !== lastChoreo ? null : buildComicPopArtBanner(playbackEvent, liveSession);
   const liveNemesis = evaluateNemesisMatchup(
     nemesisHistory,
     currentBatter.id,
@@ -1482,18 +1569,24 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               session={liveSession}
               choreo={lastChoreo}
               lastEvent={playbackEvent}
+              cameraMode={cameraMode}
+              onChangeCameraMode={(mode) => {
+                setCameraMode(mode);
+                soundEngine.play('ui_pop');
+              }}
+              celebrateConfetti={Boolean(liveCallout?.confetti)}
               overlay={
                 liveCallout ? (
                   <div
                     data-testid="comic-callout-banner"
-                    className="px-3 py-1.5 rounded-xl border-[3px] border-[#181B2C] shadow-[3px_3px_0_#181B2C] flex flex-wrap items-center justify-center gap-2 max-w-[95%]"
+                    className="px-3 py-1.5 rounded-xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] flex flex-col items-center justify-center gap-0.5 max-w-[95%] text-center"
                     style={{ backgroundColor: liveCallout.bg, color: liveCallout.text }}
                   >
                     <span className="font-display text-xs sm:text-sm tracking-wide">
                       {liveCallout.title}
                     </span>
-                    <span className="hidden sm:inline text-[11px] font-extrabold opacity-95">
-                      {liveCallout.subtitle}
+                    <span className="hidden sm:inline text-[10px] font-extrabold opacity-95">
+                      {liveCallout.coachQuip}
                     </span>
                   </div>
                 ) : null
@@ -1512,11 +1605,23 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
               watchMode={watchMode}
+              smartPauseReason={smartPauseReason}
               tacticalCall={tacticalCall}
               isBatting={humanIsBatting}
               gameCompleted={liveSession.status === 'completed'}
-              onNextPitch={handleNextPitch}
-              onToggleWatchMode={() => setWatchMode((w) => (w === 'live' ? 'paused' : 'live'))}
+              onNextPitch={() => {
+                setSmartPauseReason(null);
+                handleNextPitch();
+              }}
+              onToggleWatchMode={() => {
+                setSmartPauseReason(null);
+                setWatchMode((w) => (w === 'live' ? 'paused' : 'live'));
+              }}
+              onToggleSmartWatch={() => {
+                setSmartPauseReason(null);
+                setWatchMode((w) => (w === 'smart' ? 'paused' : 'smart'));
+                soundEngine.play('ui_pop');
+              }}
               onSimAtBat={handleSimAtBat}
               onSimHalfInning={handleSimHalfInning}
               onClutchSim={handleClutchSim}

@@ -27,6 +27,7 @@ import {
   type TeamPracticeFocusId,
   type TeamPracticeRecommendation,
 } from '../../engine/gm/managerActionInbox';
+import { CoachPopsAvatar } from './CoachPopsAvatar';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
@@ -105,30 +106,33 @@ export function ManagerClipboardBanner({
       }
     >
       <div data-testid="manager-action-inbox" className="space-y-3">
-        {/* 1. Live Promotion Chase & Season Owner Goal Strip */}
+        {/* 1. Live Promotion Chase & Season Owner Goal Strip with Coach Pops */}
         <div
           data-testid="promotion-chase-strip"
-          className={`rounded-xl border-2 border-[#181B2C] px-3 py-2 space-y-1.5 ${zoneBg}`}
+          className={`rounded-xl border-2 border-[#181B2C] px-3 py-2 flex items-center gap-2.5 ${zoneBg}`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs font-extrabold">
-            <span className="flex items-center gap-1.5 font-display">
-              <Trophy className="w-3.5 h-3.5 shrink-0" />
-              {promotionChase.headline}
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-[#FFFDF7] text-[#181B2C] border border-[#181B2C]">
-              {promotionChase.nextTierRewardText}
-            </span>
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-extrabold opacity-90">
-              <span>{promotionChase.ownerGoalTitle}</span>
-              <span>{promotionChase.ownerGoalProgressPct}%</span>
+          <CoachPopsAvatar size="sm" />
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs font-extrabold">
+              <span className="flex items-center gap-1.5 font-display">
+                <Trophy className="w-3.5 h-3.5 shrink-0" />
+                {promotionChase.headline}
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-[#FFFDF7] text-[#181B2C] border border-[#181B2C]">
+                {promotionChase.nextTierRewardText}
+              </span>
             </div>
-            <div className="h-2 rounded-full border border-[#181B2C] bg-[#FFFDF7] overflow-hidden">
-              <div
-                className="h-full bg-[#2FB356] transition-all"
-                style={{ width: `${promotionChase.ownerGoalProgressPct}%` }}
-              />
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px] font-extrabold opacity-90">
+                <span>{promotionChase.ownerGoalTitle}</span>
+                <span>{promotionChase.ownerGoalProgressPct}%</span>
+              </div>
+              <div className="h-2 rounded-full border border-[#181B2C] bg-[#FFFDF7] overflow-hidden">
+                <div
+                  className="h-full bg-[#2FB356] transition-all"
+                  style={{ width: `${promotionChase.ownerGoalProgressPct}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>

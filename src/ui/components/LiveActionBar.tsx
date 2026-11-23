@@ -5,6 +5,7 @@ import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
 import type { GameDayControlMode } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
+import { CoachPopsAvatar } from './CoachPopsAvatar';
 
 export interface ArcadeBullpenOption {
   id: string;
@@ -24,12 +25,14 @@ interface LiveActionBarProps {
   bullpenOptions?: readonly ArcadeBullpenOption[];
   latestEvent: PlayEvent | null;
   controlMode: GameDayControlMode;
-  watchMode: 'live' | 'clutch' | 'paused';
+  watchMode: 'live' | 'smart' | 'clutch' | 'paused';
+  smartPauseReason?: string | null;
   tacticalCall: TacticalCall;
   isBatting: boolean;
   gameCompleted: boolean;
   onNextPitch: () => void;
   onToggleWatchMode: () => void;
+  onToggleSmartWatch?: () => void;
   onSimAtBat: () => void;
   onSimHalfInning: () => void;
   onClutchSim: () => void;
@@ -61,11 +64,13 @@ export function LiveActionBar({
   latestEvent,
   controlMode,
   watchMode,
+  smartPauseReason,
   tacticalCall,
   isBatting,
   gameCompleted,
   onNextPitch,
   onToggleWatchMode,
+  onToggleSmartWatch,
   onSimAtBat,
   onSimHalfInning,
   onClutchSim,
@@ -103,53 +108,58 @@ export function LiveActionBar({
         data-testid="coach-action-cue"
         className={`rounded-xl border-2 px-2.5 py-2 flex flex-wrap items-center justify-between gap-2 ${cuePalette}`}
       >
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] font-extrabold">
-            <span className={`px-2 py-0.5 rounded-md border border-[#181B2C] ${badgePalette}`}>
-              {cue.badgeText}
-            </span>
-            <span className="px-2 py-0.5 rounded-md border border-[#181B2C] bg-[#1D3557] text-[#FFFDF7]">
-              {cue.turnLabel}
-            </span>
-            <span className="text-[#4A5068] truncate">
-              {matchupLabel} • {basesLabel}
-            </span>
-          </div>
-          <p className="text-xs font-extrabold leading-snug text-[#181B2C]">{cue.headline}</p>
-          {(onInspectBatter || onInspectPitcher || onInspectPlayers) ? (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              {onInspectBatter ? (
-                <button
-                  type="button"
-                  data-testid="inspect-batter-card-btn"
-                  onClick={onInspectBatter}
-                  className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
-                >
-                  🃏 Batter: {batterName ?? 'Card'}
-                </button>
-              ) : null}
-              {onInspectPitcher ? (
-                <button
-                  type="button"
-                  data-testid="inspect-pitcher-card-btn"
-                  onClick={onInspectPitcher}
-                  className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#1D3557] cursor-pointer"
-                >
-                  🃏 Pitcher: {pitcherName ?? 'Card'}
-                </button>
-              ) : null}
-              {onInspectPlayers ? (
-                <button
-                  type="button"
-                  data-testid="inspect-game-players-btn"
-                  onClick={onInspectPlayers}
-                  className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
-                >
-                  🃏 All Players
-                </button>
-              ) : null}
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          <CoachPopsAvatar size="sm" testId="live-coach-pops-avatar" />
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] font-extrabold">
+              <span className={`px-2 py-0.5 rounded-md border border-[#181B2C] ${badgePalette}`}>
+                {cue.badgeText}
+              </span>
+              <span className="px-2 py-0.5 rounded-md border border-[#181B2C] bg-[#1D3557] text-[#FFFDF7]">
+                {cue.turnLabel}
+              </span>
+              <span className="text-[#4A5068] truncate">
+                {matchupLabel} • {basesLabel}
+              </span>
             </div>
-          ) : null}
+            <p className="text-xs font-extrabold leading-snug text-[#181B2C]">
+              {smartPauseReason ? `⏸️ ${smartPauseReason} — ${cue.headline}` : cue.headline}
+            </p>
+            {(onInspectBatter || onInspectPitcher || onInspectPlayers) ? (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {onInspectBatter ? (
+                  <button
+                    type="button"
+                    data-testid="inspect-batter-card-btn"
+                    onClick={onInspectBatter}
+                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                  >
+                    🃏 Batter: {batterName ?? 'Card'}
+                  </button>
+                ) : null}
+                {onInspectPitcher ? (
+                  <button
+                    type="button"
+                    data-testid="inspect-pitcher-card-btn"
+                    onClick={onInspectPitcher}
+                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#1D3557] cursor-pointer"
+                  >
+                    🃏 Pitcher: {pitcherName ?? 'Card'}
+                  </button>
+                ) : null}
+                {onInspectPlayers ? (
+                  <button
+                    type="button"
+                    data-testid="inspect-game-players-btn"
+                    onClick={onInspectPlayers}
+                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                  >
+                    🃏 All Players
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {cue.suggestedAction ? (
@@ -187,6 +197,18 @@ export function LiveActionBar({
         >
           {watchMode === 'live' ? 'Pause Auto' : 'Auto Play 3D'}
         </ComicButton>
+
+        {onToggleSmartWatch ? (
+          <ComicButton
+            size="sm"
+            variant={watchMode === 'smart' ? 'coral' : 'violet'}
+            data-testid="smart-watch-toggle"
+            disabled={gameCompleted}
+            onClick={onToggleSmartWatch}
+          >
+            {watchMode === 'smart' ? '⏸️ Smart ON' : '✨ Smart Watch'}
+          </ComicButton>
+        ) : null}
 
         <ComicButton
           size="sm"

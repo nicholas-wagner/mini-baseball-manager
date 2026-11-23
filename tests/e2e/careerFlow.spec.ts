@@ -6,8 +6,9 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   test.setTimeout(60_000);
   await page.goto('/');
 
-  // Production launch lands straight on Play Ball / Club Creator with Design Lab hidden
+  // Production launch lands straight on Play Ball / Club Creator with cute quick-pick clubs & Design Lab hidden
   await expect(page.getByRole('button', { name: /design lab/i })).toHaveCount(0);
+  await expect(page.getByTestId('quick-club-presets')).toBeVisible();
   const startBtn = page.getByRole('button', { name: /start sandlot dynasty/i });
   await expect(startBtn).toBeVisible();
   await startBtn.click();
@@ -16,6 +17,7 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('ballpark-soundboard')).toHaveCount(0);
   await expect(page.getByTestId('manager-action-inbox')).toBeVisible();
   await expect(page.getByTestId('scheduled-matchup-card')).toBeVisible();
+  await expect(page.getByTestId('matchup-faceoff-portraits')).toBeVisible();
   await expect(page.getByTestId('schedule-series-pill')).toHaveCount(7);
   await expect(page.getByTestId('probable-matchup-strip')).toBeVisible();
   await expect(page.getByTestId('pregame-lineup-check')).toBeVisible();
@@ -44,6 +46,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   expect(nextPitchBox!.y + nextPitchBox!.height).toBeLessThanOrEqual(viewport.height);
 
   await expect(page.getByTestId('coach-action-cue')).toBeVisible();
+  await expect(page.getByTestId('camera-angle-switcher')).toBeVisible();
+  await expect(page.getByTestId('smart-watch-toggle')).toBeVisible();
   await expect(page.getByTestId('broadcast-lower-third')).toBeVisible();
   await expect(page.getByTestId('arcade-bullpen-toggle')).toBeVisible();
   await nextPitchBtn.click();
@@ -106,26 +110,28 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /download 90s card/i }).click();
   await expect(page.getByTestId('cross-train-feedback')).toContainText(/exported 90s baseball card/i);
 
-  // Visit Ballpark HQ -> Stadium Progression + Economy & District + Gazette & Front Office + Derby/Global Cup/Challenges
+  // Visit Ballpark HQ -> 4 Clean Rooms (Ballpark & Economy, Uniforms & Gear, Staff & Front Office, Events & Duels)
   await page.getByRole('button', { name: /^ballpark$/i }).locator('visible=true').first().click();
+  await expect(page.getByTestId('hub-room-tabs')).toBeVisible();
   await expect(page.getByText(/neighborhood sandlot/i)).toBeVisible();
 
   await page.getByRole('button', { name: /economy & district/i }).click();
   await expect(page.getByTestId('ballpark-economy-panel')).toBeVisible();
   await page.getByRole('button', { name: /sign turbo fizz soda/i }).click();
 
-  await page.getByRole('button', { name: /uniform studio/i }).click();
+  await page.getByRole('button', { name: /uniforms & gear/i }).click();
   await expect(page.getByTestId('uniform-designer-panel')).toBeVisible();
   await page.getByRole('button', { name: /vintage pinstripes/i }).click();
   await page.getByRole('button', { name: /apply custom uniform/i }).click();
 
+  await page.getByRole('button', { name: /staff & front office/i }).click();
   await page.getByRole('button', { name: /gazette & front office/i }).click();
   await expect(page.getByTestId('front-office-gazette-panel')).toBeVisible();
   await page.getByRole('button', { name: /draw 90s surprise card/i }).click();
   await page.getByTestId('surprise-choice-0').click();
   await expect(page.getByTestId('surprise-outcome-banner')).toBeVisible();
 
-  await page.getByRole('button', { name: /derby & sharing/i }).click();
+  await page.getByRole('button', { name: /events & duels/i }).click();
   await page.getByRole('button', { name: /run home run derby/i }).click();
   await expect(page.getByText(/derby champ:/i)).toBeVisible();
   await page.getByRole('button', { name: /run global chibi cup/i }).click();
@@ -144,31 +150,42 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /close player card/i }).click();
   await expect(page.getByTestId('awards-and-hof-panel')).toBeVisible();
 
-  // Open Coach Pops' Guide, Story & Origins CYOA, and 4 Auto-Save Slots
-  await page.getByRole('button', { name: /open dugout guide/i }).locator('visible=true').first().click();
+  // Open Coach Pops' Guide, Story & Origins CYOA, 4 Save Slots, Jukebox, Foil Packs & Settings (via Desktop Sidebar OR Clean Mobile Menu!)
+  const openUtilityItem = async (ariaPattern: RegExp) => {
+    const mobileMenuToggle = page.getByTestId('mobile-menu-toggle');
+    if (await mobileMenuToggle.isVisible()) {
+      await mobileMenuToggle.click();
+      await expect(page.getByTestId('mobile-clubhouse-menu')).toBeVisible();
+      await page.getByTestId('mobile-clubhouse-menu').getByRole('button', { name: ariaPattern }).click();
+    } else {
+      await page.getByRole('button', { name: ariaPattern }).locator('visible=true').first().click();
+    }
+  };
+
+  await openUtilityItem(/open dugout guide/i);
   await expect(page.getByText(/COACH POPS’ DUGOUT HANDBOOK/i)).toBeVisible();
   await page.getByRole('button', { name: /close dugout handbook/i }).click();
 
-  await page.getByRole('button', { name: /open dynasty story/i }).locator('visible=true').first().click();
+  await openUtilityItem(/open dynasty story/i);
   await expect(page.getByTestId('active-story-chapter')).toBeVisible();
   await page.getByRole('button', { name: /close story modal/i }).click();
 
-  await page.getByRole('button', { name: /open 4 career save slots/i }).locator('visible=true').first().click();
+  await openUtilityItem(/open 4 career save slots/i);
   await expect(page.getByTestId('career-slot-1')).toBeVisible();
   await expect(page.getByTestId('career-slot-4')).toBeVisible();
   await page.getByRole('button', { name: /close career slots/i }).click();
 
-  await page.getByRole('button', { name: /open 90s music jukebox/i }).locator('visible=true').first().click();
+  await openUtilityItem(/open 90s music jukebox/i);
   await expect(page.getByTestId('music-jukebox-modal')).toBeVisible();
   await page.getByRole('button', { name: /close music jukebox/i }).click();
 
-  await page.getByRole('button', { name: /open 1994 foil packs/i }).locator('visible=true').first().click();
+  await openUtilityItem(/open 1994 foil packs/i);
   await expect(page.getByTestId('foil-pack-modal')).toBeVisible();
   await page.getByRole('button', { name: /rip open 1994 foil pack/i }).click();
   await expect(page.getByTestId('foil-pack-card')).toHaveCount(3);
   await page.getByRole('button', { name: /close foil packs/i }).click();
 
-  await page.getByRole('button', { name: /open settings and accessibility/i }).locator('visible=true').first().click();
+  await openUtilityItem(/open settings and accessibility/i);
   await expect(page.getByTestId('settings-modal')).toBeVisible();
   await page.getByRole('button', { name: /close settings/i }).click();
 });

@@ -96,6 +96,7 @@ function renderFormBadge(formState: FormState) {
 export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const freeAgents = useGameStore((s) => s.freeAgents);
+  const individualDrillsRemaining = useGameStore((s) => s.individualDrillsRemaining);
   const swapLineupSlots = useGameStore((s) => s.swapLineupSlots);
   const assignLineupPlayer = useGameStore((s) => s.assignLineupPlayer);
   const autoOptimizeHumanLineup = useGameStore((s) => s.autoOptimizeHumanLineup);
@@ -841,7 +842,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
               <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
                 <span>Cross-Train Position</span>
-                <span className="text-[#1B4332]">Fav: {inspectedPlayer.favoritePosition}</span>
+                <span className="text-[#1B4332]">
+                  🏋️ {individualDrillsRemaining}/2 Drills • Fav: {inspectedPlayer.favoritePosition}
+                </span>
               </div>
               <div className="text-[10px] font-bold text-[#4A5068]">
                 Gains mastery at target spot, adds rust elsewhere.
@@ -871,7 +874,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
               <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
                 <span>Compromise Training Lab</span>
-                <span className="text-[#4A5068]">Fatigue {inspectedPlayer.fatigue}/100</span>
+                <span className="text-[#4A5068]">
+                  🏋️ {individualDrillsRemaining}/2 Drills • Fat {inspectedPlayer.fatigue}
+                </span>
               </div>
               <div className="text-[10px] font-bold text-[#4A5068]">
                 Every drill trades one edge for another inside player stat caps.

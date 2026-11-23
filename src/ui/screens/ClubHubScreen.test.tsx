@@ -5,7 +5,7 @@ import { useGameStore } from '../../store/gameStore';
 import { ClubHubScreen } from './ClubHubScreen';
 
 describe('ClubHubScreen — Ballparks, Coaches, Practice Complex & Manager RPG', () => {
-  it('lets a club browse 10 ballparks, hire a coach under Rookie slot caps, run Practice, and unlock a Manager RPG skill', async () => {
+  it('lets a club browse 10 ballparks, hire a coach under Rookie slot caps, run Practice, and equip Relics across the 4 clean HQ rooms', async () => {
     const user = userEvent.setup();
     useGameStore.getState().startNewCareer({
       city: 'Sandlot',
@@ -21,29 +21,26 @@ describe('ClubHubScreen — Ballparks, Coaches, Practice Complex & Manager RPG',
 
     render(<ClubHubScreen />);
 
-    // 1. Ballparks tab shows all 10 retro venues
+    // 1. Ballpark & Economy room shows all 10 retro venues (no duplicate Manager RPG tab!)
+    expect(screen.getByTestId('hub-room-tabs')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /manager rpg/i })).not.toBeInTheDocument();
     expect(screen.getByText(/high-altitude mesa park/i)).toBeInTheDocument();
     expect(screen.getByText(/neon metro dome/i)).toBeInTheDocument();
 
-    // 2. Coaches & Staff tab shows Rookie 0 / 2 cap and hires a candidate
-    await user.click(screen.getByRole('button', { name: /coaches & staff/i }));
+    // 2. Staff & Front Office room shows Rookie 0 / 2 cap and hires a candidate
+    await user.click(screen.getByRole('button', { name: /staff & front office/i }));
     expect(screen.getByText(/active staff slots: 0 \/ 2/i)).toBeInTheDocument();
     const hireButtons = screen.getAllByRole('button', { name: /^hire /i });
     await user.click(hireButtons[0]);
     expect(screen.getByText(/active staff slots: 1 \/ 2/i)).toBeInTheDocument();
 
-    // 3. Practice Complex runs Slump-Buster Film Room
+    // 3. Practice Complex sub-tab inside Staff & Front Office runs Slump-Buster Film Room
     await user.click(screen.getByRole('button', { name: /practice complex/i }));
     await user.click(screen.getByRole('button', { name: /run slump-buster film room/i }));
     expect(screen.getByText(/slump-buster film room:/i)).toBeInTheDocument();
 
-    // 4. Manager RPG unlocks Mound Whisper with starter 1 SP
-    await user.click(screen.getByRole('button', { name: /manager rpg/i }));
-    const unlockButtons = screen.getAllByRole('button', { name: /unlock \(1 sp\)/i });
-    await user.click(unlockButtons[0]);
-    expect(screen.getByText(/unlocked manager skill:/i)).toBeInTheDocument();
-
-    // 5. Relics & Chemistry tab equips a 90s Relic onto the active player
+    // 4. Uniforms & Gear room -> Relics & Chemistry equips a 90s Relic onto the active player
+    await user.click(screen.getByRole('button', { name: /uniforms & gear/i }));
     await user.click(screen.getByRole('button', { name: /relics & chemistry/i }));
     expect(screen.getByText(/clubhouse chemistry:/i)).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: /equip relic/i })[0]);

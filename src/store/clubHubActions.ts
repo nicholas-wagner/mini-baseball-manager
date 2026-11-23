@@ -334,6 +334,12 @@ export function runHumanPracticeActivity(
   request: PracticeComplexRequest,
 ): { trained: boolean; summary: string } {
   const state = useGameStore.getState();
+  if (state.individualDrillsRemaining <= 0) {
+    return {
+      trained: false,
+      summary: 'Clubhouse drill quota used (0/2 left) — play or sim a game to refresh!',
+    };
+  }
   const club = state.getHumanClub();
   if (!club) return { trained: false, summary: 'No active club.' };
   const player = club.roster.find((p) => p.id === playerId);
@@ -358,6 +364,7 @@ export function runHumanPracticeActivity(
   };
   useGameStore.setState({
     rosterActionNonce: state.rosterActionNonce + 1,
+    individualDrillsRemaining: Math.max(0, state.individualDrillsRemaining - 1),
     leagues: replaceHumanClub(state.leagues, updatedClub),
   });
   return { trained: true, summary: res.summary };

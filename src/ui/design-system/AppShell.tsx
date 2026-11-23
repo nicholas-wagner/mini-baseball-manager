@@ -17,6 +17,7 @@ interface AppShellProps {
   muted: boolean;
   onToggleMute: () => void;
   utilityActions?: ReactNode;
+  mobileUtilityActions?: ReactNode;
   children: ReactNode;
 }
 
@@ -29,6 +30,7 @@ export function AppShell({
   muted,
   onToggleMute,
   utilityActions,
+  mobileUtilityActions,
   children,
 }: AppShellProps) {
   useEffect(() => {
@@ -113,7 +115,7 @@ export function AppShell({
             <div className="font-display text-sm leading-tight truncate">{clubName}</div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {utilityActions}
+            {mobileUtilityActions ?? utilityActions}
             <button
               type="button"
               onClick={onToggleMute}

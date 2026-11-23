@@ -20,6 +20,49 @@ interface ClubCreatorScreenProps {
 const EXTRA_CITIES = ['Cedar', 'Harbor', 'Meteor', 'Oakwood', 'Rocket', 'Clover'] as const;
 const EXTRA_NAMES = ['Sox', 'Foxes', 'Badgers', 'Hounds', 'Meteors', 'Bears'] as const;
 
+const QUICK_STARTER_CLUBS = [
+  {
+    id: 'comets',
+    emoji: '🚀',
+    label: 'Sandlot Comets',
+    city: 'Sandlot',
+    clubName: 'Comets',
+    mascot: 'Rocket Dog',
+    monogram: 'SC',
+    paletteIndex: 0,
+  },
+  {
+    id: 'otters',
+    emoji: '🦦',
+    label: 'Harbor Otters',
+    city: 'Harbor',
+    clubName: 'Otters',
+    mascot: 'Captain Splash',
+    monogram: 'HO',
+    paletteIndex: 1,
+  },
+  {
+    id: 'foxes',
+    emoji: '🦊',
+    label: 'Clover Foxes',
+    city: 'Clover',
+    clubName: 'Foxes',
+    mascot: 'Lucky Fox',
+    monogram: 'CF',
+    paletteIndex: 2,
+  },
+  {
+    id: 'bears',
+    emoji: '🐻',
+    label: 'Meteor Bears',
+    city: 'Meteor',
+    clubName: 'Bears',
+    mascot: 'Astro Bear',
+    monogram: 'MB',
+    paletteIndex: 3,
+  },
+] as const;
+
 export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const startNewCareer = useGameStore((s) => s.startNewCareer);
 
@@ -83,6 +126,44 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
       >
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-5 items-start">
           <div className="space-y-3">
+            {/* Cute 1-Tap Sandlot Starter Franchises */}
+            <div data-testid="quick-club-presets" className="space-y-1.5">
+              <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+                ⚡ Quick-Pick Cute Starter Club (Or Customize Below!)
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {QUICK_STARTER_CLUBS.map((preset) => {
+                  const isActive = city === preset.city && clubName === preset.clubName;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setCity(preset.city);
+                        setClubName(preset.clubName);
+                        setMascot(preset.mascot);
+                        setMonogram(preset.monogram);
+                        setPaletteIndex(preset.paletteIndex % SAMPLE_TEAM_PALETTES.length);
+                        soundEngine.play('ui_pop');
+                      }}
+                      className={`p-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[52px] cursor-pointer transition ${
+                        isActive
+                          ? 'bg-[#FFC300] shadow-[3px_3px_0_#181B2C]'
+                          : 'bg-[#FFFDF7] hover:bg-[#FFF3BF]'
+                      }`}
+                    >
+                      <div className="font-display text-xs text-[#181B2C]">
+                        {preset.emoji} {preset.label}
+                      </div>
+                      <div className="text-[10px] font-bold text-[#4A5068] truncate">
+                        Mascot: {preset.mascot}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label
