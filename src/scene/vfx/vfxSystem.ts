@@ -21,6 +21,7 @@ export interface BallparkVfxSystem {
   setCalloutsVisible: (visible: boolean) => void;
   launchBall: (style: BallVfxStyle, callout?: { text: string; color?: string }) => { cameraShake: number };
   ball: ReturnType<typeof createBallFlightVisual>;
+  kickChalk: (position: Vec3) => void;
   impact: (position: Vec3, color: string) => void;
   clear: () => void;
   spawnComicCallout: (text: string, pos: Vec3, bgColor?: string, inCorner?: boolean | 'contact') => void;
@@ -102,6 +103,19 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     flare.visible = true;
     flareAge = 0;
   };
+  // A small, reusable fan of chalk specks at the runner's cleat.
+  const dust = new THREE.Group();
+  const grain = new THREE.CircleGeometry(.07, 7);
+  const chalk = new THREE.MeshBasicMaterial({color: '#fff1d6', transparent:true, depthWrite:false});
+  for (let i = 0; i < 7; i++) dust.add(new THREE.Mesh(grain, chalk));
+  dust.visible = false;
+  group.add(dust);
+  let dustAge = 0;
+  const kickChalk = (at: Vec3) => {
+    dust.position.set(at.x, .09, at.z);
+    dustAge = 0;
+    dust.visible = true;
+  };
   group.add(ball.group, flare);
   const callouts: ActiveCallout[] = [];
 
@@ -141,6 +155,18 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
         immediate = null;
         ball.group.visible = false;
       }
+    }
+    if (dust.visible) {
+      dustAge += dtSec;
+      const u = Math.min(1, dustAge / .40);
+      dust.children.forEach((speck, i) => {
+        const angle = 1.6 + i * .36;
+        speck.position.set(Math.cos(angle)*u*.62, Math.sin(Math.PI*u)*(.12+.03*(i%3)), Math.sin(angle)*u*.4);
+        speck.scale.setScalar((.68+.17*(i%3))*(1+u));
+        if (camera) speck.quaternion.copy(camera.quaternion);
+      });
+      chalk.opacity = (1-u)*.85;
+      dust.visible = u < 1;
     }
     if (flare.visible) {
       flareAge += dtSec;
@@ -189,6 +215,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
   const clear = () => {
     immediate = null;
     umpire.sprite.visible=false;
+    dust.visible = false;
     bat.barrel.visible = false;
     ball.group.visible = false;
     flare.visible = false;
@@ -204,6 +231,8 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     ball.dispose();
     bat.dispose();
     umpire.dispose();
+    grain.dispose();
+    chalk.dispose();
     flareGeo.dispose();
     flare.material.dispose();
   };
@@ -211,5 +240,5 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     captions = visible;
     for (const item of callouts) item.sprite.visible = visible;
   };
-  return { group, umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, clear, spawnComicCallout, update, dispose };
+  return { group, umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, kickChalk, clear, spawnComicCallout, update, dispose };
 }

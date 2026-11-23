@@ -34,8 +34,8 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
     fireEvent.click(within(screen.getByTestId('mascot-animal-picker')).getByRole('button', { name: /otter/i }));
     expect(screen.getByRole('textbox', { name: /^mascot$/i })).toHaveValue('Splash Otter');
 
-    // Primary Start Sandlot Dynasty button appears BEFORE the deeper Starting Roster Build cards!
-    const startBtn = screen.getByRole('button', { name: /start sandlot dynasty/i });
+    // Primary Play Opening Day button appears BEFORE the deeper Starting Roster Build cards!
+    const startBtn = screen.getByRole('button', { name: /play opening day/i });
     const rosterBuildHeading = screen.getByText(/starting roster build/i);
     expect(
       Boolean(startBtn.compareDocumentPosition(rosterBuildHeading) & Node.DOCUMENT_POSITION_FOLLOWING),

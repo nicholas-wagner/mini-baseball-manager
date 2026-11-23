@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_PITCH_TYPES } from '../../engine/models/player';
-import { actorAt, diamondPlay, sampleLeg } from './diamondPlay';
+import { actorAt, diamondCamera, diamondPlay, heldRunnerLead, sampleLeg } from './diamondPlay';
 import { choreographPlayEvent } from './eventChoreographer';
 import { labSequence } from './labSequence';
 import type { PlayEvent } from '../../engine/models/playEvent';
@@ -106,4 +106,39 @@ it('shows a walk-off steal at home with the stealing runner as the winner', () =
     { walkoff: true, runsScored: 1 },
   ).play!;
   expect(play.ending).toMatchObject({ kind: 'walkoff', scorer: 'RUN', start: play.leadArrival });
+});
+
+it('tracks the runner from first into third on a gap double after the pickup', () => {
+  const play = choreographPlayEvent({...event, outcome:'double', basesAfter:[null,'hitter','runner']},
+    1, ['runner',null,null], {runsScored:0}).play!;
+  const t = play.pickupAt + .55;
+  const runner = actorAt(play, 'RUN', t, 'R');
+  expect(runner.clip).toBe('field_run');
+  expect(diamondCamera(play,t,'R').lookAt.x).toBeCloseTo(runner.pos.x);
+  expect(diamondCamera(play,t,'R').lookAt.z).toBeCloseTo(runner.pos.z);
+});
+
+it('keeps the runner moving while glancing at the force umpire', () => {
+  const play = diamondPlay('ground_out');
+  const touch = actorAt(play,'BAT',play.batterArrival,'L');
+  const after = actorAt(play,'BAT',play.batterArrival+.26,'L');
+  expect(after.clip).toBe('runner_glance');
+  expect(after.pos.x).toBeGreaterThan(touch.pos.x);
+});
+
+it('keeps a held runner clear of the first baseman receiving the force', () => {
+  const play = diamondPlay('ground_out');
+  const lead = heldRunnerLead(play, 1, play.finish);
+  const receiver = actorAt(play, '1B', play.finish, 'R').pos;
+  expect(Math.hypot(lead.x-receiver.x, lead.z-receiver.z)).toBeGreaterThan(2);
+});
+
+it('keeps the first baseman on the bag and turns toward the dugout after the second catch', () => {
+  const play = diamondPlay('double_play');
+  const catchPose = actorAt(play, '1B', play.finish, 'L');
+  const look = actorAt(play, '1B', play.finish + .85, 'L');
+  const shot = diamondCamera(play, play.finish + .85, 'L');
+  const towardCamera = Math.sin(look.yaw) * (shot.position.x-look.pos.x) + Math.cos(look.yaw) * (shot.position.z-look.pos.z);
+  expect(look.pos).toEqual(catchPose.pos);
+  expect(towardCamera).toBeGreaterThan(0);
 });

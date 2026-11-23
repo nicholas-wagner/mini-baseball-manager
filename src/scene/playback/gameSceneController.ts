@@ -5,7 +5,7 @@ import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import { batterBox, headingToward } from './diamondLayout';
 import { createDelivery, sampleDeliveryFlight, type ShowcaseDelivery } from '../vfx/showcaseDelivery';
 import { runBases } from './outfieldPlay';
-import { diamondPlay, type DiamondPlay } from './diamondPlay';
+import { diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import * as THREE from 'three';
@@ -246,6 +246,8 @@ export class GameSceneController {
             })();
       rig.updateAppearance({
         traits: defender.traits,
+        quietInfielder: defender.personality === 'quiet_assassin',
+        reassurePitcher: coord.pos === 'C' && (session.balls >= 2 || fieldingSide.pitcherFatigue >= 60 || session.bases.filter(Boolean).length >= 2),
         team: fieldingTeam,
         jerseyNumber: defender.jerseyNumber,
         role: coord.pos === 'P' ? 'pitcher' : coord.pos === 'C' ? 'catcher' : 'fielder',
@@ -298,7 +300,7 @@ export class GameSceneController {
         && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
       this.replay = { play: reliefStrikeout ? {...play,reliefStrikeout:true} : play, readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
-        BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
+        BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.runnerToThird ? play.runnerToThird-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
         runnerDestinations: (play.outfield || play.close || play.kind === 'bunt_single' || play.kind === 'fielding_error') && event ? bases.map((id, i) => {
           if (!id) return i + 1;
           const dest = event.basesAfter.indexOf(id);
@@ -398,9 +400,10 @@ export class GameSceneController {
       renderDiamondPlay(play, cast, this.bats, t, t - elapsed * rate, this.camera, this.container.clientHeight,
         this.vfx, this.throws, fixedShot, this.welcome.rigs, this.replay.readout);
       this.runnerRigs.forEach((runner, i) => {
-        if (!runner.root.visible || ((play.scorerBase || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
+        if (!runner.root.visible || ((play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
         const destination = runnerDestinations?.[i];
         if (destination === undefined) {
+          if (forceAtFirst(play)) runner.root.position.copy(heldRunnerLead(play, i+1, t));
           runner.updatePose('runner_lead', t, undefined, this.camera.position);
           return;
         }

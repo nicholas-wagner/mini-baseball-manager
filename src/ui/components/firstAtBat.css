@@ -63,3 +63,11 @@
   opacity: 0.65;
   cursor: default;
 }
+.rally-result { display: grid; grid-template-columns: 62px 1fr; gap: 8px 12px; align-items: center; }
+.rally-result img { width: 62px; height: 78px; object-fit: cover; border-radius: 5px; border: 2px solid #193d37; }
+.rally-result h3 { margin: 1px 0; }
+.rally-result p { font-size: 14px; }
+.rally-call { text-transform: uppercase; letter-spacing: .07em; font: bold 12px monospace; color: #854823; }
+.rally-result footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
+.rally-result footer button:first-child { flex: none; }
+.rally-result .atbat-go { margin: 0; }

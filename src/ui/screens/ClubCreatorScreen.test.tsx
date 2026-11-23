@@ -22,7 +22,7 @@ describe('ClubCreatorScreen — Fair Starting Roster Presets (TASK-064)', () => 
     }
 
     await user.click(screen.getByRole('button', { name: /all rookies/i }));
-    await user.click(screen.getByRole('button', { name: /start sandlot dynasty/i }));
+    await user.click(screen.getByRole('button', { name: /play opening day/i }));
 
     expect(onCreated).toHaveBeenCalledTimes(1);
     const club = useGameStore.getState().getHumanClub()!;
@@ -40,7 +40,7 @@ it('deals a fresh roster when founding two clubs with the default choices', asyn
   try {
     const found = async () => {
       const view = render(<ClubCreatorScreen onCreated={() => {}} />);
-      await userEvent.click(screen.getByRole('button', { name: /start sandlot dynasty/i }));
+      await userEvent.click(screen.getByRole('button', { name: /play opening day/i }));
       const ids = useGameStore.getState().getHumanClub()!.roster.map(p => p.id);
       view.unmount();
       return ids;

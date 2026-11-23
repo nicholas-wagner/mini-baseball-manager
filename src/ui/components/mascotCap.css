@@ -1,0 +1,10 @@
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) .mascot-cap-tip {
+    transform-origin: 18px 24px;
+    animation: mascot-cap-tip 480ms ease-out;
+  }
+}
+@keyframes mascot-cap-tip {
+  38% { transform: translateY(-2px) rotate(-18deg); }
+  77% { transform: rotate(3deg); }
+}

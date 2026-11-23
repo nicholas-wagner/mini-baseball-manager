@@ -71,3 +71,9 @@
   - `broadcast_follow`: Spring-damped dynamic arc tracking the ball in play.
   - `showcase_closeup`: Turntable hero view for Design Lab & Player Inspection.
   - `practice_diorama`: Angled miniature cage/bullpen vignette view.
+
+### Opening Day rally
+
+Keep the result with the player who made the play until the manager advances. The result panel pairs their illustration with the official call and a short description of the runners. Give **Next batter** the gold primary button and **Watch again** a secondary action. Keep the two swing choices or three pitch targets in the same spot through the half-inning.
+
+For a force at first, let the manager see the mitt, the bag, the batter running through and the umpire in the same shot. A held runner takes a secondary lead. On a gap hit the camera can leave the retrieved ball to follow a runner into third or home. Use the runner’s actual base and destination for the cut.

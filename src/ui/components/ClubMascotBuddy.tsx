@@ -1,3 +1,5 @@
+import { useId } from 'react';
+import './mascotCap.css';
 export type MascotMood = 'happy' | 'cheering' | 'rally' | 'determined';
 
 interface ClubMascotBuddyProps {
@@ -8,6 +10,7 @@ interface ClubMascotBuddyProps {
   mood?: MascotMood;
   size?: 'sm' | 'md' | 'lg';
   testId?: string;
+  tipCap?: boolean;
 }
 
 type MascotSpecies = 'dog' | 'otter' | 'fox' | 'bear' | 'baseball';
@@ -46,11 +49,12 @@ export function ClubMascotBuddy({
   accentColor,
   mood = 'happy',
   size = 'md',
+  tipCap = false,
   testId = 'club-mascot-buddy',
 }: ClubMascotBuddyProps) {
   const species = detectMascotSpecies(mascot);
   const palette = SPECIES_COLORS[species];
-  const uid = `${species}-${mood}-${primaryColor.replace(/[^a-zA-Z0-9]/g, '')}-${size}`;
+  const uid = useId();
   const isCheering = mood === 'cheering';
   const isRally = mood === 'rally';
 
@@ -125,7 +129,7 @@ export function ClubMascotBuddy({
         )}
 
         {/* Team Baseball Cap (tilted backwards in rally mood!) */}
-        <g transform={isRally ? 'rotate(-8 32 22)' : undefined}>
+        <g className={tipCap ? 'mascot-cap-tip' : undefined} transform={isRally ? 'rotate(-8 32 22)' : undefined}>
           <path
             d="M16 24 C17 12, 47 12, 48 24 Z"
             fill={secondaryColor}

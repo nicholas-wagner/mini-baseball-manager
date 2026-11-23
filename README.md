@@ -12,20 +12,28 @@ Manage lineups, draft global prospects, develop branching player & manager skill
 
 ## Your first game
 
-Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Tap the gold button to take over. Coach Pops gives you one job for this hitter. On the mound, choose a target and watch the catcher set up. At bat, try the compact swing or the power swing before you commit. **More controls** opens the full dugout immediately.
+Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Choose **Play Opening Day**, then tap the featured player to take over. Coach Pops stays with you through the half-inning. On the mound, choose a target and watch the catcher set up. At bat, try the compact swing or the power swing before you commit. **More controls** opens the full dugout immediately.
 
 | Meet your player | Call your first pitch | Keep a play from the game |
 | :---: | :---: | :---: |
 | ![Opening Day on a phone with the starting player's manga card and the situation](./docs/screenshots/opening-day.webp) | ![Coach Pops asks for an out and the catcher sets up on the corner](./docs/screenshots/first-at-bat.webp) | ![A scorebook print saved from a real game](./docs/screenshots/scorebook-print.webp) |
 
-With two runners aboard, Marcus Baker gets the call to bring one home. [See his power swing preview on a phone](./docs/screenshots/batting-preview.webp).
+Marcus Baker grounds out with two runners aboard. His card stays on screen while he runs through first. **Watch again** replays the throw. **Next batter** brings Ethan Torres to the plate with one out and both runners still on.
+
+| Marcus’s groundout | Ethan’s turn |
+| :---: | :---: |
+| ![The umpire calls Marcus out at first. His card offers Watch again and Next batter.](./docs/screenshots/rally-groundout.webp) | ![Ethan at the plate with two swing choices and a chance to drive in a run.](./docs/screenshots/rally-handoff.webp) |
+
+[See the power swing preview on a phone](./docs/screenshots/batting-preview.webp).
 
 <details>
-<summary>Watch a third strike and a force at first</summary>
+<summary>Watch a third strike, a force at first and a runner rounding third</summary>
 
 ![Pitcher and catcher in one shot through strike three](./docs/screenshots/called-strike.webp)
 
 ![The shortstop throws to first as the batter runs through the bag](./docs/screenshots/force-at-first.webp)
+
+![Three frames from the same gap double show the lead runner rounding third and approaching home as the relay comes in.](./docs/screenshots/gap-relay.webp)
 
 </details>
 

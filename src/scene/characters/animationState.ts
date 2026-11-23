@@ -21,6 +21,7 @@ export type CharacterAnimClip =
   | 'catch_point'
   | 'catch_target'
   | 'catch_throw'
+  | 'runner_glance'
   | 'runner_push'
   | 'runner_lead'
   | 'field_run'
@@ -57,6 +58,7 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   catch_handoff: 1,
   catch_point: .75,
   catch_throw: .68,
+  runner_glance: .52,
   runner_push: .19,
   runner_lead: 1.0,
   field_run: 0.52,

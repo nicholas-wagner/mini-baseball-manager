@@ -11,7 +11,7 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('quick-club-presets')).toBeVisible();
   await expect(page.getByTestId('creator-manga-fan')).toBeVisible();
   await expect(page.getByTestId('mascot-animal-picker')).toBeVisible();
-  const startBtn = page.getByRole('button', { name: /start sandlot dynasty/i });
+  const startBtn = page.getByRole('button', { name: /play opening day/i });
   await expect(startBtn).toBeVisible();
   await startBtn.click();
 

@@ -374,7 +374,7 @@ export class DesignLabSceneController {
     }
     for (const [id,rig] of Object.entries(this.replayCast())) {
       rig.preparePlayback();
-      rig.root.visible=id!=='RUN' || Boolean(play.scorerBase || play.close?.steal || ['double_play','sac_fly','ball_four'].includes(play.kind));
+      rig.root.visible=id!=='RUN' || Boolean(play.scorerBase || play.runnerToThird || play.close?.steal || ['double_play','sac_fly','ball_four'].includes(play.kind));
     }
   }
 

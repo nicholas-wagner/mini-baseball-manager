@@ -43,6 +43,7 @@ export interface DiamondPlay {
   duration: number;
   unassisted: boolean;
   reliefStrikeout?: boolean;
+  runnerToThird?: 1 | 2;
   scorerBase?: 1 | 2 | 3;
   ending?: {kind: 'third_out' | 'walkoff'; start: number; scorer: 'BAT' | 'RUN'};
   close?: CloseAction;
@@ -117,12 +118,23 @@ export function sampleLeg(leg: Leg, a: Vec3, b: Vec3, progress01: number, throws
   return v;
 }
 
+export function forceAtFirst(play: DiamondPlay) {
+  return ['ground_out', 'cover_first', 'double_play', 'bunt_out'].includes(play.kind);
+}
+
+// From pitch to contact, a runner taking a secondary lead still owns the original bag.
+export function heldRunnerLead(play: DiamondPlay, base: number, time: number) {
+  const lead = .06 + .18 * progress(time, play.legs[0].start, play.legs[0].end + .65);
+  return between(BASE_PATH_VERTICES[base], BASE_PATH_VERTICES[base+1], lead);
+}
+
 function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: EffectiveBatSide) {
   const plate = play.legs[0].end;
   let pos = starts[actor];
-  if (actor === 'RUN' && play.scorerBase && !play.close?.steal) {
+  const leadBase = play.scorerBase ?? play.runnerToThird;
+  if (actor === 'RUN' && leadBase && !play.close?.steal) {
     const go = (play.outfield?.caught ? play.pickupAt : plate) + .10;
-    return runBases(BASE_PATH_VERTICES[play.scorerBase],play.scorerBase,4,time,go,play.leadArrival);
+    return runBases(BASE_PATH_VERTICES[leadBase],leadBase,play.scorerBase ? 4 : 3,time,go,play.leadArrival);
   }
   if (play.close) return closeActorAt(play, play.close, actor, time, bats, pos);
   if (actor === 'C' && play.scorerBase && play.outfield) {
@@ -242,6 +254,14 @@ export function actorAt(play: DiamondPlay, actor: Actor, time: number, bats: Eff
       if (u<.52) base={...base,clip:'runner_push',local:time-go};
     }
   }
+  if (actor === 'BAT' && forceAtFirst(play) && time >= play.batterArrival + .08 && base.clip === 'field_run') {
+    base = {...base, clip:'runner_glance'};
+  }
+  if (actor === '1B' && play.kind === 'double_play') {
+    // Keep the pocket facing the throw through the force before acknowledging the bench.
+    const turn = progress(time, play.finish + .28, play.finish + .78);
+    base = {...base, yaw: base.yaw - 2.65 * turn};
+  }
   const salute = time - play.finish - .36;
   if (play.reliefStrikeout && actor === 'P' && salute >= 0 && salute < CLIP_DURATIONS.pitch_salute && (!play.ending || time < play.ending.start)) {
     return {...base,clip:'pitch_salute',local:salute};
@@ -269,6 +289,11 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
     const u = progress(t,leg.start,leg.end);
     const point = sampleLeg(leg,a,b,u);
     const runnerFinish = play.outfield.bags > 0 || play.kind === 'sac_fly';
+    if ((play.kind === 'double' || play.kind === 'triple') && (play.scorerBase || play.runnerToThird) &&
+        t >= play.pickupAt + .28 && t <= play.leadArrival + .25) {
+      const runner = actorAt(play, 'RUN', t, bats).pos;
+      return {lookAt: {...runner, y:.83}, position:{x:runner.x-2.7, y:3.15, z:runner.z+5.3}, fov:41};
+    }
     if (play.scorerBase && t >= play.leadArrival-.55) return {position:{x:3.3,y:2.2,z:4.4},lookAt:{x:-.4,y:.85,z:-.2},fov:40};
     if (runnerFinish && t > leg.end+.12 && leg === play.legs.at(-1)) {
       const runner = actorAt(play,play.kind === 'sac_fly' ? 'RUN' : 'BAT',t,bats).pos;
@@ -284,11 +309,10 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
       z: point.z + (atWall ? 10.4 : 9.5 - 4 * zoom),
     } };
   }
-  const forceAtFirst = play.kind === 'ground_out' || play.kind === 'double_play' || play.kind === 'bunt_out';
-  if (forceAtFirst && t >= play.finish-.36) {
+  if (forceAtFirst(play) && t >= play.finish-.36) {
     const runner = actorAt(play,'BAT',t,bats).pos;
     const focus = between(first,runner,.45);
-    return {position:{x:focus.x+4.2,y:2.25,z:focus.z+3.6},lookAt:{...focus,y:.76},fov:39};
+    return {position:{x:focus.x+4.8,y:2.4,z:focus.z+1.35},lookAt:{...focus,y:.76},fov:39};
   }
   const start = actorAt(play, leg.from, leg.start, bats).pos;
   const end = actorAt(play, leg.to, leg.end, bats).pos;

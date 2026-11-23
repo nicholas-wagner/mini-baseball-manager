@@ -78,6 +78,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
 
   const [city, setCity] = useState('Sandlot');
   const [clubName, setClubName] = useState('Comets');
+  const [tipCount, setTipCount] = useState(0);
   const [mascot, setMascot] = useState('Rocket Dog');
   const [monogram, setMonogram] = useState('SC');
   const [managerName, setManagerName] = useState('Coach Skip');
@@ -192,9 +193,10 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                         type="button"
                         onClick={() => {
                           setMascot(opt.mascotName);
+                          setTipCount(n => n + 1);
                           soundEngine.play('ui_pop');
                         }}
-                        className={`px-2.5 py-1.5 min-h-[40px] rounded-xl border-2 border-[#181B2C] text-xs font-extrabold cursor-pointer transition ${
+                        className={`px-2.5 py-1.5 min-h-[44px] rounded-xl border-2 border-[#181B2C] text-xs font-extrabold cursor-pointer transition ${
                           selected
                             ? 'bg-[#FF4D6D] text-white shadow-[2px_2px_0_#181B2C]'
                             : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
@@ -215,7 +217,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                   icon={<Play className="w-4 h-4" />}
                   className="flex-1 sm:flex-none"
                 >
-                  Start Sandlot Dynasty
+                  Play Opening Day
                 </ComicButton>
                 <ComicButton
                   variant="sky"
@@ -231,7 +233,8 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
             {/* Live Bouncing Mascot + Fanned 3 Real Manga Player Cards Showcase (Top-of-screen on Mobile, Right column on Desktop!) */}
             <div className="order-first md:order-last p-2.5 sm:p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C] flex items-center justify-between gap-2 md:block md:space-y-2.5">
               <div className="flex items-center justify-start md:justify-center gap-2 min-w-0">
-                <ClubMascotBuddy
+                <button type="button" aria-label={'Tip the cap of ' + mascot} onClick={() => setTipCount(n => n + 1)}>
+                <ClubMascotBuddy key={tipCount} tipCap={tipCount > 0}
                   mascot={mascot || 'Rocket Dog'}
                   primaryColor={palette.primary}
                   secondaryColor={palette.secondary}
@@ -239,6 +242,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                   mood="cheering"
                   size="sm"
                 />
+                </button>
                 <div className="text-left min-w-0">
                   <div className="font-display text-xs sm:text-sm text-[#181B2C] leading-tight truncate">
                     {city || 'Sandlot'} {clubName || 'Comets'}

@@ -135,6 +135,7 @@ import { useNemesisStore } from '../../store/nemesisStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { ArcadeDerbyModal } from '../components/ArcadeDerbyModal';
+import { RallyResult } from '../components/RallyResult';
 import { FirstAtBat } from '../components/FirstAtBat';
 import { BatterEntrance, MatchupPrints, OpeningDayPrint } from '../components/GameDayPrints';
 import { decisionDelayMs, playReadout } from '../../scene/playback/playReadout';
@@ -239,7 +240,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const gameLog = useRef<PlayEvent[]>([]);
-  const [guidedBatter, setGuidedBatter] = useState<string | null>(null);
+  const [guidedHalf, setGuidedHalf] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
   const [recentEvents, setRecentEvents] = useState<PlayEvent[]>([]);
   const [playbackEvent, setPlaybackEvent] = useState<PlayEvent | null>(null);
@@ -271,21 +272,31 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const [modalSummary, setModalSummary] = useState<PostGameSummary | null>(null);
   const [delayedSummary,setDelayedSummary]=useState<{summary:PostGameSummary; delay:number}|null>(null);
   const [pendingRelief,setPendingRelief]=useState<{event:PlayEvent;delay:number}|null>(null);
+  const controlMode = useUserPreferencesStore((s) => s.gameDayControlMode);
+  const eventInGuide = Boolean(playbackEvent && guidedHalf === playbackEvent.inning + playbackEvent.half);
+  const guiding = Boolean(liveSession && controlMode === 'simple' && watchMode === 'paused' &&
+    (eventInGuide || guidedHalf === liveSession.inning + liveSession.half));
+  const changedSides = Boolean(playbackEvent && liveSession &&
+    (playbackEvent.inning !== liveSession.inning || playbackEvent.half !== liveSession.half));
+  const stole = playbackEvent?.type === 'stolen_base_attempt';
+  const handoff = Boolean(guiding && eventInGuide && !showMore && liveSession && playbackEvent &&
+    (stole || (playbackEvent.outcome && (changedSides || liveSession.status === 'completed' ||
+      playbackEvent.batterId !== getCurrentBatter(liveSession).id))));
   useEffect(()=>{
-    if (!delayedSummary) return;
+    if (handoff || !delayedSummary) return;
     const timer=window.setTimeout(()=>{setModalSummary(delayedSummary.summary);setDelayedSummary(null);},delayedSummary.delay);
     return ()=>window.clearTimeout(timer);
-  },[delayedSummary]);
+  },[delayedSummary,handoff]);
   useEffect(()=>{
-    if (!pendingRelief) return;
+    if (!pendingRelief || handoff) return;
     const timer=window.setTimeout(()=>{
       setPendingRelief(null);
       setPlaybackEvent(pendingRelief.event);
       setLastChoreo(choreographPlayEvent(pendingRelief.event,speed));
       soundEngine.play('bullpen_phone');
-    },pendingRelief.delay);
+    }, playbackEvent ? pendingRelief.delay : 0);
     return ()=>window.clearTimeout(timer);
-  },[pendingRelief,speed]);
+  },[pendingRelief,speed,handoff,playbackEvent]);
   const [boxScoreOpen, setBoxScoreOpen] = useState(false);
   const [inspectedGamePlayerId, setInspectedGamePlayerId] = useState<string | null>(null);
   const [preGameScoutPlayerId, setPreGameScoutPlayerId] = useState<string | null>(null);
@@ -293,7 +304,6 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const [showPitchMath, setShowPitchMath] = useState(false);
   const [gameWeather, setGameWeather] = useState<GameDayWeather | null>(null);
   const wakeLockEnabled = useUserPreferencesStore((s) => s.wakeLockEnabled);
-  const controlMode = useUserPreferencesStore((s) => s.gameDayControlMode);
   const setControlMode = useUserPreferencesStore((s) => s.setGameDayControlMode);
   const toggleControlMode = useUserPreferencesStore((s) => s.toggleGameDayControlMode);
   const pendingLivePlayoff = usePostseasonStore((s) => s.pendingLiveGame);
@@ -332,10 +342,6 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   }, [humanClub, activeOpponent]);
 
   const hasLiveSession = liveSession !== null;
-  useEffect(() => {
-    if (!guidedBatter || !liveSession || (lastChoreo && revealedPlay !== lastChoreo)) return;
-    if (liveSession.status === 'completed' || getCurrentBatter(liveSession).id !== guidedBatter) setGuidedBatter(null);
-  }, [guidedBatter, liveSession, lastChoreo, revealedPlay]);
   useEffect(() => {
     if (!lastChoreo) return;
     const decisionMs = decisionDelayMs(lastChoreo);
@@ -443,7 +449,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     setLastChoreo(null);
     gameLog.current = [];
     setTacticalCall('normal');
-    setGuidedBatter(null);
+    setGuidedHalf(null);
     setPlaybackEvent(null);
     setSelectedPitchType(null);
     setDefensiveShift('standard');
@@ -481,7 +487,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     if (!clutch) return;
     setActiveOpponentId(opp.id);
     gameLog.current = [...clutch.gameEvents];
-    setGuidedBatter(guided ? getCurrentBatter(clutch.session).id : null);
+    setGuidedHalf(guided ? clutch.session.inning + clutch.session.half : null);
     setShowMore(false);
     setTacticalCall(guided && (clutch.session.half === 'BOT') === clutch.session.home.isHuman ? 'contact' : 'normal');
     setLiveSession(clutch.session);
@@ -616,23 +622,23 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     [armedPowerId, batterGuess, defensiveShift, gameWeather, nemesisHistory, pitchTarget, selectedPitchType],
   );
 
-  const handleNextPitch = useCallback(() => {
+  const handleNextPitch = useCallback((call = tacticalCall) => {
     if (!liveSession || liveSession.status === 'completed') return;
     const { nextSession, events } = stepPitch(
       liveSession,
-      tacticalCall,
+      call,
       resolvePitchCallOption(liveSession),
     );
     setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId);
     if (
-      tacticalCall === 'steal' ||
-      tacticalCall === 'steal_3b' ||
-      tacticalCall === 'double_steal' ||
-      tacticalCall === 'steal_home' ||
-      tacticalCall === 'pitchout' ||
-      tacticalCall === 'hold_runner' ||
-      tacticalCall === 'intentional_walk'
+      call === 'steal' ||
+      call === 'steal_3b' ||
+      call === 'double_steal' ||
+      call === 'steal_home' ||
+      call === 'pitchout' ||
+      call === 'hold_runner' ||
+      call === 'intentional_walk'
     ) {
       setTacticalCall('normal');
     }
@@ -1833,15 +1839,17 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
         liveFieldingSide.catcherPopTimeBonus,
       )
     : [];
-  const bestQuickSteal = quickStealCandidates[0]
+  const bestCandidate = quickStealCandidates.reduce<(typeof quickStealCandidates)[number] | undefined>(
+    (best, play) => !best || play.successPct > best.successPct ? play : best, undefined);
+  const bestQuickSteal = bestCandidate
     ? {
-        label: quickStealCandidates[0].label,
-        runnerName: quickStealCandidates[0].runnerName,
-        successPct: quickStealCandidates[0].successPct,
+        label: bestCandidate.label,
+        runnerName: bestCandidate.runnerName,
+        successPct: bestCandidate.successPct,
         call: (
-          quickStealCandidates[0].playType === 'steal_2b'
+          bestCandidate.playType === 'steal_2b'
             ? 'steal'
-            : quickStealCandidates[0].playType
+            : bestCandidate.playType
         ) as TacticalCall,
       }
     : null;
@@ -1857,20 +1865,26 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     moundVisitUsed,
   });
   const pendingDecision = Boolean(lastChoreo && revealedPlay !== lastChoreo);
-  const shown = pendingDecision && prePlaySession ? prePlaySession : liveSession;
-  const guiding = guidedBatter === getCurrentBatter(shown).id && controlMode === 'simple' && watchMode === 'paused';
+  const playing = Boolean(lastChoreo && finishedPlay !== lastChoreo);
+  const shown = prePlaySession && (pendingDecision || (handoff && changedSides)) ? prePlaySession : liveSession;
+  const resultShown = handoff && !pendingDecision ? playbackEvent : null;
+  const shownBases = resultShown?.basesAfter ?? shown.bases;
   const guidedBatting = (shown.half === 'BOT') === shown.home.isHuman;
-  const playing = lastChoreo && finishedPlay !== lastChoreo;
   const atBatSide = playbackEvent?.half === 'TOP' ? liveSession.away : liveSession.home;
   const onMoundSide = playbackEvent?.half === 'TOP' ? liveSession.home : liveSession.away;
-  const picturedBatter = (playing && playbackEvent?.batterId && atBatSide.playersById[playbackEvent.batterId]) || currentBatter;
-  const picturedPitcher = (playing && playbackEvent?.pitcherId && onMoundSide.playersById[playbackEvent.pitcherId]) || currentPitcher;
-  const showNextMatchup = !playing && liveSession.status === 'in_progress' && playbackEvent && (
+  const picturedBatter = ((playing || handoff) && playbackEvent?.batterId && atBatSide.playersById[playbackEvent.batterId]) || currentBatter;
+  const picturedPitcher = ((playing || handoff) && playbackEvent?.pitcherId && onMoundSide.playersById[playbackEvent.pitcherId]) || currentPitcher;
+  const showNextMatchup = !handoff && !playing && liveSession.status === 'in_progress' && playbackEvent && (
     (playbackEvent.batterId && playbackEvent.batterId !== currentBatter.id) ||
     (playbackEvent.pitcherId && playbackEvent.pitcherId !== currentPitcher.id)
   );
-  const readout = pendingDecision ? null : playReadout(playbackEvent);
-  const liveCallout = pendingDecision ? null : buildComicPopArtBanner(playbackEvent, liveSession);
+  const readout = pendingDecision || showNextMatchup ? null : playReadout(playbackEvent);
+  const liveCallout = pendingDecision || showNextMatchup ? null : buildComicPopArtBanner(playbackEvent, liveSession);
+  const replayable = Boolean(lastChoreo?.play && !playing && watchMode === 'paused' &&
+    playbackEvent && (stole || (!['called_pitch','missed_pitch','ball_pitch','foul_back'].includes(lastChoreo.play.kind))));
+  const stealingId = stole && prePlaySession?.bases.find(id => id &&
+    prePlaySession.bases.indexOf(id) !== playbackEvent?.basesAfter.indexOf(id));
+  const creditedPlayer = (stealingId && atBatSide.playersById[stealingId]) || picturedBatter;
   const liveNemesis = evaluateNemesisMatchup(
     nemesisHistory,
     currentBatter.id,
@@ -2000,12 +2014,12 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
         <ScoreboardStrip
           flash={readout ? { ...readout, seq: playbackEvent!.seq } : null}
           awayAbbr={liveAwayClub.colors.monogram}
-          awayScore={shown.away.score}
+          awayScore={resultShown?.awayScore ?? shown.away.score}
           awayHits={shown.away.hits}
           awayErrors={shown.away.errors}
           awayColor={liveAwayClub.colors.primary}
           homeAbbr={liveHomeClub.colors.monogram}
-          homeScore={shown.home.score}
+          homeScore={resultShown?.homeScore ?? shown.home.score}
           homeHits={shown.home.hits}
           homeErrors={shown.home.errors}
           homeColor={liveHomeClub.colors.primary}
@@ -2013,11 +2027,11 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           half={shown.half}
           balls={shown.balls}
           strikes={shown.strikes}
-          outs={shown.outs}
+          outs={resultShown?.outsAfter ?? shown.outs}
           bases={[
-            Boolean(shown.bases[0]),
-            Boolean(shown.bases[1]),
-            Boolean(shown.bases[2]),
+            Boolean(shownBases[0]),
+            Boolean(shownBases[1]),
+            Boolean(shownBases[2]),
           ]}
         />
       </div>
@@ -2030,7 +2044,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
               preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' ? 'power' : 'contact') : pitchTarget) : null}
               awayClub={liveAwayClub}
               homeClub={liveHomeClub}
-              session={liveSession}
+              session={prePlaySession && lastChoreo && !showNextMatchup ? prePlaySession : liveSession}
               choreo={showNextMatchup ? null : lastChoreo}
               lastEvent={showNextMatchup ? null : playbackEvent}
               cameraMode={cameraMode}
@@ -2097,15 +2111,29 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
               pitcherPowerArmed={
                 !humanIsBatting && Boolean(armedPowerId) && picturedPitcher.id === currentPitcher.id
               }
-              latestEvent={pendingDecision ? null : playbackEvent}
+              latestEvent={pendingDecision || showNextMatchup ? null : playbackEvent}
               onInspect={openGamePlayerCard}
             />
 
-            {guiding && <FirstAtBat session={shown} batting={guidedBatting} target={pitchTarget} call={tacticalCall}
-              locked={pendingDecision} expanded={showMore} powerArmed={Boolean(armedPowerId)} cue={liveCue} onExpand={()=>setShowMore(v=>!v)}
+            {handoff && !playing && playbackEvent && prePlaySession && lastChoreo ?
+              <RallyResult player={creditedPlayer} gameOver={liveSession.status === 'completed'} before={prePlaySession} event={playbackEvent}
+                nextLabel={liveSession.status === 'completed' ? 'Box score' : changedSides ? 'Change sides' : stole ? 'Back to the batter' : 'Next batter'}
+                onReplay={() => setLastChoreo({...lastChoreo})}
+                onContinue={() => {
+                  setLastChoreo(null);
+                  setPlaybackEvent(null);
+                  if (delayedSummary) { setModalSummary(delayedSummary.summary); setDelayedSummary(null); }
+                }} /> : guiding && <FirstAtBat session={shown} batting={guidedBatting} target={pitchTarget} call={tacticalCall}
+              locked={playing} expanded={showMore} powerArmed={Boolean(armedPowerId)} cue={liveCue} onExpand={()=>setShowMore(v=>!v)}
               onTarget={target=>{setLastChoreo(null);setPlaybackEvent(null);setPitchTarget(target);}}
               onSwing={call=>{setLastChoreo(null);setPlaybackEvent(null);setTacticalCall(call);}}
-              onPitch={handleNextPitch} onSuggested={()=>liveCue.suggestedAction && handleSuggestedAction(liveCue.suggestedAction)} />}
+              onPitch={handleNextPitch} onSuggested={()=>{
+                const action = liveCue.suggestedAction;
+                if (action?.type === 'steal' && action.tacticalCall) handleNextPitch(action.tacticalCall);
+                else if (action) handleSuggestedAction(action);
+              }} />}
+            {(!guiding || showMore) && replayable && lastChoreo && <button className="atbat-tip"
+              onClick={() => setLastChoreo({...lastChoreo})}>Watch again · {playReadout(playbackEvent)?.label}</button>}
             {(!guiding || showMore) && <LiveActionBar
               cue={liveCue}
               matchupLabel={`${currentBatter.name} vs ${currentPitcher.name}`}
@@ -2115,7 +2143,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
               lowerThird={liveLowerThird}
               clutchRecap={clutchRecap}
               firstPitchTip={firstPitchTip}
-              bullpenOptions={arcadeBullpenOptions}
+              bullpenOptions={humanIsBatting ? [] : arcadeBullpenOptions}
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
               watchMode={watchMode}

@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test('Opening Day print, live matchup and final rematch work on the first screen', async ({ page }) => {
+  test.slow();
   await page.goto('/');
-  await page.getByRole('button', { name: /start sandlot dynasty/i }).click();
+  await page.getByRole('button', { name: /play opening day/i }).click();
   const opening = page.getByRole('region', { name: 'Opening Day feature' });
   const name = await opening.getByRole('heading').innerText();
   const start = opening.getByRole('button', { name: /^(Bat|Pitch) with / });
@@ -17,15 +18,7 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   const matchup = page.getByRole('group', { name: 'Matchup cards' });
   await expect(matchup.getByRole('button', { name: 'Inspect ' + name + ' card' })).toBeVisible();
   const guide = page.getByRole('region',{name:'First at-bat'});
-  const corner = guide.getByRole('button',{name:'Corner',exact:true});
-  await (await corner.count() ? corner : guide.getByRole('button',{name:'Swing big'})).click();
-  const pitch = guide.getByRole('button',{name:/Pitch to the corner|Swing for power/});
-  await expect(pitch).toBeInViewport();
-  await pitch.click();
-  await expect(
-    page.locator('.plate-verdict, [data-testid="comic-callout-banner"]').first(),
-  ).toBeVisible({timeout:15000});
-  if (await guide.count()) await guide.getByRole('button',{name:'More controls'}).click();
+  await guide.getByRole('button',{name:'More controls'}).click();
   await page.getByTestId('fast-sim-toggle').click();
   await page.getByRole('button', { name: /sim to end/i }).click();
   const recap = page.getByRole('dialog', { name: /post-game box score/i });
@@ -52,4 +45,27 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   if (!await albumButton.count()) await page.getByRole('button',{name:'Open clubhouse menu'}).click();
   await albumButton.click();
   await expect(page.getByRole('region',{name:'Scorebook prints'}).getByRole('heading')).toHaveText(scorer);
+});
+
+test('a replay keeps the first out and hands the same rally to Ethan', async ({ page }) => {
+  test.slow();
+  await page.addInitScript(() => {
+    const random = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = array => array instanceof Uint32Array && array.length === 1
+      ? (array.fill(2089), array) : random(array);
+  });
+  await page.goto('/');
+  await page.getByRole('button', {name:'Play Opening Day'}).click();
+  await page.getByRole('button', {name:'Bat with Marcus'}).click();
+  const guide = page.getByRole('region', {name:'First at-bat'});
+  await guide.getByRole('button', {name:'Swing big'}).click();
+  await guide.getByRole('button', {name:'Swing for power'}).click();
+  const result = page.getByRole('region', {name:'Play result'});
+  await expect(result.getByRole('heading')).toHaveText('Marcus Baker', {timeout:20000});
+  await result.getByRole('button', {name:'Watch again'}).click();
+  await expect(result.getByRole('heading')).toHaveText('Marcus Baker', {timeout:20000});
+  await expect(result).toContainText('Runners stay on first and second.');
+  await result.getByRole('button', {name:'Next batter'}).click();
+  await expect(page.getByRole('group', {name:'Matchup cards'})).toContainText('Ethan Torres');
+  await expect(guide).toContainText('One out. A single could score a run.');
 });

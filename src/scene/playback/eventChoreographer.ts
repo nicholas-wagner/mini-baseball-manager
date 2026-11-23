@@ -296,6 +296,10 @@ export function choreographPlayEvent(
         return id && !event.basesAfter.includes(id);
       });
       const scorer = scoringPlay && context.runsScored!==0 ? crossed[context.winningRunIndex ?? 0] : undefined;
+      if (!scorer && (kind === 'double' || kind === 'triple') && event.basesAfter[2]) {
+        timed.runnerToThird = ([2, 1] as const).find(base => basesBefore?.[base - 1] === event.basesAfter[2]);
+        if (timed.runnerToThird) timed.leadArrival = timed.pickupAt + 1.35;
+      }
       finishPlay(timed,event.outsAfter===3,Boolean(context.walkoff),scorer);
     }
     return {

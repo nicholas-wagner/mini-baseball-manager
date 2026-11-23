@@ -23,6 +23,8 @@ export interface PaintedPlayerOptions {
   throwsHand?: ThrowsHand;
   batSide?: EffectiveBatSide;
   sprintSpeed?: number;
+  reassurePitcher?: boolean;
+  quietInfielder?: boolean;
 }
 
 export interface PaintedPlayerRig {
@@ -189,7 +191,7 @@ export function createPaintedPlayerRig(
     camera?: THREE.Vector3Like,
     caught = false,
   ) {
-    const running = (role === 'runner' || role === 'batter') && clip === 'field_run';
+    const running = (role === 'runner' || role === 'batter') && (clip === 'field_run' || clip === 'runner_glance');
     const sliding = clip === 'runner_slide' || clip === 'slide_safe';
     const tagging = clip === 'field_tag' && role !== 'catcher';
     const popping = clip === 'catch_throw' || clip === 'catch_point' || clip==='catch_handoff';
@@ -212,10 +214,14 @@ export function createPaintedPlayerRig(
     }
     if (clip==='slide_safe') rear=false;
     const homeTag = clip === 'field_tag' && role === 'catcher';
-    const frame = paintedMotion(motionRole, homeTag ? 'catch_receive' : clip, homeTag ? .22 : time);
-    if (clip==='catch_target') {
+    const frame = paintedMotion(motionRole, homeTag ? 'catch_receive' : clip === 'runner_glance' ? 'field_run' : clip, homeTag ? .22 : time);
+    if (clip==='catch_target' || (role === 'catcher' && opt.reassurePitcher && clip === 'field_ready')) {
       frame.cel=5;
       frame.squash=.018;
+      if (opt.reassurePitcher) {
+        const beat = time % 3.4;
+        if (beat < .16 || (beat >= .33 && beat < .49)) frame.cel = 4;
+      }
       if (a.glasses !== 'none') {
         // A brief nod into the mask as the receiver sets the target.
         const beat = Math.min(1,((time + opt.traits.seed % 5 * .13) % 3.8) / .52);
@@ -337,10 +343,14 @@ export function createPaintedPlayerRig(
     bodyMat.uniforms.collar.value.set(nx / 256, 1 - ny / 256);
     headJoint.position.set(swingMirror * (nx - 128) * unit * width, (249 - ny - 8) * unit, 0.032);
     headJoint.rotation.z = rotationSign * frame.tilt;
+    bodyMat.uniforms.sleeve.value.set(0, rear ? .59 : .46);
     if (clip === 'bat_stance') {
       // Each player keeps a quiet pre-pitch habit through changes of club or uniform.
       const beat = Math.pow(Math.max(0,Math.sin(time*3.6 + (opt.traits.seed % 13))),4);
-      if (opt.traits.seed % 3 === 0) headJoint.rotation.z += .085 * beat;
+      if (opt.traits.seed % 3 === 0) {
+        headJoint.rotation.z += .085 * beat;
+        bodyMat.uniforms.sleeve.value.x = beat * (rear ? -1 : 1);
+      }
       else if (opt.traits.seed % 3 === 1 && bat.barrel.visible) {
         // Two taps from the painted grip, then a pause in the loaded stance.
         const cycle = (time + Math.abs(opt.traits.seed % 5) * .17) % 3.6;
@@ -358,11 +368,17 @@ export function createPaintedPlayerRig(
     }
     if (sliding) headJoint.rotation.z = actorFlip * (clip==='slide_safe' ? -.14 : .12);
 
+    if (clip === 'runner_glance') {
+      headJoint.rotation.y = -.47 * actorFlip;
+      headJoint.rotation.z += .12 * actorFlip;
+    } else headJoint.rotation.y = 0;
     head.scale.set(256 * headUnit, 256 * headUnit, 1);
     head.position.set(0, 72 * headUnit, 0);
     const showDetails = !rear || headSheet === 'helmet-quarter';
     headMat.uniforms.showDetails.value = Number(showDetails);
-    if (showDetails) detail.paint(a, headSheet, faceCell, clip==='slide_safe' ? 3 : emotion, opt.team.accent);
+    if (showDetails) detail.paint(a, headSheet, faceCell, clip==='slide_safe' || (opt.quietInfielder && caught && mood==='happy') ? 3 : emotion, opt.team.accent);
+    bodyMat.uniforms.pocket.value.set(contactX/256, 1-contactY/256,
+      caught && clip === 'field_receive' ? Math.max(0, 1-Math.abs(time-.28)/.22) : 0);
     number.visible =
       role !== 'catcher' &&
       (role === 'pitcher' || role === 'fielder' || role === 'runner') &&

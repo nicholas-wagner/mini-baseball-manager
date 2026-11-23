@@ -11,7 +11,7 @@ import type { GameSessionState } from '../../engine/simulation/gameState';
 import { getCurrentBatter, getCurrentPitcher } from '../../engine/simulation/gameState';
 import './gameDayPrints.css';
 
-function Print({ player }: { player: Player }) {
+export function PlayerPrint({ player }: { player: Player }) {
   const src = playerIllustration(player.id);
   const [failed, setFailed] = useState<string>();
   return (
@@ -66,7 +66,7 @@ export function OpeningDayPrint({
         aria-label={'Inspect ' + player.name + ' card'}
         onClick={() => onInspect(player)}
       >
-        <Print player={player} />
+        <PlayerPrint player={player} />
         <span>
           {player.position} <b>#{player.jerseyNumber}</b>
         </span>
@@ -100,7 +100,7 @@ export function RosterPrintGallery({ players, club }: { players: Player[]; club:
           const src = playerIllustration(player.id);
           const caption = (
             <>
-              <Print player={player} />
+              <PlayerPrint player={player} />
               <span>
                 <b>{player.name}</b>
                 <small>
@@ -127,7 +127,7 @@ export function RosterPrintGallery({ players, club }: { players: Player[]; club:
 export function BatterEntrance({ player }: { player: Player }) {
   return (
     <div className="batter-entrance" aria-hidden="true">
-      <Print player={player} />
+      <PlayerPrint player={player} />
       <span>
         At bat
         <br />
@@ -202,7 +202,7 @@ export function MatchupPrints({
             aria-label={'Inspect ' + player.name + ' card'}
           >
             <span className="matchup-thumb-wrap">
-              <Print player={player} />
+              <PlayerPrint player={player} />
             </span>
             <span className="matchup-card-meta">
               <span className="matchup-card-toprow">

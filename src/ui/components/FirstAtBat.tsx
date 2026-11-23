@@ -51,7 +51,7 @@ export function FirstAtBat({
       : (ours > theirs ? "Up by " : "Down by ") + Math.abs(ours - theirs) + ".";
   const objective = batting
     ? session.bases[1] || session.bases[2]
-      ? "Bring the runner home."
+      ? session.outs === 1 ? "One out. A single could score a run." : "Bring the runner home."
       : "Get on base."
     : session.outs === 2
       ? "Get the last out."
@@ -63,7 +63,7 @@ export function FirstAtBat({
     : pitches.find((p) => p.id === target)?.action;
   const tip =
     cue.suggestedAction &&
-    (cue.kind === "pitcher_gassed" ||
+    ((batting && cue.kind === "steal_opportunity") || (!batting && cue.kind === "pitcher_gassed") ||
       (cue.kind === "power_ready" && session.strikes === 2));
   return (
     <section className="atbat-guide" aria-label="First at-bat">
@@ -105,7 +105,7 @@ export function FirstAtBat({
                   </button>
                 ))}
           </div>
-          <button className="atbat-go" disabled={locked} onClick={onPitch}>
+          <button className="atbat-go" disabled={locked} onClick={() => onPitch()}>
             {powerArmed ? "⚡ " : ""}
             {action ?? (batting ? "Next pitch" : "Throw pitch")}
           </button>

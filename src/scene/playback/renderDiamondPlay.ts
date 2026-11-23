@@ -8,7 +8,7 @@ import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types
 import type { PaintedPlayerRig } from '../characters/paintedPlayer';
 import { BALL_TRAJECTORY_PRESETS } from '../vfx/ballTrajectory';
 import type { BallparkVfxSystem } from '../vfx/vfxSystem';
-import { actorAt, diamondCamera, sampleLeg, type Actor, type DiamondPlay } from './diamondPlay';
+import { actorAt, diamondCamera, forceAtFirst, sampleLeg, type Actor, type DiamondPlay } from './diamondPlay';
 
 export type DiamondCast = Record<Actor, PaintedPlayerRig>;
 const actors: Actor[] = ['C', 'P', 'BAT', 'SS', '2B', '1B', '3B', 'LF', 'CF', 'RF', 'RUN'];
@@ -72,6 +72,10 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       (_, u) => sampleLeg(flying, a, b, u, throws), play.close && flying.from === 'C' && flying.to === 'P' ? .23 : 1);
     vfx.ball.sizeForCamera(camera, heightPx);
   }
+  const force = forceAtFirst(play);
+  if (force && previous < play.batterArrival && seconds >= play.batterArrival) {
+    vfx.kickChalk(actorAt(play, 'BAT', play.batterArrival, side).pos);
+  }
   if (play.unassisted && previous < play.finish && seconds >= play.finish) {
     const base = actorAt(play, '1B', play.finish, side).pos;
     vfx.impact(base, '#A9EDDC');
@@ -81,7 +85,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     if (previous >= leg.end || seconds < leg.end) continue;
     const at = leg.endPoint ?? contact(leg.to, leg.end);
     if (play.close && leg.from === 'C' && leg.to === 'P') continue;
-    vfx.impact(at, leg.to === 'BAT' ? '#FFE499' : '#A9EDDC');
+    vfx.impact(at, (leg.to === 'BAT' || (force && leg.end === play.finish)) ? '#FFE499' : '#A9EDDC');
     if (play.close || play.kind==='bullpen') continue;
     if (play.outfield) {
       if (leg === play.legs[1]) {
@@ -131,9 +135,9 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     }
   }
   const ump = vfx.umpire;
-  ump.sprite.visible=Boolean(play.close?.steal && t>play.pickupAt+.62 && (!play.ending || t<play.ending.start));
+  ump.sprite.visible=Boolean(((play.close?.steal && t>play.pickupAt+.62) || (force && t>play.finish-.30)) && (!play.ending || t<play.ending.start));
   if (ump.sprite.visible) {
-    const bag=play.fieldAt;
+    const bag=force ? BASE_PATH_VERTICES[1] : play.fieldAt;
     const dx=shot.position.x-bag.x,dz=shot.position.z-bag.z;
     const distance=Math.max(.01,Math.hypot(dx,dz));
     ump.sprite.position.set(bag.x+(-1.5*dx-.76*dz)/distance,.045,bag.z+(-1.5*dz+.76*dx)/distance);
@@ -151,11 +155,12 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   const received = play.legs.filter(l => t >= l.end).at(-1);
   for (const actor of actors) {
     const rig = cast[actor];
-    const movingLead = play.scorerBase || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal || play.kind === 'ball_four';
+    const movingLead = play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal || play.kind === 'ball_four';
     if (actor === 'RUN' && (!movingLead || !rig.root.visible)) continue;
     const state = stateAt(actor, t);
     rig.logicalYaw = state.yaw;
     rig.root.position.copy(state.pos);
-    rig.updatePose(state.clip, state.local, undefined, camera.position, !flying && !received?.endPoint && (received?.to === actor || (!received && play.kind==='bullpen' && actor==='C')));
+    const grin = play.kind === 'double_play' && actor === '1B' && t > play.finish + .20;
+    rig.updatePose(state.clip, state.local, grin ? 'happy' : undefined, camera.position, !flying && !received?.endPoint && (received?.to === actor || (!received && play.kind==='bullpen' && actor==='C')));
   }
 }
