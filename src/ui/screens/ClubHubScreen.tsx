@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
   Coins,
@@ -88,14 +88,21 @@ function getRoomForSubTab(tab: HubSubTab): HubRoomId {
   return 'events_room';
 }
 
-export function ClubHubScreen() {
+export interface ClubHubScreenProps {
+  initialSubTab?: HubSubTab;
+}
+
+export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps = {}) {
   const club = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
   const worldSeed = useGameStore((s) => s.worldSeed);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
   const individualDrillsRemaining = useGameStore((s) => s.individualDrillsRemaining);
 
-  const [subTab, setSubTab] = useState<HubSubTab>('stadiums');
+  const [subTab, setSubTab] = useState<HubSubTab>(initialSubTab);
+  useEffect(() => {
+    setSubTab(initialSubTab);
+  }, [initialSubTab]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
   const [activeClip, setActiveClip] = useState<
     'idle' | 'practice_cage' | 'practice_bullpen' | 'field_dive' | 'field_run' | 'celebrate_hr'

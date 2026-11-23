@@ -31,7 +31,6 @@ import { SettingsModal } from './ui/components/SettingsModal';
 import { StoryChapterModal } from './ui/components/StoryChapterModal';
 import { TrophyCaseModal } from './ui/components/TrophyCaseModal';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
-import { ComicCard } from './ui/design-system/ComicCard';
 import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
 import { GameDayScreen } from './ui/screens/GameDayScreen';
 
@@ -69,18 +68,6 @@ const NAV_ITEMS: readonly NavItem[] = [
   { id: 'economy', label: 'Ballpark', icon: <Building2 className="w-4 h-4" /> },
 ];
 
-const UPCOMING_MILESTONES: Record<
-  Exclude<TabId, 'lab' | 'gameday' | 'roster' | 'league' | 'skills'>,
-  { title: string; milestone: string; summary: string }
-> = {
-  economy: {
-    title: 'Sim-City Ballpark Economy & Upgrades',
-    milestone: 'Milestone 5',
-    summary:
-      'Control ticket & concession pricing, sign 90s parody sponsors for your outfield wall, negotiate TV contracts, and visually upgrade your 3D stadium.',
-  },
-};
-
 export function App() {
   const [designLabVisible, setDesignLabVisible] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -102,6 +89,7 @@ export function App() {
   const [packsOpen, setPacksOpen] = useState(false);
   const [trophyOpen, setTrophyOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [hubInitialSubTab, setHubInitialSubTab] = useState<'stadiums' | 'relics'>('stadiums');
   const humanClub = useGameStore((s) => s.getHumanClub());
   const manager = useGameStore((s) => s.manager);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
@@ -199,7 +187,7 @@ export function App() {
 
   const mobileUtilityActions = (
     <div className="flex items-center gap-1.5">
-      {unopenedPackCount > 0 ? (
+      {humanClub && unopenedPackCount > 0 ? (
         <button
           type="button"
           onClick={() => {
@@ -237,104 +225,127 @@ export function App() {
   );
 
   const desktopUtilityActions = (
-    <div className="flex flex-col gap-1.5">
-      <button
-        type="button"
-        onClick={() => {
-          soundEngine.play('ui_pop');
-          setGuideOpen(true);
-        }}
-        className="comic-btn bg-[#FFF3BF] text-[#181B2C] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
-        aria-label="Open Dugout Guide"
-        title="Coach Pops’ Guide"
-      >
-        <BookOpen className="w-3.5 h-3.5 shrink-0" />
-        <span>Coach Pops’ Guide</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          soundEngine.play('ui_pop');
-          setStoryOpen(true);
-        }}
-        className={`comic-btn px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 ${
-          hasUnreadChapter ? 'bg-[#FFC300] text-[#181B2C]' : 'bg-[#FBF4E4] text-[#181B2C]'
-        }`}
-        aria-label="Open Dynasty Story"
-        title="Story & Origins"
-      >
-        <ScrollText className="w-3.5 h-3.5 shrink-0" />
-        <span>Story &amp; Origins{hasUnreadChapter ? ' ★' : ''}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          soundEngine.play('ui_pop');
-          setSlotsOpen(true);
-        }}
-        className="comic-btn bg-[#D8F3DC] text-[#1B4332] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
-        aria-label="Open 4 Career Save Slots"
-        title="4 Save Slots"
-      >
-        <HardDrive className="w-3.5 h-3.5 shrink-0" />
-        <span>4 Save Slots{lastAutoSavedIso ? ' ✓' : ''}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          soundEngine.play('ui_pop');
-          setJukeboxOpen(true);
-        }}
-        className={`comic-btn px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 ${
-          bgmEnabled && !muted ? 'bg-[#E0C3FC] text-[#181B2C]' : 'bg-[#FBF4E4] text-[#4A5068]'
-        }`}
-        aria-label="Open 90s Music Jukebox"
-        title="90s Music Jukebox"
-      >
-        <Disc3 className="w-3.5 h-3.5 shrink-0" />
-        <span>{bgmEnabled && !muted ? 'Jukebox: ON' : 'Jukebox: OFF'}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          soundEngine.play('ui_pop');
-          setPacksOpen(true);
-        }}
-        className={`comic-btn px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0 ${
-          unopenedPackCount > 0 ? 'bg-[#FFC300] text-[#181B2C]' : 'bg-[#F5EEFF] text-[#4C1D95]'
-        }`}
-        aria-label="Open 1994 Foil Packs"
-        title="1994 Foil Card Booster Packs"
-      >
-        <Gift className="w-3.5 h-3.5 shrink-0" />
-        <span>Foil Packs{unopenedPackCount > 0 ? ` (${unopenedPackCount})` : ''}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          soundEngine.play('ui_pop');
-          setTrophyOpen(true);
-        }}
-        className="comic-btn bg-[#FFF8E7] text-[#181B2C] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
-        aria-label="Open Trophy and Sticker Album"
-        title="Trophy & Sticker Album"
-      >
-        <Trophy className="w-3.5 h-3.5 shrink-0 text-[#F77F00]" />
-        <span>Trophy Album</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          soundEngine.play('ui_pop');
-          setSettingsOpen(true);
-        }}
-        className="comic-btn bg-[#E0FBFC] text-[#1D3557] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
-        aria-label="Open Settings and Accessibility"
-        title="Settings & Accessibility"
-      >
-        <Settings className="w-3.5 h-3.5 shrink-0" />
-        <span>Settings</span>
-      </button>
+    <div className="space-y-1.5">
+      {humanClub && unopenedPackCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.play('ui_pop');
+            setPacksOpen(true);
+          }}
+          className="w-full comic-btn bg-[#FFC300] text-[#181B2C] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[40px]"
+          aria-label="Open 1994 Foil Packs"
+          title="1994 Foil Card Booster Packs"
+        >
+          <Gift className="w-3.5 h-3.5 shrink-0" />
+          <span>Foil Packs ({unopenedPackCount})</span>
+        </button>
+      ) : null}
+      <div data-testid="desktop-utility-grid" className="grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.play('ui_pop');
+            setGuideOpen(true);
+          }}
+          className="comic-btn bg-[#FFF3BF] text-[#181B2C] px-2 py-1.5 text-[11px] flex items-center justify-center gap-1 min-h-[40px]"
+          aria-label="Open Dugout Guide"
+          title="Coach Pops’ Guide"
+        >
+          <BookOpen className="w-3.5 h-3.5 shrink-0" />
+          <span>Guide</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.play('ui_pop');
+            setSlotsOpen(true);
+          }}
+          className="comic-btn bg-[#D8F3DC] text-[#1B4332] px-2 py-1.5 text-[11px] flex items-center justify-center gap-1 min-h-[40px]"
+          aria-label="Open 4 Career Save Slots"
+          title="4 Save Slots"
+        >
+          <HardDrive className="w-3.5 h-3.5 shrink-0" />
+          <span>Saves{lastAutoSavedIso ? ' ✓' : ''}</span>
+        </button>
+        {humanClub ? (
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.play('ui_pop');
+              setStoryOpen(true);
+            }}
+            className={`comic-btn px-2 py-1.5 text-[11px] flex items-center justify-center gap-1 min-h-[40px] ${
+              hasUnreadChapter ? 'bg-[#FFC300] text-[#181B2C]' : 'bg-[#FBF4E4] text-[#181B2C]'
+            }`}
+            aria-label="Open Dynasty Story"
+            title="Story & Origins"
+          >
+            <ScrollText className="w-3.5 h-3.5 shrink-0" />
+            <span>Story{hasUnreadChapter ? ' ★' : ''}</span>
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.play('ui_pop');
+            setJukeboxOpen(true);
+          }}
+          className={`comic-btn px-2 py-1.5 text-[11px] flex items-center justify-center gap-1 min-h-[40px] ${
+            bgmEnabled && !muted ? 'bg-[#E0C3FC] text-[#181B2C]' : 'bg-[#FBF4E4] text-[#4A5068]'
+          }`}
+          aria-label="Open 90s Music Jukebox"
+          title="90s Music Jukebox"
+        >
+          <Disc3 className="w-3.5 h-3.5 shrink-0" />
+          <span>Music</span>
+        </button>
+        {humanClub && unopenedPackCount === 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.play('ui_pop');
+              setPacksOpen(true);
+            }}
+            className="comic-btn bg-[#F5EEFF] text-[#4C1D95] px-2 py-1.5 text-[11px] flex items-center justify-center gap-1 min-h-[40px]"
+            aria-label="Open 1994 Foil Packs"
+            title="1994 Foil Card Booster Packs"
+          >
+            <Gift className="w-3.5 h-3.5 shrink-0" />
+            <span>Packs</span>
+          </button>
+        ) : null}
+        {humanClub ? (
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.play('ui_pop');
+              setTrophyOpen(true);
+            }}
+            className="comic-btn bg-[#FFF8E7] text-[#181B2C] px-2 py-1.5 text-[11px] flex items-center justify-center gap-1 min-h-[40px]"
+            aria-label="Open Trophy and Sticker Album"
+            title="Trophy & Sticker Album"
+          >
+            <Trophy className="w-3.5 h-3.5 shrink-0 text-[#F77F00]" />
+            <span>Trophies</span>
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            soundEngine.play('ui_pop');
+            setSettingsOpen(true);
+          }}
+          className={`comic-btn bg-[#E0FBFC] text-[#1D3557] px-2 py-1.5 text-[11px] flex items-center justify-center gap-1 min-h-[40px] ${
+            humanClub && unopenedPackCount === 0 ? 'col-span-2' : ''
+          }`}
+          aria-label="Open Settings and Accessibility"
+          title="Settings & Accessibility"
+        >
+          <Settings className="w-3.5 h-3.5 shrink-0" />
+          <span>Settings</span>
+        </button>
+      </div>
     </div>
   );
 
@@ -356,16 +367,22 @@ export function App() {
       }).tabBadges
     : {};
 
-  const visibleNavItems = (designLabVisible
-    ? NAV_ITEMS
-    : NAV_ITEMS.filter((item) => item.id !== 'lab')
-  ).map((item) => {
-    if (item.id === 'roster' && inboxBadges.roster) return { ...item, badge: inboxBadges.roster };
-    if (item.id === 'skills' && inboxBadges.skills) return { ...item, badge: inboxBadges.skills };
-    if (item.id === 'league' && inboxBadges.league) return { ...item, badge: inboxBadges.league };
-    if (item.id === 'economy' && inboxBadges.economy) return { ...item, badge: inboxBadges.economy };
-    return item;
-  });
+  const visibleNavItems = !humanClub
+    ? designLabVisible
+      ? NAV_ITEMS.filter((item) => item.id === 'lab' || item.id === 'gameday')
+      : []
+    : (designLabVisible ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.id !== 'lab')).map((item) => {
+        if (item.id === 'roster' && inboxBadges.roster) return { ...item, badge: inboxBadges.roster };
+        if (item.id === 'skills' && inboxBadges.skills) return { ...item, badge: inboxBadges.skills };
+        if (item.id === 'league' && inboxBadges.league) return { ...item, badge: inboxBadges.league };
+        if (item.id === 'economy' && inboxBadges.economy) return { ...item, badge: inboxBadges.economy };
+        return item;
+      });
+
+  const handleOpenRelics = () => {
+    setHubInitialSubTab('relics');
+    setActiveTab('economy');
+  };
 
   const renderMainContent = () => {
     if (activeTab === 'lab' && designLabVisible) {
@@ -374,8 +391,12 @@ export function App() {
     if (activeTab === 'gameday' || activeTab === 'lab') {
       return humanClub ? (
         <GameDayScreen
-          onJumpToTab={(tab) => setActiveTab(tab)}
+          onJumpToTab={(tab) => {
+            if (tab === 'economy') setHubInitialSubTab('stadiums');
+            setActiveTab(tab);
+          }}
           onOpenStory={() => setStoryOpen(true)}
+          onOpenRelics={handleOpenRelics}
         />
       ) : (
         <ClubCreatorScreen onCreated={() => setActiveTab('gameday')} />
@@ -403,18 +424,10 @@ export function App() {
       );
     }
 
-    if (activeTab === 'economy' && humanClub) {
-      return <ClubHubScreen />;
-    }
-
-    const upcoming = UPCOMING_MILESTONES[activeTab];
-    return (
-      <ComicCard title={upcoming.title} subtitle={upcoming.milestone} headerBg="#1B4332">
-        <p className="font-bold text-sm text-[#4A5068] leading-relaxed">{upcoming.summary}</p>
-        <p className="mt-3 text-xs font-extrabold uppercase tracking-wider text-[#2FB356]">
-          Tracked in PLAN.md — Milestone 2 MVP Play Ball & Roster tabs are now live!
-        </p>
-      </ComicCard>
+    return humanClub ? (
+      <ClubHubScreen initialSubTab={hubInitialSubTab} />
+    ) : (
+      <ClubCreatorScreen onCreated={() => setActiveTab('economy')} />
     );
   };
 
@@ -430,6 +443,7 @@ export function App() {
       activeTab={activeTab}
       onSelectTab={(id) => {
         soundEngine.play('ui_pop');
+        if (id === 'economy') setHubInitialSubTab('stadiums');
         setActiveTab(id as TabId);
       }}
       muted={muted}
@@ -459,7 +473,23 @@ export function App() {
         onStartNewInSlot={() => setActiveTab('gameday')}
       />
       <MusicJukeboxModal open={jukeboxOpen} onClose={() => setJukeboxOpen(false)} />
-      <FoilPackModal open={packsOpen} onClose={() => setPacksOpen(false)} />
+      <FoilPackModal
+        open={packsOpen}
+        onClose={() => setPacksOpen(false)}
+        backLabel={gamesPlayed === 0 ? '⚾ Back to Opening Day' : '⚾ Back to Game Day'}
+        onBackToGame={() => {
+          setPacksOpen(false);
+          setActiveTab('gameday');
+        }}
+        onViewRelics={
+          humanClub
+            ? () => {
+                setPacksOpen(false);
+                handleOpenRelics();
+              }
+            : undefined
+        }
+      />
       <TrophyCaseModal open={trophyOpen} onClose={() => setTrophyOpen(false)} />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
@@ -580,6 +610,9 @@ export function App() {
                 <Settings className="w-4 h-4 shrink-0" />
                 <span>Settings &amp; Accessibility</span>
               </button>
+              <div className="pt-1 text-center text-[10px] font-extrabold text-[#1B4332]">
+                ✓ 100% Offline Ready • Local Saves, 3D &amp; Audio
+              </div>
             </div>
           </div>
         </div>

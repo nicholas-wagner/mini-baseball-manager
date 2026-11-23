@@ -62,15 +62,21 @@ describe('Mini Baseball Manager — App & Design Lab Integration', () => {
     await user.click(screen.getByRole('button', { name: /switch \(s\)/i }));
     expect(screen.getAllByText(/switch-hitter platoon edge/i).length).toBeGreaterThanOrEqual(1);
 
-    // Navigate to Ballpark preview tab and live Skill Tree tab, then back to Design Lab
+    // Navigate to Play Ball (Club Creator), found a club, then visit live Ballpark & Skill Tree tabs and return to Design Lab
+    await user.click(screen.getAllByRole('button', { name: /play ball/i })[0]);
+    expect(
+      await screen.findByText(/found your 90s sandlot club/i, {}, { timeout: 10_000 }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /play opening day/i }));
     await user.click(screen.getAllByRole('button', { name: /ballpark/i })[0]);
     expect(
-      await screen.findByText(/sim-city ballpark economy & upgrades/i, {}, { timeout: 10_000 }),
+      await screen.findByTestId('ballpark-visual-banner', {}, { timeout: 10_000 }),
     ).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /skill tree/i })[0]);
     expect(
-      await screen.findByText(/found your 90s sandlot club/i, {}, { timeout: 10_000 }),
+      await screen.findByTestId('skill-tree-player-strip', {}, { timeout: 10_000 }),
     ).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /design lab/i })[0]);

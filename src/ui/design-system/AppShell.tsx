@@ -54,37 +54,41 @@ export function AppShell({
           <div className="font-display text-lg leading-tight mt-0.5">{clubName}</div>
         </div>
 
-        <nav aria-label="Primary Navigation" className="flex-1 space-y-2">
-          {navItems.map((item) => {
-            const isActive = item.id === activeTab;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSelectTab(item.id)}
-                className={[
-                  'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-heading font-bold text-sm border-2 transition-all cursor-pointer',
-                  isActive
-                    ? 'bg-[#FFC300] text-[#181B2C] border-[#181B2C] shadow-[3px_3px_0_#181B2C]'
-                    : 'bg-[#21513D] text-[#FBF4E4] border-[#0E291E] hover:bg-[#29634B]',
-                ].join(' ')}
-              >
-                <span className="flex items-center gap-2.5">
-                  {item.icon}
-                  <span>{item.label}</span>
-                </span>
-                {item.badge ? (
-                  <span
-                    aria-hidden="true"
-                    className="text-[10px] font-display px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white border border-[#181B2C]"
-                  >
-                    {item.badge}
+        {navItems.length > 0 ? (
+          <nav aria-label="Primary Navigation" className="flex-1 space-y-1.5">
+            {navItems.map((item) => {
+              const isActive = item.id === activeTab;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelectTab(item.id)}
+                  className={[
+                    'w-full flex items-center justify-between px-3 py-2 rounded-xl font-heading font-bold text-sm border-2 transition-all cursor-pointer',
+                    isActive
+                      ? 'bg-[#FFC300] text-[#181B2C] border-[#181B2C] shadow-[3px_3px_0_#181B2C]'
+                      : 'bg-[#21513D] text-[#FBF4E4] border-[#0E291E] hover:bg-[#29634B]',
+                  ].join(' ')}
+                >
+                  <span className="flex items-center gap-2.5">
+                    {item.icon}
+                    <span>{item.label}</span>
                   </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </nav>
+                  {item.badge ? (
+                    <span
+                      aria-hidden="true"
+                      className="text-[10px] font-display px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white border border-[#181B2C]"
+                    >
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </nav>
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {utilityActions ? (
           <div className="space-y-1.5 pt-1 border-t border-white/15">{utilityActions}</div>
@@ -127,45 +131,51 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 p-3 sm:p-5 pb-24 md:pb-6 max-w-7xl w-full mx-auto">
+        <main
+          className={`flex-1 p-3 sm:p-5 ${
+            navItems.length > 0 ? 'pb-24 md:pb-6' : 'pb-6'
+          } max-w-7xl w-full mx-auto`}
+        >
           {children}
         </main>
       </div>
 
-      {/* Mobile Bottom Tab Bar */}
-      <nav
-        aria-label="Mobile Navigation"
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1B4332] border-t-[3px] border-[#181B2C] px-2 pt-1.5 flex items-center justify-around gap-1"
-        style={{ paddingBottom: 'max(0.45rem, var(--safe-bottom))' }}
-      >
-        {navItems.map((item) => {
-          const isActive = item.id === activeTab;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelectTab(item.id)}
-              className={[
-                'relative flex-1 min-h-[48px] rounded-xl flex flex-col items-center justify-center gap-0.5 text-[10px] font-heading font-bold transition-colors',
-                isActive
-                  ? 'bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C]'
-                  : 'text-[#E3F2EA]',
-              ].join(' ')}
-            >
-              {item.badge ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute -top-1.5 right-0.5 text-[8px] leading-none font-display px-1 py-0.5 rounded-full bg-[#FF4D6D] text-white border border-[#181B2C]"
-                >
-                  {item.badge}
-                </span>
-              ) : null}
-              {item.icon}
-              <span className="truncate">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      {/* Mobile Bottom Tab Bar (hidden on Screen 0 before club creation) */}
+      {navItems.length > 0 ? (
+        <nav
+          aria-label="Mobile Navigation"
+          className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1B4332] border-t-[3px] border-[#181B2C] px-2 pt-1.5 flex items-center justify-around gap-1"
+          style={{ paddingBottom: 'max(0.45rem, var(--safe-bottom))' }}
+        >
+          {navItems.map((item) => {
+            const isActive = item.id === activeTab;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onSelectTab(item.id)}
+                className={[
+                  'relative flex-1 min-h-[48px] rounded-xl flex flex-col items-center justify-center gap-0.5 text-[10px] font-heading font-bold transition-colors',
+                  isActive
+                    ? 'bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C]'
+                    : 'text-[#E3F2EA]',
+                ].join(' ')}
+              >
+                {item.badge ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-1.5 right-0.5 text-[8px] leading-none font-display px-1 py-0.5 rounded-full bg-[#FF4D6D] text-white border border-[#181B2C]"
+                  >
+                    {item.badge}
+                  </span>
+                ) : null}
+                {item.icon}
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      ) : null}
     </div>
   );
 }

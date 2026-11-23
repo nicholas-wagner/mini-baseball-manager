@@ -231,57 +231,69 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
             </div>
 
             {/* Live Bouncing Mascot + Fanned 3 Real Manga Player Cards Showcase (Top-of-screen on Mobile, Right column on Desktop!) */}
-            <div className="order-first md:order-last p-2.5 sm:p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C] flex items-center justify-between gap-2 md:block md:space-y-2.5">
-              <div className="flex items-center justify-start md:justify-center gap-2 min-w-0">
-                <button type="button" aria-label={'Tip the cap of ' + mascot} onClick={() => setTipCount(n => n + 1)}>
-                <ClubMascotBuddy key={tipCount} tipCap={tipCount > 0}
-                  mascot={mascot || 'Rocket Dog'}
-                  primaryColor={palette.primary}
-                  secondaryColor={palette.secondary}
-                  accentColor={palette.accent}
-                  mood="cheering"
-                  size="sm"
-                />
-                </button>
-                <div className="text-left min-w-0">
-                  <div className="font-display text-xs sm:text-sm text-[#181B2C] leading-tight truncate">
-                    {city || 'Sandlot'} {clubName || 'Comets'}
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] font-bold text-[#4A5068] truncate">
-                    {mascot || 'Rocket Dog'}
-                  </div>
-                  <div className="flex md:hidden items-center gap-1 mt-1">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-[#181B2C]"
-                      style={{ backgroundColor: palette.primary }}
+            <div className="order-first md:order-last p-2.5 sm:p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C] flex flex-col gap-2 md:block md:space-y-2.5">
+              <div className="flex items-center justify-between md:justify-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    type="button"
+                    aria-label={'Tip the cap of ' + mascot}
+                    onClick={() => setTipCount((n) => n + 1)}
+                    className="shrink-0"
+                  >
+                    <ClubMascotBuddy
+                      key={tipCount}
+                      tipCap={tipCount > 0}
+                      mascot={mascot || 'Rocket Dog'}
+                      primaryColor={palette.primary}
+                      secondaryColor={palette.secondary}
+                      accentColor={palette.accent}
+                      mood="cheering"
+                      size="sm"
                     />
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-[#181B2C]"
-                      style={{ backgroundColor: palette.secondary }}
-                    />
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-[#181B2C]"
-                      style={{ backgroundColor: palette.accent }}
-                    />
+                  </button>
+                  <div className="text-left min-w-0">
+                    <div
+                      data-testid="creator-club-identity"
+                      className="font-display text-sm text-[#181B2C] leading-tight"
+                    >
+                      {city || 'Sandlot'} {clubName || 'Comets'}
+                    </div>
+                    <div className="text-[11px] font-bold text-[#4A5068]">
+                      {mascot || 'Rocket Dog'}
+                    </div>
                   </div>
+                </div>
+                <div className="flex md:hidden items-center gap-1 shrink-0">
+                  <span
+                    className="w-3 h-3 rounded-full border border-[#181B2C]"
+                    style={{ backgroundColor: palette.primary }}
+                  />
+                  <span
+                    className="w-3 h-3 rounded-full border border-[#181B2C]"
+                    style={{ backgroundColor: palette.secondary }}
+                  />
+                  <span
+                    className="w-3 h-3 rounded-full border border-[#181B2C]"
+                    style={{ backgroundColor: palette.accent }}
+                  />
                 </div>
               </div>
 
               <div
                 data-testid="creator-manga-fan"
-                className="flex items-end justify-center pt-1 pb-0.5 px-1 shrink-0"
+                className="flex items-end justify-center pt-0.5 pb-0.5 px-1 shrink-0"
               >
                 {featuredMangaCards.map((card, idx) => {
                   const tiltClass =
                     idx === 0
-                      ? '-rotate-6 -mr-3 z-0'
+                      ? '-rotate-6 -mr-2.5 z-0'
                       : idx === 1
                         ? 'z-10 -translate-y-1 scale-105'
-                        : 'rotate-6 -ml-3 z-0';
+                        : 'rotate-6 -ml-2.5 z-0';
                   return (
                     <div
                       key={card.id}
-                      className={`w-[56px] md:w-[80px] rounded-lg border-2 border-[#181B2C] bg-[#FFF8E7] p-0.5 shadow-[2px_3px_0_#181B2C] transition-transform ${tiltClass}`}
+                      className={`w-[60px] md:w-[80px] rounded-lg border-2 border-[#181B2C] bg-[#FFF8E7] p-0.5 shadow-[2px_3px_0_#181B2C] transition-transform ${tiltClass}`}
                     >
                       <img
                         src={card.illustration}

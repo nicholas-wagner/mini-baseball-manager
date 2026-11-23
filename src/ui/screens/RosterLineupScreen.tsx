@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { downloadPlayerCardPng } from '../../art/export/cardExporter';
 import { FlagBadge } from '../../art/flags/FlagBadge';
+import { playerIllustration } from '../../art/portraits/illustratedPlayerPool';
+import pendingPortrait from '../../art/portraits/illustrations/portrait-pending.svg';
 import { soundEngine } from '../../audio/soundEngine';
 import type { FieldPosition } from '../../engine/handedness/types';
 import {
@@ -362,15 +364,17 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           </div>
         ) : null}
 
-        <div
-          data-testid="coed-synergy-banner"
-          className="mb-3 px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-[#1D3557]"
-        >
-          <span className="font-display">
-            Clubhouse Synergy: {coEdSynergy.label} ({coEdSynergy.maleCount}M / {coEdSynergy.femaleCount}F)
-          </span>
-          <span>{coEdSynergy.summary}</span>
-        </div>
+        {rosterView === 'lineup' ? (
+          <div
+            data-testid="coed-synergy-banner"
+            className="mb-3 px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-[#1D3557]"
+          >
+            <span className="font-display">
+              Clubhouse Synergy: {coEdSynergy.label} ({coEdSynergy.maleCount}M / {coEdSynergy.femaleCount}F)
+            </span>
+            <span>{coEdSynergy.summary}</span>
+          </div>
+        ) : null}
 
         {/* Mobile & Desktop Quick Switch: Lineup Management vs Full 90s Roster Baseball Card Binder */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4]">
@@ -402,7 +406,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           </div>
           <span className="text-[11px] font-bold text-[#4A5068]">
             {rosterView === 'cards'
-              ? (printGallery ? 'Tap a print to enlarge it.' : 'Choose Stats to flip a card.')
+              ? printGallery
+                ? 'Tap a print to enlarge it.'
+                : 'Tap any card to flip, star, or nickname!'
               : 'Tap 🃏 Card on any player to inspect instantly'}
           </span>
         </div>
@@ -432,53 +438,111 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                   {tab.label}
                 </ComicButton>
               ))}
-              <button type="button" className="ml-auto min-h-11 px-3 text-sm font-bold underline cursor-pointer" aria-pressed={printGallery}
-                onClick={() => setPrintGallery(v => !v)}>{printGallery ? 'Stat cards' : 'Print gallery'}</button>
+              <button
+                type="button"
+                className="ml-auto min-h-11 px-3 text-sm font-bold underline cursor-pointer"
+                aria-pressed={printGallery}
+                onClick={() => setPrintGallery((v) => !v)}
+              >
+                {printGallery ? 'Stat cards' : 'Print gallery'}
+              </button>
             </div>
 
-            {printGallery ? <RosterPrintGallery club={humanClub.name} players={filteredBinderEntries.map(e => e.player)} /> :
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredBinderEntries.map(({ player, roleTag }) => (
-                <div
-                  key={player.id}
-                  data-testid="roster-binder-card-slot"
-                  className="mx-auto w-full max-w-[300px] space-y-2 p-2.5 rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7]"
-                >
-                  <div className="text-center text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
-                    {roleTag}
-                  </div>
-                  <FlipBaseballCard
-                    player={toBaseballCardPlayer(player)}
-                    team={teamColors}
-                    mood={formStateToCardMood(player.formState)}
-                  />
-                  <div className="flex gap-1.5">
-                    <ComicButton
-                      size="sm"
-                      variant="sky"
-                      className="flex-1"
-                      icon={<FileSearch className="w-3.5 h-3.5" />}
-                      onClick={() => {
-                        setInspectedPlayerId(player.id);
-                        setDossierOpen(true);
-                        soundEngine.play('ui_pop');
-                      }}
-                    >
-                      Dossier
-                    </ComicButton>
-                    <ComicButton
-                      size="sm"
-                      variant="gold"
-                      className="flex-1"
-                      icon={<Download className="w-3.5 h-3.5" />}
-                      onClick={() => triggerPngDownload(player)}
-                    >
-                      PNG
-                    </ComicButton>
-                  </div>
+            {printGallery ? (
+              <RosterPrintGallery club={humanClub.name} players={filteredBinderEntries.map((e) => e.player)} />
+            ) : filteredBinderEntries.length === 0 ? (
+              <div className="p-5 rounded-2xl border-2 border-dashed border-[#181B2C]/35 bg-[#FFFDF7] text-center space-y-1">
+                <div className="font-display text-sm text-[#181B2C]">
+                  {cardFilter === 'favorites' ? 'No ⭐ Favorite Players Yet!' : 'No Cards in This Filter'}
                 </div>
-              ))}
-            </div>}
+                <div className="text-xs font-bold text-[#4A5068]">
+                  Tap ☆ on any player card or lineup row to pin your favorite stars here.
+                </div>
+              </div>
+            ) : (
+              <div
+                data-testid="roster-binder-grid"
+                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3"
+              >
+                {filteredBinderEntries.map(({ player, roleTag }) => {
+                  const ovr = computePlayerOverall(player);
+                  const isFav = favoritePlayerIds.includes(player.id);
+                  const portraitSrc = playerIllustration(player.id) ?? pendingPortrait;
+                  const rarityRing =
+                    player.rarity === 'mvp'
+                      ? 'bg-gradient-to-br from-[#FFF3BF] via-[#FFD166] to-[#FFADAD]'
+                      : player.rarity === 'allstar'
+                        ? 'bg-gradient-to-br from-[#E0FBFC] via-[#FFFDF7] to-[#D8F3DC]'
+                        : 'bg-[#FFFDF7]';
+                  return (
+                    <div
+                      key={player.id}
+                      data-testid="roster-binder-card-slot"
+                      className={`relative rounded-2xl border-[2.5px] border-[#181B2C] shadow-[3px_3px_0_#181B2C] overflow-hidden flex flex-col ${rarityRing}`}
+                    >
+                      <button
+                        type="button"
+                        data-testid="binder-star-btn"
+                        aria-pressed={isFav}
+                        aria-label={`Toggle favorite for ${player.name}`}
+                        onClick={() => {
+                          toggleFavoritePlayer(player.id);
+                          soundEngine.play('ui_pop');
+                        }}
+                        className={`absolute top-1.5 right-1.5 z-10 w-9 h-9 rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer shadow-[2px_2px_0_#181B2C] ${
+                          isFav
+                            ? 'bg-[#FFC300] text-[#181B2C]'
+                            : 'bg-[#FFFDF7]/95 text-[#4A5068] hover:bg-[#FFF3BF]'
+                        }`}
+                      >
+                        {isFav ? '⭐' : '☆'}
+                      </button>
+
+                      <button
+                        type="button"
+                        data-testid="binder-card-open-btn"
+                        onClick={() => openCardModalFor(player.id)}
+                        className="w-full text-left flex-1 flex flex-col cursor-pointer group"
+                      >
+                        <div className="px-2 pt-2 pb-1 flex items-center gap-1 pr-11">
+                          <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[10px]">
+                            {player.position}
+                          </span>
+                          <span className="font-mono-tabular text-[10px] font-extrabold text-[#1D3557]">
+                            #{player.jerseyNumber}
+                          </span>
+                          <span className="ml-auto px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#1B4332] text-[#1B4332] font-mono-tabular text-[10px] font-extrabold">
+                            OVR {ovr}
+                          </span>
+                        </div>
+                        <div className="px-2">
+                          <div className="rounded-xl border-2 border-[#181B2C] overflow-hidden bg-[#FBF4E4] aspect-[4/4.6]">
+                            <img
+                              src={portraitSrc}
+                              alt={`${player.name} baseball card`}
+                              loading="lazy"
+                              className="w-full h-full object-cover object-top group-hover:scale-[1.03] transition-transform"
+                            />
+                          </div>
+                        </div>
+                        <div className="px-2 py-2 space-y-0.5">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <FlagBadge nationalityId={player.nationalityId} size="sm" />
+                            <span className="font-display text-xs text-[#181B2C] truncate">
+                              {player.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-[#4A5068]">
+                            <span className="truncate">{roleTag}</span>
+                            <span className="text-[#1D3557] font-extrabold shrink-0">Flip →</span>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">

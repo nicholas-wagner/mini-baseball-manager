@@ -80,7 +80,7 @@ describe('Tabs & Mobile Polish Round 6 (Non-Clipping Headers, Roster Rows & Favo
     expect(cannonCard.textContent).toMatch(/aa/i);
   });
 
-  it('makes the Offline Ready banner a compact 1-line pill that can be dismissed cleanly', () => {
+  it('keeps PwaInstallBanner quiet when offline without an install prompt, and dismisses cleanly when an install prompt is shown', async () => {
     const origOnLine = Object.getOwnPropertyDescriptor(Navigator.prototype, 'onLine');
     Object.defineProperty(Navigator.prototype, 'onLine', {
       configurable: true,
@@ -88,9 +88,18 @@ describe('Tabs & Mobile Polish Round 6 (Non-Clipping Headers, Roster Rows & Favo
     });
     try {
       render(<PwaInstallBanner />);
-      expect(screen.getByTestId('pwa-install-banner')).toBeInTheDocument();
-      const dismissBtn = screen.getByTestId('dismiss-offline-banner');
-      fireEvent.click(dismissBtn);
+      expect(screen.queryByTestId('pwa-install-banner')).not.toBeInTheDocument();
+
+      const installEvent = new Event('beforeinstallprompt') as Event & {
+        prompt: () => Promise<void>;
+        userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+      };
+      installEvent.prompt = vi.fn().mockResolvedValue(undefined);
+      installEvent.userChoice = Promise.resolve({ outcome: 'dismissed' });
+      fireEvent(window, installEvent);
+
+      expect(await screen.findByTestId('pwa-install-banner')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /dismiss install banner/i }));
       expect(screen.queryByTestId('pwa-install-banner')).not.toBeInTheDocument();
     } finally {
       if (origOnLine) {

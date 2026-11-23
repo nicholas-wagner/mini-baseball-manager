@@ -250,34 +250,39 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
 
   return (
     <div data-testid="uniform-designer-panel" className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[310px_1fr] gap-4 items-start">
-        {/* Live Kit + 2.5D Chibi Preview */}
-        <div className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-3 text-center">
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-3.5 items-start">
+        {/* Compact Side-by-Side Kit + Live 2.5D Chibi Preview (keeps Presets & Colors above the fold on mobile!) */}
+        <div className="p-2.5 sm:p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2.5 text-center">
           <div className="font-display text-xs uppercase text-[#181B2C] flex items-center justify-center gap-1.5">
             <Palette className="w-4 h-4 text-[#E63946]" />
             Live Uniform &amp; Crest Preview
           </div>
-          <UniformKitShowcaseSvg draft={draft} clubName={`${club.city} ${club.name}`} />
-          {modelPlayer ? (
-            <div className="w-32 h-36 mx-auto">
-              <PaintedUniformPreview
-                traits={modelPlayer.traits}
-                team={{
-                  primary: draft.primary,
-                  secondary: draft.secondary,
-                  accent: draft.accent,
-                  monogram: draft.monogram || club.colors.monogram,
-                }}
-                jerseyNumber={modelPlayer.jerseyNumber}
-                role={isPitcherPosition(modelPlayer.position) ? 'pitcher' : 'batter'}
-                throwsHand={modelPlayer.throws}
-                batSide={modelPlayer.bats === 'L' ? 'L' : 'R'}
-                clip="idle"
-              />
-            </div>
-          ) : null}
+          <div
+            data-testid="uniform-hero-strip"
+            className="grid grid-cols-[1fr_104px] items-center gap-2"
+          >
+            <UniformKitShowcaseSvg draft={draft} clubName={`${club.city} ${club.name}`} />
+            {modelPlayer ? (
+              <div className="w-[104px] h-[116px] mx-auto rounded-xl border-2 border-[#181B2C]/20 bg-[#FFFDF7] flex items-center justify-center overflow-hidden">
+                <PaintedUniformPreview
+                  traits={modelPlayer.traits}
+                  team={{
+                    primary: draft.primary,
+                    secondary: draft.secondary,
+                    accent: draft.accent,
+                    monogram: draft.monogram || club.colors.monogram,
+                  }}
+                  jerseyNumber={modelPlayer.jerseyNumber}
+                  role={isPitcherPosition(modelPlayer.position) ? 'pitcher' : 'batter'}
+                  throwsHand={modelPlayer.throws}
+                  batSide={modelPlayer.bats === 'L' ? 'L' : 'R'}
+                  clip="idle"
+                />
+              </div>
+            ) : null}
+          </div>
           <ComicButton
-            size="md"
+            size="sm"
             variant={appliedSaved ? 'gold' : 'turf'}
             data-confirmed={appliedSaved ? 'true' : undefined}
             icon={<Sparkles className="w-4 h-4" />}
