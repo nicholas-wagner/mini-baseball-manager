@@ -31,6 +31,10 @@ import { hireHumanRetiredLegendCoach } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
 import { AwardsAndHofPanel } from '../components/AwardsAndHofPanel';
+import {
+  PlayerCardModal,
+  type InspectableCardEntry,
+} from '../components/PlayerCardModal';
 import { PlayerDossierModal } from '../components/PlayerDossierModal';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -128,6 +132,10 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
   const [inspectedLeader, setInspectedLeader] = useState<{
     player: Player;
     clubName: string;
+  } | null>(null);
+  const [leagueCardModal, setLeagueCardModal] = useState<{
+    selectedId: string;
+    entries: InspectableCardEntry[];
   } | null>(null);
 
   if (!humanClub) return null;
@@ -591,7 +599,27 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                   >
                     <td className="px-3 py-2 font-display">{row.rank}</td>
                     <td className="px-3 py-2 font-extrabold">
-                      {row.clubName} {row.isHuman ? '(YOU)' : ''}
+                      <button
+                        type="button"
+                        data-testid="standings-club-btn"
+                        onClick={() => {
+                          const targetClub = tierClubs.find((c) => c.id === row.clubId);
+                          if (!targetClub) return;
+                          const entries: InspectableCardEntry[] = targetClub.roster.map((p) => ({
+                            player: p,
+                            club: targetClub,
+                            roleTag: `${targetClub.city} ${targetClub.name} • ${p.position}`,
+                          }));
+                          setLeagueCardModal({
+                            selectedId: targetClub.lineup[0]?.playerId ?? targetClub.roster[0].id,
+                            entries,
+                          });
+                          soundEngine.play('card_flip');
+                        }}
+                        className="text-left hover:text-[#E63946] hover:underline cursor-pointer"
+                      >
+                        🃏 {row.clubName} {row.isHuman ? '(YOU)' : ''}
+                      </button>
                     </td>
                     <td className="px-2 py-2 text-right font-mono-tabular">{row.wins}</td>
                     <td className="px-2 py-2 text-right font-mono-tabular">{row.losses}</td>
@@ -620,7 +648,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
             </table>
           </div>
 
-          {/* League Leaders */}
+          {/* League Leaders (Clickable 90s Baseball Cards!) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
               <div className="font-display text-xs text-[#181B2C]">Home Run Leaders</div>
@@ -631,19 +659,26 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                   <button
                     key={entry.playerId}
                     type="button"
+                    data-testid="league-leader-card-btn"
                     aria-label={`Inspect leader ${entry.playerName}`}
                     onClick={() => {
-                      if (matchPlayer) {
-                        setInspectedLeader({
-                          player: matchPlayer,
-                          clubName: ownerClub ? `${ownerClub.city} ${ownerClub.name}` : 'League Club',
+                      if (matchPlayer && ownerClub) {
+                        setLeagueCardModal({
+                          selectedId: matchPlayer.id,
+                          entries: [
+                            {
+                              player: matchPlayer,
+                              club: ownerClub,
+                              roleTag: `HR LEADER • ${entry.value} HR`,
+                            },
+                          ],
                         });
-                        soundEngine.play('ui_pop');
+                        soundEngine.play('card_flip');
                       }
                     }}
                     className="w-full flex justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
                   >
-                    <span className="truncate">{entry.playerName}</span>
+                    <span className="truncate">🃏 {entry.playerName}</span>
                     <span className="font-mono-tabular text-[#1B4332]">{entry.value} HR</span>
                   </button>
                 );
@@ -658,19 +693,26 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                   <button
                     key={entry.playerId}
                     type="button"
+                    data-testid="league-leader-card-btn"
                     aria-label={`Inspect leader ${entry.playerName}`}
                     onClick={() => {
-                      if (matchPlayer) {
-                        setInspectedLeader({
-                          player: matchPlayer,
-                          clubName: ownerClub ? `${ownerClub.city} ${ownerClub.name}` : 'League Club',
+                      if (matchPlayer && ownerClub) {
+                        setLeagueCardModal({
+                          selectedId: matchPlayer.id,
+                          entries: [
+                            {
+                              player: matchPlayer,
+                              club: ownerClub,
+                              roleTag: `STRIKEOUT LEADER • ${entry.value} K`,
+                            },
+                          ],
                         });
-                        soundEngine.play('ui_pop');
+                        soundEngine.play('card_flip');
                       }
                     }}
                     className="w-full flex justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
                   >
-                    <span className="truncate">{entry.playerName}</span>
+                    <span className="truncate">🃏 {entry.playerName}</span>
                     <span className="font-mono-tabular text-[#1D3557]">{entry.value} K</span>
                   </button>
                 );
@@ -711,6 +753,30 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
           />
         </div>
       </ComicCard>
+
+      <PlayerCardModal
+        open={leagueCardModal !== null}
+        entry={
+          leagueCardModal
+            ? (leagueCardModal.entries.find((e) => e.player.id === leagueCardModal.selectedId) ??
+                leagueCardModal.entries[0] ??
+                null)
+            : null
+        }
+        allEntries={leagueCardModal?.entries ?? []}
+        onSelectPlayerId={(id) =>
+          setLeagueCardModal((prev) => (prev ? { ...prev, selectedId: id } : prev))
+        }
+        onOpenDossier={(player) => {
+          const found = leagueCardModal?.entries.find((e) => e.player.id === player.id);
+          setLeagueCardModal(null);
+          setInspectedLeader({
+            player,
+            clubName: found ? `${found.club.city} ${found.club.name}` : 'League Club',
+          });
+        }}
+        onClose={() => setLeagueCardModal(null)}
+      />
 
       <PlayerDossierModal
         player={inspectedLeader?.player ?? null}

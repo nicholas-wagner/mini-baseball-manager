@@ -18,7 +18,9 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('scheduled-matchup-card')).toBeVisible();
   await expect(page.getByTestId('schedule-series-pill')).toHaveCount(7);
   await expect(page.getByTestId('probable-matchup-strip')).toBeVisible();
+  await expect(page.getByTestId('pregame-lineup-check')).toBeVisible();
   await expect(page.getByTestId('start-clutch-moment-btn')).toBeVisible();
+  await page.getByTestId('auto-tune-lineup-btn').click();
   await page.getByTestId('scout-rival-starter-btn').click();
   await expect(page.getByRole('dialog', { name: /player baseball card/i })).toBeVisible();
   await page.getByRole('button', { name: /close player card/i }).click();
@@ -43,6 +45,7 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
 
   await expect(page.getByTestId('coach-action-cue')).toBeVisible();
   await expect(page.getByTestId('broadcast-lower-third')).toBeVisible();
+  await expect(page.getByTestId('arcade-bullpen-toggle')).toBeVisible();
   await nextPitchBtn.click();
   await expect(page.getByTestId('live-last-pitch-readout')).toContainText(/mph|ball|strike|out|hit|walk/i);
 
@@ -133,9 +136,12 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /generate club export code/i }).click();
   await expect(page.locator('#club-export-code')).toHaveValue(/^MBM1:/);
 
-  // Visit League tab and confirm Playoff Bracket + Season Awards & Club Hall of Fame Ballot render
+  // Visit League tab and confirm Playoff Bracket, clickable rival club cards, and Season Awards & Club Hall of Fame Ballot render
   await page.getByRole('button', { name: /^league$/i }).locator('visible=true').first().click();
   await expect(page.getByTestId('playoff-bracket-panel')).toBeVisible();
+  await page.getByTestId('standings-club-btn').nth(1).click();
+  await expect(page.getByRole('dialog', { name: /player baseball card/i })).toBeVisible();
+  await page.getByRole('button', { name: /close player card/i }).click();
   await expect(page.getByTestId('awards-and-hof-panel')).toBeVisible();
 
   // Open Coach Pops' Guide, Story & Origins CYOA, and 4 Auto-Save Slots

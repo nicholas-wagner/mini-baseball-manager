@@ -26,6 +26,7 @@ import {
   createClutchMomentSession,
   evaluateSeriesStakes,
 } from '../../engine/gm/gameDayMoments';
+import { evaluatePreGameLineupCheck } from '../../engine/gm/seriesRecap';
 import {
   buildManagerActionInbox,
   recommendTeamPracticeFocus,
@@ -207,6 +208,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const currentGameInSeries = useGameStore((s) => s.currentGameInSeries);
   const seriesResults = useGameStore((s) => s.seriesResults);
+  const lastSeriesRecap = useGameStore((s) => s.lastSeriesRecap);
   const practiceAvailable = useGameStore((s) => s.practiceAvailable);
   const lastPracticeFocusLabel = useGameStore((s) => s.lastPracticeFocusLabel);
   const activeGameplan = useGameStore((s) => s.activeGameplan);
@@ -219,6 +221,8 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   const resolveActiveGmInboxDecision = useGameStore((s) => s.resolveActiveGmInboxDecision);
   const spotlightBreakoutPlayer = useGameStore((s) => s.spotlightBreakoutPlayer);
   const swapTiredStarterToFresh = useGameStore((s) => s.swapTiredStarterToFresh);
+  const autoTuneHumanLineupForStarter = useGameStore((s) => s.autoTuneHumanLineupForStarter);
+  const clearLastSeriesRecap = useGameStore((s) => s.clearLastSeriesRecap);
   const [gmQuickFeedback, setGmQuickFeedback] = useState<string | null>(null);
 
   const opponents = humanClub
@@ -719,32 +723,127 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     const probableMatchup = scheduledOpponent
       ? buildPreGameProbableMatchup(humanClub, scheduledOpponent)
       : null;
-    const preGameScoutEntries: InspectableCardEntry[] =
-      probableMatchup && scheduledOpponent
-        ? [
-            {
-              player: probableMatchup.humanStarter,
-              club: humanClub,
-              roleTag: 'YOUR PROBABLE STARTER',
-            },
-            {
-              player: probableMatchup.opponentStarter,
-              club: scheduledOpponent,
-              roleTag: 'RIVAL PROBABLE STARTER',
-            },
-            {
-              player: probableMatchup.opponentStarHitter,
-              club: scheduledOpponent,
-              roleTag: 'RIVAL STAR SLUGGER',
-            },
-          ]
-        : [];
+    const lineupCheck = probableMatchup
+      ? evaluatePreGameLineupCheck(humanClub, probableMatchup.opponentStarter)
+      : null;
+    const recapMvpPlayer = lastSeriesRecap
+      ? humanClub.roster.find((p) => p.id === lastSeriesRecap.seriesMvp.playerId) ?? null
+      : null;
+    const preGameScoutEntries: InspectableCardEntry[] = [];
+    if (probableMatchup && scheduledOpponent) {
+      preGameScoutEntries.push(
+        {
+          player: probableMatchup.humanStarter,
+          club: humanClub,
+          roleTag: 'YOUR PROBABLE STARTER',
+        },
+        {
+          player: probableMatchup.opponentStarter,
+          club: scheduledOpponent,
+          roleTag: 'RIVAL PROBABLE STARTER',
+        },
+        {
+          player: probableMatchup.opponentStarHitter,
+          club: scheduledOpponent,
+          roleTag: 'RIVAL STAR SLUGGER',
+        },
+      );
+    }
+    if (
+      recapMvpPlayer &&
+      !preGameScoutEntries.some((entry) => entry.player.id === recapMvpPlayer.id)
+    ) {
+      preGameScoutEntries.push({
+        player: recapMvpPlayer,
+        club: humanClub,
+        roleTag: `SERIES ${lastSeriesRecap!.seriesNumber} MVP • ${lastSeriesRecap!.seriesMvp.tagLine}`,
+      });
+    }
     const activePreGameScoutEntry = preGameScoutPlayerId
       ? (preGameScoutEntries.find((e) => e.player.id === preGameScoutPlayerId) ?? null)
       : null;
 
     return (
       <div className="space-y-4">
+        {lastSeriesRecap ? (
+          <div
+            data-testid="series-recap-card"
+            className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFF8E7] shadow-[4px_4px_0_#181B2C] space-y-2.5"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#9D0208]">
+                  📰 SANDLOT SPORTS EXTRA — SERIES {lastSeriesRecap.seriesNumber} FINAL
+                </div>
+                <div className="font-display text-sm sm:text-base text-[#181B2C]">
+                  {lastSeriesRecap.headline}
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label="Dismiss series recap"
+                onClick={() => {
+                  clearLastSeriesRecap();
+                  soundEngine.play('ui_pop');
+                }}
+                className="px-2.5 py-1 rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] text-xs font-extrabold text-[#181B2C] cursor-pointer"
+              >
+                ✕ Dismiss
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {lastSeriesRecap.gameLines.map((g) => (
+                <span
+                  key={g.gameNumber}
+                  data-testid="series-recap-game-chip"
+                  className={`px-2 py-0.5 rounded-lg border-2 border-[#181B2C] font-mono-tabular text-[11px] font-extrabold ${
+                    g.won ? 'bg-[#D8F3DC] text-[#1B4332]' : 'bg-[#FFE5EC] text-[#9D0208]'
+                  }`}
+                >
+                  {g.label}
+                </span>
+              ))}
+              <span className="px-2 py-0.5 rounded-lg border border-[#181B2C] bg-[#FFF3BF] text-[11px] font-extrabold text-[#181B2C]">
+                {lastSeriesRecap.standingsShiftText}
+              </span>
+              {lastSeriesRecap.cashEarned > 0 ? (
+                <span className="px-2 py-0.5 rounded-lg border border-[#181B2C] bg-[#E0FBFC] text-[11px] font-extrabold text-[#1D3557]">
+                  +${lastSeriesRecap.cashEarned.toLocaleString()} Cash
+                  {lastSeriesRecap.sweepBonusAwarded ? ' (incl. Sweep Bonus!)' : ''}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-dashed border-[#181B2C]/25">
+              <button
+                type="button"
+                data-testid="series-recap-mvp-btn"
+                onClick={() => {
+                  setPreGameScoutPlayerId(lastSeriesRecap.seriesMvp.playerId);
+                  soundEngine.play('card_flip');
+                }}
+                className="px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FFC300] hover:bg-[#FFD166] text-xs font-extrabold text-[#181B2C] cursor-pointer"
+              >
+                🃏 Series MVP: {lastSeriesRecap.seriesMvp.playerName} (
+                {lastSeriesRecap.seriesMvp.tagLine})
+              </button>
+              {lastSeriesRecap.levelUps.length > 0 && onJumpToTab ? (
+                <ComicButton
+                  size="sm"
+                  variant="violet"
+                  onClick={() => {
+                    soundEngine.play('ui_pop');
+                    onJumpToTab('skills');
+                  }}
+                >
+                  ⚡ {lastSeriesRecap.levelUps.length} Level-Up
+                  {lastSeriesRecap.levelUps.length === 1 ? '' : 's'} — Spend SP
+                </ComicButton>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <ManagerClipboardBanner
           clubName={`${humanClub.city} ${humanClub.name}`}
           recordLabel={`${humanClub.wins}-${humanClub.losses}`}
@@ -935,6 +1034,35 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                       {computePlayerOverall(probableMatchup.opponentStarHitter)})
                     </button>
                   </div>
+
+                  {lineupCheck ? (
+                    <div
+                      data-testid="pregame-lineup-check"
+                      className="pt-1.5 border-t border-dashed border-[#181B2C]/20 flex flex-wrap items-center justify-between gap-2 text-[11px]"
+                    >
+                      <span
+                        className={`font-extrabold ${
+                          lineupCheck.needsAttention ? 'text-[#9D0208]' : 'text-[#1B4332]'
+                        }`}
+                      >
+                        {lineupCheck.badgeText}
+                        {lineupCheck.tips.length > 0 ? `: ${lineupCheck.tips.join(' • ')}` : ''}
+                      </span>
+                      <ComicButton
+                        size="sm"
+                        variant={lineupCheck.needsAttention ? 'gold' : 'cream'}
+                        data-testid="auto-tune-lineup-btn"
+                        icon={<Sparkles className="w-3.5 h-3.5" />}
+                        onClick={() => {
+                          const res = autoTuneHumanLineupForStarter(lineupCheck.starterThrows);
+                          soundEngine.play('level_up');
+                          setGmQuickFeedback(res.summary);
+                        }}
+                      >
+                        ✨ Auto-Tune vs {lineupCheck.starterThrows}HP
+                      </ComicButton>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1223,6 +1351,14 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     }
     if (action.type === 'bullpen_swap' && action.relieverId) {
       handleBullpenSwap(action.relieverId);
+      return;
+    }
+    if (action.type === 'pinch_hit' && action.pinchHitterId) {
+      const res = applyPinchHitter(liveSession, humanSideKey, action.pinchHitterId);
+      if (res.applied && res.event) {
+        soundEngine.play('organ_charge');
+        applyStepResult(res.nextSession, [res.event], activeOpponent.id);
+      }
     }
   };
 
@@ -1288,6 +1424,18 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     : null;
   const liveLowerThird = buildLiveBroadcastLowerThird(liveSession);
   const liveRunnerIds = liveSession.bases.filter((id): id is string => Boolean(id));
+  const arcadeBullpenOptions = availableRelievers
+    .map((relId) => {
+      const rel = liveSession[humanSideKey].playersById[relId];
+      if (!rel) return null;
+      return {
+        id: rel.id,
+        name: rel.name,
+        throws: rel.throws,
+        roleLabel: rel.pitcherRole ? PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole] : 'RP',
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
   const openGamePlayerCard = (playerId: string) => {
     if (watchMode === 'live') setWatchMode('paused');
     setInspectedGamePlayerId(playerId);
@@ -1360,6 +1508,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               pitcherName={currentPitcher.name}
               lowerThird={liveLowerThird}
               clutchRecap={clutchRecap}
+              bullpenOptions={arcadeBullpenOptions}
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
               watchMode={watchMode}
@@ -1380,6 +1529,10 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               onToggleControlMode={() => {
                 toggleControlMode();
                 soundEngine.play('ui_pop');
+              }}
+              onSelectBullpenReliever={(relId) => {
+                soundEngine.play('bullpen_phone');
+                handleBullpenSwap(relId);
               }}
               onInspectBatter={() => openGamePlayerCard(currentBatter.id)}
               onInspectPitcher={() => openGamePlayerCard(currentPitcher.id)}

@@ -1,9 +1,17 @@
-import { FastForward, Play, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { FastForward, Play, RefreshCw, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
 import type { GameDayControlMode } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
+
+export interface ArcadeBullpenOption {
+  id: string;
+  name: string;
+  throws: string;
+  roleLabel: string;
+}
 
 interface LiveActionBarProps {
   cue: LiveActionCue;
@@ -13,6 +21,7 @@ interface LiveActionBarProps {
   pitcherName?: string;
   lowerThird?: LiveBroadcastLowerThird;
   clutchRecap?: string | null;
+  bullpenOptions?: readonly ArcadeBullpenOption[];
   latestEvent: PlayEvent | null;
   controlMode: GameDayControlMode;
   watchMode: 'live' | 'clutch' | 'paused';
@@ -28,6 +37,7 @@ interface LiveActionBarProps {
   onSelectTacticalCall: (call: TacticalCall) => void;
   onSuggestedAction: (action: SuggestedQuickAction) => void;
   onToggleControlMode: () => void;
+  onSelectBullpenReliever?: (relieverId: string) => void;
   onInspectBatter?: () => void;
   onInspectPitcher?: () => void;
   onInspectPlayers?: () => void;
@@ -47,6 +57,7 @@ export function LiveActionBar({
   pitcherName,
   lowerThird,
   clutchRecap,
+  bullpenOptions = [],
   latestEvent,
   controlMode,
   watchMode,
@@ -62,10 +73,12 @@ export function LiveActionBar({
   onSelectTacticalCall,
   onSuggestedAction,
   onToggleControlMode,
+  onSelectBullpenReliever,
   onInspectBatter,
   onInspectPitcher,
   onInspectPlayers,
 }: LiveActionBarProps) {
+  const [bullpenOpen, setBullpenOpen] = useState(false);
   const cuePalette =
     cue.urgency === 'high'
       ? 'bg-[#FFF3BF] border-[#E63946] text-[#181B2C]'
@@ -217,6 +230,19 @@ export function LiveActionBar({
           Sim to End
         </ComicButton>
 
+        {bullpenOptions.length > 0 && onSelectBullpenReliever ? (
+          <ComicButton
+            size="sm"
+            variant={bullpenOpen ? 'coral' : 'sky'}
+            data-testid="arcade-bullpen-toggle"
+            disabled={gameCompleted}
+            icon={<RefreshCw className="w-3.5 h-3.5" />}
+            onClick={() => setBullpenOpen((open) => !open)}
+          >
+            📞 Bullpen ({bullpenOptions.length})
+          </ComicButton>
+        ) : null}
+
         <ComicButton
           size="sm"
           variant={controlMode === 'advanced' ? 'violet' : 'cream'}
@@ -228,6 +254,40 @@ export function LiveActionBar({
           {controlMode === 'simple' ? 'Pro Manager' : 'Simple Arcade'}
         </ComicButton>
       </div>
+
+      {bullpenOpen && bullpenOptions.length > 0 && onSelectBullpenReliever ? (
+        <div
+          data-testid="arcade-bullpen-drawer"
+          className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
+        >
+          <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-[#1D3557]">
+            <span>📞 Quick Bullpen Call — Tap a Fresh Arm to Enter</span>
+            <button
+              type="button"
+              onClick={() => setBullpenOpen(false)}
+              className="underline cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {bullpenOptions.map((rel) => (
+              <ComicButton
+                key={rel.id}
+                size="sm"
+                variant="cream"
+                data-testid="arcade-bullpen-bring-in"
+                onClick={() => {
+                  onSelectBullpenReliever(rel.id);
+                  setBullpenOpen(false);
+                }}
+              >
+                Bring In {rel.name} ({rel.throws}HP{rel.roleLabel ? ` • ${rel.roleLabel}` : ''})
+              </ComicButton>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* Row 3: Compact TV Broadcast Lower-Third + Clutch Jump-In Banner + Optional Swing Pills + Live Readout */}
       {clutchRecap ? (

@@ -1,8 +1,11 @@
 import type { TacticalCall } from '../models/playEvent';
+import type { ThrowsHand } from '../handedness/types';
+import type { Player } from '../models/player';
 import { canTriggerSpecialAbility } from '../rpg/abilityCooldowns';
 import { fatigueToEndurance } from '../rpg/pitcherEndurance';
 import { getActivatablePowersForPlayer } from '../rpg/specialPowerEffects';
 import { getEligibleStealPlays, type StealPlayType } from './baserunning';
+import { getAvailableBenchPlayers } from './dugoutDrama';
 import {
   getBattingSide,
   getCurrentBatter,
@@ -18,12 +21,18 @@ export type LiveActionCueKind =
   | 'power_armed'
   | 'pitcher_gassed'
   | 'power_ready'
+  | 'pinch_hit_opportunity'
   | 'steal_opportunity'
   | 'clutch_moment'
   | 'default_pitching'
   | 'default_batting';
 
-export type SuggestedQuickActionType = 'arm_power' | 'steal' | 'mound_visit' | 'bullpen_swap';
+export type SuggestedQuickActionType =
+  | 'arm_power'
+  | 'steal'
+  | 'mound_visit'
+  | 'bullpen_swap'
+  | 'pinch_hit';
 
 export interface SuggestedQuickAction {
   type: SuggestedQuickActionType;
@@ -31,6 +40,7 @@ export interface SuggestedQuickAction {
   powerId?: string;
   tacticalCall?: TacticalCall;
   relieverId?: string;
+  pinchHitterId?: string;
 }
 
 export interface LiveActionCue {
@@ -191,6 +201,74 @@ function findReadyPowerCue(
   return buildPowerReadyCue(activatable[0].id, activatable[0].name, turnLabel, primaryButtonLabel);
 }
 
+function scorePinchHitterMatchup(player: Player, pitcherThrows: ThrowsHand): number {
+  const formBonus =
+    player.formState === 'blazing'
+      ? 10
+      : player.formState === 'hot'
+        ? 5
+        : player.formState === 'cold'
+          ? -6
+          : player.formState === 'frozen'
+            ? -10
+            : 0;
+  const platoonBonus = player.bats === 'S' ? 4 : player.bats !== pitcherThrows ? 8 : -4;
+  return player.ratings.contact * 0.55 + player.ratings.power * 0.45 + formBonus + platoonBonus;
+}
+
+function isPinchHitSpotEligible(
+  session: GameSessionState,
+  humanSideKey: 'away' | 'home',
+  isBatting: boolean,
+  batter: Player,
+  pitcherThrows: ThrowsHand,
+): boolean {
+  if (!isBatting) return false;
+  const isLateClose =
+    session.inning >= Math.max(2, session.regulationInnings - 1) &&
+    Math.abs(session.away.score - session.home.score) <= 2;
+  const hasRisp = Boolean(session.bases[1] || session.bases[2]);
+  if (!isLateClose || !hasRisp) return false;
+  const isCold = batter.formState === 'cold' || batter.formState === 'frozen';
+  const isBottomOrderMismatch =
+    session[humanSideKey].lineupIndex >= 6 && batter.bats === pitcherThrows;
+  return isCold || isBottomOrderMismatch;
+}
+
+function findPinchHitCue(
+  session: GameSessionState,
+  humanSideKey: 'away' | 'home',
+  isBatting: boolean,
+  turnLabel: string,
+  primaryButtonLabel: string,
+): LiveActionCue | null {
+  const batter = getCurrentBatter(session);
+  const pitcher = getCurrentPitcher(session);
+  if (!isPinchHitSpotEligible(session, humanSideKey, isBatting, batter, pitcher.throws)) return null;
+
+  const bench = getAvailableBenchPlayers(session, humanSideKey);
+  if (bench.length === 0) return null;
+  const currentScore = scorePinchHitterMatchup(batter, pitcher.throws);
+  const bestSub = [...bench].sort(
+    (a, b) => scorePinchHitterMatchup(b, pitcher.throws) - scorePinchHitterMatchup(a, pitcher.throws),
+  )[0];
+  if (scorePinchHitterMatchup(bestSub, pitcher.throws) < currentScore + 14) return null;
+
+  return {
+    kind: 'pinch_hit_opportunity',
+    urgency: 'high',
+    turnLabel,
+    badgeText: '🏏 PINCH-HIT UPGRADE!',
+    headline: `Big spot with RISP! Send ${bestSub.name} (${bestSub.bats}) off the bench for ${batter.name}!`,
+    primaryButtonLabel,
+    suggestedAction: {
+      type: 'pinch_hit',
+      label: `🏏 Pinch Hit: ${bestSub.name.split(' ')[0]}`,
+      pinchHitterId: bestSub.id,
+    },
+  };
+}
+
 function findStealCue(
   session: GameSessionState,
   isBatting: boolean,
@@ -260,6 +338,9 @@ export function computeLiveActionCue(input: LiveActionAdvisorInput): LiveActionC
 
   const powerCue = findReadyPowerCue(session, humanSideKey, isBatting, turnLabel, primaryButtonLabel);
   if (powerCue) return powerCue;
+
+  const pinchHitCue = findPinchHitCue(session, humanSideKey, isBatting, turnLabel, primaryButtonLabel);
+  if (pinchHitCue) return pinchHitCue;
 
   const stealCue = findStealCue(session, isBatting, tacticalCall, turnLabel, primaryButtonLabel);
   if (stealCue) return stealCue;

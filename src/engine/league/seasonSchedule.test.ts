@@ -80,7 +80,12 @@ describe('Predetermined 7-Series Season Schedule (Home & Away) + Road Game Live 
     expect(humanAfterRoad.wins + humanAfterRoad.losses).toBe(1);
 
     // Empty tier safely returns 0 simulated games
-    expect(simulateSeriesRound([], 0, 1)).toEqual({ clubs: [], gamesSimulated: 0 });
+    expect(simulateSeriesRound([], 0, 1)).toEqual({
+      clubs: [],
+      gamesSimulated: 0,
+      humanGames: [],
+      humanOpponentId: null,
+    });
   });
 
   it('automatically flips Coach Pops turn cues for Road Games where human is AWAY (bats TOP, pitches BOT)', () => {

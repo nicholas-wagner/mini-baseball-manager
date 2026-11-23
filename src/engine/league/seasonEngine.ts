@@ -62,6 +62,14 @@ export interface HumanScheduledSeries {
   status: 'completed' | 'current' | 'upcoming';
 }
 
+export interface HumanSeriesGameLog {
+  gameNumber: number;
+  humanScore: number;
+  opponentScore: number;
+  won: boolean;
+  isHome: boolean;
+}
+
 export interface StandingsRow {
   rank: number;
   clubId: string;
@@ -365,6 +373,28 @@ export function getTierLeagueLeaders(clubs: readonly Club[]): TierLeagueLeaders 
   };
 }
 
+function buildHumanGameLog(
+  gameNumber: number,
+  humanIsHome: boolean,
+  homeWon: boolean,
+  homeScore: number,
+  awayScore: number,
+): HumanSeriesGameLog {
+  return {
+    gameNumber,
+    humanScore: humanIsHome ? homeScore : awayScore,
+    opponentScore: humanIsHome ? awayScore : homeScore,
+    won: humanIsHome ? homeWon : !homeWon,
+    isHome: humanIsHome,
+  };
+}
+
+function findHumanOpponentId(away: Club, home: Club): string | null {
+  if (home.isHuman) return away.id;
+  if (away.isHuman) return home.id;
+  return null;
+}
+
 function simulateMatchupGames(
   map: Map<string, Club>,
   match: SeriesMatchup,
@@ -373,23 +403,23 @@ function simulateMatchupGames(
   regulationInnings: GameLengthInnings,
   humanGameplan: SeriesGameplanId,
   humanGamesAlreadyPlayed: number,
-): number {
+  humanGamesOut: HumanSeriesGameLog[],
+): { simulated: number; humanOpponentId: string | null } {
   const initialAway = map.get(match.awayClubId);
   const initialHome = map.get(match.homeClubId);
-  if (!initialAway || !initialHome) return 0;
+  if (!initialAway || !initialHome) return { simulated: 0, humanOpponentId: null };
 
-  const involvesHuman = initialAway.isHuman || initialHome.isHuman;
-  const startGame = involvesHuman ? Math.max(0, humanGamesAlreadyPlayed) : 0;
+  const humanOpponentId = findHumanOpponentId(initialAway, initialHome);
+  const startGame = humanOpponentId ? Math.max(0, humanGamesAlreadyPlayed) : 0;
   let simulated = 0;
 
   for (let g = startGame; g < match.gamesCount; g += 1) {
     const away = map.get(match.awayClubId)!;
     const home = map.get(match.homeClubId)!;
-    const gameSeed = seed + matchIdx * 31 + g * 7;
     const result = simFullGame(
       away,
       home,
-      gameSeed,
+      seed + matchIdx * 31 + g * 7,
       regulationInnings,
       'regular',
       away.isHuman ? humanGameplan : 'balanced',
@@ -398,9 +428,14 @@ function simulateMatchupGames(
     const homeWon = result.winnerClubId === home.id;
     map.set(home.id, applyGameStatDeltasToClub(home, result.playerStatDeltas, homeWon));
     map.set(away.id, applyGameStatDeltasToClub(away, result.playerStatDeltas, !homeWon));
+    if (humanOpponentId) {
+      humanGamesOut.push(
+        buildHumanGameLog(g + 1, home.isHuman, homeWon, result.homeScore, result.awayScore),
+      );
+    }
     simulated += 1;
   }
-  return simulated;
+  return { simulated, humanOpponentId };
 }
 
 /** Simulates one full 3-game series round (4 matchups × 3 games) for an 8-club tier. */
@@ -411,16 +446,25 @@ export function simulateSeriesRound(
   regulationInnings: GameLengthInnings = 9,
   humanGameplan: SeriesGameplanId = 'balanced',
   humanGamesAlreadyPlayed = 0,
-): { clubs: Club[]; gamesSimulated: number } {
+): {
+  clubs: Club[];
+  gamesSimulated: number;
+  humanGames: readonly HumanSeriesGameLog[];
+  humanOpponentId: string | null;
+} {
   const schedule = generateTierSchedule(clubs.map((c) => c.id));
   const round = schedule[seriesIndex % schedule.length];
-  if (!round) return { clubs: [...clubs], gamesSimulated: 0 };
+  if (!round) {
+    return { clubs: [...clubs], gamesSimulated: 0, humanGames: [], humanOpponentId: null };
+  }
 
   const map = new Map(clubs.map((c) => [c.id, c]));
+  const humanGames: HumanSeriesGameLog[] = [];
   let gamesSimulated = 0;
+  let humanOpponentId: string | null = null;
 
   round.matchups.forEach((match, matchIdx) => {
-    gamesSimulated += simulateMatchupGames(
+    const res = simulateMatchupGames(
       map,
       match,
       matchIdx,
@@ -428,12 +472,17 @@ export function simulateSeriesRound(
       regulationInnings,
       humanGameplan,
       humanGamesAlreadyPlayed,
+      humanGames,
     );
+    gamesSimulated += res.simulated;
+    if (res.humanOpponentId) humanOpponentId = res.humanOpponentId;
   });
 
   return {
     clubs: clubs.map((c) => map.get(c.id)!),
     gamesSimulated,
+    humanGames,
+    humanOpponentId,
   };
 }
 

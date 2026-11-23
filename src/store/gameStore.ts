@@ -9,6 +9,11 @@ import {
 } from '../engine/gm/gmSeasonPulse';
 import { SERIES_SWEEP_BONUS_CASH } from '../engine/gm/gameDayMoments';
 import {
+  autoTuneLineupForStarter,
+  buildSeriesRecapReport,
+  type SeriesRecapReport,
+} from '../engine/gm/seriesRecap';
+import {
   applySeriesAutoProgression,
   diffClubLevelUps,
   runQuickTeamPractice,
@@ -139,6 +144,7 @@ export interface GameStoreState {
   freeAgents: Player[];
   settings: UserSaveSettings;
   lastPostGameSummary: PostGameSummary | null;
+  lastSeriesRecap: SeriesRecapReport | null;
   lastPlayoffResult: TierPlayoffResult | null;
   lastOffseasonTransitions: readonly TierPromotionTransition[];
   activeOffseason: OffseasonState | null;
@@ -159,6 +165,8 @@ export interface GameStoreState {
   resolveActiveGmInboxDecision: (choiceIndex: 0 | 1) => { summary: string } | null;
   spotlightBreakoutPlayer: (playerId: string) => { applied: boolean; summary: string };
   swapTiredStarterToFresh: (freshPitcherId: string) => boolean;
+  autoTuneHumanLineupForStarter: (starterThrows: 'L' | 'R') => { tuned: boolean; summary: string };
+  clearLastSeriesRecap: () => void;
   runPlayoffsAndAdvanceSeason: (
     regulationInnings?: GameLengthInnings,
   ) => {
@@ -264,6 +272,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     freeAgents: [],
     settings: { ...DEFAULT_SAVE_SETTINGS },
     lastPostGameSummary: null,
+    lastSeriesRecap: null,
     lastPlayoffResult: null,
     lastOffseasonTransitions: [],
     activeOffseason: null,
@@ -301,6 +310,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           enableIllnesses: input.enableIllnesses ?? true,
         },
         lastPostGameSummary: null,
+        lastSeriesRecap: null,
         lastPlayoffResult: null,
         lastOffseasonTransitions: [],
         activeOffseason: null,
@@ -314,7 +324,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       }
 
       const prevHumanClub = findClubAcrossLeagues(state.leagues, state.humanClubId);
+      const prevHumanTierClubs = prevHumanClub ? state.leagues[prevHumanClub.leagueTier] : [];
       const nextLeagues = { ...state.leagues };
+      let humanSeriesGames: readonly import('../engine/league/seasonEngine').HumanSeriesGameLog[] = [];
+      let humanOpponentId: string | null = null;
       LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
         if (nextLeagues[tier].length < 2) return;
         const roundSeed =
@@ -322,14 +335,19 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           state.seasonNumber * 10000 +
           state.currentSeriesIndex * 500 +
           tierIdx * 71;
-        nextLeagues[tier] = simulateSeriesRound(
+        const simRes = simulateSeriesRound(
           nextLeagues[tier],
           state.currentSeriesIndex,
           roundSeed,
           regulationInnings,
           state.activeGameplan,
           tier === prevHumanClub?.leagueTier ? state.currentGameInSeries : 0,
-        ).clubs;
+        );
+        nextLeagues[tier] = simRes.clubs;
+        if (tier === prevHumanClub?.leagueTier) {
+          humanSeriesGames = simRes.humanGames;
+          humanOpponentId = simRes.humanOpponentId;
+        }
       });
 
       const nextIndex = state.currentSeriesIndex + 1;
@@ -342,6 +360,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       let nextOwnerGoalClaimed = state.ownerGoalClaimedSeason;
       let nextInboxEvent = state.activeGmInboxEvent;
       let nextSeriesResults = state.seriesResults;
+      let nextSeriesRecap: SeriesRecapReport | null = null;
 
       if (prevHumanClub && postHumanClub && state.manager) {
         winsGained = Math.max(0, postHumanClub.wins - prevHumanClub.wins);
@@ -360,7 +379,8 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           lossesGained,
         );
         let finalClub = autoProg.club;
-        if (totalSeriesWins >= 3 && totalSeriesLosses === 0) {
+        const sweepBonusAwarded = totalSeriesWins >= 3 && totalSeriesLosses === 0;
+        if (sweepBonusAwarded) {
           cashEarned += SERIES_SWEEP_BONUS_CASH;
           finalClub = {
             ...finalClub,
@@ -394,6 +414,24 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         cashEarned += autoProg.cashEarned;
         levelUps = autoProg.levelUps;
 
+        const oppClub =
+          nextLeagues[finalClub.leagueTier].find((c) => c.id === humanOpponentId) ??
+          nextLeagues[finalClub.leagueTier].find((c) => c.id !== finalClub.id);
+        if (oppClub) {
+          nextSeriesRecap = buildSeriesRecapReport({
+            seriesNumber: nextIndex,
+            prevHumanClub,
+            postHumanClub: finalClub,
+            opponentClub: oppClub,
+            prevTierClubs: prevHumanTierClubs,
+            postTierClubs: nextLeagues[finalClub.leagueTier],
+            humanGames: humanSeriesGames,
+            cashEarned,
+            sweepBonusAwarded,
+            levelUps,
+          });
+        }
+
         // Roll 1 crisp incoming GM Inbox Event (AI Trade Offer or Clubhouse Dilemma) when inbox is clear
         if (!nextInboxEvent && nextIndex < 7) {
           const inboxRng = createSeededRng(
@@ -414,6 +452,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         currentSeriesIndex: nextIndex,
         currentGameInSeries: 0,
         seriesResults: nextSeriesResults,
+        lastSeriesRecap: nextSeriesRecap,
         practiceAvailable: true,
         lastPracticeFocusLabel: null,
         spotlightUsedThisSeries: false,
@@ -495,6 +534,24 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const updatedClub: Club = { ...humanClub, rotationCursor: idx };
       set({ leagues: updateHumanClubInLeagues(state.leagues, updatedClub) });
       return true;
+    },
+
+    autoTuneHumanLineupForStarter: (starterThrows) => {
+      const state = get();
+      const humanClub = get().getHumanClub();
+      if (!humanClub) return { tuned: false, summary: 'No active club found.' };
+      const res = autoTuneLineupForStarter(humanClub, starterThrows);
+      set({
+        leagues: updateHumanClubInLeagues(state.leagues, {
+          ...humanClub,
+          lineup: res.lineup,
+        }),
+      });
+      return { tuned: true, summary: res.summary };
+    },
+
+    clearLastSeriesRecap: () => {
+      set({ lastSeriesRecap: null });
     },
 
     runPlayoffsAndAdvanceSeason: (regulationInnings = 5) => {
