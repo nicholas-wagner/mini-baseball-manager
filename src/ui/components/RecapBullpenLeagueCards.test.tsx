@@ -25,6 +25,7 @@ describe('Sports-Page Series Recap, Arcade Bullpen, Pre-Game Auto-Tune & Clickab
 
   it('shows a Sports-Page Series Recap card after simming a series with 3 game scores and clickable Series MVP baseball card', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     fireEvent.click(screen.getByRole('button', { name: /sim next 3-game series/i }));
     const recap = screen.getByTestId('series-recap-card');
@@ -43,6 +44,7 @@ describe('Sports-Page Series Recap, Arcade Bullpen, Pre-Game Auto-Tune & Clickab
 
   it('offers 1-tap Pre-Game Auto-Tune vs today starter and 1-tap Arcade Mode Bullpen reliever picker in 3D games', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     // Pre-game Lineup Check + 1-tap Auto-Tune vs Rival Starter
     expect(screen.getByTestId('pregame-lineup-check')).toBeInTheDocument();

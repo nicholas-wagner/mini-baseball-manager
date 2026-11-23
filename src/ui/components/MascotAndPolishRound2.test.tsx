@@ -116,6 +116,7 @@ describe('Round 2 Gameplay Polish: Mascot Buddy, Tactile Foil Reveal, Accurate P
 
   it('puts Next Matchup above Manager Clipboard, keeps Play Ball clean with Fast Sim menu, pauses Smart Watch on card inspect, and awards Victory Foil Packs via Sim to End', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     // Play Ball matchup card appears BEFORE Manager Clipboard so players can play immediately on mobile!
     const matchupEl = screen.getByTestId('scheduled-matchup-card');

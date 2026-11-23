@@ -70,6 +70,7 @@ describe('Cute, Clean & Balanced Gameplay Polish (Drill Quota, Portraits, 4-Room
 
   it('renders cute manga portraits & Coach Pops charm on GameDay & SkillTree, plus 3D camera switcher and Smart Watch toggle', () => {
     const { unmount } = render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     expect(screen.getByTestId('matchup-faceoff-portraits')).toBeInTheDocument();
     expect(screen.getByTestId('coach-pops-avatar')).toBeInTheDocument();
 

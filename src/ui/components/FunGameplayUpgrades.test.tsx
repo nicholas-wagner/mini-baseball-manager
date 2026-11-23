@@ -27,6 +27,7 @@ describe('Mind Games, Live Dugout Chess, 1994 Foil Packs & Nemesis Matchups UI',
 
   it('exposes Pitch Target / Guess Pitch Mind Games & Live Dugout Chess (Mound Visit, Kick Dirt, Bench) on GameDayScreen', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
     fireEvent.click(screen.getByTestId('control-mode-toggle'));
 

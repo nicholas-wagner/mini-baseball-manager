@@ -25,6 +25,7 @@ describe('Game Day Moments UI (Clutch Jump-In, Series Tally, Broadcast Lower-Thi
 
   it('shows probable pitching matchup + rival star scout cards pre-game and lets you jump straight into a late-inning Clutch Moment with TV Broadcast Lower-Third', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     // Pre-Game Probable Matchup strip with tappable scout cards
     expect(screen.getByTestId('probable-matchup-strip')).toBeInTheDocument();
@@ -43,6 +44,7 @@ describe('Game Day Moments UI (Clutch Jump-In, Series Tally, Broadcast Lower-Thi
 
   it('tracks live 3-game series results on the 7-series schedule strip and displays series stakes mid-series', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     // Sim Game 1 via Instant Sim -> Series 1 stays active with 1-0 or 0-1 live series stakes badge!
     fireEvent.click(screen.getByRole('button', { name: /instant sim game/i }));

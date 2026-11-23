@@ -55,7 +55,8 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
     expect(screen.getByRole('dialog', { name: /player baseball card/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /close player card/i }));
 
-    // Gentle Story & Origins comic beat card is surfaced cleanly
+    // Expand Opening Day season & GM options -> Story & Origins comic beat card is surfaced cleanly
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     expect(screen.getByTestId('story-chapter-nudge')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('story-chapter-nudge-btn'));
     expect(onOpenStory).toHaveBeenCalledTimes(1);
@@ -63,6 +64,7 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
 
   it('gives Simple Arcade Mode interactive Pitching Calls (Heat/Trick/Corner), Batting Calls, First-Pitch Tip & glowing Hype Power Bar', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
 
     // Friendly first-pitch tip visible before pitch #1

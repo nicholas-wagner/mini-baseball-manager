@@ -203,7 +203,8 @@ function pushClubMilestoneItems(
     });
   }
 
-  if (hasAffordableBallparkUpgrade(club)) {
+  const isOpeningDayPreGame = club.wins + club.losses === 0 && currentSeriesIndex === 0;
+  if (!isOpeningDayPreGame && hasAffordableBallparkUpgrade(club)) {
     tabBadges.economy = '⬆';
     items.push({
       kind: 'ballpark_upgrade',

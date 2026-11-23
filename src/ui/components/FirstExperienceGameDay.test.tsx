@@ -27,6 +27,7 @@ describe('Simplified First-Experience Game Day & Design-Lab-Only Soundboard', ()
 
   it('starts in Arcade Mode with an obvious action bar right under the 3D field and expands Pro Manager controls on 1 tap', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
 
     // Live 3D field + attached Action Bar + clear Coach Cue are immediately present

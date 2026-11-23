@@ -1,5 +1,8 @@
-import { Coins, Gift, Sparkles, Trophy, Users } from 'lucide-react';
-import { buildMvpDugoutQuote } from '../../engine/gm/openingDayHook';
+import { Coins, Sparkles, Trophy, Users } from 'lucide-react';
+import {
+  buildMvpDugoutQuote,
+  buildPostGameMvpHeadline,
+} from '../../engine/gm/openingDayHook';
 import type { Club } from '../../engine/models/club';
 import { isPitcherPosition } from '../../engine/models/player';
 import {
@@ -11,9 +14,9 @@ import type { PostGameSummary } from '../../store/gameStore';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { toBaseballCardPlayer } from '../utils/playerCardAdapter';
+import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { ScorebookPrint } from './ScorebookPrint';
 import { useGameStore } from '../../store/gameStore';
-import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { FlipBaseballCard } from './FlipBaseballCard';
 
 interface PostGameSummaryModalProps {
@@ -53,12 +56,7 @@ export function PostGameSummaryModal({
     summary.result.finalState.away.playersById[summary.mvp.playerId];
   const mvpCardPlayer = toBaseballCardPlayer(mvpDomainPlayer, 'mvp');
   const game = summary.result.playerStatDeltas[summary.mvp.playerId];
-  const who = summary.mvp.playerName;
-  const story = game?.homeRuns ? who + ' homered ' + (game.homeRuns === 1 ? 'once' : game.homeRuns + ' times') + '.'
-    : game?.pitchingStrikeouts ? who + ' struck out ' + game.pitchingStrikeouts + (game.pitchingStrikeouts === 1 ? ' batter.' : ' batters.')
-    : game?.rbis ? who + ' drove in ' + game.rbis + (game.rbis === 1 ? ' run.' : ' runs.')
-    : game?.hits ? who + ' collected ' + game.hits + (game.hits === 1 ? ' hit.' : ' hits.')
-    : who + ' earned player of the game.';
+  const story = buildPostGameMvpHeadline(summary.mvp.playerName, game);
   const humanWon = summary.won;
   const humanScore = summary.isHomeGame ? summary.homeScore : summary.awayScore;
   const rivalScore = summary.isHomeGame ? summary.awayScore : summary.homeScore;
@@ -91,9 +89,28 @@ export function PostGameSummaryModal({
             </span>
           }
         >
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#d6bea0] pb-3">
-            <h3 className="font-display text-lg leading-tight text-[#173f3a] max-w-sm">{story}</h3>
-            {onPlayAgain && <button type="button" className="recap-rematch" onClick={onPlayAgain}>{playAgainLabel ?? 'Play Next Game'}</button>}
+          <div className="mb-3 space-y-2 border-b-2 border-[#d6bea0] pb-3">
+            <h3 className="font-display text-base sm:text-lg leading-tight text-[#173f3a]">
+              {story}
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              {unopenedPackCount > 0 && onOpenFoilPacks ? (
+                <ComicButton
+                  size="sm"
+                  variant="coral"
+                  onClick={onOpenFoilPacks}
+                >
+                  {humanWon
+                    ? `🎁 Victory! Rip Foil Pack (${unopenedPackCount})`
+                    : `🎁 Rip Foil Pack (${unopenedPackCount})`}
+                </ComicButton>
+              ) : null}
+              {onPlayAgain ? (
+                <button type="button" className="recap-rematch" onClick={onPlayAgain}>
+                  {playAgainLabel ?? 'Play Next Game'}
+                </button>
+              ) : null}
+            </div>
           </div>
           <ScorebookPrint moments={summary.moments ?? []} kept={humanClub.keepsakes} onKeep={keepMoment} />
           <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
@@ -260,15 +277,6 @@ export function PostGameSummaryModal({
               ) : null}
 
               <div className="flex flex-wrap gap-2.5 pt-1">
-                {unopenedPackCount > 0 && onOpenFoilPacks ? (
-                  <ComicButton
-                    variant="coral"
-                    icon={<Gift className="w-4 h-4" />}
-                    onClick={onOpenFoilPacks}
-                  >
-                    🎁 Rip Foil Pack ({unopenedPackCount})
-                  </ComicButton>
-                ) : null}
                 {onSpendSkillPoints && totalUnspentSp > 0 ? (
                   <ComicButton variant="violet" onClick={onSpendSkillPoints}>
                     ⚡ Spend Skill Points ({totalUnspentSp} SP)

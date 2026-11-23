@@ -6,19 +6,23 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   test.setTimeout(60_000);
   await page.goto('/');
 
-  // Production launch lands straight on Play Ball / Club Creator with cute quick-pick clubs, mascot picker & Design Lab hidden
+  // Production launch lands straight on Play Ball / Club Creator with cute quick-pick clubs, fanned manga cards, mascot picker & Design Lab hidden
   await expect(page.getByRole('button', { name: /design lab/i })).toHaveCount(0);
   await expect(page.getByTestId('quick-club-presets')).toBeVisible();
+  await expect(page.getByTestId('creator-manga-fan')).toBeVisible();
   await expect(page.getByTestId('mascot-animal-picker')).toBeVisible();
   const startBtn = page.getByRole('button', { name: /start sandlot dynasty/i });
   await expect(startBtn).toBeVisible();
   await startBtn.click();
 
-  // Soundboard lives exclusively in Design Lab (NOT cluttering Game Day)
+  // Calm Opening Day lands with Opening Day Print + Meet Your 3 Stars + 1-tap Full Season & GM Options toggle
   await expect(page.getByTestId('ballpark-soundboard')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Opening Day feature' })).toBeVisible();
+  await expect(page.getByTestId('meet-your-squad-card')).toBeVisible();
+  await expect(page.getByTestId('scheduled-matchup-card')).toHaveCount(0);
+  await page.getByTestId('opening-day-more-toggle').click();
   await expect(page.getByTestId('manager-action-inbox')).toBeVisible();
   await expect(page.getByTestId('scheduled-matchup-card')).toBeVisible();
-  await expect(page.getByTestId('meet-your-squad-card')).toBeVisible();
   await expect(page.getByTestId('welcome-checklist-strip')).toBeVisible();
   await expect(page.getByTestId('start-smart-watch-btn')).toBeVisible();
   await expect(page.getByTestId('open-arcade-derby-btn')).toBeVisible();

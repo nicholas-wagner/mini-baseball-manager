@@ -186,15 +186,16 @@ export function App() {
     return unsubscribe;
   }, [autoSaveActiveCareer]);
 
+  const gamesPlayed = humanClub ? humanClub.wins + humanClub.losses : 0;
   const hasUnreadChapter = Boolean(
     humanClub &&
       getNextAvailableStoryChapter(storyState, {
-        gamesPlayed: humanClub.wins + humanClub.losses,
+        gamesPlayed,
         seasonNumber,
       }),
   );
 
-  const hasMobileBadge = hasUnreadChapter || unopenedPackCount > 0;
+  const hasMobileBadge = gamesPlayed >= 1 && hasUnreadChapter;
 
   const mobileUtilityActions = (
     <div className="flex items-center gap-1.5">
@@ -227,6 +228,7 @@ export function App() {
         {hasMobileBadge ? (
           <span
             aria-hidden="true"
+            data-testid="mobile-menu-badge-dot"
             className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#FF4D6D] border-2 border-[#181B2C]"
           />
         ) : null}

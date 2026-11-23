@@ -22,6 +22,7 @@ describe('Pitch Math / Dice-Roll Inspector & Deep Player Scouting Dossier Modal'
 
   it('toggles Show Math / Dice Rolls on Game Day Play-by-Play Ticker to reveal live formula breakdowns', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
     fireEvent.click(screen.getByRole('button', { name: /next pitch/i }));
 

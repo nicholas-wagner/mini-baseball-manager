@@ -27,6 +27,7 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       const user = userEvent.setup();
       render(<GameDayScreen />);
 
+      await user.click(screen.getByTestId('opening-day-more-toggle'));
       expect(screen.queryByText(/choose today's matchup/i)).not.toBeInTheDocument();
       expect(screen.getByTestId('scheduled-matchup-card')).toBeInTheDocument();
       expect(screen.getByTestId('season-schedule-strip')).toBeInTheDocument();

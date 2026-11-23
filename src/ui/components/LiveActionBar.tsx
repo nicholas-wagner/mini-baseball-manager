@@ -93,7 +93,7 @@ export function LiveActionBar({
   watchMode,
   smartPauseReason,
   tacticalCall,
-  pitchTarget = 'attack_zone',
+  pitchTarget = 'high_heat',
   isBatting,
   gameCompleted,
   humanHype = 25,
@@ -138,13 +138,16 @@ export function LiveActionBar({
         : 'bg-[#1B4332] text-[#FFD166]';
 
   const hypePct = Math.min(100, Math.round((humanHype / Math.max(1, hypeCost)) * 100));
+  const isHypeReady = humanHype >= hypeCost;
+  const hypeReadoutLabel = isHypeReady ? 'READY! 100%' : `${hypePct}%`;
+  const hasBullpenPicker = bullpenOptions.length > 0 && Boolean(onSelectBullpenReliever);
 
   return (
     <div
       data-testid="live-action-bar"
-      className="rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] shadow-[4px_4px_0_#181B2C] p-2.5 sm:p-3 space-y-2"
+      className="rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] shadow-[4px_4px_0_#181B2C] p-2 sm:p-3 space-y-1.5 sm:space-y-2"
     >
-      {/* Row 1: Interactive 3-Call Arcade Choice (Batting & Pitching!) + Visible Glowing Hype Bar */}
+      {/* Row 1: Interactive 3-Call Arcade Choice (Batting & Pitching!) + High-Contrast Hype Bar */}
       <div className="flex flex-wrap items-center justify-between gap-1.5">
         {controlMode === 'simple' ? (
           <div
@@ -160,6 +163,7 @@ export function LiveActionBar({
                     key={opt.id}
                     type="button"
                     title={opt.hint}
+                    aria-pressed={tacticalCall === opt.id}
                     disabled={gameCompleted}
                     onClick={() => onSelectTacticalCall(opt.id)}
                     className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
@@ -176,6 +180,7 @@ export function LiveActionBar({
                     key={opt.id}
                     type="button"
                     title={opt.hint}
+                    aria-pressed={pitchTarget === opt.id}
                     disabled={gameCompleted}
                     onClick={() => onSelectPitchTarget?.(opt.id)}
                     className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
@@ -191,6 +196,7 @@ export function LiveActionBar({
               <button
                 type="button"
                 data-testid="arcade-steal-btn"
+                aria-pressed={tacticalCall === quickStealOption.call}
                 disabled={gameCompleted}
                 onClick={() =>
                   onSelectTacticalCall(
@@ -209,26 +215,32 @@ export function LiveActionBar({
           </div>
         ) : null}
 
-        {/* Visible Glowing ⚡ Special Power Hype Meter (Fun in BOTH Arcade & Pro Modes!) */}
+        {/* High-Contrast ⚡ Special Power Hype Meter (Sleek full-width strip on phones, inline right on desktop!) */}
         <div
           data-testid="arcade-hype-bar"
-          className="flex items-center gap-2 ml-auto px-2 py-1 rounded-xl border-2 border-[#181B2C] bg-[#F5EEFF]"
+          className={`flex items-center justify-between gap-2 w-full sm:w-auto sm:ml-auto px-2 py-1 rounded-xl border-2 border-[#181B2C] ${
+            readyPowerLabel && onArmReadyPower ? 'bg-[#FFF8DC]' : 'bg-[#F5EEFF]'
+          }`}
         >
-          <div className="space-y-0.5 min-w-[88px]">
-            <div className="flex items-center justify-between text-[9px] font-extrabold uppercase text-[#4C1D95]">
-              <span>⚡ Hype</span>
-              <span className="font-mono-tabular">
-                {humanHype}/{hypeCost}
-              </span>
-            </div>
-            <div className="h-2 rounded-full border border-[#181B2C] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 flex-1 sm:flex-none sm:min-w-[140px]">
+            <span className="text-[10px] font-extrabold uppercase text-[#181B2C] shrink-0">
+              ⚡ Hype
+            </span>
+            <div className="h-2.5 flex-1 min-w-[54px] rounded-full border border-[#181B2C] bg-white overflow-hidden">
               <div
                 className={`h-full transition-all ${
-                  hypePct >= 100 ? 'bg-[#FF4D6D]' : 'bg-[#FFC300]'
+                  isHypeReady ? 'bg-[#FF4D6D]' : 'bg-[#FFC300]'
                 }`}
                 style={{ width: `${hypePct}%` }}
               />
             </div>
+            <span
+              className={`font-mono-tabular text-[10px] uppercase shrink-0 ${
+                isHypeReady ? 'text-[#B51748] font-black' : 'text-[#4C1D95] font-extrabold'
+              }`}
+            >
+              {hypeReadoutLabel}
+            </span>
           </div>
           {readyPowerLabel && onArmReadyPower ? (
             <button
@@ -236,10 +248,10 @@ export function LiveActionBar({
               data-testid="arcade-unleash-power-btn"
               disabled={gameCompleted}
               onClick={onArmReadyPower}
-              className={`px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] font-display text-[10px] cursor-pointer ${
+              className={`px-2.5 py-1 min-h-[34px] rounded-lg border-2 border-[#181B2C] font-display text-[10px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#181B2C] shrink-0 transition ${
                 powerArmed
                   ? 'bg-[#FF4D6D] text-white'
-                  : 'bg-[#FFC300] text-[#181B2C] animate-pulse'
+                  : 'bg-[#FFC300] text-[#181B2C] ring-2 ring-[#FF4D6D] hover:bg-[#FFD166]'
               }`}
             >
               {powerArmed ? '🔥 ARMED!' : `⚡ ${readyPowerLabel}`}
@@ -248,84 +260,100 @@ export function LiveActionBar({
         </div>
       </div>
 
-      {/* Row 2: Streamlined Primary Controller (Right Under the 3D Ballpark — Always in Thumb Zone!) */}
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-        <ComicButton
-          size="md"
-          variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'turf'}
-          disabled={gameCompleted}
-          icon={<Play className="w-4 h-4" />}
-          aria-label={cue.primaryButtonLabel}
-          onClick={onNextPitch}
-          className="flex-1 sm:flex-none min-w-[140px]"
+      {/* Row 2: Compact 2-Row Mobile Controller Grid (Zero orphan rows — always in thumb zone!) */}
+      <div data-testid="live-control-grid" className="space-y-1.5">
+        <div
+          className={
+            onToggleSmartWatch && onCycleSpeed
+              ? 'grid grid-cols-[minmax(0,1.22fr)_minmax(0,1.15fr)_auto] gap-1.5'
+              : 'flex flex-wrap items-center gap-1.5'
+          }
         >
-          {isBatting ? 'Next Pitch' : 'Throw Pitch'}
-        </ComicButton>
-
-        {onToggleSmartWatch ? (
           <ComicButton
             size="sm"
-            variant={watchMode === 'smart' ? 'coral' : 'violet'}
-            data-testid="smart-watch-toggle"
+            variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'turf'}
             disabled={gameCompleted}
-            onClick={onToggleSmartWatch}
+            icon={<Play className="w-3.5 h-3.5" />}
+            aria-label={cue.primaryButtonLabel}
+            onClick={onNextPitch}
+            className="w-full px-2.5 text-xs whitespace-nowrap"
           >
-            {watchMode === 'smart' ? '⏸️ Smart ON' : '✨ Smart Watch'}
+            {isBatting ? 'Next Pitch' : 'Throw Pitch'}
           </ComicButton>
-        ) : null}
 
-        {onCycleSpeed ? (
-          <ComicButton
-            size="sm"
-            variant={speed > 1 ? 'gold' : 'cream'}
-            data-testid="arcade-speed-toggle"
-            disabled={gameCompleted}
-            onClick={onCycleSpeed}
-          >
-            ⏩ {speed}x
-          </ComicButton>
-        ) : null}
+          {onToggleSmartWatch ? (
+            <ComicButton
+              size="sm"
+              variant={watchMode === 'smart' ? 'coral' : 'violet'}
+              data-testid="smart-watch-toggle"
+              disabled={gameCompleted}
+              onClick={onToggleSmartWatch}
+              className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
+            >
+              {watchMode === 'smart' ? '⏸️ Smart ON' : '✨ Smart Watch'}
+            </ComicButton>
+          ) : null}
 
-        <ComicButton
-          size="sm"
-          variant={fastSimOpen || watchMode === 'live' ? 'gold' : 'cream'}
-          data-testid="fast-sim-toggle"
-          disabled={gameCompleted}
-          icon={<FastForward className="w-3.5 h-3.5" />}
-          onClick={() => {
-            setFastSimOpen((open) => !open);
-            setBullpenOpen(false);
-          }}
+          {onCycleSpeed ? (
+            <ComicButton
+              size="sm"
+              variant={speed > 1 ? 'gold' : 'cream'}
+              data-testid="arcade-speed-toggle"
+              disabled={gameCompleted}
+              onClick={onCycleSpeed}
+              className="px-2.5 text-[11px] sm:text-xs whitespace-nowrap"
+            >
+              ⏩ {speed}x
+            </ComicButton>
+          ) : null}
+        </div>
+
+        <div
+          className={`grid gap-1.5 ${hasBullpenPicker ? 'grid-cols-3' : 'grid-cols-2'}`}
         >
-          {watchMode === 'live' ? 'Auto ON ▾' : 'Fast Sim ▾'}
-        </ComicButton>
-
-        {bullpenOptions.length > 0 && onSelectBullpenReliever ? (
           <ComicButton
             size="sm"
-            variant={bullpenOpen ? 'coral' : 'sky'}
-            data-testid="arcade-bullpen-toggle"
+            variant={fastSimOpen || watchMode === 'live' ? 'gold' : 'cream'}
+            data-testid="fast-sim-toggle"
             disabled={gameCompleted}
-            icon={<RefreshCw className="w-3.5 h-3.5" />}
+            icon={<FastForward className="w-3.5 h-3.5" />}
             onClick={() => {
-              setBullpenOpen((open) => !open);
-              setFastSimOpen(false);
+              setFastSimOpen((open) => !open);
+              setBullpenOpen(false);
             }}
+            className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
           >
-            📞 Bullpen ({bullpenOptions.length})
+            {watchMode === 'live' ? 'Auto ON ▾' : 'Fast Sim ▾'}
           </ComicButton>
-        ) : null}
 
-        <ComicButton
-          size="sm"
-          variant={controlMode === 'advanced' ? 'violet' : 'cream'}
-          data-testid="control-mode-toggle"
-          icon={<Sliders className="w-3.5 h-3.5" />}
-          onClick={onToggleControlMode}
-          className="ml-auto"
-        >
-          {controlMode === 'simple' ? 'Pro Manager' : 'Simple Arcade'}
-        </ComicButton>
+          {hasBullpenPicker ? (
+            <ComicButton
+              size="sm"
+              variant={bullpenOpen ? 'coral' : 'sky'}
+              data-testid="arcade-bullpen-toggle"
+              disabled={gameCompleted}
+              icon={<RefreshCw className="w-3.5 h-3.5" />}
+              onClick={() => {
+                setBullpenOpen((open) => !open);
+                setFastSimOpen(false);
+              }}
+              className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
+            >
+              📞 Bullpen ({bullpenOptions.length})
+            </ComicButton>
+          ) : null}
+
+          <ComicButton
+            size="sm"
+            variant={controlMode === 'advanced' ? 'violet' : 'cream'}
+            data-testid="control-mode-toggle"
+            icon={<Sliders className="w-3.5 h-3.5" />}
+            onClick={onToggleControlMode}
+            className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
+          >
+            {controlMode === 'simple' ? 'Pro Manager' : 'Simple Arcade'}
+          </ComicButton>
+        </div>
       </div>
 
       {/* Compact Fast Sim Popover Drawer (Auto Play 3D, At-Bat, Half-Inn, Clutch, Sim to End) */}
@@ -429,6 +457,36 @@ export function LiveActionBar({
           </div>
         </div>
       ) : null}
+
+      {/* Compact Last-Play Readout directly under the 2-row controller so it stays visible above the fold on mobile! */}
+      <div className="pt-1 border-t border-dashed border-[#181B2C]/20 flex items-center justify-between gap-2 text-[11px]">
+        <div
+          data-testid="live-last-pitch-readout"
+          className="font-bold text-[#181B2C] truncate flex-1 min-w-0"
+        >
+          {latestEvent ? (
+            <>
+              <span className="font-extrabold text-[#1B4332] mr-1">
+                [{latestEvent.half} {latestEvent.inning}]
+              </span>
+              {latestEvent.commentary}
+            </>
+          ) : (
+            <span className="text-[#4A5068]">
+              Eyes on the 3D diamond — press {isBatting ? 'Next Pitch' : 'Throw Pitch'} to start!
+            </span>
+          )}
+        </div>
+        {latestEvent?.pitchThrown ? (
+          <span
+            data-testid="last-pitch-radar-pill"
+            className="px-2 py-0.5 rounded-lg bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] font-extrabold shrink-0"
+          >
+            {latestEvent.pitchThrown.mph} mph {PITCH_TYPE_SHORT_LABELS[latestEvent.pitchThrown.pitchType]}
+            {latestEvent.pitchThrown.isFavoritePitch ? ' ★' : ''}
+          </span>
+        ) : null}
+      </div>
 
       {/* Row 3: Coach Pops' Contextual Turn & Action Cue + First-Pitch Welcome Tip + 1-Tap Card Inspection */}
       <div
@@ -552,35 +610,6 @@ export function LiveActionBar({
           </div>
         </div>
       ) : null}
-
-      <div className="pt-1.5 border-t border-dashed border-[#181B2C]/20 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-        <div
-          data-testid="live-last-pitch-readout"
-          className="font-bold text-[#181B2C] truncate flex-1 min-w-[160px]"
-        >
-          {latestEvent ? (
-            <>
-              <span className="font-extrabold text-[#1B4332] mr-1">
-                [{latestEvent.half} {latestEvent.inning}]
-              </span>
-              {latestEvent.commentary}
-            </>
-          ) : (
-            <span className="text-[#4A5068]">
-              Eyes on the 3D diamond — press {isBatting ? 'Next Pitch' : 'Throw Pitch'} to start!
-            </span>
-          )}
-        </div>
-        {latestEvent?.pitchThrown ? (
-          <span
-            data-testid="last-pitch-radar-pill"
-            className="px-2 py-0.5 rounded-lg bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] font-extrabold shrink-0"
-          >
-            {latestEvent.pitchThrown.mph} mph {PITCH_TYPE_SHORT_LABELS[latestEvent.pitchThrown.pitchType]}
-            {latestEvent.pitchThrown.isFavoritePitch ? ' ★' : ''}
-          </span>
-        ) : null}
-      </div>
     </div>
   );
 }

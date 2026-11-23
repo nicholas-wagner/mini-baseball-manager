@@ -332,7 +332,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     bio: rng.pick(BIOS),
     level: 1,
     xp: 0,
-    skillPoints: 1,
+    skillPoints: 0,
     unlockedSkillIds: [],
     equippedPowerIds: [],
     equippedRelicIds: [],

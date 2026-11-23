@@ -4,6 +4,8 @@ import { EnlargePrint } from './EnlargePrint';
 import { ArrowRight } from 'lucide-react';
 import { playerIllustration } from '../../art/portraits/illustratedPlayerPool';
 import pending from '../../art/portraits/illustrations/portrait-pending.svg';
+import { evaluateMatchupCardSparkle } from '../../engine/gm/openingDayHook';
+import type { PlayEvent } from '../../engine/models/playEvent';
 import type { Player } from '../../engine/models/player';
 import type { GameSessionState } from '../../engine/simulation/gameState';
 import { getCurrentBatter, getCurrentPitcher } from '../../engine/simulation/gameState';
@@ -46,10 +48,12 @@ function describeSituation(s: GameSessionState) {
 
 export function OpeningDayPrint({
   session,
+  opponentLabel,
   onStart,
   onInspect,
 }: {
   session: GameSessionState;
+  opponentLabel?: string;
   onStart: () => void;
   onInspect: (player: Player) => void;
 }) {
@@ -68,7 +72,9 @@ export function OpeningDayPrint({
         </span>
       </button>
       <div className="opening-copy">
-        <p className="print-kicker">Opening Day</p>
+        <p className="print-kicker">
+          Opening Day{opponentLabel ? ` · ${opponentLabel}` : ''}
+        </p>
         <h2>{player.name}</h2>
         <p className="opening-inning">
           {session.half === 'TOP' ? 'Top' : 'Bottom'} of inning {session.inning}
@@ -135,34 +141,91 @@ export function MatchupPrints({
   batter,
   pitcher,
   memories = [],
+  batterFavorite = false,
+  pitcherFavorite = false,
+  batterPowerReady = false,
+  pitcherPowerReady = false,
+  batterPowerArmed = false,
+  pitcherPowerArmed = false,
+  latestEvent = null,
   onInspect,
 }: {
   batter: Player;
   pitcher: Player;
   memories?: readonly ScorebookMoment[];
+  batterFavorite?: boolean;
+  pitcherFavorite?: boolean;
+  batterPowerReady?: boolean;
+  pitcherPowerReady?: boolean;
+  batterPowerArmed?: boolean;
+  pitcherPowerArmed?: boolean;
+  latestEvent?: PlayEvent | null;
   onInspect: (id: string) => void;
 }) {
+  const entries = [
+    {
+      player: batter,
+      role: 'At bat',
+      sparkle: evaluateMatchupCardSparkle({
+        player: batter,
+        role: 'batter',
+        isFavorite: batterFavorite,
+        powerReady: batterPowerReady,
+        powerArmed: batterPowerArmed,
+        latestEvent,
+      }),
+    },
+    {
+      player: pitcher,
+      role: 'On the mound',
+      sparkle: evaluateMatchupCardSparkle({
+        player: pitcher,
+        role: 'pitcher',
+        isFavorite: pitcherFavorite,
+        powerReady: pitcherPowerReady,
+        powerArmed: pitcherPowerArmed,
+        latestEvent,
+      }),
+    },
+  ];
   return (
     <div className="matchup-prints" role="group" aria-label="Matchup cards">
-      {[
-        { player: batter, role: 'At bat' },
-        { player: pitcher, role: 'On the mound' },
-      ].map(({ player, role }) => {
-        const memory = memories.find(m => m.playerId === player.id);
+      {entries.map(({ player, role, sparkle }) => {
+        const memory = memories.find((m) => m.playerId === player.id);
         return (
-        <button
-          key={role}
-          onClick={() => onInspect(player.id)}
-          aria-label={'Inspect ' + player.name + ' card'}
-        >
-          <Print player={player} />
-          <span>
-            <small>{role}</small>
-            <strong>{player.name}</strong>
-            {memory && <em className="matchup-memory-line">{memory.caption} · last kept play</em>}
-          </span>
-        </button>
-      );})}
+          <button
+            key={role}
+            type="button"
+            data-sparkle-tone={sparkle.ringTone}
+            className={`matchup-card-tile sparkle-${sparkle.ringTone}`}
+            onClick={() => onInspect(player.id)}
+            aria-label={'Inspect ' + player.name + ' card'}
+          >
+            <span className="matchup-thumb-wrap">
+              <Print player={player} />
+            </span>
+            <span className="matchup-card-meta">
+              <span className="matchup-card-toprow">
+                <small>{role}</small>
+                {sparkle.reactionBubble ? (
+                  <em className="matchup-reaction-pill">{sparkle.reactionBubble}</em>
+                ) : null}
+              </span>
+              <strong>{player.name}</strong>
+              {sparkle.badges.length > 0 ? (
+                <span className="matchup-sparkle-badges">
+                  {sparkle.badges.map((badge) => (
+                    <em key={badge}>{badge}</em>
+                  ))}
+                </span>
+              ) : null}
+              {memory ? (
+                <em className="matchup-memory-line">{memory.caption} · last kept play</em>
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

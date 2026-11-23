@@ -58,6 +58,7 @@ describe('Mobile Roster Baseball Cards, Live R/H/E Scoreboard & In-Game Player C
 
   it('lets the user inspect the live batter, pitcher, and other players baseball cards during a 3D game while updating R/H/E & count live', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
 

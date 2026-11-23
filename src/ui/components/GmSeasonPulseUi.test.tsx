@@ -46,6 +46,7 @@ describe('GM Season Pulse UI: Promotion Chase, Series Gameplan, Incoming Inbox &
     }));
 
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     // 1. Live Promotion Chase & Owner Goal strip
     expect(screen.getByTestId('promotion-chase-strip')).toBeInTheDocument();

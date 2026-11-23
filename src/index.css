@@ -2,6 +2,18 @@
 @import './styles/tokens.css';
 
 @layer base {
+  html {
+    scroll-padding-top: 72px;
+    scroll-padding-bottom: 84px;
+  }
+
+  @media (min-width: 768px) {
+    html {
+      scroll-padding-top: 16px;
+      scroll-padding-bottom: 16px;
+    }
+  }
+
   html,
   body,
   #root {

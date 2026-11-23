@@ -27,6 +27,7 @@ describe('GM-First Manager Clipboard, Auto-Leveling, Sticky Score & Mobile Modal
   it('shows the Manager Clipboard on Play Ball with 1-tap Fast GM Sim Series, Quick Practice & dynamic alerts', () => {
     let jumpedTo: string | null = null;
     render(<GameDayScreen onJumpToTab={(tab) => { jumpedTo = tab; }} />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sim next 3-game series/i })).toBeInTheDocument();
@@ -73,6 +74,7 @@ describe('GM-First Manager Clipboard, Auto-Leveling, Sticky Score & Mobile Modal
 
   it('keeps the live scoreboard sticky while watching a live game', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
 
     const stickyWrap = screen.getByTestId('sticky-live-scoreboard');

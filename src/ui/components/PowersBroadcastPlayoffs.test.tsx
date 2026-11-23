@@ -60,6 +60,7 @@ describe('Broadcast Strike-Zone Plot, Active Special Power Dock & Interactive Pl
 
   it('exposes live Active National/Capstone Power activation button & Matchup Power Badges in GameDayScreen', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
     fireEvent.click(screen.getByTestId('control-mode-toggle'));
 

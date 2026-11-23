@@ -4,10 +4,15 @@ import {
   applyOpeningDaySparkSp,
   buildFirstPitchCoachTip,
   buildMvpDugoutQuote,
+  buildPostGameMvpHeadline,
+  evaluateMatchupCardSparkle,
   evaluateTrophyCaseProgress,
   evaluateWelcomeChecklist,
   selectClubSpotlightTrio,
 } from './openingDayHook';
+import { buildManagerActionInbox } from './managerActionInbox';
+import { createManagerProfile } from '../models/manager';
+import type { PlayEvent } from '../models/playEvent';
 
 function makeClub(seed = 1994) {
   return generateSixTierWorld(seed, {
@@ -193,5 +198,179 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
     expect(album.unlockedCount).toBeGreaterThanOrEqual(5);
     expect(album.relicsOwnedCount).toBe(1);
     expect(album.favoriteCount).toBe(2);
+  });
+
+  it('starts fresh rosters at 0 SP so Day-1 Spark yields exactly 2 player SP (+1 Manager = 3 total) and hides Ballpark badge before Game 1', () => {
+    const club = makeClub(1994);
+    expect(club.roster.every((p) => p.skillPoints === 0)).toBe(true);
+
+    const sparked = applyOpeningDaySparkSp(club);
+    const totalPlayerSp = sparked.roster.reduce((sum, p) => sum + p.skillPoints, 0);
+    expect(totalPlayerSp).toBe(2);
+
+    const manager = createManagerProfile({ name: 'Coach Skip', avatarSeed: 1994 });
+    const preGameInbox = buildManagerActionInbox({
+      club: { ...sparked, economy: { ...sparked.economy, cash: 25_000 } },
+      manager,
+      currentSeriesIndex: 0,
+      unopenedPackCount: 1,
+    });
+    expect(preGameInbox.tabBadges.skills).toBe('⚡ 3');
+    expect(preGameInbox.tabBadges.economy).toBeUndefined();
+
+    const postGameInbox = buildManagerActionInbox({
+      club: { ...sparked, wins: 1, economy: { ...sparked.economy, cash: 25_000 } },
+      manager,
+      currentSeriesIndex: 0,
+      unopenedPackCount: 1,
+    });
+    expect(postGameInbox.tabBadges.economy).toBe('⬆');
+  });
+
+  it('builds energetic 90s sports headlines for post-game MVPs instead of robotic copy', () => {
+    expect(buildPostGameMvpHeadline('Rowan Hayes', { homeRuns: 1 })).toMatch(/crushed a home run/i);
+    expect(buildPostGameMvpHeadline('Rowan Hayes', { homeRuns: 2 })).toMatch(/launched 2 home runs/i);
+    expect(buildPostGameMvpHeadline('Inés Torres', { pitchingStrikeouts: 5 })).toMatch(/fanned 5 batters/i);
+    expect(buildPostGameMvpHeadline('Inés Torres', { pitchingStrikeouts: 3 })).toMatch(/mowed down 3 batters/i);
+    expect(buildPostGameMvpHeadline('Inés Torres', { pitchingStrikeouts: 1 })).toMatch(/key k/i);
+    expect(buildPostGameMvpHeadline('Kiko Sato', { rbis: 3 })).toMatch(/drove in 3/i);
+    expect(buildPostGameMvpHeadline('Kiko Sato', { rbis: 1 })).toMatch(/knocked in/i);
+    expect(buildPostGameMvpHeadline('Finn Reed', { hits: 3 })).toMatch(/racked up 3/i);
+    expect(buildPostGameMvpHeadline('Finn Reed', { hits: 1 })).toMatch(/clutch hit/i);
+    expect(buildPostGameMvpHeadline('Finn Reed', { hits: 2 })).toMatch(/2 hits/i);
+    expect(buildPostGameMvpHeadline('Sam Park', undefined)).toMatch(/player of the game/i);
+  });
+
+  it('computes reactive sparkle glow rings, badges, and live play reactions for MatchupPrints', () => {
+    const club = makeClub(1994);
+    const batter = { ...club.roster[0], formState: 'hot' as const };
+    const pitcher = { ...club.roster.find((p) => p.position === 'SP')!, formState: 'neutral' as const };
+
+    const hrEvent: PlayEvent = {
+      seq: 10,
+      inning: 3,
+      half: 'BOT',
+      type: 'ball_in_play',
+      outsBefore: 0,
+      outsAfter: 0,
+      balls: 1,
+      strikes: 1,
+      basesAfter: [null, null, null],
+      isClutchMoment: false,
+      outcome: 'home_run',
+      batterId: batter.id,
+      pitcherId: pitcher.id,
+      awayScore: 1,
+      homeScore: 2,
+      commentary: 'Boom!',
+    };
+
+    const hrSparkle = evaluateMatchupCardSparkle({
+      player: batter,
+      role: 'batter',
+      isFavorite: true,
+      powerReady: true,
+      powerArmed: false,
+      latestEvent: hrEvent,
+    });
+    expect(hrSparkle.ringTone).toBe('celebrate');
+    expect(hrSparkle.reactionBubble).toMatch(/boom/i);
+    expect(hrSparkle.badges.some((b) => /fav/i.test(b))).toBe(true);
+
+    const kEvent: PlayEvent = {
+      ...hrEvent,
+      seq: 11,
+      outcome: 'strikeout',
+    };
+    const kSparkle = evaluateMatchupCardSparkle({
+      player: pitcher,
+      role: 'pitcher',
+      isFavorite: false,
+      powerReady: true,
+      powerArmed: true,
+      latestEvent: kEvent,
+    });
+    expect(kSparkle.ringTone).toBe('celebrate');
+    expect(kSparkle.reactionBubble).toMatch(/filthy k/i);
+    expect(kSparkle.badges.some((b) => /armed/i.test(b))).toBe(true);
+
+    const powerReadyOnly = evaluateMatchupCardSparkle({
+      player: pitcher,
+      role: 'pitcher',
+      isFavorite: false,
+      powerReady: true,
+      powerArmed: false,
+      latestEvent: null,
+    });
+    expect(powerReadyOnly.ringTone).toBe('power');
+    expect(powerReadyOnly.badges.some((b) => /power/i.test(b))).toBe(true);
+
+    const surgeEvent: PlayEvent = {
+      ...hrEvent,
+      seq: 12,
+      outcome: 'single',
+      specialPowerTriggered: {
+        actor: 'batter',
+        powerId: 'comet',
+        calloutText: 'COMET!',
+        vfxColor: '#FFC300',
+      },
+    };
+    const surgeSparkle = evaluateMatchupCardSparkle({
+      player: batter,
+      role: 'batter',
+      isFavorite: false,
+      powerReady: false,
+      powerArmed: false,
+      latestEvent: surgeEvent,
+    });
+    expect(surgeSparkle.reactionBubble).toMatch(/surge/i);
+
+    const doubleEvent: PlayEvent = { ...hrEvent, seq: 13, outcome: 'double' };
+    expect(
+      evaluateMatchupCardSparkle({
+        player: batter,
+        role: 'batter',
+        isFavorite: false,
+        powerReady: false,
+        powerArmed: false,
+        latestEvent: doubleEvent,
+      }).reactionBubble,
+    ).toMatch(/ripped/i);
+
+    const walkEvent: PlayEvent = { ...hrEvent, seq: 14, outcome: 'walk' };
+    expect(
+      evaluateMatchupCardSparkle({
+        player: batter,
+        role: 'batter',
+        isFavorite: false,
+        powerReady: false,
+        powerArmed: false,
+        latestEvent: walkEvent,
+      }).reactionBubble,
+    ).toMatch(/on base/i);
+
+    const outEvent: PlayEvent = { ...hrEvent, seq: 15, outcome: 'ground_out' };
+    expect(
+      evaluateMatchupCardSparkle({
+        player: pitcher,
+        role: 'pitcher',
+        isFavorite: false,
+        powerReady: false,
+        powerArmed: false,
+        latestEvent: outEvent,
+      }).reactionBubble,
+    ).toMatch(/got 'em/i);
+
+    const coldCalm = evaluateMatchupCardSparkle({
+      player: { ...pitcher, formState: 'cold' },
+      role: 'pitcher',
+      isFavorite: false,
+      powerReady: false,
+      powerArmed: false,
+      latestEvent: null,
+    });
+    expect(coldCalm.ringTone).toBe('none');
+    expect(coldCalm.badges.some((b) => /cold/i.test(b))).toBe(true);
   });
 });

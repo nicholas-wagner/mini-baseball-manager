@@ -221,6 +221,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const [gmQuickFeedback, setGmQuickFeedback] = useState<string | null>(null);
   const [derbyOpen, setDerbyOpen] = useState(false);
   const [trophyOpen, setTrophyOpen] = useState(false);
+  const [openingSeasonExpanded, setOpeningSeasonExpanded] = useState(false);
 
   const opponents = humanClub
     ? leagues[humanClub.leagueTier].filter((c) => c.id !== humanClub.id)
@@ -252,7 +253,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const [cameraMode, setCameraMode] = useState<LiveCameraMode>('auto');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
-  const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('attack_zone');
+  const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('high_heat');
   const [batterGuess, setBatterGuess] = useState<BatterPitchGuess>('none');
   const [moundVisitUsed, setMoundVisitUsed] = useState(false);
   const [argueUsed, setArgueUsed] = useState(false);
@@ -434,7 +435,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     setRecentEvents([]);
     setAtBatEvents([]);
     setArmedPowerId(null);
-    setPitchTarget('attack_zone');
+    setPitchTarget('high_heat');
     setBatterGuess('none');
     setMoundVisitUsed(false);
     setArgueUsed(false);
@@ -487,7 +488,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     setRecentEvents([...clutch.events].reverse());
     setAtBatEvents([]);
     setArmedPowerId(null);
-    setPitchTarget('attack_zone');
+    setPitchTarget(guided ? 'attack_zone' : 'high_heat');
     setBatterGuess('none');
     setMoundVisitUsed(false);
     setArgueUsed(false);
@@ -930,10 +931,21 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
       ? (preGameScoutEntries.find((e) => e.player.id === preGameScoutPlayerId) ?? null)
       : null;
 
+    const showFullSeasonHub = !isOpeningDay || openingSeasonExpanded;
+    const openingOpponentLabel = scheduledOpponent
+      ? `${scheduledIsHome ? 'vs' : '@'} ${scheduledOpponent.city} ${scheduledOpponent.name}`
+      : undefined;
+
     return (
       <div className="space-y-4">
-        {openingMoment && <OpeningDayPrint session={openingMoment.session} onStart={()=>handleStartClutchMoment(true)}
-          onInspect={player => setPreGameScoutPlayerId(player.id)} />}
+        {openingMoment && (
+          <OpeningDayPrint
+            session={openingMoment.session}
+            opponentLabel={openingOpponentLabel}
+            onStart={() => handleStartClutchMoment(true)}
+            onInspect={(player) => setPreGameScoutPlayerId(player.id)}
+          />
+        )}
         {/* Top-of-Screen Glowing Foil Pack Alert (Instant Dopamine Hit!) */}
         {unopenedPacks.length > 0 ? (
           <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-r from-[#7209B7] via-[#F72585] to-[#FFC300] text-white flex flex-wrap items-center justify-between gap-2 shadow-[4px_4px_0_#181B2C]">
@@ -959,6 +971,83 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           </div>
         ) : null}
 
+        {/* Opening Day Cute "Meet Your 3 Stars" Manga Card Showcase (Moment #3 on Opening Day!) */}
+        {spotlightTrio.length > 0 ? (
+          <div
+            data-testid="meet-your-squad-card"
+            className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFF8E7] shadow-[4px_4px_0_#181B2C] space-y-2.5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-display text-xs sm:text-sm text-[#181B2C]">
+                🌟 MEET YOUR {humanClub.name.toUpperCase()} STARS! (Tap Any Card to Flip!)
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-[#FFC300] border border-[#181B2C] text-[10px] font-extrabold text-[#181B2C]">
+                OPENING DAY SQUAD
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {spotlightTrio.map((star) => (
+                <button
+                  key={star.player.id}
+                  type="button"
+                  data-testid="squad-star-btn"
+                  onClick={() => {
+                    setPreGameScoutPlayerId(star.player.id);
+                    soundEngine.play('card_flip');
+                  }}
+                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] flex items-center gap-2.5 text-left cursor-pointer shadow-[2px_2px_0_#181B2C]"
+                >
+                  <PlayerPortraitBadge
+                    player={star.player}
+                    primaryColor={humanClub.colors.primary}
+                    accentColor={humanClub.colors.accent}
+                    size="sm"
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-extrabold uppercase text-[#7209B7]">
+                      {star.roleBadge}
+                    </div>
+                    <div className="font-display text-xs text-[#181B2C] truncate">
+                      {star.player.name} ({star.player.position})
+                    </div>
+                    <div className="text-[10px] font-bold text-[#4A5068] truncate">
+                      {star.tagline}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Calm Opening Day Progressive Disclosure Toggle (Auto-expands once Game 1 is complete!) */}
+        {isOpeningDay ? (
+          <button
+            type="button"
+            data-testid="opening-day-more-toggle"
+            aria-expanded={openingSeasonExpanded}
+            onClick={() => {
+              setOpeningSeasonExpanded((v) => !v);
+              soundEngine.play('ui_pop');
+            }}
+            className="w-full p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C] flex flex-wrap items-center justify-between gap-2 text-left cursor-pointer min-h-[48px] transition"
+          >
+            <div className="min-w-0">
+              <div className="font-display text-xs sm:text-sm text-[#181B2C]">
+                📋 Full Season &amp; GM Options {openingSeasonExpanded ? '▴' : '▾'}
+              </div>
+              <div className="text-[11px] font-bold text-[#4A5068]">
+                Full 5/7/9-Inn Game • 7-Series Schedule • 30s HR Derby • Trophy Album • GM Clipboard
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] text-[#1D3557] font-display text-[11px] shrink-0">
+              {openingSeasonExpanded ? 'Hide Options' : 'Show Options'}
+            </span>
+          </button>
+        ) : null}
+
+        {showFullSeasonHub ? (
+          <div className="space-y-4">
         {lastSeriesRecap ? (
           <div
             data-testid="series-recap-card"
@@ -1547,55 +1636,6 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           </div>
         ) : null}
 
-        {/* Opening Day Cute "Meet Your 3 Stars" Manga Card Showcase */}
-        {spotlightTrio.length > 0 ? (
-          <div
-            data-testid="meet-your-squad-card"
-            className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFF8E7] shadow-[4px_4px_0_#181B2C] space-y-2.5"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-display text-xs sm:text-sm text-[#181B2C]">
-                🌟 MEET YOUR {humanClub.name.toUpperCase()} STARS! (Tap Any Card to Flip!)
-              </div>
-              <span className="px-2 py-0.5 rounded-full bg-[#FFC300] border border-[#181B2C] text-[10px] font-extrabold text-[#181B2C]">
-                OPENING DAY SQUAD
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {spotlightTrio.map((star) => (
-                <button
-                  key={star.player.id}
-                  type="button"
-                  data-testid="squad-star-btn"
-                  onClick={() => {
-                    setPreGameScoutPlayerId(star.player.id);
-                    soundEngine.play('card_flip');
-                  }}
-                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] flex items-center gap-2.5 text-left cursor-pointer shadow-[2px_2px_0_#181B2C]"
-                >
-                  <PlayerPortraitBadge
-                    player={star.player}
-                    primaryColor={humanClub.colors.primary}
-                    accentColor={humanClub.colors.accent}
-                    size="sm"
-                  />
-                  <div className="min-w-0">
-                    <div className="text-[9px] font-extrabold uppercase text-[#7209B7]">
-                      {star.roleBadge}
-                    </div>
-                    <div className="font-display text-xs text-[#181B2C] truncate">
-                      {star.player.name} ({star.player.position})
-                    </div>
-                    <div className="text-[10px] font-bold text-[#4A5068] truncate">
-                      {star.tagline}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         {/* Gentle Story & Origins Comic Adventure Nudge */}
         {nextStoryBeat && onOpenStory ? (
           <div
@@ -1668,6 +1708,8 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           }}
           onActionClick={handleManagerJump}
         />
+          </div>
+        ) : null}
 
         <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
 
@@ -2033,7 +2075,31 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
                 </div> : null
               }
             />
-            <MatchupPrints memories={humanClub.keepsakes} batter={picturedBatter} pitcher={picturedPitcher} onInspect={openGamePlayerCard} />
+            <MatchupPrints
+              memories={humanClub.keepsakes}
+              batter={picturedBatter}
+              pitcher={picturedPitcher}
+              batterFavorite={favoritePlayerIds.includes(picturedBatter.id)}
+              pitcherFavorite={favoritePlayerIds.includes(picturedPitcher.id)}
+              batterPowerReady={
+                humanIsBatting &&
+                Boolean(readyPowerOption) &&
+                picturedBatter.id === currentBatter.id
+              }
+              pitcherPowerReady={
+                !humanIsBatting &&
+                Boolean(readyPowerOption) &&
+                picturedPitcher.id === currentPitcher.id
+              }
+              batterPowerArmed={
+                humanIsBatting && Boolean(armedPowerId) && picturedBatter.id === currentBatter.id
+              }
+              pitcherPowerArmed={
+                !humanIsBatting && Boolean(armedPowerId) && picturedPitcher.id === currentPitcher.id
+              }
+              latestEvent={pendingDecision ? null : playbackEvent}
+              onInspect={openGamePlayerCard}
+            />
 
             {guiding && <FirstAtBat session={shown} batting={guidedBatting} target={pitchTarget} call={tacticalCall}
               locked={pendingDecision} expanded={showMore} powerArmed={Boolean(armedPowerId)} cue={liveCue} onExpand={()=>setShowMore(v=>!v)}

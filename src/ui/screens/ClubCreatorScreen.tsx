@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Dices, Play, Sparkles } from 'lucide-react';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
+import { ILLUSTRATED_PLAYER_POOL } from '../../art/portraits/illustratedPlayerPool';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
 import { soundEngine } from '../../audio/soundEngine';
 import {
@@ -88,6 +89,10 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
 
   const palette = SAMPLE_TEAM_PALETTES[paletteIndex];
   const previewTraits = createPortraitTraits(seedNonce);
+  const featuredMangaCards = [0, 1, 2].map(
+    (offset) =>
+      ILLUSTRATED_PLAYER_POOL[(paletteIndex * 3 + offset) % ILLUSTRATED_PLAYER_POOL.length],
+  );
 
   const handleRandomize = () => {
     const nextSeed = seedNonce + 137;
@@ -134,8 +139,8 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
         headerBg="#1B4332"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 1. Above-the-Fold 5-Second Toy Box Hero (Quick Club + Cute Mascot + Live Preview + BIG PLAY BUTTON!) */}
-          <div className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_230px] gap-4 items-center">
+          {/* 1. Above-the-Fold 5-Second Toy Box Hero (Quick Club + Cute Mascot + Fanned Manga Cards + BIG PLAY BUTTON!) */}
+          <div className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_270px] gap-4 items-center">
             <div className="space-y-3">
               <div data-testid="quick-club-presets" className="space-y-1.5">
                 <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
@@ -223,38 +228,89 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
               </div>
             </div>
 
-            {/* Live Bouncing Mascot + Painted Chibi Uniform Stage */}
-            <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C]">
-              <div className="flex items-center justify-center gap-2">
+            {/* Live Bouncing Mascot + Fanned 3 Real Manga Player Cards Showcase (Top-of-screen on Mobile, Right column on Desktop!) */}
+            <div className="order-first md:order-last p-2.5 sm:p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C] flex items-center justify-between gap-2 md:block md:space-y-2.5">
+              <div className="flex items-center justify-start md:justify-center gap-2 min-w-0">
                 <ClubMascotBuddy
                   mascot={mascot || 'Rocket Dog'}
                   primaryColor={palette.primary}
                   secondaryColor={palette.secondary}
                   accentColor={palette.accent}
                   mood="cheering"
-                  size="md"
+                  size="sm"
                 />
                 <div className="text-left min-w-0">
-                  <div className="font-display text-sm text-[#181B2C] leading-tight truncate">
+                  <div className="font-display text-xs sm:text-sm text-[#181B2C] leading-tight truncate">
                     {city || 'Sandlot'} {clubName || 'Comets'}
                   </div>
-                  <div className="text-[11px] font-bold text-[#4A5068] truncate">
-                    Mascot: {mascot || 'Rocket Dog'}
+                  <div className="text-[10px] sm:text-[11px] font-bold text-[#4A5068] truncate">
+                    {mascot || 'Rocket Dog'}
+                  </div>
+                  <div className="flex md:hidden items-center gap-1 mt-1">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-[#181B2C]"
+                      style={{ backgroundColor: palette.primary }}
+                    />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-[#181B2C]"
+                      style={{ backgroundColor: palette.secondary }}
+                    />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-[#181B2C]"
+                      style={{ backgroundColor: palette.accent }}
+                    />
                   </div>
                 </div>
               </div>
-              <div className="w-36 h-40 mx-auto mt-1.5">
-                <PaintedUniformPreview
-                  traits={previewTraits}
-                  team={{
-                    primary: palette.primary,
-                    secondary: palette.secondary,
-                    accent: palette.accent,
-                    monogram: monogram.slice(0, 2) || 'SC',
-                  }}
-                  jerseyNumber={24}
-                  role="pitcher"
-                />
+
+              <div
+                data-testid="creator-manga-fan"
+                className="flex items-end justify-center pt-1 pb-0.5 px-1 shrink-0"
+              >
+                {featuredMangaCards.map((card, idx) => {
+                  const tiltClass =
+                    idx === 0
+                      ? '-rotate-6 -mr-3 z-0'
+                      : idx === 1
+                        ? 'z-10 -translate-y-1 scale-105'
+                        : 'rotate-6 -ml-3 z-0';
+                  return (
+                    <div
+                      key={card.id}
+                      className={`w-[56px] md:w-[80px] rounded-lg border-2 border-[#181B2C] bg-[#FFF8E7] p-0.5 shadow-[2px_3px_0_#181B2C] transition-transform ${tiltClass}`}
+                    >
+                      <img
+                        src={card.illustration}
+                        alt={`${card.name} manga baseball card`}
+                        width={80}
+                        height={100}
+                        className="w-full aspect-[4/5] object-cover rounded-[4px] border border-[#181B2C]/30"
+                      />
+                      <div className="hidden md:flex items-center justify-between px-1 py-0.5 text-[9px] font-extrabold text-[#181B2C]">
+                        <span className="truncate">{card.name.split(' ')[0]}</span>
+                        <span className="font-mono-tabular text-[#9D0208]">{card.position}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden md:flex items-center justify-center gap-2 text-[10px] font-extrabold text-[#1B4332]">
+                <span>🃏 3,000+ Manga Cards</span>
+                <span className="inline-flex items-center gap-1">
+                  <span
+                    className="w-3 h-3 rounded-full border border-[#181B2C]"
+                    style={{ backgroundColor: palette.primary }}
+                  />
+                  <span
+                    className="w-3 h-3 rounded-full border border-[#181B2C]"
+                    style={{ backgroundColor: palette.secondary }}
+                  />
+                  <span
+                    className="w-3 h-3 rounded-full border border-[#181B2C]"
+                    style={{ backgroundColor: palette.accent }}
+                  />
+                </span>
               </div>
             </div>
           </div>
@@ -356,26 +412,41 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
               </div>
             </div>
 
-            <div>
-              <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C] mb-1.5">
-                Uniform Colors
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-3 items-center">
+              <div>
+                <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C] mb-1.5">
+                  Uniform Colors
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {SAMPLE_TEAM_PALETTES.map((item, idx) => (
+                    <ComicButton
+                      key={item.id}
+                      size="sm"
+                      variant={paletteIndex === idx ? 'gold' : 'cream'}
+                      active={paletteIndex === idx}
+                      onClick={() => setPaletteIndex(idx)}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full border border-[#181B2C] inline-block"
+                        style={{ backgroundColor: item.primary }}
+                      />
+                      {item.name}
+                    </ComicButton>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {SAMPLE_TEAM_PALETTES.map((item, idx) => (
-                  <ComicButton
-                    key={item.id}
-                    size="sm"
-                    variant={paletteIndex === idx ? 'gold' : 'cream'}
-                    active={paletteIndex === idx}
-                    onClick={() => setPaletteIndex(idx)}
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full border border-[#181B2C] inline-block"
-                      style={{ backgroundColor: item.primary }}
-                    />
-                    {item.name}
-                  </ComicButton>
-                ))}
+              <div className="w-28 h-32 mx-auto rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] p-1">
+                <PaintedUniformPreview
+                  traits={previewTraits}
+                  team={{
+                    primary: palette.primary,
+                    secondary: palette.secondary,
+                    accent: palette.accent,
+                    monogram: monogram.slice(0, 2) || 'SC',
+                  }}
+                  jerseyNumber={24}
+                  role="pitcher"
+                />
               </div>
             </div>
 

@@ -24,6 +24,7 @@ describe('Predetermined Season Schedule UI & Home/Away Road Trip Play', () => {
 
   it('shows the predetermined 7-series Home/Away schedule instead of an opponent picker and launches Road Trips with human batting TOP 1', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     // No manual opponent picker ("Choose Today's Matchup") — shows predetermined schedule!
     expect(screen.queryByText(/choose today's matchup/i)).not.toBeInTheDocument();

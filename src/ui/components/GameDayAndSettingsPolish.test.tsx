@@ -37,6 +37,7 @@ describe('Broadcast Polish, Trainer Table, PNG Card Export & Settings Drawer', (
     const user = userEvent.setup();
     render(<GameDayScreen />);
 
+    await user.click(screen.getByTestId('opening-day-more-toggle'));
     await user.click(screen.getByRole('button', { name: /start live 3d game/i }));
     expect(screen.getByTestId('game-weather-banner')).toBeInTheDocument();
     expect(screen.getByTestId('rivalry-showdown-banner')).toBeInTheDocument();

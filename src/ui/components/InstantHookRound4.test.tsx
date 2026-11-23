@@ -104,6 +104,7 @@ describe('Instant Hook Round 4: Day-1 SP & Checklist, Arcade Speed/Steal/Smart S
 
   it('offers 1-tap Smart Watch 3D start, Arcade Speed Toggle, and Playable Derby / Trophy buttons on GameDayScreen', () => {
     render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
 
     expect(screen.getByTestId('start-smart-watch-btn')).toBeInTheDocument();
     expect(screen.getByTestId('open-arcade-derby-btn')).toBeInTheDocument();
