@@ -1,6 +1,8 @@
+import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import { batterBox, headingToward } from './diamondLayout';
 import { createDelivery, sampleDeliveryFlight, type ShowcaseDelivery } from '../vfx/showcaseDelivery';
+import { runBases } from './outfieldPlay';
 import { diamondPlay, type DiamondPlay } from './diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
@@ -58,6 +60,7 @@ function toTeamColors(club: Club): PortraitTeamColors {
 export class GameSceneController {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
+  private welcome: WalkoffTeammates;
   private camera: THREE.PerspectiveCamera;
   private ballpark: ReturnType<typeof createMiniBallpark>;
   private stadiumOverlay: StadiumEvolutionOverlay | null = null;
@@ -74,7 +77,7 @@ export class GameSceneController {
   private elapsedSec = 0;
   private trauma = 0;
 
-  private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number } | null = null;
+  private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; runnerDestinations?: number[] } | null = null;
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
   private bats: EffectiveBatSide = 'R';
   private throws: ThrowsHand = 'R';
@@ -89,6 +92,7 @@ export class GameSceneController {
   constructor(container: HTMLElement) {
     this.container = container;
     this.scene = new THREE.Scene();
+    this.welcome=new WalkoffTeammates(this.scene);
     this.scene.background = new THREE.Color(0x63caff);
     this.scene.fog = new THREE.Fog(0x88dbff, 48, 115);
 
@@ -167,7 +171,9 @@ export class GameSceneController {
     choreo?: ChoreographedStep | null,
     event?: PlayEvent | null,
   ): void {
-    const half = choreo && event ? event.half : session.half;
+    const half = event?.type==='pitching_change' && event.pitcherId
+      ? session.home.playersById[event.pitcherId] ? 'TOP' : 'BOT'
+      : choreo && event ? event.half : session.half;
     const fieldingClub = half === 'TOP' ? homeClub : awayClub;
     const battingClub = half === 'TOP' ? awayClub : homeClub;
 
@@ -196,7 +202,7 @@ export class GameSceneController {
 
     const pitcher = fieldingSide.playersById[(choreo && event?.pitcherId) || fieldingSide.activePitcherId];
     const batterSlot = battingSide.lineup[battingSide.lineupIndex % battingSide.lineup.length];
-    const batter = battingSide.playersById[(choreo && event?.batterId) || batterSlot.playerId];
+    const batter = (choreo && event?.batterId && battingSide.playersById[event.batterId]) || battingSide.playersById[batterSlot.playerId];
     const effectiveBat = resolveEffectiveBatSide(batter.bats, pitcher.throws);
 
     this.bats = effectiveBat;
@@ -209,6 +215,7 @@ export class GameSceneController {
       throwsHand: batter.throws,
       batSide: effectiveBat,
     });
+    this.batterRig.preparePlayback();
     const box = batterBox(effectiveBat);
     this.batterRig.logicalYaw = box.yaw;
     this.batterRig.root.position.copy(box.position);
@@ -232,9 +239,11 @@ export class GameSceneController {
         role: coord.pos === 'P' ? 'pitcher' : coord.pos === 'C' ? 'catcher' : 'fielder',
         throwsHand: defender.throws,
       });
+      rig.preparePlayback();
     }
 
-    session.bases.forEach((baseId, idx) => {
+    const bases = (choreo?.outfield || choreo?.close || choreo?.infield === 'bunt_single' || choreo?.infield === 'fielding_error') && choreo.basesBefore ? choreo.basesBefore : session.bases;
+    bases.forEach((baseId, idx) => {
       const runnerId = idx === 0 && choreo?.infield === 'double_play' ? choreo.leadRunnerId : baseId;
       const rig = this.runnerRigs[idx];
       rig.root.position.copy(BASE_PATH_VERTICES[idx + 1]);
@@ -249,17 +258,31 @@ export class GameSceneController {
           role: 'fielder',
           throwsHand: runner.throws,
         });
+        rig.preparePlayback();
       }
     });
 
     this.replay = null;
     this.pitch = null;
     this.vfx.clear();
-    if (choreo?.infield) {
-      const play = diamondPlay(choreo.infield, choreo.highlightFielderPos);
+    this.welcome.hide();
+    const play = choreo?.play ?? choreo?.close ?? choreo?.outfield ?? (choreo?.infield ? diamondPlay(choreo.infield, choreo.highlightFielderPos) : undefined);
+    if (play && choreo) {
+      if (play.ending?.kind==='walkoff') {
+        const teammates=battingSide.lineup.map(slot=>battingSide.playersById[slot.playerId])
+          .filter(p=>p && p.id!==batter.id && !bases.includes(p.id)).slice(0,2);
+        this.welcome.set(teammates.map(p=>({traits:p.traits,jerseyNumber:p.jerseyNumber,throwsHand:p.throws,team:battingTeam,role:'fielder'})));
+      }
       const at = (pos: DiamondDefenderPos) => this.defenders.get(pos)!;
-      this.replay = { play, cast: { P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
-        '3B': at('3B'), BAT: this.batterRig, RUN: this.runnerRigs[0] },
+      this.replay = { play, cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
+        '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
+        BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
+        runnerDestinations: (play.outfield || play.close || play.kind === 'bunt_single' || play.kind === 'fielding_error') && event ? bases.map((id, i) => {
+          if (!id) return i + 1;
+          const dest = event.basesAfter.indexOf(id);
+          if (dest >= 0) return dest + 1;
+          return play.outfield?.caught && play.kind !== 'sac_fly' ? i + 1 : 4;
+        }) : undefined,
         start: this.elapsedSec, rate: play.duration * 1000 / choreo.durationMs };
       return;
     }
@@ -333,27 +356,41 @@ export class GameSceneController {
 
   private startLoop(): void {
     const tick = (now: number) => {
-      const dt = Math.min(0.05, Math.max(0.001, (now - this.lastTimestamp) / 1000));
+      const elapsed = Math.max(0, (now - this.lastTimestamp) / 1000);
+      const dt = Math.min(.05, elapsed);
       this.lastTimestamp = now;
-      this.elapsedSec += dt;
-      this.updateScene(dt);
+      this.elapsedSec += elapsed;
+      this.updateScene(dt, elapsed);
       this.renderer.render(this.scene, this.camera);
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
   }
 
-  private updateScene(dt: number): void {
+  private updateScene(dt: number, elapsed: number): void {
     if (this.replay) {
-      const { play, cast, start, rate } = this.replay;
+      const { play, cast, start, rate, runnerDestinations } = this.replay;
       const t = (this.elapsedSec - start) * rate;
-      renderDiamondPlay(play, cast, this.bats, t, t - dt * rate, this.camera, this.container.clientHeight, this.vfx);
-      for (const pos of ['C', 'LF', 'CF', 'RF'] as const)
-        this.defenders.get(pos)?.updatePose('field_ready', t, undefined, this.camera.position);
-      for (const runner of this.runnerRigs) {
-        if (runner.root.visible && !(play.kind === 'double_play' && runner === cast.RUN))
+      const fixedShot = this.cameraOverride
+        ? getCameraPresetPose(this.cameraOverride,this.elapsedSec,0,this.throws,this.bats) : undefined;
+      renderDiamondPlay(play, cast, this.bats, t, t - elapsed * rate, this.camera, this.container.clientHeight,
+        this.vfx, this.throws, fixedShot, this.welcome.rigs);
+      this.runnerRigs.forEach((runner, i) => {
+        if (!runner.root.visible || ((play.scorerBase || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
+        const destination = runnerDestinations?.[i];
+        if (destination === undefined) {
           runner.updatePose('runner_lead', t, undefined, this.camera.position);
-      }
+          return;
+        }
+        const go = play.close?.steal ? .52 : play.kind === 'ball_four' ? play.pickupAt+.60
+          : (play.outfield?.caught ? play.pickupAt : play.legs[0].end) + .12;
+        const arrival = play.kind === 'ball_four' ? play.batterArrival : play.close?.steal ? play.leadArrival : go + (destination - i - 1) * 1.30;
+        const state = runBases(BASE_PATH_VERTICES[i + 1], i + 1, destination, t, go, arrival);
+        runner.root.position.copy(state.pos);
+        runner.logicalYaw = state.yaw;
+        runner.updatePose(state.clip, state.local, undefined, this.camera.position);
+        if (destination === 4 && t > arrival + .28) runner.root.visible = false;
+      });
       this.vfx.update(dt, this.camera);
       this.ballpark.update(dt, 0.57);
       return;
@@ -405,6 +442,7 @@ export class GameSceneController {
     if (this.stadiumOverlay) this.stadiumOverlay.dispose();
     this.ballpark.dispose();
     for (const rig of this.defenders.values()) rig.dispose();
+    this.welcome.dispose();
     this.batterRig.dispose();
     for (const runner of this.runnerRigs) runner.dispose();
     this.renderer.dispose();

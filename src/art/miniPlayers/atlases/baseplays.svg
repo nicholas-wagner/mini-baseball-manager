@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="3072" viewBox="0 0 1024 3072">
+  <!-- Four registered poses per uniform row. The lower half is the matching skin ink mask. -->
+  <style>
+    .uniform{fill:var(--fabric,#f4e8d8)} .shade{fill:var(--shade,#baaaa7)}
+    .red{fill:var(--trim,#be3442)} .blue{fill:var(--pad,#303f60)}
+    .skin{fill:var(--skin,#eeb481)} .mitt{fill:var(--leather,#b3692c)}
+    .light{fill:var(--light,#efae5b)} .seam{fill:none;stroke:var(--ink,#49313a);stroke-width:2}
+    .detail{fill:none;stroke:var(--thread,#fff0d6);stroke-width:2.3}
+  </style>
+  <defs>
+    <g id="shoe">
+      <path class="red" d="M-14-7Q-7-14 1-8L8-3Q20-3 22 3Q22 8 14 9L-13 9Q-18 6-14-7Z"/>
+      <path class="uniform" d="M-14 5Q1 7 21 3L21 7Q10 12-14 10Z"/>
+      <path class="detail" d="m0-5-4 3m10-1-4 3"/>
+    </g>
+    <g id="glove">
+      <path class="mitt" d="M-16 5Q-26-2-20-11Q-15-15-9-6L-13-22Q-12-28-7-25L-2-15L-3-27Q0-32 5-26L8-16L9-26Q13-29 16-23L16-14Q23-22 25-13Q24 0 14 10Q0 21-16 9Z"/>
+      <path class="light" d="M-13 3Q-6 10 4 7L16-4Q10 12-1 14Q-12 16-13 3Z"/>
+      <path class="seam" d="m-9-17 6 9m3-13 5 12m7-11 1 10M-14 3Q-5-6 4-5"/>
+      <path class="detail" d="m-15 9 3-3m3 6 3-3m4 3 3-3m4 1 3-4"/>
+    </g>
+    <g id="slidelegs">
+      <path class="blue" d="M113 202Q133 180 151 179Q166 180 163 192L145 218 125 229 105 220Z"/>
+      <path class="uniform" d="M124 202Q142 183 152 182Q161 184 158 191L143 210 127 220 111 214Z"/>
+      <path class="red" d="m140 210-12 15-17 3-6-9 19-12Z"/>
+      <use xlink:href="#shoe" transform="translate(113 230) rotate(9)"/>
+      <path class="red" d="M154 212 211 214 224 200 232 206 224 229 156 232Z"/>
+      <use xlink:href="#shoe" transform="translate(226 214) rotate(-62)"/>
+    </g>
+    <g id="slidepants">
+      <path class="uniform" d="M89 191Q103 186 126 200L164 212 195 213 194 230 146 233Q121 232 105 224Q85 219 89 191Z"/>
+      <path class="shade" d="M95 211Q122 225 149 223L194 219 194 228Q164 237 130 231Q101 228 95 211Z" stroke="none"/>
+      <path class="seam" d="m113 202 33 17 28 1m10-4-5 4"/>
+    </g>
+    <g id="slideshorts">
+      <path class="skin" d="m137 205 39 10 24 1-1 13-36-1-35-10Z"/>
+      <path class="uniform" d="M90 188Q109 186 131 200L151 208 143 226Q111 227 93 214Z"/>
+      <path class="seam" d="m136 205-7 14"/>
+    </g>
+    <g id="slideskirt">
+      <use xlink:href="#slideshorts"/><path class="uniform" d="M88 188 115 189Q130 202 146 208L135 219 125 215 122 221 97 217 83 208Z"/>
+      <path class="seam" d="m110 195 9 19m-20-16 4 14"/>
+    </g>
+    <g id="slidetorso">
+      <path class="skin" d="M73 161Q75 152 84 157L93 178 82 203 68 222Q62 233 56 229Q52 225 58 218L64 208 50 222Q42 224 43 219L58 201Z"/>
+      <path class="uniform" d="M81 141 97 144Q113 148 115 161L119 175Q114 184 123 196L112 204 86 198 80 178 68 173 71 153Z"/>
+      <path class="shade" d="m79 170 8-11 7 17 21 12 2 9-27-4Z" stroke="none"/>
+      <path class="red" d="m71 168 13 7-2 5-14-7Z"/>
+      <path class="blue" d="m85 194 31 4 6-4 3 7-11 5-30-6Z"/>
+    </g>
+    <g id="slidetop"><use xlink:href="#slidetorso"/>
+      <path class="skin" d="M104 157Q109 150 115 155L128 164 150 147 150 137Q151 132 155 135L155 142 161 133Q166 130 166 135L161 150 133 177Q128 180 122 176L107 167Z"/>
+      <path class="uniform" d="M99 146Q113 140 122 157L112 169 100 164Z"/>
+      <path class="red" d="m119 153 5 4-11 13-4-4Z"/>
+      <path class="detail" d="m79 151 3-5m9 45 13 3"/>
+    </g>
+    <g id="stancelegs">
+      <path class="blue" d="M106 159 127 169 103 207 65 237 53 226 86 190Z"/>
+      <path class="blue" d="M133 159Q148 155 160 173L174 198 178 233 158 237 153 202 120 183Z"/>
+      <use xlink:href="#shoe" transform="translate(58 234) rotate(-12)"/>
+      <use xlink:href="#shoe" transform="translate(168 235)"/>
+    </g>
+    <g id="longlegs">
+      <path class="uniform" d="M105 152 148 153 166 179 174 203 177 225 159 227 153 202 129 182 104 210 74 230 58 222 86 191Z"/>
+      <path class="seam" d="m117 166-17 27-13 9m50-31 20 22m-3 9 9-4m-64 9-13 3"/>
+    </g>
+    <g id="shortlegs">
+      <path class="skin" d="m91 183 15 7-13 18-22 16-9-10Zm62-8 14 7 5 17-15 3-10-17Z"/>
+      <path class="uniform" d="m103 150 46 2 18 28-20 15-18-15-16 16-24-13Z"/>
+    </g>
+    <g id="skirt"><use xlink:href="#shortlegs"/><path class="uniform" d="m106 150 43 1 15 31-13 7-15-3-13 5-28-9Z"/><path class="seam" d="m121 158-6 23m23-23 6 23"/></g>
+    <g id="tagtop">
+      <path class="skin" d="M126 131Q132 125 141 132L145 157 132 178Q126 186 119 180L115 175 128 154Z"/>
+      <path class="uniform" d="M127 113 146 105Q162 106 172 123L160 140 146 138 149 158Q131 172 102 157L114 132Z"/>
+      <path class="blue" d="M104 153Q129 164 149 154L151 162Q131 174 101 161Z"/>
+      <path class="skin" d="M157 131Q166 122 171 132L183 160 205 184 197 197 169 173Q164 170 160 161Z"/>
+      <path class="red" d="m156 133 14-10 4 6-16 12Z"/>
+      <use xlink:href="#glove" transform="translate(209 199) rotate(143) scale(1.13)"/>
+      <path class="seam" d="m135 117-7 25 8 10"/>
+    </g>
+    <g id="armor">
+      <path class="blue" d="M108 80 126 85 145 78 162 94 150 143 130 152 105 138 95 98Z"/>
+      <path class="seam" d="m105 101 23 8 22-9m-46 12 24 8 20-7m-41 12 21 7 17-6"/>
+      <path class="detail" d="m109 91 18 7 15-5m-30 38 12 4"/>
+      <path class="blue" d="m91 187 13 6-29 35-12-7Zm63 9 16-4 6 32-16 4Z"/>
+    </g>
+    <g id="catchbody">
+      <path class="uniform" d="m108 79 20-3 23 4 23 18-12 20-13-4 1 39q-20 15-47 0l2-40-16 1-6-20Z"/>
+      <path class="mitt" d="m163 101 13 5 10 19-16 14-12-13Z"/>
+      <use xlink:href="#glove" transform="translate(172 121) rotate(18)"/>
+      <use xlink:href="#armor"/>
+    </g>
+    <g id="load"><use xlink:href="#catchbody"/><path class="skin" d="m95 94-11 6-16-14-6-24 9-4 9 19 19 4Z"/><path class="skin" d="m62 64-7-8 2-13 9-3 7 6-2 15Z"/></g>
+    <g id="throw"><use xlink:href="#catchbody"/><path class="skin" d="M96 102Q87 102 77 93L50 69 24 52 28 43 59 54 90 78 101 85Z"/><path class="skin" d="m28 52-10-3-9-10 2-4 11 6-6-8 3-4 14 13Z"/></g>
+    <g id="pantsrow"><use xlink:href="#slidelegs"/><use xlink:href="#slidepants"/><use xlink:href="#slidetop"/><g transform="translate(256)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#tagtop"/></g></g>
+    <g id="shortsrow"><use xlink:href="#slidelegs"/><use xlink:href="#slideshorts"/><use xlink:href="#slidetop"/><g transform="translate(256)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#tagtop"/></g></g>
+    <g id="skirtrow"><use xlink:href="#slidelegs"/><use xlink:href="#slideskirt"/><use xlink:href="#slidetop"/><g transform="translate(256)"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/><use xlink:href="#tagtop"/></g></g>
+    <g id="catchpants"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/></g>
+    <g id="catchshorts"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/></g>
+    <g id="catchskirt"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/></g>
+    <g id="catcharms"><use x="512" xlink:href="#load"/><use x="768" xlink:href="#throw"/></g>
+    <g id="safetop">
+      <use transform="translate(49 7) rotate(13 89 193)" xlink:href="#slidetorso"/>
+      <path class="skin" d="M160 171Q165 166 171 173L186 196 211 214 227 217Q234 219 231 223L219 223 229 227Q229 232 218 229L205 225 175 206Z"/>
+      <path class="uniform" d="M151 154Q162 148 174 169L165 180 153 174Z"/>
+      <path class="red" d="m171 166 4 6-10 10-4-6Z"/>
+    </g>
+    <g id="rearjersey">
+      <path class="uniform" d="m108 79 20-3 23 4 23 18-12 20-13-4 1 39q-20 15-47 0l2-40-16 1-6-20Z"/>
+      <path class="blue" d="m105 79 25 26 21-25 6 5-23 29 15 32-7 4-15-28-17 29-7-5 20-33-24-28Z"/>
+      <path class="blue" d="m103 146 45 1 1 8-47 2Z"/>
+    </g>
+    <g id="rearvest"><use xlink:href="#rearjersey"/><use xlink:href="#glove" transform="translate(172 121) rotate(24)"/></g>
+    <g id="point"><use xlink:href="#catchbody"/>
+      <path class="skin" d="M93 96Q83 104 74 101L64 93Q58 87 63 81L74 74Q82 70 87 76L91 85Z"/>
+      <path class="skin" d="M67 86Q61 78 66 71L73 66Q78 63 81 68Q87 65 90 71L89 81 81 89Z"/>
+      <path class="seam" d="m77 70 3 5m3-4 3 5"/>
+    </g>
+    <g id="rearpoint"><use xlink:href="#rearvest"/>
+      <path class="skin" d="M96 98Q84 107 74 103L65 92Q61 85 65 80L77 65 84 45Q86 39 90 43L88 61 93 58Q99 57 98 64L90 80 81 89Z"/>
+      <path class="red" d="m86 94 11-11 5 7-12 12Z"/>
+    </g>
+    <g id="handoff">
+      <use xlink:href="#rearjersey"/>
+      <use xlink:href="#armor"/>
+      <path class="blue" d="m152 91 15 5 7 16-12 12-12-13Z"/>
+      <use xlink:href="#glove" transform="translate(159 128) rotate(76) scale(.77)"/>
+      <path class="skin" d="M97 99Q88 105 91 116Q95 125 110 127L164 124 193 119 204 120 219 115Q224 110 218 109L207 112 217 104Q219 100 214 101L198 108 190 108 163 111 115 111 106 99Z"/>
+      <path class="uniform" d="m103 89 13 17-14 12-13-9Z"/>
+      <path class="red" d="m109 101 6 5-13 12-5-4Z"/>
+      <path class="seam" d="m203 115 10-4m-20 4 6-1"/>
+    </g>
+    <g id="poses" stroke="var(--ink,#30232c)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
+      <use xlink:href="#pantsrow"/><use x="512" xlink:href="#catchpants"/><use x="768" xlink:href="#catchpants"/><use xlink:href="#catcharms"/>
+      <g transform="translate(0 256)"><use xlink:href="#shortsrow"/><use x="512" xlink:href="#catchshorts"/><use x="768" xlink:href="#catchshorts"/><use xlink:href="#catcharms"/></g>
+      <g transform="translate(0 512)"><use xlink:href="#skirtrow"/><use x="512" xlink:href="#catchskirt"/><use x="768" xlink:href="#catchskirt"/><use xlink:href="#catcharms"/></g>
+      <g transform="translate(0 768)"><g transform="translate(99) scale(.56 1)"><use xlink:href="#slidelegs"/><use xlink:href="#slidepants"/></g><use xlink:href="#safetop"/><g transform="translate(256)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#point"/></g><g transform="translate(512)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#rearpoint"/></g><g transform="translate(768)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#handoff"/></g></g>
+      <g transform="translate(0 1024)"><g transform="translate(99) scale(.56 1)"><use xlink:href="#slidelegs"/><use xlink:href="#slideshorts"/></g><use xlink:href="#safetop"/><g transform="translate(256)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#point"/></g><g transform="translate(512)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#rearpoint"/></g><g transform="translate(768)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#handoff"/></g></g>
+      <g transform="translate(0 1280)"><g transform="translate(99) scale(.56 1)"><use xlink:href="#slidelegs"/><use xlink:href="#slideskirt"/></g><use xlink:href="#safetop"/><g transform="translate(256)"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/><use xlink:href="#point"/></g><g transform="translate(512)"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/><use xlink:href="#rearpoint"/></g><g transform="translate(768)"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/><use xlink:href="#handoff"/></g></g>
+    </g>
+    <filter id="mask" color-interpolation-filters="sRGB"><feColorMatrix values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  1 0 0 0 0"/></filter>
+  </defs>
+  <use xlink:href="#poses"/>
+  <g transform="translate(0 1536)" filter="url(#mask)" style="--fabric:black;--shade:black;--trim:black;--pad:black;--skin:#eee;--leather:black;--light:black;--ink:black;--thread:black"><use xlink:href="#poses"/></g>
+</svg>

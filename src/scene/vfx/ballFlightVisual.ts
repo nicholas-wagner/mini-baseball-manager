@@ -75,7 +75,10 @@ export function createBallFlightVisual() {
     vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.86, depthWrite: false,
   }));
   trail.frustumCulled = false;
-  group.add(trail, ball);
+  const groundShadow = new THREE.Mesh(new THREE.CircleGeometry(.25, 18),
+    new THREE.MeshBasicMaterial({ color: 0x1c3226, transparent: true, depthWrite: false }));
+  groundShadow.rotation.x = -Math.PI / 2;
+  group.add(groundShadow, trail, ball);
   group.visible = false;
   let ballScale = 1;
   let lastPrimary = '';
@@ -87,6 +90,13 @@ export function createBallFlightVisual() {
     group.visible = true;
     const head = sample(spec, progress);
     ball.position.set(head.x, head.y, head.z);
+    groundShadow.visible = spec.style === 'line_drive' || spec.style === 'moonshot_hr';
+    if (groundShadow.visible) {
+      const lift = Math.min(head.y / 12, 1);
+      groundShadow.position.set(head.x, .053, head.z);
+      groundShadow.scale.setScalar(.82 + lift * .65);
+      groundShadow.material.opacity = .46 - lift * .31;
+    }
     ball.rotation.set(progress * 16, progress * 10, 0.5);
     const repaint = lastPrimary !== primary || lastAccent !== spec.secondaryColor;
     const main = repaint ? new THREE.Color(primary) : null;
@@ -122,6 +132,8 @@ export function createBallFlightVisual() {
   function dispose() {
     ball.geometry.dispose();
     ball.material.dispose();
+    groundShadow.geometry.dispose();
+    groundShadow.material.dispose();
     texture.dispose();
     geometry.dispose();
     trail.material.dispose();

@@ -488,7 +488,9 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           ? before?.basesAfter ?? liveSession?.bases : undefined;
         const walkoff=emitted.some(e=>e.type==='game_end' && e.soundCue==='fireworks_boom');
         const beforeHome=before?.homeScore ?? liveSession?.home.score ?? 0;
-        const choreo = choreographPlayEvent(lastEvent, speed, basesBefore, {walkoff,
+        const beforeAway=before?.awayScore ?? liveSession?.away.score ?? 0;
+        const runsScored=lastEvent.half==='BOT' ? lastEvent.homeScore-beforeHome : lastEvent.awayScore-beforeAway;
+        const choreo = choreographPlayEvent(lastEvent, speed, basesBefore, {walkoff,runsScored,
           winningRunIndex:walkoff ? Math.max(0,lastEvent.awayScore-beforeHome) : 0});
         if (walkoff && choreo.play) summaryDelay=choreo.durationMs;
         const relief=emitted.slice(emitted.indexOf(lastEvent)+1).find(e=>e.type==='pitching_change');

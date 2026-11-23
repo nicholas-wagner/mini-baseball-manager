@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1536" viewBox="0 0 1024 1536">
+  <!-- One registered celebration per uniform row. The lower half is the matching skin ink mask. -->
+  <style>
+    .uniform{fill:var(--fabric,#f4e8d8)} .shade{fill:var(--shade,#baaaa7)}
+    .red{fill:var(--trim,#be3442)} .blue{fill:var(--pad,#303f60)}
+    .skin{fill:var(--skin,#eeb481)} .mitt{fill:var(--leather,#b3692c)}
+    .light{fill:var(--light,#efae5b)} .seam{fill:none;stroke:var(--ink,#49313a);stroke-width:2}
+    .detail{fill:none;stroke:var(--thread,#fff0d6);stroke-width:2.3}
+  </style>
+  <defs>
+    <g id="shoe">
+      <path class="red" d="M-14-7Q-7-14 1-8L8-3Q20-3 22 3Q22 8 14 9L-13 9Q-18 6-14-7Z"/>
+      <path class="uniform" d="M-14 5Q1 7 21 3L21 7Q10 12-14 10Z"/>
+      <path class="detail" d="m0-5-4 3m10-1-4 3"/>
+    </g>
+    <g id="stancelegs">
+      <path class="blue" d="M106 159 127 169 103 207 65 237 53 226 86 190Z"/>
+      <path class="blue" d="M133 159Q148 155 160 173L174 198 178 233 158 237 153 202 120 183Z"/>
+      <use xlink:href="#shoe" transform="translate(58 234) rotate(-12)"/>
+      <use xlink:href="#shoe" transform="translate(168 235)"/>
+    </g>
+    <g id="longlegs">
+      <path class="uniform" d="M105 152 148 153 166 179 174 203 177 225 159 227 153 202 129 182 104 210 74 230 58 222 86 191Z"/>
+      <path class="seam" d="m117 166-17 27-13 9m50-31 20 22m-3 9 9-4m-64 9-13 3"/>
+    </g>
+    <g id="shortlegs">
+      <path class="skin" d="m91 183 15 7-13 18-22 16-9-10Zm62-8 14 7 5 17-15 3-10-17Z"/>
+      <path class="uniform" d="m103 150 46 2 18 28-20 15-18-15-16 16-24-13Z"/>
+    </g>
+    <g id="skirt"><use xlink:href="#shortlegs"/><path class="uniform" d="m106 150 43 1 15 31-13 7-15-3-13 5-28-9Z"/><path class="seam" d="m121 158-6 23m23-23 6 23"/></g>
+<g id="arms">
+  <path class="skin" d="M108 111Q96 118 84 110L65 97 46 77 35 73 27 60Q24 53 29 49L34 51Q32 43 37 43L42 46Q45 39 49 45L54 57 55 68 76 82 99 92Z"/>
+  <path class="skin" d="M151 110Q164 115 175 100L193 82 203 63 213 59 219 46Q220 39 216 37L211 39Q212 33 207 33L201 38Q198 32 194 39L190 49 192 57 178 73 158 87Z"/>
+  <path class="seam" d="m31 54 6 6m1-10 5 7m163-16-4 6m10-5-4 7"/>
+  <path class="uniform" d="M119 91 136 89 148 86 166 81 177 99 157 117 147 118 151 155Q128 166 101 156L106 117 94 119 75 104 87 85 107 93Z"/>
+  <path class="shade" d="m109 122 7 17 30 10 5 6-20 5-28-4Z"/>
+  <path class="red" d="m77 99 20 14-4 7-20-15Zm86-15 5-5 12 20-5 4Z"/>
+  <path class="blue" d="M102 151Q125 159 149 150L151 158Q126 168 100 159Z"/>
+</g>
+<g id="poses" stroke="var(--ink,#30232c)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
+<g transform="translate(0 0)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#arms"/></g>
+<g transform="translate(0 256)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#arms"/></g>
+<g transform="translate(0 512)"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/><use xlink:href="#arms"/></g>
+</g>
+    <filter id="mask" color-interpolation-filters="sRGB"><feColorMatrix values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  1 0 0 0 0"/></filter>
+  </defs>
+  <use xlink:href="#poses"/>
+  <g transform="translate(0 768)" filter="url(#mask)" style="--fabric:black;--shade:black;--trim:black;--pad:black;--skin:#eee;--leather:black;--light:black;--ink:black;--thread:black"><use xlink:href="#poses"/></g>
+</svg>

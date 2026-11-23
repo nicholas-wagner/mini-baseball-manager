@@ -9,6 +9,14 @@ export const BASE_PATH_VERTICES: readonly Vec3[] = [
   { x: 0, y: 0.04, z: 0 }, // Home (4)
 ] as const;
 
+export const INFIELD_DIRT = { radius: 15.2, centerZ: -10.5 } as const;
+export const OUTFIELD_WALL = { radius: 40, centerZ: -3 } as const;
+export const OUTFIELD_STARTS = {
+  LF: { x: -15, y: .04, z: -27 },
+  CF: { x: 0, y: .04, z: -32 },
+  RF: { x: 15, y: .04, z: -27 },
+} as const;
+
 export const BATTERS_BOX = { centerOffset: 1.18, halfWidth: .64, halfLength: 1.32, lineWidth: .06 } as const;
 
 export function batterBox(side: EffectiveBatSide) {

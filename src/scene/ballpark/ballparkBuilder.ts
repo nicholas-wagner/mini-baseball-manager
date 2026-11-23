@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BATTERS_BOX, batterBox } from '../playback/diamondLayout';
+import { BATTERS_BOX, INFIELD_DIRT, OUTFIELD_WALL, batterBox } from '../playback/diamondLayout';
 import { createClayTexture, createFloodlights, createHorizon } from './parkScenery';
 import { createToonMaterial, getToonGradientMap } from '../core/toonMaterials';
 import type { LiveStadiumScoreboardSnapshot } from './liveScoreboardData';
@@ -303,9 +303,9 @@ export function createMiniBallpark(): BallparkEnvironment {
   // Warm clay infield diamond arc
   const clay = createClayTexture();
   const dirtMat = new THREE.MeshToonMaterial({ map: clay, gradientMap: getToonGradientMap() });
-  const infieldDirt = new THREE.Mesh(new THREE.CircleGeometry(15.2, 32), dirtMat);
+  const infieldDirt = new THREE.Mesh(new THREE.CircleGeometry(INFIELD_DIRT.radius, 32), dirtMat);
   infieldDirt.rotation.x = -Math.PI / 2;
-  infieldDirt.position.set(0, 0.015, -10.5);
+  infieldDirt.position.set(0, 0.015, INFIELD_DIRT.centerZ);
   infieldDirt.receiveShadow = true;
   group.add(infieldDirt);
 
@@ -401,13 +401,13 @@ export function createMiniBallpark(): BallparkEnvironment {
   group.add(rightFoul);
 
   // Curved iconic green outfield fence + yellow home-run cap rail
-  const wallRadius = 40;
+  const { radius: wallRadius, centerZ } = OUTFIELD_WALL;
   const track = new THREE.Mesh(
     new THREE.RingGeometry(wallRadius - 2.2, wallRadius, 48, 1, Math.PI * 0.22, Math.PI * 0.56),
     dirtMat,
   );
   track.rotation.x = -Math.PI / 2;
-  track.position.set(0, 0.025, -3);
+  track.position.set(0, 0.025, centerZ);
   group.add(track);
   const wallMat = createToonMaterial(0x1f6e43);
   const hrRailMat = createToonMaterial(0xffc300);
@@ -416,17 +416,17 @@ export function createMiniBallpark(): BallparkEnvironment {
     const startAngle = -Math.PI * 0.78 + (i / segments) * (Math.PI * 0.56);
     const midAngle = startAngle + (Math.PI * 0.56) / segments / 2;
     const x = Math.cos(midAngle) * wallRadius;
-    const z = Math.sin(midAngle) * wallRadius - 3;
+    const z = Math.sin(midAngle) * wallRadius + centerZ;
 
     const panel = new THREE.Mesh(new THREE.BoxGeometry(4.1, 3.2, 0.6), wallMat);
     panel.position.set(x, 1.6, z);
-    panel.lookAt(0, 1.6, -3);
+    panel.lookAt(0, 1.6, centerZ);
     panel.receiveShadow = true;
     group.add(panel);
 
     const rail = new THREE.Mesh(new THREE.BoxGeometry(4.15, 0.28, 0.75), hrRailMat);
     rail.position.set(x, 3.28, z);
-    rail.lookAt(0, 3.28, -3);
+    rail.lookAt(0, 3.28, centerZ);
     group.add(rail);
   }
 

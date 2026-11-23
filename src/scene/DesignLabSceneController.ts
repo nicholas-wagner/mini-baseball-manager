@@ -1,6 +1,8 @@
+import { labSequence, type LabSequence } from './playback/labSequence';
+import { WalkoffTeammates } from './characters/walkoffTeammates';
 import { pitchFlightScale } from './vfx/ballFlightVisual';
 import { batterBox } from './playback/diamondLayout';
-import { diamondPlay, type DiamondPlay, type DiamondPlayKind } from './playback/diamondPlay';
+import type { DiamondPlay, DiamondPlayKind } from './playback/diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './playback/renderDiamondPlay';
 import * as THREE from 'three';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../art/portraits/types';
@@ -52,12 +54,15 @@ export class DesignLabSceneController {
   private cameraPose: CameraPose;
   private cameraPreset: CameraPresetId = 'over_shoulder_pitcher';
   private playStartedAt = 0;
-  private infield: DiamondPlay | null = null;
-  private infielders: Pick<DiamondCast, 'SS' | '1B' | '2B' | '3B' | 'RUN'> | null = null;
+  private queue:DiamondPlay[]=[];
+  private fixedBattery=false;
+  private welcome:WalkoffTeammates;
+  private diamond: DiamondPlay | null = null;
+  private replayFielders: Omit<DiamondCast, 'C' | 'P' | 'BAT'> | null = null;
   private fieldTeam: PortraitTeamColors;
   private delivery: ShowcaseDelivery | null = null;
   private callout?: { text: string; color: string };
-  private playAccent?: () => void;
+  private playAccent?: (kind?: DiamondPlayKind) => void;
   private trauma = 0;
   private crowdExcitement = 0.25;
   private turntableOffset = 0;
@@ -90,6 +95,7 @@ export class DesignLabSceneController {
     this.stature.pitcher = STATURE_SCALE[appearance.stature];
 
     this.scene = new THREE.Scene();
+    this.welcome=new WalkoffTeammates(this.scene);
     this.scene.background = new THREE.Color(0x4bb9ee);
     this.scene.fog = new THREE.Fog(0x88dbff, 48, 115);
 
@@ -186,23 +192,30 @@ export class DesignLabSceneController {
   }
 
   private replayCast(): DiamondCast {
-    if (!this.infielders) {
+    if (!this.replayFielders) {
       const make = (seed: number, jersey: number, runner = false) => {
         const rig = createPaintedPlayerRig({ traits: createPortraitTraits(seed), role: 'fielder', throwsHand: 'R',
           team: runner ? SAMPLE_TEAM_PALETTES[1] : this.fieldTeam, jerseyNumber: jersey }, 0, runner);
         this.scene.add(rig.root);
         return rig;
       };
-      this.infielders = { SS: make(8107, 6), '2B': make(8108, 4), '1B': make(8110, 3),
-        '3B': make(8113, 5), RUN: make(8114, 22, true) };
+      this.replayFielders = { SS: make(8107, 6), '2B': make(8108, 4), '1B': make(8110, 3),
+        '3B': make(8113, 5), LF: make(8115, 7), CF: make(8116, 8), RF: make(8117, 9), RUN: make(8114, 22, true) };
     }
-    return { ...this.infielders, P: this.pitcher, BAT: this.batter };
+    return { ...this.replayFielders, C: this.catcher, P: this.pitcher, BAT: this.batter };
   }
 
-  private endInfieldReplay() {
-    if (!this.infield) return;
-    this.infield = null;
-    if (this.infielders) for (const rig of Object.values(this.infielders)) rig.root.visible = false;
+  private endDiamondReplay() {
+    if (!this.diamond) return;
+    this.diamond = null;
+    this.queue=[];
+    this.fixedBattery=false;
+    this.welcome.hide();
+    this.pitcher.root.position.copy(MOUND);
+    this.pitcher.logicalYaw=0;
+    this.catcher.root.position.set(0,.04,1.12);
+    this.catcher.logicalYaw = Math.PI;
+    if (this.replayFielders) for (const rig of Object.values(this.replayFielders)) rig.root.visible = false;
     this.fielder.root.visible = true;
     const box = batterBox(this.batterSide);
     this.batter.logicalYaw = box.yaw;
@@ -226,7 +239,7 @@ export class DesignLabSceneController {
 
   setCameraPreset(preset: CameraPresetId): void {
     if (preset === this.cameraPreset) return;
-    this.endInfieldReplay();
+    this.endDiamondReplay();
     const leavingCloseUp = this.cameraPreset === 'showcase_closeup' || this.cameraPreset === 'mound_portrait';
     this.cameraPreset = preset;
     if (preset === 'showcase_closeup') {
@@ -261,10 +274,10 @@ export class DesignLabSceneController {
       const style = (this.delivery.hit ?? this.delivery.pitch).style;
       this.delivery = createDelivery(style, pitcherThrows, batterSide, this.pitcherClip, this.batterClip, this.stature);
     }
-    if (this.fieldTeam !== team && this.infielders) {
-      this.endInfieldReplay();
-      for (const rig of Object.values(this.infielders)) { this.scene.remove(rig.root); rig.dispose(); }
-      this.infielders = null;
+    if (this.fieldTeam !== team && this.replayFielders) {
+      this.endDiamondReplay();
+      for (const rig of Object.values(this.replayFielders)) { this.scene.remove(rig.root); rig.dispose(); }
+      this.replayFielders = null;
     }
     this.fieldTeam = team;
     this.pitcherThrows = pitcherThrows;
@@ -299,6 +312,8 @@ export class DesignLabSceneController {
     });
   }
 
+  setCalloutsVisible(visible: boolean) { this.vfx.setCalloutsVisible(visible); }
+
   setMoodOverride(mood: PortraitMood | undefined): void {
     this.moodOverride = mood;
   }
@@ -314,20 +329,17 @@ export class DesignLabSceneController {
   triggerShowcaseAction(
     ballStyle: BallVfxStyle | null,
     callout?: { text: string; color: string; y?: number; z?: number },
-    onAccent?: () => void,
-    infield?: DiamondPlayKind,
+    onAccent?: (kind?: DiamondPlayKind) => void,
+    kind?: LabSequence,
   ): void {
-    this.endInfieldReplay();
+    this.endDiamondReplay();
     this.vfx.clear();
-    if (infield) {
+    if (kind) {
       this.delivery = null;
-      this.infield = diamondPlay(infield);
-      this.playAccent = onAccent;
-      this.playStartedAt = this.elapsedSec;
-      this.fielder.root.visible = false;
-      for (const [actor, rig] of Object.entries(this.replayCast())) {
-        rig.root.visible = actor !== 'RUN' || infield === 'double_play';
-      }
+      this.queue=labSequence(kind);
+      this.fixedBattery=kind==='battery_reel';
+      this.playAccent=onAccent;
+      this.startDiamond(this.queue.shift()!);
       return;
     }
     this.fielder.root.position.copy(FIELDER_START);
@@ -349,6 +361,20 @@ export class DesignLabSceneController {
         callout.color,
       );
       this.crowdExcitement = 0.85;
+    }
+  }
+
+  private startDiamond(play:DiamondPlay) {
+    this.vfx.clear();
+    this.diamond=play;
+    this.playStartedAt=this.elapsedSec;
+    this.fielder.root.visible=false;
+    if (play.ending?.kind==='walkoff') {
+      this.welcome.set([17,31].map(n=>({traits:createPortraitTraits(6500+n),team:SAMPLE_TEAM_PALETTES[1],jerseyNumber:n,role:'fielder'})));
+    }
+    for (const [id,rig] of Object.entries(this.replayCast())) {
+      rig.preparePlayback();
+      rig.root.visible=id!=='RUN' || Boolean(play.scorerBase || play.close?.steal || ['double_play','sac_fly','ball_four'].includes(play.kind));
     }
   }
 
@@ -471,11 +497,20 @@ export class DesignLabSceneController {
     // Resolve the camera before selecting front or rear artwork.
     const targetPose = this.presetPose();
     const playTime = this.elapsedSec - this.playStartedAt;
-    if (this.infield) {
-      renderDiamondPlay(this.infield, this.replayCast(), this.batterSide, playTime, previousPlayTime,
-        this.camera, this.viewportHeight, this.vfx);
-      if (previousPlayTime < this.infield.finish && playTime >= this.infield.finish) this.playAccent?.();
-      this.catcher.updatePose('field_ready', playTime, undefined, this.camera.position);
+    if (this.diamond) {
+      renderDiamondPlay(this.diamond, this.replayCast(), this.batterSide, playTime, previousPlayTime,
+        this.camera, this.viewportHeight, this.vfx, this.pitcherThrows,
+        this.fixedBattery ? {
+          position:{x:(this.batterSide==='R'?-.48:.48)+(this.pitcherThrows==='R'?-1.15:1.15),y:2.55,z:6.30},
+          lookAt:{x:this.batterSide==='R'?-.48:.48,y:1.05,z:0},fov:38,
+        } : undefined,
+        this.welcome.rigs);
+      const play = this.diamond;
+      const accentAt = play.outfield
+        ? (play.outfield.caught || play.outfield.wall ? play.legs[1].end : play.legs[0].end)
+        : play.finish;
+      if (previousPlayTime < accentAt && playTime >= accentAt) this.playAccent?.(play.kind);
+      if (playTime>=play.duration && this.queue.length) this.startDiamond(this.queue.shift()!);
       this.ballpark.update(this.elapsedSec, 0.5);
       this.vfx.update(dt, this.camera);
       this.renderer.render(this.scene, this.camera);
@@ -513,11 +548,12 @@ export class DesignLabSceneController {
   dispose(): void {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
+    this.welcome.dispose();
     this.pitcher.dispose();
     this.batter.dispose();
     this.catcher.dispose();
     this.fielder.dispose();
-    if (this.infielders) for (const rig of Object.values(this.infielders)) rig.dispose();
+    if (this.replayFielders) for (const rig of Object.values(this.replayFielders)) rig.dispose();
     this.ballpark.dispose();
     this.vfx.dispose();
     this.renderer.dispose();

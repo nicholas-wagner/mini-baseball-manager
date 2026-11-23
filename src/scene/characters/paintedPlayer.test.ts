@@ -25,6 +25,7 @@ describe('shared painted minis', () => {
       used.add('rear-' + bottom);
     }
     used.add('receivers');
+    used.add('strides');
     expect([...used].sort()).toEqual(Object.keys(files).map(path => path.split('/').at(-1)!.slice(0,-4)).sort());
   });
   it('stands over the pivot foot and keeps one throwing side from set through hand break and recovery', () => {
@@ -158,4 +159,32 @@ describe('shared painted minis', () => {
     }
     rig.dispose();
   });
+});
+
+it('keeps the catcher’s throwing hand opposite the pocket from both sides of the bag', () => {
+  for (const throwsHand of ['R','L'] as const) {
+    const rig = createPaintedPlayerRig({ team: SAMPLE_TEAM_PALETTES[0], jerseyNumber: 2,
+      role: 'catcher', throwsHand, traits: PLAYER_CATALOG[0].traits });
+    for (const z of [-5,5]) {
+      const camera = new Vector3(0,2,z);
+      const glove = rig.contactAt('catch_receive',.22,rig.root.position,camera);
+      const hand = rig.contactAt('catch_throw',.33,rig.root.position,camera);
+      expect(Math.sign(hand.x)).toBe(-Math.sign(glove.x));
+      expect(hand.y).toBeGreaterThan(glove.y);
+    }
+    rig.dispose();
+  }
+});
+
+it('keeps the receiving uniform resident across live pitcher updates', () => {
+  const options = {traits:PLAYER_CATALOG[0].traits, team:SAMPLE_TEAM_PALETTES[0], jerseyNumber:12, role:'pitcher' as const};
+  const rig = createPaintedPlayerRig(options);
+  const body = rig.root.getObjectByName('painted uniform') as import('three').Mesh<
+    import('three').BufferGeometry, import('three').ShaderMaterial>;
+  rig.updatePose('field_receive', .3);
+  const uniform = body.material.uniforms.sheet.value;
+  rig.updateAppearance({...options,jerseyNumber:22,traits:PLAYER_CATALOG[13].traits});
+  rig.updatePose('field_receive', .3);
+  expect(body.material.uniforms.sheet.value).toBe(uniform);
+  rig.dispose();
 });

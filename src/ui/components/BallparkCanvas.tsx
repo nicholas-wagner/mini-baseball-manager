@@ -1,3 +1,4 @@
+import type { LabSequence } from '../../scene/playback/labSequence';
 import type { DiamondPlayKind } from '../../scene/playback/diamondPlay';
 import { useEffect, useRef, useState } from 'react';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../../art/portraits/types';
@@ -9,8 +10,8 @@ import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
 
 export interface ShowcaseTrigger {
   nonce?: number;
-  infield?: DiamondPlayKind;
-  onAccent?: () => void;
+  diamondPlay?: LabSequence;
+  onAccent?: (kind?: DiamondPlayKind) => void;
   ballStyle: BallVfxStyle | null;
   callout?: { text: string; color: string; y?: number; z?: number };
 }
@@ -19,6 +20,7 @@ interface BallparkCanvasProps {
   heroTraits: PortraitTraits;
   heroTeam: PortraitTeamColors;
   heroJersey: number;
+  showCallouts?: boolean;
   heroThrows?: ThrowsHand;
   batterSide?: EffectiveBatSide;
   cameraPreset: CameraPresetId;
@@ -35,6 +37,7 @@ export function BallparkCanvas({
   heroTeam,
   heroJersey,
   heroThrows = 'R',
+  showCallouts = true,
   batterSide = 'R',
   cameraPreset,
   pitcherClip,
@@ -96,10 +99,12 @@ export function BallparkCanvas({
     });
   }, [cameraPreset, pitcherClip, batterClip, fielderClip, moodOverride]);
 
+  useEffect(() => { controllerRef.current?.setCalloutsVisible(showCallouts); }, [showCallouts]);
+
   useEffect(() => {
     if (!trigger) return;
     if (controllerRef.current) {
-      controllerRef.current.triggerShowcaseAction(trigger.ballStyle, trigger.callout, trigger.onAccent, trigger.infield);
+      controllerRef.current.triggerShowcaseAction(trigger.ballStyle, trigger.callout, trigger.onAccent, trigger.diamondPlay);
     } else {
       trigger.onAccent?.();
     }

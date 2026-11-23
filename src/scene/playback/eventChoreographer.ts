@@ -1,6 +1,9 @@
-import { BASE_PATH_VERTICES } from './diamondLayout';
+import { finishPlay } from './teamReactions';
+import { closeKindFor, stealFrom } from './plateAndSteals';
+import { BASE_PATH_VERTICES, OUTFIELD_STARTS } from './diamondLayout';
 export { BASE_PATH_VERTICES } from './diamondLayout';
-import { diamondPlay, selectDiamondPlay, type DiamondPlayKind } from './diamondPlay';
+import { selectOutfieldKind } from './outfieldPlay';
+import { diamondPlay, type DiamondPlay, selectDiamondPlay, type DiamondPlayKind } from './diamondPlay';
 import type { FieldPosition } from '../../engine/handedness/types';
 import type { AtBatOutcome, PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { BallVfxStyle } from '../../engine/vfx/types';
@@ -24,13 +27,17 @@ export const DIAMOND_DEFENDER_COORDS: readonly DefenderCoord[] = [
   { pos: '2B', x: 4.6, y: 0.04, z: -17.6, yaw: 0 },
   { pos: '3B', x: -8.8, y: 0.04, z: -11.4, yaw: 0 },
   { pos: 'SS', x: -4.6, y: 0.04, z: -17.6, yaw: 0 },
-  { pos: 'LF', x: -15, y: 0.04, z: -27, yaw: 0 },
-  { pos: 'CF', x: 0, y: 0.04, z: -32, yaw: 0 },
-  { pos: 'RF', x: 15, y: 0.04, z: -27, yaw: 0 },
+  { pos: 'LF', ...OUTFIELD_STARTS.LF, yaw: 0 },
+  { pos: 'CF', ...OUTFIELD_STARTS.CF, yaw: 0 },
+  { pos: 'RF', ...OUTFIELD_STARTS.RF, yaw: 0 },
 ] as const;
 
 export interface ChoreographedStep {
+  play?: DiamondPlay;
+  close?: DiamondPlay;
   infield?: DiamondPlayKind;
+  outfield?: DiamondPlay;
+  basesBefore?: PlayEvent['basesAfter'];
   leadRunnerId?: string;
   cameraPreset: CameraPresetId;
   pitcherClip: CharacterAnimClip;
@@ -245,12 +252,21 @@ export function interpolateBaserunnerPosition(
 export function choreographPlayEvent(
   event: PlayEvent,
   speed: 1 | 2 | 4,
+  basesBefore?: PlayEvent['basesAfter'],
+  context: {walkoff?:boolean; winningRunIndex?:number; runsScored?:number} = {},
 ): ChoreographedStep {
   const divisor = SPEED_DIVISOR[speed];
 
+  const closeKind = closeKindFor(event);
+  const fromBase = basesBefore && stealFrom(basesBefore, event.basesAfter);
+  const close = closeKind && (event.type !== 'stolen_base_attempt' || fromBase)
+    ? diamondPlay(closeKind, undefined, event, fromBase) : undefined;
+
   if (event.type === 'stolen_base_attempt') {
+    if (close) finishPlay(close,event.outsAfter===3,Boolean(context.walkoff),undefined);
     const stoleBase = event.outsAfter === event.outsBefore;
     return {
+      play:close, close, basesBefore,
       cameraPreset: 'broadcast_diamond',
       pitcherClip: 'pitch_windup',
       batterClip: 'bat_stance',
@@ -261,20 +277,34 @@ export function choreographPlayEvent(
       callout: stoleBase
         ? { text: 'SAFE! STOLEN BASE!', color: '#2FB356' }
         : { text: 'GUNNED DOWN!', color: '#FF4D6D' },
-      durationMs: Math.round(1100 / divisor),
+      durationMs: Math.round((close ? close.duration * 1000 : 1100) / divisor),
     };
   }
 
   if (event.outcome && OUTCOME_PRESETS[event.outcome]) {
     const preset = OUTCOME_PRESETS[event.outcome];
-    const infield = selectDiamondPlay(event.outcome, event.battedBallType);
+    const infield = selectDiamondPlay(event.outcome, event.battedBallType, event.fieldingHighlight?.fielderPos);
+    const kind = selectOutfieldKind(event);
+    const outfield = kind ? diamondPlay(kind, undefined, event) : undefined;
+    const cover = infield==='ground_out' && event.fieldingHighlight?.fielderPos==='1B' &&
+      (event.seq % 2 === 0 || (event.ballFlight && event.ballFlight.landingX < 8));
+    const timed = close ?? outfield ?? (infield ? diamondPlay(cover?'cover_first':infield, event.fieldingHighlight?.fielderPos,event) : undefined);
+    if (timed) {
+      const scoringPlay = Boolean(outfield && (!outfield.outfield?.caught || kind==='sac_fly')) || context.walkoff;
+      const crossed = ([3,2,1] as const).filter(base=>{
+        const id = basesBefore?.[base-1];
+        return id && !event.basesAfter.includes(id);
+      });
+      const scorer = scoringPlay && context.runsScored!==0 ? crossed[context.winningRunIndex ?? 0] : undefined;
+      finishPlay(timed,event.outsAfter===3,Boolean(context.walkoff),scorer);
+    }
     return {
-      infield,
+      play:timed, infield, outfield, close, basesBefore,
       cameraPreset: event.isClutchMoment && preset.cameraPreset === 'over_shoulder_pitcher'
         ? 'over_shoulder_batter'
         : preset.cameraPreset,
-      pitcherClip: preset.pitcherClip,
-      batterClip: preset.batterClip,
+      pitcherClip: close ? 'pitch_windup' : preset.pitcherClip,
+      batterClip: close ? close.kind === 'swinging_third' || close.kind === 'foul_back' ? 'bat_swing' : 'bat_stance' : preset.batterClip,
       fielderClip: event.fieldingHighlight?.anim ?? preset.fielderClip,
       highlightFielderPos: event.fieldingHighlight?.fielderPos,
       ballStyle: event.ballFlight?.style ?? preset.ballStyle,
@@ -282,11 +312,13 @@ export function choreographPlayEvent(
       callout: event.specialPowerTriggered
         ? { text: event.specialPowerTriggered.calloutText, color: event.specialPowerTriggered.vfxColor }
         : preset.callout,
-      durationMs: Math.round((infield ? diamondPlay(infield).duration * 1000 : preset.baseDurationMs) / divisor),
+      durationMs: Math.round((timed ? timed.duration * 1000 : preset.baseDurationMs) / divisor),
     };
   }
 
+  const relief = event.type==='pitching_change' ? diamondPlay('bullpen') : undefined;
   return {
+    play:relief, basesBefore,
     cameraPreset: event.type === 'game_end' ? 'broadcast_diamond' : 'over_shoulder_pitcher',
     pitcherClip: 'idle',
     batterClip: event.type === 'game_end' ? 'celebrate_hr' : 'bat_stance',
@@ -294,6 +326,6 @@ export function choreographPlayEvent(
     ballStyle: null,
     soundCue: event.soundCue ?? null,
     callout: event.type === 'pitching_change' ? { text: 'BULLPEN CALL!', color: '#4CC3FF' } : undefined,
-    durationMs: Math.round(700 / divisor),
+    durationMs: Math.round((relief ? relief.duration*1000 : 700) / divisor),
   };
 }

@@ -12,6 +12,14 @@ export type CharacterAnimClip =
   | 'field_throw'
   | 'field_pop'
   | 'field_receive'
+  | 'runner_slide'
+  | 'field_tag'
+  | 'slide_safe'
+  | 'catch_handoff'
+  | 'catch_point'
+  | 'catch_target'
+  | 'catch_throw'
+  | 'runner_push'
   | 'runner_lead'
   | 'field_run'
   | 'field_dive'
@@ -38,6 +46,14 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   field_throw: 0.65,
   field_receive: 0.7,
   field_pop: 0.7,
+  runner_slide: .72,
+  field_tag: .68,
+  catch_target: .8,
+  slide_safe: 1,
+  catch_handoff: 1,
+  catch_point: .75,
+  catch_throw: .68,
+  runner_push: .19,
   runner_lead: 1.0,
   field_run: 0.52,
   field_dive: 1.15,

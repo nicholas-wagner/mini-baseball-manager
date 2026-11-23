@@ -109,3 +109,19 @@ describe('Event Choreographer & Diamond Coordinates (TASK-016)', () => {
     expect(hrStep.callout?.text).toMatch(/home run|ka-boom/i);
   });
 });
+
+it('keeps the bat on the shoulder for a called third strike and swings through a swinging third strike', () => {
+  const looking = choreographPlayEvent(buildEvent({ outcome: 'strikeout', soundCue: 'ump_strike_call' }), 1);
+  const chasing = choreographPlayEvent(buildEvent({ outcome: 'strikeout', soundCue: 'strikeout_punch' }), 1);
+  expect(looking.batterClip).toBe('bat_stance');
+  expect(looking.close?.kind).toBe('called_third');
+  expect(chasing.close?.kind).toBe('swinging_third');
+});
+
+it('tracks the lead runner on a failed double steal, even at the end of a half inning', () => {
+  const play = choreographPlayEvent(buildEvent({ type: 'stolen_base_attempt', outsBefore: 2, outsAfter: 3,
+    basesAfter: [null, 'trail', null] }), 1, ['trail', 'lead', null]).close!;
+  expect(play.close?.fromBase).toBe(2);
+  expect(play.pickup).toBe('3B');
+  expect(play.receiveAt).toBeLessThan(play.leadArrival);
+});

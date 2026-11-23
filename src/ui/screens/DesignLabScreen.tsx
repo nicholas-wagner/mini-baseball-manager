@@ -51,7 +51,7 @@ interface ActionPreset {
   fielderClip: CharacterAnimClip;
   ballStyle: BallVfxStyle | null;
   sound: SoundCue;
-  infield?: ShowcaseTrigger['infield'];
+  diamondPlay?: ShowcaseTrigger['diamondPlay'];
   recommendedCamera?: CameraPresetId;
   callout?: { text: string; color: string; y?: number; z?: number };
 }
@@ -68,6 +68,11 @@ const COMET_PITCH: ActionPreset = {
   recommendedCamera: 'over_shoulder_pitcher',
 };
 
+const PLATE_REEL: ActionPreset = {
+  ...COMET_PITCH, id: 'plate_reel', label: 'Plate and Steals', diamondPlay: 'plate_reel',
+  recommendedCamera: 'broadcast_diamond', variant: 'gold',
+};
+
 const ANIMATION_ACTIONS: readonly ActionPreset[] = [
   {
     id: 'idle',
@@ -80,12 +85,25 @@ const ANIMATION_ACTIONS: readonly ActionPreset[] = [
     sound: 'ui_pop',
   },
   COMET_PITCH,
+  ...(['R','L'] as const).map((hand):ActionPreset=>({
+    ...PLATE_REEL,id:'battery_'+hand,diamondPlay:'battery_reel',label:hand==='R'?'Right-handed at-bat':'Left-handed at-bat',
+    sound:'glove_pop',
+  })),
   ...([
+    ['foul_back', 'Foul Back', 'bat_crack'], ['called_third', 'Called Third Strike', 'ump_strike_call'],
+    ['swinging_third', 'Swinging Third Strike', 'strikeout_punch'], ['ball_four', 'Ball Four', 'glove_pop'],
+    ['steal_safe', 'Steal Second — Safe', 'ump_safe_call'], ['steal_out', 'Steal Second — Out', 'glove_pop'],
     ['ground_out', 'Groundout to short', 'glove_pop'], ['double_play', '6–4–3 Double Play', 'double_play_snap'],
-    ['pop_up', 'Infield Pop Fly', 'glove_pop'], ['bunt_out', 'Bunt Throwout', 'glove_pop'],
-  ] as const).map(([infield, label, sound]): ActionPreset => ({
-    id: infield, infield, label, sound, variant: 'turf', recommendedCamera: 'broadcast_diamond',
-    pitcherClip: 'pitch_windup', batterClip: infield === 'bunt_out' ? 'bat_bunt' : 'bat_swing',
+    ['cover_first','3–1 Cover','glove_pop'], ['relay_home','Relay Home','glove_pop'],
+    ['third_out','Third-out Flip','glove_pop'], ['bullpen','Bullpen Handoff','bullpen_phone'], ['walkoff','Walk-off Welcome','crowd_cheer'],
+    ['bunt_single', 'Bunt Single', 'ump_safe_call'], ['fielding_error', 'Bobbled Grounder', 'glove_pop'],
+    ['infield_liner', 'Infield Lineout', 'glove_pop'], ['pop_up', 'Infield Pop Fly', 'glove_pop'], ['bunt_out', 'Bunt Throwout', 'glove_pop'],
+    ['single', 'Single to Left', 'bat_crack'], ['double', 'Gap Double', 'bat_crack'],
+    ['triple', 'Triple off the Wall', 'wall_thud'], ['fly_out', 'Running Flyout', 'glove_pop'],
+    ['line_out', 'Outfield Lineout', 'glove_pop'], ['sac_fly', 'Sacrifice Fly', 'glove_pop'],
+  ] as const).map(([diamondPlay, label, sound]): ActionPreset => ({
+    id: diamondPlay, diamondPlay, label, sound, variant: 'turf', recommendedCamera: 'broadcast_diamond',
+    pitcherClip: 'pitch_windup', batterClip: diamondPlay === 'bunt_out' ? 'bat_bunt' : 'bat_swing',
     fielderClip: 'field_ready', ballStyle: 'line_drive',
   })),
   {
@@ -111,6 +129,7 @@ const ANIMATION_ACTIONS: readonly ActionPreset[] = [
   },
   {
     id: 'moonshot_hr',
+    diamondPlay: 'home_run',
     label: 'Bomb-Swing HR',
     variant: 'gold',
     pitcherClip: 'pitch_windup',
@@ -222,6 +241,7 @@ export function DesignLabScreen() {
   const [batterClip, setBatterClip] = useState<CharacterAnimClip>('bat_stance');
   const [fielderClip, setFielderClip] = useState<CharacterAnimClip>('field_ready');
   const [trigger, setTrigger] = useState<ShowcaseTrigger | null>(null);
+  const [showCallouts, setShowCallouts] = useState(true);
   const [turntableNudge, setTurntableNudge] = useState(0);
   const [rollSeed, setRollSeed] = useState(9601);
   const [opposingBatterBats, setOpposingBatterBats] = useState<BatsHand>('R');
@@ -231,7 +251,8 @@ export function DesignLabScreen() {
   const pitchingMotion = resolveAthleteAppearance(heroPlayer.traits).pitchingMotion;
   const heroNation = getNationalityById(heroPlayer.nationalityId);
   const heroHeritage = heroNation.heritageAbility;
-  const platoon = evaluatePlatoonMatchup(opposingBatterBats, heroPlayer.throws);
+  const previewHand = activeActionId==='battery_R' ? 'R' : activeActionId==='battery_L' ? 'L' : heroPlayer.throws;
+  const platoon = evaluatePlatoonMatchup(opposingBatterBats, previewHand);
 
   const handleTriggerHeritagePower = () => {
     setActiveActionId('heritage_power');
@@ -271,17 +292,20 @@ export function DesignLabScreen() {
     if (preset.recommendedCamera && !keepCamera && !studyingPitch) {
       setCameraPreset(preset.recommendedCamera);
     }
-    const playAccent = () => soundEngine.play(preset.sound);
+    const playAccent: NonNullable<ShowcaseTrigger['onAccent']> = kind => {
+      const sound = preset.id === 'plate_reel' ? ANIMATION_ACTIONS.find(action => action.id === kind)?.sound : preset.sound;
+      if (sound) soundEngine.play(sound);
+    };
     if (!preset.ballStyle) playAccent();
     setTrigger({
-      infield: preset.infield,
+      diamondPlay: preset.diamondPlay,
       ballStyle: preset.ballStyle,
       callout: preset.callout,
       onAccent: preset.ballStyle ? playAccent : undefined,
     });
   };
 
-  const activePreset = ANIMATION_ACTIONS.find(action => action.id === activeActionId);
+  const activePreset = activeActionId === PLATE_REEL.id ? PLATE_REEL : ANIMATION_ACTIONS.find(action => action.id === activeActionId);
   const heritageSelected = activeActionId === 'heritage_power';
   const replayLabel = heritageSelected ? heroHeritage.name : activePreset?.label;
   const canReplay = activeActionId !== 'idle';
@@ -351,7 +375,8 @@ export function DesignLabScreen() {
             heroTraits={heroPlayer.traits}
             heroTeam={activeTeam}
             heroJersey={heroPlayer.jerseyNumber}
-            heroThrows={heroPlayer.throws}
+            heroThrows={previewHand}
+            showCallouts={showCallouts && !activeActionId.startsWith('battery_')}
             batterSide={platoon.effectiveBatSide}
             cameraPreset={cameraPreset}
             pitcherClip={pitcherClip}
@@ -361,6 +386,16 @@ export function DesignLabScreen() {
             trigger={trigger}
             turntableNudge={turntableNudge}
           />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <ComicButton variant="gold" icon={<Play size={16} />} onClick={() => handleAction(PLATE_REEL)}>
+              Play six-play reel
+            </ComicButton>
+            <label className="inline-flex min-h-11 items-center gap-2 px-2 text-sm font-bold">
+                <input type="checkbox" checked={showCallouts} onChange={e => setShowCallouts(e.target.checked)} />
+                Show play callouts
+            </label>
+          </div>
 
           {/* Live Platoon Matchup & Batter Handedness Switcher */}
           <div className="bg-[#F1E4C8] border-2 border-[#181B2C] rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2">

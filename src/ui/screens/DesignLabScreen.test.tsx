@@ -71,3 +71,31 @@ it('can replay a groundout, a force at second and relay to first, a pop fly, and
     expect(screen.getByRole('button', { name: 'Replay ' + label })).toBeVisible();
   }
 }, 30_000);
+
+it('can replay a hit into the gap and a catch in the outfield', () => {
+  render(<DesignLabScreen />);
+  for (const label of ['Gap Double', 'Running Flyout']) {
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    expect(screen.getByRole('button', { name: 'Replay ' + label })).toBeVisible();
+  }
+});
+
+it('offers the six-play reel, individual takes, and a callout-free review', () => {
+  render(<DesignLabScreen />);
+  fireEvent.click(screen.getByText('Play six-play reel'));
+  expect(screen.getByLabelText('Replay Plate and Steals')).toBeVisible();
+  const captions = screen.getByLabelText('Show play callouts');
+  fireEvent.click(captions);
+  expect(captions).not.toBeChecked();
+  for (const label of ['Foul Back', 'Called Third Strike', 'Swinging Third Strike', 'Ball Four', 'Steal Second — Safe', 'Steal Second — Out']) {
+    expect(screen.getByText(label).closest('button')).toBeEnabled();
+  }
+});
+
+it('can replay a fixed-camera at-bat with either pitching hand and select team sequences', () => {
+  render(<DesignLabScreen />);
+  for (const name of ['Right-handed at-bat','Left-handed at-bat','3–1 Cover','Relay Home','Third-out Flip','Bullpen Handoff','Walk-off Welcome']) {
+    fireEvent.click(screen.getByRole('button',{name}));
+    expect(screen.getByLabelText('Replay '+name)).toBeVisible();
+  }
+},30_000);

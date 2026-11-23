@@ -1,3 +1,5 @@
+import welcomeAtlas from '../../art/miniPlayers/atlases/welcome.svg?url';
+import basePlayAtlas from '../../art/miniPlayers/atlases/baseplays.svg?url';
 import * as THREE from 'three';
 import type { AthleteAppearance } from '../../art/portraits/athleteAppearance';
 import type { PortraitTeamColors } from '../../art/portraits/types';
@@ -26,7 +28,7 @@ export function acquirePaint(key: string) {
   }
   let done!: () => void;
   const loading = new Promise<void>(resolve => { done = resolve; });
-  const texture = new THREE.TextureLoader().load(assets['../../art/miniPlayers/atlases/' + key + '.png'], done, undefined, done);
+  const texture = new THREE.TextureLoader().load(key==='welcome' ? welcomeAtlas : key === 'baseplays' ? basePlayAtlas : assets['../../art/miniPlayers/atlases/' + key + '.png'], done, undefined, done);
   pending.set(texture, loading);
   texture.colorSpace = THREE.NoColorSpace;
   texture.minFilter = THREE.LinearFilter;
@@ -64,6 +66,7 @@ export function paintedMaterial(isHead: boolean) {
       head: { value: Number(isHead) },
       maskHelmet: { value: 0 },
       nearLimb: { value: 0 },
+      rows: { value: 3 },
       collar: { value: new THREE.Vector2() },
     },
     vertexShader: `varying vec2 at;
@@ -74,11 +77,12 @@ export function paintedMaterial(isHead: boolean) {
       uniform vec3 skin,skinShade,skinLight,hair,hairLight,iris,primary,secondary;
       uniform float head,maskHelmet,nearLimb,showDetails;
       uniform vec2 collar;
+      uniform float rows;
       varying vec2 at;
       vec3 fabric(vec3 base,float v){return mix(base*.24,base,clamp(v/.81,0.,1.))+max(v-.81,0.)*.95;}
       void main(){
         if(nearLimb>.5 && (at.y<collar.y-.03 || abs(at.x-collar.x)<.08))discard;
-        vec2 tile=(cell+clamp(at,vec2(.002),vec2(.998)))/vec2(4.,3.);
+        vec2 tile=(cell+clamp(at,vec2(.002),vec2(.998)))/vec2(4.,rows);
         vec4 s=texture2D(sheet,vec2(tile.x,.5+.5*tile.y));
         vec4 detail = showDetails>.5 ? texture2D(details,at) : vec4(0.);
         float alpha = detail.a + s.a*(1.-detail.a);

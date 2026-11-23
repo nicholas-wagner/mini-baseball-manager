@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diamondPlay, selectDiamondPlay, sampleLeg } from './diamondPlay';
+import { actorAt, diamondPlay, selectDiamondPlay, sampleLeg } from './diamondPlay';
 
 describe('infield playback', () => {
   it('fields a chopper before throwing the batter out at first', () => {
@@ -33,4 +33,22 @@ describe('infield playback', () => {
     expect(sampleLeg(lob, a, b, 0.5).y).toBeGreaterThan(6);
     expect(sampleLeg(lob, a, b, 1)).toEqual(b);
   });
+});
+
+it('lets the bunter reach first before the throw, and shows an error escaping the first glove', () => {
+  const bunt = diamondPlay('bunt_single');
+  expect(bunt.batterArrival).toBeLessThan(bunt.legs.at(-1)!.end);
+  expect(actorAt(bunt, 'BAT', bunt.legs[0].end, 'L').clip).toBe('bat_bunt');
+  const error = diamondPlay('fielding_error');
+  expect(error.legs.map(leg => leg.kind)).toContain('bounce');
+  expect(error.legs.at(-1)!.end).toBeLessThan(error.duration);
+});
+
+it('plays a live infield liner into the glove of the named infielder', () => {
+  expect(selectDiamondPlay('line_out','line_drive','SS')).toBe('infield_liner');
+  expect(selectDiamondPlay('line_out','line_drive','LF')).toBeUndefined();
+  const liner = diamondPlay('infield_liner','3B');
+  expect(liner.legs).toHaveLength(2);
+  expect(liner.legs[1].to).toBe('3B');
+  expect(actorAt(liner,'3B',liner.finish,'R').clip).toBe('field_receive');
 });

@@ -1,3 +1,5 @@
+import { createBaseUmpire } from './baseUmpire';
+import { createPaintedBat } from '../characters/paintedBat';
 import * as THREE from 'three';
 import { createBallFlightVisual } from './ballFlightVisual';
 import { BALL_TRAJECTORY_PRESETS, type BallTrajectorySpec, type BallVfxStyle } from './ballTrajectory';
@@ -14,6 +16,9 @@ interface ActiveCallout {
 
 export interface BallparkVfxSystem {
   group: THREE.Group;
+  droppedBat: THREE.Mesh;
+  umpire: ReturnType<typeof createBaseUmpire>;
+  setCalloutsVisible: (visible: boolean) => void;
   launchBall: (style: BallVfxStyle, callout?: { text: string; color?: string }) => { cameraShake: number };
   ball: ReturnType<typeof createBallFlightVisual>;
   impact: (position: Vec3, color: string) => void;
@@ -69,6 +74,12 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
   const group = new THREE.Group();
 
   const ball = createBallFlightVisual();
+  const umpire=createBaseUmpire();
+  group.add(umpire.sprite);
+  const bat = createPaintedBat();
+  bat.barrel.visible = false;
+  group.add(bat.barrel);
+  let captions = true;
   const rays: number[] = [];
   for (let i = 0; i < 9; i++) {
     const angle = (i / 9) * Math.PI * 2;
@@ -100,6 +111,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     bgColor = '#FFC300',
     inCorner = false,
   ) => {
+    if (!captions) return;
     const texture = createComicCalloutTexture(text, bgColor);
     const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
     const sprite = new THREE.Sprite(mat);
@@ -171,6 +183,8 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
 
   const clear = () => {
     immediate = null;
+    umpire.sprite.visible=false;
+    bat.barrel.visible = false;
     ball.group.visible = false;
     flare.visible = false;
     for (const c of callouts.splice(0)) {
@@ -183,8 +197,14 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
   const dispose = () => {
     clear();
     ball.dispose();
+    bat.dispose();
+    umpire.dispose();
     flareGeo.dispose();
     flare.material.dispose();
   };
-  return { group, ball, launchBall, impact, clear, spawnComicCallout, update, dispose };
+  const setCalloutsVisible = (visible: boolean) => {
+    captions = visible;
+    for (const item of callouts) item.sprite.visible = visible;
+  };
+  return { group, umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, clear, spawnComicCallout, update, dispose };
 }

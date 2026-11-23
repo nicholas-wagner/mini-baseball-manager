@@ -82,7 +82,13 @@ export function paintedMotion(
       cel = 8;
       squash = 0.04;
       tilt = 0.12;
-    } else if (cel === 9) hop = 0.045 * Math.abs(Math.sin(seconds * 9));
+    } else if (cel === 9) {
+      const step = Math.sin(phase * 2*Math.PI);
+      hop = .068*Math.abs(step);
+      squash = .032*Math.cos(phase * 4*Math.PI);
+      lean = -.075 + .032*step;
+      tilt = .048*step;
+    }
   }
   if (clip === 'celebrate_hr' && role === 'pitcher') {
     const lift = clamp((phase - 0.16) / 0.67);

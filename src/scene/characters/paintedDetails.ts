@@ -84,6 +84,10 @@ export function createFaceDetails() {
     const mid = (lx + rx) / 2, eye = (ly + ry) / 2;
     const [left, leftY, right, rightY, lowerLip] = face.mouth;
     const mouthX = (left + right) / 2, lip = (leftY + rightY) / 2;
+    if (mood===3) {
+      const smile = `M${left} ${leftY}Q${mouthX} ${lip+5} ${right} ${rightY}Q${mouthX+2} ${lip+21} ${left} ${leftY}Z`;
+      fill(smile,'#fff4da'); line(smile,ink,2.5);
+    }
     const lipAngle = Math.atan2(rightY - leftY, right - left);
     const [jawL, jawY, lowL, lowLY, chin, bottom, lowR, lowRY, jawR, farY] = face.jaw;
     if (groom === 'shortBeard' || groom === 'longBeard' || groom === 'stubble') {
