@@ -52,6 +52,7 @@ import {
   PlayerCardModal,
   type InspectableCardEntry,
 } from '../components/PlayerCardModal';
+import { PlayerPortraitBadge } from '../components/PlayerPortraitBadge';
 import { PlayerDossierModal } from '../components/PlayerDossierModal';
 import { SaveSlotsModal } from '../components/SaveSlotsModal';
 import { TrainersTablePanel } from '../components/TrainersTablePanel';
@@ -475,6 +476,13 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                         <span className="w-7 h-7 rounded-lg bg-[#181B2C] text-[#FFD166] font-display text-xs flex items-center justify-center shrink-0">
                           {idx + 1}
                         </span>
+                        <PlayerPortraitBadge
+                          player={player}
+                          primaryColor={humanClub.colors.primary}
+                          accentColor={humanClub.colors.accent}
+                          size="xs"
+                          testId="roster-lineup-portrait"
+                        />
                         <span className="px-2 py-0.5 rounded-md bg-[#1B4332] text-[#FBF4E4] font-display text-[11px] shrink-0">
                           {slot.defensivePosition}
                         </span>
@@ -485,19 +493,28 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                               {player.name}
                             </span>
                             {posEval.isFavorite ? (
-                              <span className="px-1.5 py-0.5 rounded bg-[#FFC300] text-[#181B2C] text-[10px] font-extrabold">
+                              <span
+                                title="Natural Favorite Position (+5 Fielding boost!)"
+                                className="px-1.5 py-0.5 rounded bg-[#FFC300] text-[#181B2C] text-[10px] font-extrabold"
+                              >
                                 ★ FAV
                               </span>
                             ) : null}
                             {posEval.isOutOfPosition ? (
-                              <span className="px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white text-[10px] font-extrabold">
-                                OOP
+                              <span
+                                title="Learning Position (Out of Position — Auto-Optimize or Cross-Train!)"
+                                className="px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white text-[10px] font-extrabold"
+                              >
+                                ⚠️ Learning Pos
                               </span>
                             ) : null}
                             {renderFormBadge(player.formState)}
                           </div>
-                          <div className="text-[11px] font-bold text-[#4A5068]">
-                            B/T: {player.bats}/{player.throws} • OVR {ovr} •{' '}
+                          <div
+                            title={`Bats ${player.bats} / Throws ${player.throws}`}
+                            className="text-[11px] font-bold text-[#4A5068]"
+                          >
+                            Bats {player.bats}/Throws {player.throws} • OVR {ovr} •{' '}
                             {SPECIALIST_LABELS[player.specialistArchetype]} • Pos: {eligibleList}
                           </div>
                         </div>
@@ -548,13 +565,21 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                       <button
                         type="button"
                         onClick={() => setInspectedPlayerId(pitcher.id)}
-                        className="text-left min-h-[44px] flex-1"
+                        className="flex items-center gap-2 text-left min-h-[44px] flex-1 min-w-0"
                       >
-                        <div className="font-bold text-xs text-[#181B2C]">
-                          SP{idx + 1}: {pitcher.name} ({pitcher.throws}HP)
-                        </div>
-                        <div className="text-[11px] font-bold text-[#4A5068]">
-                          OVR {ovr} • {SPECIALIST_LABELS[pitcher.specialistArchetype]}
+                        <PlayerPortraitBadge
+                          player={pitcher}
+                          primaryColor={humanClub.colors.primary}
+                          accentColor={humanClub.colors.accent}
+                          size="xs"
+                        />
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs text-[#181B2C] truncate">
+                            SP{idx + 1}: {pitcher.name} ({pitcher.throws}HP)
+                          </div>
+                          <div className="text-[11px] font-bold text-[#4A5068]">
+                            OVR {ovr} • {SPECIALIST_LABELS[pitcher.specialistArchetype]}
+                          </div>
                         </div>
                       </button>
                       <div className="flex items-center gap-1">
@@ -593,10 +618,18 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                     <button
                       type="button"
                       onClick={() => setInspectedPlayerId(player.id)}
-                      className="text-left text-xs font-bold text-[#181B2C] flex-1 min-h-[44px]"
+                      className="flex items-center gap-2 text-left text-xs font-bold text-[#181B2C] flex-1 min-h-[44px] min-w-0"
                     >
-                      {player.position} {player.name} ({player.bats}/{player.throws}) • OVR{' '}
-                      {computePlayerOverall(player)} • {MARKET_TIER_LABELS[player.marketTier]}
+                      <PlayerPortraitBadge
+                        player={player}
+                        primaryColor={humanClub.colors.primary}
+                        accentColor={humanClub.colors.accent}
+                        size="xs"
+                      />
+                      <span className="truncate">
+                        {player.position} {player.name} ({player.bats}/{player.throws}) • OVR{' '}
+                        {computePlayerOverall(player)} • {MARKET_TIER_LABELS[player.marketTier]}
+                      </span>
                     </button>
                     <div className="flex gap-1">
                       <ComicButton
@@ -629,11 +662,19 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                     <button
                       type="button"
                       onClick={() => setInspectedPlayerId(rp.id)}
-                      className="text-left py-1 text-xs font-bold text-[#4A5068] flex-1 min-h-[44px]"
+                      className="flex items-center gap-2 text-left py-1 text-xs font-bold text-[#4A5068] flex-1 min-h-[44px] min-w-0"
                     >
-                      RP {rp.name} ({rp.throws}HP
-                      {rp.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]}` : ''}) • OVR{' '}
-                      {computePlayerOverall(rp)} • {SPECIALIST_LABELS[rp.specialistArchetype]}
+                      <PlayerPortraitBadge
+                        player={rp}
+                        primaryColor={humanClub.colors.primary}
+                        accentColor={humanClub.colors.accent}
+                        size="xs"
+                      />
+                      <span className="truncate">
+                        RP {rp.name} ({rp.throws}HP
+                        {rp.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]}` : ''}) • OVR{' '}
+                        {computePlayerOverall(rp)} • {SPECIALIST_LABELS[rp.specialistArchetype]}
+                      </span>
                     </button>
                     <ComicButton
                       size="sm"

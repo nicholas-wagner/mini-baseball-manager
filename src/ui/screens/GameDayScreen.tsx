@@ -28,6 +28,12 @@ import {
 } from '../../engine/gm/gameDayMoments';
 import { evaluatePreGameLineupCheck } from '../../engine/gm/seriesRecap';
 import {
+  buildFirstPitchCoachTip,
+  selectClubSpotlightTrio,
+} from '../../engine/gm/openingDayHook';
+import { getNextAvailableStoryChapter } from '../../engine/story/storyEngine';
+import { useCareerStoryStore } from '../../store/careerSlots';
+import {
   buildManagerActionInbox,
   recommendTeamPracticeFocus,
   type ManagerJumpTarget,
@@ -170,13 +176,16 @@ function safeScrollTop(): void {
 
 interface GameDayScreenProps {
   onJumpToTab?: (tab: 'roster' | 'skills' | 'league' | 'economy') => void;
+  onOpenStory?: () => void;
 }
 
-export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
+export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps = {}) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
   const manager = useGameStore((s) => s.manager);
   const worldSeed = useGameStore((s) => s.worldSeed);
+  const seasonNumber = useGameStore((s) => s.seasonNumber);
+  const storyState = useCareerStoryStore((s) => s.storyState);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const currentGameInSeries = useGameStore((s) => s.currentGameInSeries);
   const seriesResults = useGameStore((s) => s.seriesResults);
@@ -827,6 +836,12 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
     const recapMvpPlayer = lastSeriesRecap
       ? humanClub.roster.find((p) => p.id === lastSeriesRecap.seriesMvp.playerId) ?? null
       : null;
+    const isOpeningDay = humanClub.wins + humanClub.losses === 0;
+    const spotlightTrio = isOpeningDay ? selectClubSpotlightTrio(humanClub) : [];
+    const nextStoryBeat = getNextAvailableStoryChapter(storyState, {
+      gamesPlayed: humanClub.wins + humanClub.losses,
+      seasonNumber,
+    });
     const preGameScoutEntries: InspectableCardEntry[] = [];
     if (probableMatchup && scheduledOpponent) {
       preGameScoutEntries.push(
@@ -847,6 +862,15 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
         },
       );
     }
+    for (const star of spotlightTrio) {
+      if (!preGameScoutEntries.some((entry) => entry.player.id === star.player.id)) {
+        preGameScoutEntries.push({
+          player: star.player,
+          club: humanClub,
+          roleTag: star.roleBadge,
+        });
+      }
+    }
     if (
       recapMvpPlayer &&
       !preGameScoutEntries.some((entry) => entry.player.id === recapMvpPlayer.id)
@@ -863,6 +887,31 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
 
     return (
       <div className="space-y-4">
+        {/* Top-of-Screen Glowing Foil Pack Alert (Instant Dopamine Hit!) */}
+        {unopenedPacks.length > 0 ? (
+          <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-r from-[#7209B7] via-[#F72585] to-[#FFC300] text-white flex flex-wrap items-center justify-between gap-2 shadow-[4px_4px_0_#181B2C]">
+            <div className="flex items-center gap-2 font-display text-xs sm:text-sm drop-shadow-[1px_1px_0_#181B2C]">
+              <Gift className="w-4 h-4 text-[#FFD166] shrink-0" />
+              <span>
+                {isOpeningDay
+                  ? `🎁 Opening Day Gift! You have ${unopenedPacks.length} shiny 1994 Foil Pack${unopenedPacks.length === 1 ? '' : 's'}!`
+                  : `You have ${unopenedPacks.length} unopened 1994 Foil Booster Pack${unopenedPacks.length === 1 ? '' : 's'}!`}
+              </span>
+            </div>
+            <ComicButton
+              size="sm"
+              variant="gold"
+              icon={<Sparkles className="w-3.5 h-3.5" />}
+              onClick={() => {
+                setFoilModalOpen(true);
+                soundEngine.play('ui_pop');
+              }}
+            >
+              Rip Foil Pack!
+            </ComicButton>
+          </div>
+        ) : null}
+
         {lastSeriesRecap ? (
           <div
             data-testid="series-recap-card"
@@ -1236,47 +1285,50 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                 </ComicButton>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-extrabold uppercase text-[#181B2C]">
-                  Game Length:
-                </span>
-                {GAME_LENGTH_OPTIONS.map((opt) => (
+              {/* Compact Settings Bar: Game Length + Play Style */}
+              <div className="p-2.5 rounded-xl border-2 border-[#181B2C]/25 bg-[#FBF4E4] flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold uppercase text-[#181B2C]">
+                    Length:
+                  </span>
+                  {GAME_LENGTH_OPTIONS.map((opt) => (
+                    <ComicButton
+                      key={opt.innings}
+                      size="sm"
+                      variant={gameLength === opt.innings ? 'gold' : 'cream'}
+                      active={gameLength === opt.innings}
+                      onClick={() => setGameLength(opt.innings)}
+                    >
+                      {opt.label}
+                    </ComicButton>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold uppercase text-[#181B2C] flex items-center gap-1">
+                    <Sliders className="w-3.5 h-3.5" />
+                    Style:
+                  </span>
                   <ComicButton
-                    key={opt.innings}
                     size="sm"
-                    variant={gameLength === opt.innings ? 'gold' : 'cream'}
-                    active={gameLength === opt.innings}
-                    onClick={() => setGameLength(opt.innings)}
+                    variant={controlMode === 'simple' ? 'turf' : 'cream'}
+                    active={controlMode === 'simple'}
+                    onClick={() => setControlMode('simple')}
                   >
-                    {opt.label}
+                    🎮 Arcade Mode (Simple)
                   </ComicButton>
-                ))}
+                  <ComicButton
+                    size="sm"
+                    variant={controlMode === 'advanced' ? 'violet' : 'cream'}
+                    active={controlMode === 'advanced'}
+                    onClick={() => setControlMode('advanced')}
+                  >
+                    🧠 Pro Manager (All Controls)
+                  </ComicButton>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-extrabold uppercase text-[#181B2C] flex items-center gap-1">
-                  <Sliders className="w-3.5 h-3.5" />
-                  Play Style:
-                </span>
-                <ComicButton
-                  size="sm"
-                  variant={controlMode === 'simple' ? 'turf' : 'cream'}
-                  active={controlMode === 'simple'}
-                  onClick={() => setControlMode('simple')}
-                >
-                  🎮 Arcade Mode (Simple)
-                </ComicButton>
-                <ComicButton
-                  size="sm"
-                  variant={controlMode === 'advanced' ? 'violet' : 'cream'}
-                  active={controlMode === 'advanced'}
-                  onClick={() => setControlMode('advanced')}
-                >
-                  🧠 Pro Manager (All Controls)
-                </ComicButton>
-              </div>
-
-              {/* Predetermined 7-Series Home & Away Season Schedule Strip */}
+              {/* Predetermined 7-Series Home & Away Season Schedule Strip (Horizontal Scroll on Phones!) */}
               <div className="space-y-1.5 pt-2 border-t-2 border-dashed border-[#181B2C]/20">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-extrabold uppercase text-[#181B2C]">
                   <span>📅 Season Schedule (7 Predetermined 3-Game Series • Home &amp; Away)</span>
@@ -1287,7 +1339,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                 </div>
                 <div
                   data-testid="season-schedule-strip"
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
+                  className="flex overflow-x-auto pb-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-2"
                 >
                   {seasonSchedule.entries.map((entry) => {
                     const rec = seriesResults[entry.seriesIndex];
@@ -1308,7 +1360,7 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
                     <div
                       key={entry.seriesIndex}
                       data-testid="schedule-series-pill"
-                      className={`p-2 rounded-xl border-2 border-[#181B2C] text-left transition ${
+                      className={`min-w-[165px] shrink-0 sm:min-w-0 p-2 rounded-xl border-2 border-[#181B2C] text-left transition ${
                         entry.status === 'current'
                           ? 'bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C]'
                           : entry.status === 'completed'
@@ -1356,6 +1408,83 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           </ComicCard>
         </div>
 
+        {/* Opening Day Cute "Meet Your 3 Stars" Manga Card Showcase */}
+        {spotlightTrio.length > 0 ? (
+          <div
+            data-testid="meet-your-squad-card"
+            className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFF8E7] shadow-[4px_4px_0_#181B2C] space-y-2.5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-display text-xs sm:text-sm text-[#181B2C]">
+                🌟 MEET YOUR {humanClub.name.toUpperCase()} STARS! (Tap Any Card to Flip!)
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-[#FFC300] border border-[#181B2C] text-[10px] font-extrabold text-[#181B2C]">
+                OPENING DAY SQUAD
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {spotlightTrio.map((star) => (
+                <button
+                  key={star.player.id}
+                  type="button"
+                  data-testid="squad-star-btn"
+                  onClick={() => {
+                    setPreGameScoutPlayerId(star.player.id);
+                    soundEngine.play('card_flip');
+                  }}
+                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] flex items-center gap-2.5 text-left cursor-pointer shadow-[2px_2px_0_#181B2C]"
+                >
+                  <PlayerPortraitBadge
+                    player={star.player}
+                    primaryColor={humanClub.colors.primary}
+                    accentColor={humanClub.colors.accent}
+                    size="sm"
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-extrabold uppercase text-[#7209B7]">
+                      {star.roleBadge}
+                    </div>
+                    <div className="font-display text-xs text-[#181B2C] truncate">
+                      {star.player.name} ({star.player.position})
+                    </div>
+                    <div className="text-[10px] font-bold text-[#4A5068] truncate">
+                      {star.tagline}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Gentle Story & Origins Comic Adventure Nudge */}
+        {nextStoryBeat && onOpenStory ? (
+          <div
+            data-testid="story-chapter-nudge"
+            className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#F5EEFF] flex flex-wrap items-center justify-between gap-2 shadow-[3px_3px_0_#181B2C]"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-extrabold uppercase text-[#7209B7]">
+                📖 COMIC STORY BEAT READY — ACT {nextStoryBeat.act} OF 3
+              </div>
+              <div className="font-display text-xs sm:text-sm text-[#181B2C] truncate">
+                {nextStoryBeat.title} — Make a fun dugout choice to shape your team’s legend!
+              </div>
+            </div>
+            <ComicButton
+              size="sm"
+              variant="violet"
+              data-testid="story-chapter-nudge-btn"
+              onClick={() => {
+                soundEngine.play('ui_pop');
+                onOpenStory();
+              }}
+            >
+              📖 Read Story Chapter
+            </ComicButton>
+          </div>
+        ) : null}
+
         <ManagerClipboardBanner
           clubName={`${humanClub.city} ${humanClub.name}`}
           recordLabel={`${humanClub.wins}-${humanClub.losses}`}
@@ -1400,29 +1529,6 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
           }}
           onActionClick={handleManagerJump}
         />
-
-        {unopenedPacks.length > 0 ? (
-          <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-r from-[#7209B7] via-[#F72585] to-[#FFC300] text-white flex flex-wrap items-center justify-between gap-2 shadow-[4px_4px_0_#181B2C]">
-            <div className="flex items-center gap-2 font-display text-xs sm:text-sm drop-shadow-[1px_1px_0_#181B2C]">
-              <Gift className="w-4 h-4 text-[#FFD166] shrink-0" />
-              <span>
-                You have {unopenedPacks.length} unopened 1994 Foil Booster Pack
-                {unopenedPacks.length === 1 ? '' : 's'}!
-              </span>
-            </div>
-            <ComicButton
-              size="sm"
-              variant="gold"
-              icon={<Sparkles className="w-3.5 h-3.5" />}
-              onClick={() => {
-                setFoilModalOpen(true);
-                soundEngine.play('ui_pop');
-              }}
-            >
-              Rip Foil Pack!
-            </ComicButton>
-          </div>
-        ) : null}
 
         <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
 
@@ -1493,6 +1599,16 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
   );
   const humanSideKey: 'away' | 'home' = liveSession.home.isHuman ? 'home' : 'away';
   const humanIsBatting = (liveSession.half === 'BOT') === (humanSideKey === 'home');
+  const humanHypeNow = liveSession[humanSideKey].hypeGauge;
+  const humanActorNow = humanIsBatting ? currentBatter : currentPitcher;
+  const humanAvailNow = humanIsBatting ? batterSpecial : pitcherSpecial;
+  const humanPowersNow = getActivatablePowersForPlayer(humanActorNow, humanIsBatting ? 'batter' : 'pitcher');
+  const readyPowerOption = humanAvailNow.allowed ? (humanPowersNow[0] ?? null) : null;
+  const firstPitchTip = buildFirstPitchCoachTip({
+    isOpeningDay: humanClub.wins + humanClub.losses === 0,
+    isBatting: humanIsBatting,
+    hasThrownPitch: recentEvents.length > 0,
+  });
   const liveAwayClub = humanSideKey === 'home' ? activeOpponent : humanClub;
   const liveHomeClub = humanSideKey === 'home' ? humanClub : activeOpponent;
   const availableRelievers = liveSession[humanSideKey].bullpenIds.filter(
@@ -1710,14 +1826,30 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               pitcherName={currentPitcher.name}
               lowerThird={liveLowerThird}
               clutchRecap={clutchRecap}
+              firstPitchTip={firstPitchTip}
               bullpenOptions={arcadeBullpenOptions}
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
               watchMode={watchMode}
               smartPauseReason={smartPauseReason}
               tacticalCall={tacticalCall}
+              pitchTarget={pitchTarget}
               isBatting={humanIsBatting}
               gameCompleted={liveSession.status === 'completed'}
+              humanHype={humanHypeNow}
+              hypeCost={SPECIAL_ABILITY_HYPE_COST}
+              readyPowerLabel={readyPowerOption?.name ?? null}
+              powerArmed={Boolean(armedPowerId)}
+              onArmReadyPower={
+                readyPowerOption
+                  ? () => {
+                      setArmedPowerId((prev) =>
+                        prev === readyPowerOption.id ? null : readyPowerOption.id,
+                      );
+                      soundEngine.play('clutch_stinger');
+                    }
+                  : undefined
+              }
               onNextPitch={() => {
                 setSmartPauseReason(null);
                 handleNextPitch();
@@ -1737,6 +1869,10 @@ export function GameDayScreen({ onJumpToTab }: GameDayScreenProps = {}) {
               onSimToEnd={handleSimToEnd}
               onSelectTacticalCall={(call) => {
                 setTacticalCall(call);
+                soundEngine.play('ui_pop');
+              }}
+              onSelectPitchTarget={(intent) => {
+                setPitchTarget(intent);
                 soundEngine.play('ui_pop');
               }}
               onSuggestedAction={handleSuggestedAction}

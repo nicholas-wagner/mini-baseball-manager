@@ -6,9 +6,10 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   test.setTimeout(60_000);
   await page.goto('/');
 
-  // Production launch lands straight on Play Ball / Club Creator with cute quick-pick clubs & Design Lab hidden
+  // Production launch lands straight on Play Ball / Club Creator with cute quick-pick clubs, mascot picker & Design Lab hidden
   await expect(page.getByRole('button', { name: /design lab/i })).toHaveCount(0);
   await expect(page.getByTestId('quick-club-presets')).toBeVisible();
+  await expect(page.getByTestId('mascot-animal-picker')).toBeVisible();
   const startBtn = page.getByRole('button', { name: /start sandlot dynasty/i });
   await expect(startBtn).toBeVisible();
   await startBtn.click();
@@ -17,6 +18,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('ballpark-soundboard')).toHaveCount(0);
   await expect(page.getByTestId('manager-action-inbox')).toBeVisible();
   await expect(page.getByTestId('scheduled-matchup-card')).toBeVisible();
+  await expect(page.getByTestId('meet-your-squad-card')).toBeVisible();
+  await expect(page.getByTestId('story-chapter-nudge')).toBeVisible();
   await expect(page.getByTestId('matchup-faceoff-portraits')).toBeVisible();
   await expect(page.getByTestId('schedule-series-pill')).toHaveCount(7);
   await expect(page.getByTestId('probable-matchup-strip')).toBeVisible();
@@ -46,6 +49,9 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   expect(nextPitchBox!.y + nextPitchBox!.height).toBeLessThanOrEqual(viewport.height);
 
   await expect(page.getByTestId('coach-action-cue')).toBeVisible();
+  await expect(page.getByTestId('first-pitch-tip')).toBeVisible();
+  await expect(page.getByTestId('arcade-call-bar')).toBeVisible();
+  await expect(page.getByTestId('arcade-hype-bar')).toBeVisible();
   await expect(page.getByTestId('camera-angle-switcher')).toBeVisible();
   await expect(page.getByTestId('smart-watch-toggle')).toBeVisible();
   await expect(page.getByTestId('broadcast-lower-third')).toBeVisible();

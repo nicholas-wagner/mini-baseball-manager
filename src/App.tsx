@@ -356,7 +356,10 @@ export function App() {
     }
     if (activeTab === 'gameday' || activeTab === 'lab') {
       return humanClub ? (
-        <GameDayScreen onJumpToTab={(tab) => setActiveTab(tab)} />
+        <GameDayScreen
+          onJumpToTab={(tab) => setActiveTab(tab)}
+          onOpenStory={() => setStoryOpen(true)}
+        />
       ) : (
         <ClubCreatorScreen onCreated={() => setActiveTab('gameday')} />
       );

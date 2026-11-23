@@ -4,6 +4,7 @@ import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
 import type { FormState } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
+import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
 import type { GameDayControlMode } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
 import { CoachPopsAvatar } from './CoachPopsAvatar';
@@ -23,14 +24,21 @@ interface LiveActionBarProps {
   pitcherName?: string;
   lowerThird?: LiveBroadcastLowerThird;
   clutchRecap?: string | null;
+  firstPitchTip?: string | null;
   bullpenOptions?: readonly ArcadeBullpenOption[];
   latestEvent: PlayEvent | null;
   controlMode: GameDayControlMode;
   watchMode: 'live' | 'smart' | 'clutch' | 'paused';
   smartPauseReason?: string | null;
   tacticalCall: TacticalCall;
+  pitchTarget?: PitchTargetIntent;
   isBatting: boolean;
   gameCompleted: boolean;
+  humanHype?: number;
+  hypeCost?: number;
+  readyPowerLabel?: string | null;
+  powerArmed?: boolean;
+  onArmReadyPower?: () => void;
   onNextPitch: () => void;
   onToggleWatchMode: () => void;
   onToggleSmartWatch?: () => void;
@@ -39,6 +47,7 @@ interface LiveActionBarProps {
   onClutchSim: () => void;
   onSimToEnd: () => void;
   onSelectTacticalCall: (call: TacticalCall) => void;
+  onSelectPitchTarget?: (intent: PitchTargetIntent) => void;
   onSuggestedAction: (action: SuggestedQuickAction) => void;
   onToggleControlMode: () => void;
   onSelectBullpenReliever?: (relieverId: string) => void;
@@ -47,10 +56,16 @@ interface LiveActionBarProps {
   onInspectPlayers?: () => void;
 }
 
-const SIMPLE_BAT_APPROACHES: readonly { id: TacticalCall; label: string }[] = [
-  { id: 'normal', label: 'Normal' },
-  { id: 'contact', label: 'Contact' },
-  { id: 'power', label: 'Power' },
+const SIMPLE_BAT_APPROACHES: readonly { id: TacticalCall; label: string; hint: string }[] = [
+  { id: 'contact', label: '🎯 Contact', hint: 'Put it in play' },
+  { id: 'normal', label: '⚾ Normal', hint: 'Balanced swing' },
+  { id: 'power', label: '💥 Swing Big!', hint: 'Hunt home runs' },
+];
+
+const SIMPLE_PITCH_CALLS: readonly { id: PitchTargetIntent; label: string; hint: string }[] = [
+  { id: 'high_heat', label: '🔥 Heat', hint: 'Fastball power' },
+  { id: 'bury_offspeed', label: '🌀 Trick', hint: 'Fool them' },
+  { id: 'paint_corners', label: '🎯 Corner', hint: 'Pinpoint edge' },
 ];
 
 function formEmoji(form: FormState): string {
@@ -67,14 +82,21 @@ export function LiveActionBar({
   pitcherName,
   lowerThird,
   clutchRecap,
+  firstPitchTip = null,
   bullpenOptions = [],
   latestEvent,
   controlMode,
   watchMode,
   smartPauseReason,
   tacticalCall,
+  pitchTarget = 'attack_zone',
   isBatting,
   gameCompleted,
+  humanHype = 25,
+  hypeCost = 60,
+  readyPowerLabel = null,
+  powerArmed = false,
+  onArmReadyPower,
   onNextPitch,
   onToggleWatchMode,
   onToggleSmartWatch,
@@ -83,6 +105,7 @@ export function LiveActionBar({
   onClutchSim,
   onSimToEnd,
   onSelectTacticalCall,
+  onSelectPitchTarget,
   onSuggestedAction,
   onToggleControlMode,
   onSelectBullpenReliever,
@@ -106,93 +129,108 @@ export function LiveActionBar({
         ? 'bg-[#2FB356] text-white'
         : 'bg-[#1B4332] text-[#FFD166]';
 
+  const hypePct = Math.min(100, Math.round((humanHype / Math.max(1, hypeCost)) * 100));
+
   return (
     <div
       data-testid="live-action-bar"
-      className="rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] shadow-[4px_4px_0_#181B2C] p-2.5 sm:p-3 space-y-2.5"
+      className="rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] shadow-[4px_4px_0_#181B2C] p-2.5 sm:p-3 space-y-2"
     >
-      {/* Row 1: Coach Pops' "Right Now" Contextual Turn & Action Cue */}
-      <div
-        data-testid="coach-action-cue"
-        className={`rounded-xl border-2 px-2.5 py-2 flex flex-wrap items-center justify-between gap-2 ${cuePalette}`}
-      >
-        <div className="flex items-start gap-2 min-w-0 flex-1">
-          <CoachPopsAvatar size="sm" testId="live-coach-pops-avatar" />
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] font-extrabold">
-              <span className={`px-2 py-0.5 rounded-md border border-[#181B2C] ${badgePalette}`}>
-                {cue.badgeText}
-              </span>
-              <span className="px-2 py-0.5 rounded-md border border-[#181B2C] bg-[#1D3557] text-[#FFFDF7]">
-                {cue.turnLabel}
-              </span>
-              <span className="text-[#4A5068] truncate">
-                {matchupLabel} • {basesLabel}
+      {/* Row 1: Interactive 3-Call Arcade Choice (Batting & Pitching!) + Visible Glowing Hype Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        {controlMode === 'simple' ? (
+          <div
+            data-testid="arcade-call-bar"
+            className="flex flex-wrap items-center gap-1"
+          >
+            <span className="font-display text-[10px] uppercase text-[#1D3557] mr-0.5">
+              {isBatting ? 'Swing:' : 'Pitch:'}
+            </span>
+            {isBatting
+              ? SIMPLE_BAT_APPROACHES.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    title={opt.hint}
+                    disabled={gameCompleted}
+                    onClick={() => onSelectTacticalCall(opt.id)}
+                    className={`px-2 py-1 min-h-[34px] rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                      tacticalCall === opt.id
+                        ? 'bg-[#FF4D6D] text-white shadow-[2px_2px_0_#181B2C]'
+                        : 'bg-[#FBF4E4] text-[#181B2C] hover:bg-[#FFF3BF]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))
+              : SIMPLE_PITCH_CALLS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    title={opt.hint}
+                    disabled={gameCompleted}
+                    onClick={() => onSelectPitchTarget?.(opt.id)}
+                    className={`px-2 py-1 min-h-[34px] rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                      pitchTarget === opt.id
+                        ? 'bg-[#1D3557] text-[#FFD166] shadow-[2px_2px_0_#181B2C]'
+                        : 'bg-[#E0FBFC] text-[#1D3557] hover:bg-[#FFF3BF]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+          </div>
+        ) : null}
+
+        {/* Visible Glowing ⚡ Special Power Hype Meter (Fun in BOTH Arcade & Pro Modes!) */}
+        <div
+          data-testid="arcade-hype-bar"
+          className="flex items-center gap-2 ml-auto px-2 py-1 rounded-xl border-2 border-[#181B2C] bg-[#F5EEFF]"
+        >
+          <div className="space-y-0.5 min-w-[88px]">
+            <div className="flex items-center justify-between text-[9px] font-extrabold uppercase text-[#4C1D95]">
+              <span>⚡ Hype</span>
+              <span className="font-mono-tabular">
+                {humanHype}/{hypeCost}
               </span>
             </div>
-            <p className="text-xs font-extrabold leading-snug text-[#181B2C]">
-              {smartPauseReason ? `⏸️ ${smartPauseReason} — ${cue.headline}` : cue.headline}
-            </p>
-            {(onInspectBatter || onInspectPitcher || onInspectPlayers) ? (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                {onInspectBatter ? (
-                  <button
-                    type="button"
-                    data-testid="inspect-batter-card-btn"
-                    onClick={onInspectBatter}
-                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
-                  >
-                    🃏 Batter: {batterName ?? 'Card'}
-                  </button>
-                ) : null}
-                {onInspectPitcher ? (
-                  <button
-                    type="button"
-                    data-testid="inspect-pitcher-card-btn"
-                    onClick={onInspectPitcher}
-                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#1D3557] cursor-pointer"
-                  >
-                    🃏 Pitcher: {pitcherName ?? 'Card'}
-                  </button>
-                ) : null}
-                {onInspectPlayers ? (
-                  <button
-                    type="button"
-                    data-testid="inspect-game-players-btn"
-                    onClick={onInspectPlayers}
-                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
-                  >
-                    🃏 All Players
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="h-2 rounded-full border border-[#181B2C] bg-white overflow-hidden">
+              <div
+                className={`h-full transition-all ${
+                  hypePct >= 100 ? 'bg-[#FF4D6D]' : 'bg-[#FFC300]'
+                }`}
+                style={{ width: `${hypePct}%` }}
+              />
+            </div>
           </div>
+          {readyPowerLabel && onArmReadyPower ? (
+            <button
+              type="button"
+              data-testid="arcade-unleash-power-btn"
+              disabled={gameCompleted}
+              onClick={onArmReadyPower}
+              className={`px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] font-display text-[10px] cursor-pointer ${
+                powerArmed
+                  ? 'bg-[#FF4D6D] text-white'
+                  : 'bg-[#FFC300] text-[#181B2C] animate-pulse'
+              }`}
+            >
+              {powerArmed ? '🔥 ARMED!' : `⚡ ${readyPowerLabel}`}
+            </button>
+          ) : null}
         </div>
-
-        {cue.suggestedAction ? (
-          <ComicButton
-            size="sm"
-            variant={cue.urgency === 'high' ? 'gold' : 'turf'}
-            icon={<Sparkles className="w-3.5 h-3.5" />}
-            disabled={gameCompleted}
-            onClick={() => onSuggestedAction(cue.suggestedAction!)}
-          >
-            {cue.suggestedAction.label}
-          </ComicButton>
-        ) : null}
       </div>
 
-      {/* Row 2: Streamlined Arcade Controller (Pitch + Smart Watch + Fast Sim Drawer + Bullpen + Pro Mode) */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Row 2: Streamlined Primary Controller (Right Under the 3D Ballpark — Always in Thumb Zone!) */}
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <ComicButton
           size="md"
-          variant={cue.kind === 'power_armed' ? 'coral' : 'turf'}
+          variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'turf'}
           disabled={gameCompleted}
           icon={<Play className="w-4 h-4" />}
           aria-label={cue.primaryButtonLabel}
           onClick={onNextPitch}
-          className="flex-1 sm:flex-none min-w-[145px]"
+          className="flex-1 sm:flex-none min-w-[140px]"
         >
           {isBatting ? 'Next Pitch' : 'Throw Pitch'}
         </ComicButton>
@@ -353,7 +391,87 @@ export function LiveActionBar({
         </div>
       ) : null}
 
-      {/* Row 3: Compact TV Broadcast Lower-Third + Clutch Jump-In Banner + Optional Swing Pills + Live Readout */}
+      {/* Row 3: Coach Pops' Contextual Turn & Action Cue + First-Pitch Welcome Tip + 1-Tap Card Inspection */}
+      <div
+        data-testid="coach-action-cue"
+        className={`rounded-xl border-2 px-2.5 py-2 flex flex-wrap items-center justify-between gap-2 ${cuePalette}`}
+      >
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          <CoachPopsAvatar size="sm" testId="live-coach-pops-avatar" />
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] font-extrabold">
+              <span className={`px-2 py-0.5 rounded-md border border-[#181B2C] ${badgePalette}`}>
+                {cue.badgeText}
+              </span>
+              <span className="px-2 py-0.5 rounded-md border border-[#181B2C] bg-[#1D3557] text-[#FFFDF7]">
+                {cue.turnLabel}
+              </span>
+              <span className="text-[#4A5068] truncate">
+                {matchupLabel} • {basesLabel}
+              </span>
+            </div>
+            <p className="text-xs font-extrabold leading-snug text-[#181B2C]">
+              {smartPauseReason ? `⏸️ ${smartPauseReason} — ${cue.headline}` : cue.headline}
+            </p>
+            {firstPitchTip ? (
+              <div
+                data-testid="first-pitch-tip"
+                className="mt-1 px-2 py-1 rounded-lg border border-[#7209B7]/40 bg-[#F5EEFF] text-[#4C1D95] text-[11px] font-extrabold"
+              >
+                🧢 {firstPitchTip}
+              </div>
+            ) : null}
+            {(onInspectBatter || onInspectPitcher || onInspectPlayers) ? (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {onInspectBatter ? (
+                  <button
+                    type="button"
+                    data-testid="inspect-batter-card-btn"
+                    onClick={onInspectBatter}
+                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                  >
+                    🃏 Batter: {batterName ?? 'Card'}
+                  </button>
+                ) : null}
+                {onInspectPitcher ? (
+                  <button
+                    type="button"
+                    data-testid="inspect-pitcher-card-btn"
+                    onClick={onInspectPitcher}
+                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#1D3557] cursor-pointer"
+                  >
+                    🃏 Pitcher: {pitcherName ?? 'Card'}
+                  </button>
+                ) : null}
+                {onInspectPlayers ? (
+                  <button
+                    type="button"
+                    data-testid="inspect-game-players-btn"
+                    onClick={onInspectPlayers}
+                    className="px-2 py-1 min-h-[32px] rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10px] sm:text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                  >
+                    🃏 All Players
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {cue.suggestedAction ? (
+          <ComicButton
+            size="sm"
+            variant={cue.urgency === 'high' ? 'gold' : 'turf'}
+            icon={<Sparkles className="w-3.5 h-3.5" />}
+            disabled={gameCompleted}
+            onClick={() => onSuggestedAction(cue.suggestedAction!)}
+          >
+            {cue.suggestedAction.label}
+          </ComicButton>
+        ) : null}
+      </div>
+
+      {/* Row 3: Compact TV Broadcast Lower-Third + Clutch Jump-In Banner + Live Readout */}
       {clutchRecap ? (
         <div
           data-testid="clutch-recap-banner"
@@ -395,46 +513,22 @@ export function LiveActionBar({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-dashed border-[#181B2C]/20 text-[11px]">
-        {controlMode === 'simple' && isBatting ? (
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="font-extrabold uppercase text-[10px] text-[#4A5068] mr-1">
-              Swing (Optional):
+      <div
+        data-testid="live-last-pitch-readout"
+        className="pt-1.5 border-t border-dashed border-[#181B2C]/20 text-[11px] font-bold text-[#181B2C] truncate"
+      >
+        {latestEvent ? (
+          <>
+            <span className="font-extrabold text-[#1B4332] mr-1">
+              [{latestEvent.half} {latestEvent.inning}]
             </span>
-            {SIMPLE_BAT_APPROACHES.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => onSelectTacticalCall(opt.id)}
-                className={`px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#181B2C] font-heading font-bold text-[11px] cursor-pointer ${
-                  tacticalCall === opt.id
-                    ? 'bg-[#FF4D6D] text-white'
-                    : 'bg-[#FBF4E4] text-[#181B2C]'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        <div
-          data-testid="live-last-pitch-readout"
-          className="font-bold text-[#181B2C] truncate flex-1 min-w-[180px]"
-        >
-          {latestEvent ? (
-            <>
-              <span className="font-extrabold text-[#1B4332] mr-1">
-                [{latestEvent.half} {latestEvent.inning}]
-              </span>
-              {latestEvent.commentary}
-            </>
-          ) : (
-            <span className="text-[#4A5068]">
-              Eyes on the 3D diamond — press {isBatting ? 'Next Pitch' : 'Throw Pitch'} to start!
-            </span>
-          )}
-        </div>
+            {latestEvent.commentary}
+          </>
+        ) : (
+          <span className="text-[#4A5068]">
+            Eyes on the 3D diamond — press {isBatting ? 'Next Pitch' : 'Throw Pitch'} to start!
+          </span>
+        )}
       </div>
     </div>
   );

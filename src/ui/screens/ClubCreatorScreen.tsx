@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dices, Play } from 'lucide-react';
+import { Dices, Play, Sparkles } from 'lucide-react';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
 import { soundEngine } from '../../audio/soundEngine';
@@ -9,6 +9,7 @@ import {
 } from '../../engine/gm/rosterPresets';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import { newCareerSeed, useGameStore } from '../../store/gameStore';
+import { ClubMascotBuddy } from '../components/ClubMascotBuddy';
 import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -37,7 +38,7 @@ const QUICK_STARTER_CLUBS = [
     label: 'Harbor Otters',
     city: 'Harbor',
     clubName: 'Otters',
-    mascot: 'Captain Splash',
+    mascot: 'Splash Otter',
     monogram: 'HO',
     paletteIndex: 1,
   },
@@ -61,6 +62,14 @@ const QUICK_STARTER_CLUBS = [
     monogram: 'MB',
     paletteIndex: 3,
   },
+] as const;
+
+const MASCOT_ANIMAL_OPTIONS = [
+  { id: 'dog', emoji: '🐶', label: 'Dog', mascotName: 'Rocket Dog' },
+  { id: 'otter', emoji: '🦦', label: 'Otter', mascotName: 'Splash Otter' },
+  { id: 'fox', emoji: '🦊', label: 'Fox', mascotName: 'Lucky Fox' },
+  { id: 'bear', emoji: '🐻', label: 'Bear', mascotName: 'Astro Bear' },
+  { id: 'buddy', emoji: '⚾', label: 'Buddy', mascotName: 'Slugger Buddy' },
 ] as const;
 
 export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
@@ -120,48 +129,146 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   return (
     <div className="max-w-4xl mx-auto">
       <ComicCard
-        title="FOUND YOUR 90s SANDLOT CLUB"
-        subtitle="Customize your franchise colors, chibi uniform, and Rookie Sandlot League start"
+        title="⚾ FOUND YOUR 90s SANDLOT CLUB — PICK YOUR TEAM!"
+        subtitle="Jump onto the 3D Sandlot diamond in 5 seconds • Collect 90s manga cards & chase the Mini Majors!"
         headerBg="#1B4332"
       >
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-5 items-start">
-          <div className="space-y-3">
-            {/* Cute 1-Tap Sandlot Starter Franchises */}
-            <div data-testid="quick-club-presets" className="space-y-1.5">
-              <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
-                ⚡ Quick-Pick Cute Starter Club (Or Customize Below!)
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 1. Above-the-Fold 5-Second Toy Box Hero (Quick Club + Cute Mascot + Live Preview + BIG PLAY BUTTON!) */}
+          <div className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_230px] gap-4 items-center">
+            <div className="space-y-3">
+              <div data-testid="quick-club-presets" className="space-y-1.5">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+                  ⚡ Step 1: Pick a Cute Starter Club
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {QUICK_STARTER_CLUBS.map((preset) => {
+                    const isActive = city === preset.city && clubName === preset.clubName;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          setCity(preset.city);
+                          setClubName(preset.clubName);
+                          setMascot(preset.mascot);
+                          setMonogram(preset.monogram);
+                          setPaletteIndex(preset.paletteIndex % SAMPLE_TEAM_PALETTES.length);
+                          soundEngine.play('ui_pop');
+                        }}
+                        className={`p-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[52px] cursor-pointer transition ${
+                          isActive
+                            ? 'bg-[#FFC300] shadow-[3px_3px_0_#181B2C]'
+                            : 'bg-[#FFFDF7] hover:bg-[#FFF3BF]'
+                        }`}
+                      >
+                        <div className="font-display text-xs text-[#181B2C]">
+                          {preset.emoji} {preset.label}
+                        </div>
+                        <div className="text-[10px] font-bold text-[#4A5068] truncate">
+                          {preset.mascot}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {QUICK_STARTER_CLUBS.map((preset) => {
-                  const isActive = city === preset.city && clubName === preset.clubName;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setCity(preset.city);
-                        setClubName(preset.clubName);
-                        setMascot(preset.mascot);
-                        setMonogram(preset.monogram);
-                        setPaletteIndex(preset.paletteIndex % SAMPLE_TEAM_PALETTES.length);
-                        soundEngine.play('ui_pop');
-                      }}
-                      className={`p-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[52px] cursor-pointer transition ${
-                        isActive
-                          ? 'bg-[#FFC300] shadow-[3px_3px_0_#181B2C]'
-                          : 'bg-[#FFFDF7] hover:bg-[#FFF3BF]'
-                      }`}
-                    >
-                      <div className="font-display text-xs text-[#181B2C]">
-                        {preset.emoji} {preset.label}
-                      </div>
-                      <div className="text-[10px] font-bold text-[#4A5068] truncate">
-                        Mascot: {preset.mascot}
-                      </div>
-                    </button>
-                  );
-                })}
+
+              <div data-testid="mascot-animal-picker" className="space-y-1.5">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+                  🐾 Step 2: Pick Your Team Mascot Buddy
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {MASCOT_ANIMAL_OPTIONS.map((opt) => {
+                    const selected = mascot.toLowerCase().includes(opt.id) || mascot === opt.mascotName;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setMascot(opt.mascotName);
+                          soundEngine.play('ui_pop');
+                        }}
+                        className={`px-2.5 py-1.5 min-h-[40px] rounded-xl border-2 border-[#181B2C] text-xs font-extrabold cursor-pointer transition ${
+                          selected
+                            ? 'bg-[#FF4D6D] text-white shadow-[2px_2px_0_#181B2C]'
+                            : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
+                        }`}
+                      >
+                        {opt.emoji} {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <ComicButton
+                  type="submit"
+                  size="lg"
+                  variant="turf"
+                  icon={<Play className="w-4 h-4" />}
+                  className="flex-1 sm:flex-none"
+                >
+                  Start Sandlot Dynasty
+                </ComicButton>
+                <ComicButton
+                  variant="sky"
+                  size="md"
+                  icon={<Dices className="w-4 h-4" />}
+                  onClick={handleRandomize}
+                >
+                  Randomize Club
+                </ComicButton>
+              </div>
+            </div>
+
+            {/* Live Bouncing Mascot + Painted Chibi Uniform Stage */}
+            <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C]">
+              <div className="flex items-center justify-center gap-2">
+                <ClubMascotBuddy
+                  mascot={mascot || 'Rocket Dog'}
+                  primaryColor={palette.primary}
+                  secondaryColor={palette.secondary}
+                  accentColor={palette.accent}
+                  mood="cheering"
+                  size="md"
+                />
+                <div className="text-left min-w-0">
+                  <div className="font-display text-sm text-[#181B2C] leading-tight truncate">
+                    {city || 'Sandlot'} {clubName || 'Comets'}
+                  </div>
+                  <div className="text-[11px] font-bold text-[#4A5068] truncate">
+                    Mascot: {mascot || 'Rocket Dog'}
+                  </div>
+                </div>
+              </div>
+              <div className="w-36 h-40 mx-auto mt-1.5">
+                <PaintedUniformPreview
+                  traits={previewTraits}
+                  team={{
+                    primary: palette.primary,
+                    secondary: palette.secondary,
+                    accent: palette.accent,
+                    monogram: monogram.slice(0, 2) || 'SC',
+                  }}
+                  jerseyNumber={24}
+                  role="pitcher"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Optional Customization & Strategy Details (Already Ready Above — Tweak Anytime!) */}
+          <div className="p-3.5 rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-1 border-b border-dashed border-[#181B2C]/25 pb-2">
+              <span className="font-display text-xs uppercase text-[#1D3557] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#F77F00]" />
+                Optional: Customize Club Name, Uniform, Starting Roster &amp; Rules
+              </span>
+              <span className="text-[10px] font-bold text-[#4A5068]">
+                Defaults are already ready to play above!
+              </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -311,12 +418,12 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+            <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2">
               <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
                 Career Realism Toggles (Low-Frequency, Fun-First)
               </div>
               <div className="flex flex-wrap gap-3">
-                <label className="inline-flex items-center gap-2 min-h-[44px] px-2.5 rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] text-xs font-extrabold text-[#181B2C] cursor-pointer">
+                <label className="inline-flex items-center gap-2 min-h-[44px] px-2.5 rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] text-xs font-extrabold text-[#181B2C] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={enableInjuries}
@@ -325,7 +432,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                   />
                   Athletic Injuries ({enableInjuries ? 'ON' : 'OFF'})
                 </label>
-                <label className="inline-flex items-center gap-2 min-h-[44px] px-2.5 rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] text-xs font-extrabold text-[#181B2C] cursor-pointer">
+                <label className="inline-flex items-center gap-2 min-h-[44px] px-2.5 rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] text-xs font-extrabold text-[#181B2C] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={enableIllnesses}
@@ -336,46 +443,6 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                 </label>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-3 pt-2">
-              <ComicButton
-                variant="sky"
-                icon={<Dices className="w-4 h-4" />}
-                onClick={handleRandomize}
-              >
-                Randomize Club
-              </ComicButton>
-              <ComicButton
-                type="submit"
-                variant="turf"
-                icon={<Play className="w-4 h-4" />}
-              >
-                Start Sandlot Dynasty
-              </ComicButton>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] text-center shadow-[3px_3px_0_#181B2C]">
-            <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#4A5068]">
-              Home Uniform Preview
-            </div>
-            <div className="w-40 h-44 mx-auto my-2">
-              <PaintedUniformPreview
-                traits={previewTraits}
-                team={{
-                  primary: palette.primary,
-                  secondary: palette.secondary,
-                  accent: palette.accent,
-                  monogram: monogram.slice(0, 2) || 'SC',
-                }}
-                jerseyNumber={24}
-                role="pitcher"
-              />
-            </div>
-            <div className="font-display text-sm text-[#181B2C]">
-              {city || 'Sandlot'} {clubName || 'Comets'}
-            </div>
-            <div className="text-xs font-bold text-[#4A5068]">Mascot: {mascot || 'Rocket Dog'}</div>
           </div>
         </form>
       </ComicCard>

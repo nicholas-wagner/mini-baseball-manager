@@ -137,7 +137,7 @@ export function BroadcastHud({
               <span>
                 {session.away.name} {awayPct}%
               </span>
-              <span>WIN PROBABILITY</span>
+              <span>WHO’S AHEAD? (WIN %)</span>
               <span>
                 {session.home.name} {homePct}%
               </span>
