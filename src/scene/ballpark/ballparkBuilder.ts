@@ -7,6 +7,7 @@ import type { LiveStadiumScoreboardSnapshot } from './liveScoreboardData';
 export interface BallparkEnvironment {
   group: THREE.Group;
   update: (timeSec: number, crowdExcitement: number) => void;
+  setPlateTarget: (visible: boolean) => void;
   updateScoreboard: (snapshot: LiveStadiumScoreboardSnapshot) => void;
   dispose: () => void;
 }
@@ -360,7 +361,12 @@ export function createMiniBallpark(): BallparkEnvironment {
   const plate = new THREE.Mesh(new THREE.ShapeGeometry(plateShape), baseMat);
   plate.rotation.x = -Math.PI / 2;
   plate.position.y = 0.05;
-  group.add(plate);
+  const plateTarget = new THREE.Mesh(plate.geometry, new THREE.MeshBasicMaterial({ color: 0xffc300 }));
+  plateTarget.rotation.copy(plate.rotation);
+  plateTarget.position.y = plate.position.y - .004;
+  plateTarget.scale.set(1.32, 1.32, 1);
+  plateTarget.visible = false;
+  group.add(plate, plateTarget);
 
   // Crisp white chalk foul lines
   const chalkMat = new THREE.MeshBasicMaterial({ color: 0xfbf4e4 });
@@ -735,6 +741,7 @@ export function createMiniBallpark(): BallparkEnvironment {
   return {
     group,
     update,
+    setPlateTarget(visible) { plateTarget.visible = visible; },
     updateScoreboard: scoreboardDisplay.updateScoreboard,
     dispose,
   };

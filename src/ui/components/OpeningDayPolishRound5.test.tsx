@@ -57,7 +57,7 @@ describe('Opening Day Polish Round 5 (Clean Badges, Unified Opening Story, 2-Row
 
     // 3 calm Opening Day moments visible immediately
     expect(screen.getByRole('region', { name: 'Opening Day feature' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /rip foil pack/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rip foil pack/i })).toBeNull();
     expect(screen.getByTestId('meet-your-squad-card')).toBeInTheDocument();
 
     // Competing matchup card & GM clipboard start tucked behind 1-tap toggle on Opening Day

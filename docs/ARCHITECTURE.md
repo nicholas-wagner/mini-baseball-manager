@@ -712,3 +712,5 @@ export interface SaveFileV1 {
 ### Live replay and batter handoff
 
 Game Day advances the simulation once per manager action. It keeps the pre-play session and the chosen event alongside the choreography. Replaying starts a new presentation clock for that event. The scorebook, player totals and career rewards are written only by the original simulation action. Opening Day guidance is scoped to the starting inning and half. A third out or walk-off can finish its field sequence before the manager changes sides or opens the final box score.
+
+The featured-player cue identifies the batting or pitching role. A groundout handoff carries the outgoing batter’s ID so the scene can dress the second rig from the same roster. Replay scoring text requires the recorded fielding position and the animated throw to agree. The between-innings pack button opens the existing welcome pack in inventory.

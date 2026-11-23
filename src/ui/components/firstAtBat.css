@@ -71,3 +71,19 @@
 .rally-result footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
 .rally-result footer button:first-child { flex: none; }
 .rally-result .atbat-go { margin: 0; }
+.guided-line, .guided-teams, .guided-team, .guided-count, .rally-gift { display: flex; align-items: center; }
+.guided-line { width: 100%; min-height: 44px; gap: 10px; justify-content: space-between; text-align: left; }
+.guided-teams { gap: 8px; min-width: 0; flex-wrap: wrap; }
+.guided-team { gap: 4px; min-width: 0; font-size: 14px; font-weight: 800; }
+.guided-team i { width: 9px; height: 9px; border: 1px solid white; border-radius: 50%; flex: none; }
+.guided-team span { overflow-wrap: anywhere; }
+.guided-team b { color: #ffdb76; font: 800 18px monospace; }
+.guided-count { gap: 3px; flex-shrink: 0; font: 750 12px system-ui; }
+.guided-count small { display: block; font-size: 11px; color: #c3ddcf; }
+.swing-tradeoff { margin-top: 5px; font-size: 13px; font-weight: 650; }
+.rally-gift { grid-column: 1/-1; justify-content: space-between; gap: 10px; padding: 3px 8px; border-radius: 7px; color: white; background: linear-gradient(110deg,#433272,#744069); font-weight: 800; }
+.rally-gift button { min-height: 44px; color: #ffe4a3; text-decoration: underline; }
+
+.rally-detail {grid-column:1 / -1;color:#254332;font-weight:700}
+.rally-detail summary {cursor:pointer;min-height:44px;align-content:center}
+.rally-detail p {padding:0 0 .5rem 1rem}

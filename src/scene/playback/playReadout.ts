@@ -50,3 +50,16 @@ export function decisionDelayMs(step: ChoreographedStep) {
   const play = step.play ?? step.close ?? step.outfield;
   return play ? (step.durationMs * play.finish) / play.duration : 0;
 }
+
+/** Score the assist only when the official event and the visible throw agree. */
+export function scoringDetail(event: PlayEvent, play?: ChoreographedStep['play']) {
+  const fielder = event.fieldingHighlight;
+  if (!fielder?.fielderId || !event.batterId || event.outcome !== 'ground_out' ||
+      event.outsAfter <= event.outsBefore || event.basesAfter.includes(event.batterId) ||
+      play?.kind !== 'ground_out') return;
+  const pos = fielder.fielderPos;
+  if (!play.legs.some(leg => leg.kind === 'throw' && leg.from === pos && leg.to === '1B')) return;
+  if (pos === 'SS') return 'Shortstop to first · 6–3';
+  if (pos === '2B') return 'Second to first · 4–3';
+  if (pos === '3B') return 'Third to first · 5–3';
+}

@@ -196,8 +196,9 @@ export function createPaintedPlayerRig(
     const tagging = clip === 'field_tag' && role !== 'catcher';
     const popping = clip === 'catch_throw' || clip === 'catch_point' || clip==='catch_handoff';
     const basePlayPose = sliding || tagging || popping;
-    const leading = clip === 'runner_lead' || clip==='runner_push' || (role==='batter' && clip==='celebrate_hr');
-    const pitching = role==='pitcher' && ['idle','field_ready','pitch_set','pitch_windup','pitch_super','practice_bullpen'].includes(clip);
+    const tapping = clip === 'glove_tap';
+    const leading = tapping || clip === 'runner_lead' || clip==='runner_push' || (role==='batter' && clip==='celebrate_hr');
+    const pitching = role==='pitcher' && ['idle','field_ready','pitch_gather','pitch_set','pitch_windup','pitch_super','practice_bullpen'].includes(clip);
     const motionRole = running || leading || sliding ? 'runner' : role==='pitcher' && !pitching && clip!=='celebrate_hr' ? 'fielder' : role;
     const stride = clip==='field_run' && !running;
     if (delivery) {
@@ -214,7 +215,11 @@ export function createPaintedPlayerRig(
     }
     if (clip==='slide_safe') rear=false;
     const homeTag = clip === 'field_tag' && role === 'catcher';
-    const frame = paintedMotion(motionRole, homeTag ? 'catch_receive' : clip === 'runner_glance' ? 'field_run' : clip, homeTag ? .22 : time);
+    const heldCatch = homeTag || clip === 'catch_frame';
+    const frame = paintedMotion(motionRole, heldCatch ? 'catch_receive' : clip === 'runner_glance' ? 'field_run' : clip, heldCatch ? .22 : time);
+    if (clip === 'catch_frame') {
+      frame.tilt += .035 * Math.sin(Math.PI * Math.min(1, time / .32));
+    }
     if (clip==='catch_target' || (role === 'catcher' && opt.reassurePitcher && clip === 'field_ready')) {
       frame.cel=5;
       frame.squash=.018;
@@ -285,9 +290,15 @@ export function createPaintedPlayerRig(
       frame.hop=.20*Math.abs(Math.sin(time*5.4));
       frame.tilt=.09*Math.sin(time*5.4);
     }
-    const bodySheet = cheering ? 'welcome' : basePlayPose ? 'baseplays' : receiving ? 'receivers' : stride ? 'strides' : running ? `play-${view}-${a.bottoms}` as const
+    if (tapping) {
+      frame.cel = runnerRow[a.bottoms] + 1;
+      frame.expression = 2;
+      frame.shift = 0;
+      frame.squash = 0;
+    }
+    const bodySheet = cheering || tapping ? 'welcome' : basePlayPose ? 'baseplays' : receiving ? 'receivers' : stride ? 'strides' : running ? `play-${view}-${a.bottoms}` as const
       : leading ? 'runners' : (clip === 'field_throw' || (role === 'pitcher' && !pitching)) ? (rear ? `rear-${a.bottoms}` as const : a.bottoms) : style.body;
-    const registration = bodySheet==='welcome' ? [126,92,40,54] : anchors[bodySheet][frame.cel];
+    const registration = bodySheet==='welcome' ? (tapping ? [126,92,235,113] : [126,92,40,54]) : anchors[bodySheet][frame.cel];
     const [nx,ny,contactX,contactY]=registration;
     const emotion = mood
       ? mood === 'happy'
@@ -339,10 +350,11 @@ export function createPaintedPlayerRig(
     }
     nearArm.scale.copy(body.scale);
     nearArm.position.set(0, body.position.y, 0.063);
-    nearArm.visible = !cheering && !basePlayPose && !pitching && role !== 'runner';
+    nearArm.visible = !tapping && !cheering && !basePlayPose && !pitching && role !== 'runner';
     bodyMat.uniforms.collar.value.set(nx / 256, 1 - ny / 256);
     headJoint.position.set(swingMirror * (nx - 128) * unit * width, (249 - ny - 8) * unit, 0.032);
     headJoint.rotation.z = rotationSign * frame.tilt;
+    if (clip === 'catch_frame') headJoint.position.y -= .035 * Math.sin(Math.PI * Math.min(1, time / .32));
     bodyMat.uniforms.sleeve.value.set(0, rear ? .59 : .46);
     if (clip === 'bat_stance') {
       // Each player keeps a quiet pre-pitch habit through changes of club or uniform.
@@ -360,6 +372,12 @@ export function createPaintedPlayerRig(
       else actor.position.x += .032 * beat * actorFlip;
     }
     const roll = clip === 'pitch_set' && opt.traits.seed % 3 === 0;
+    if (clip === 'pitch_gather') {
+      const close = THREE.MathUtils.smoothstep(time, .18, .92);
+      ball.position.set(.027 * (1-close), -.024 + .018*close, .07-.10*close);
+      ball.rotation.x = close * 2;
+      frame.held = close < .97;
+    }
     if (pitching) {
       const gather = Math.min(1, frame.pitchPhase / .24);
       headJoint.position.y -= .038 * Math.sin(Math.PI * gather);

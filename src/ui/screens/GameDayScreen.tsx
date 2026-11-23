@@ -138,7 +138,8 @@ import { ArcadeDerbyModal } from '../components/ArcadeDerbyModal';
 import { RallyResult } from '../components/RallyResult';
 import { FirstAtBat } from '../components/FirstAtBat';
 import { BatterEntrance, MatchupPrints, OpeningDayPrint } from '../components/GameDayPrints';
-import { decisionDelayMs, playReadout } from '../../scene/playback/playReadout';
+import type { PlayerEntranceCue } from '../../scene/playback/firstAtBatPresentation';
+import { decisionDelayMs, scoringDetail, playReadout } from '../../scene/playback/playReadout';
 import { BroadcastHud } from '../components/BroadcastHud';
 import { ClubMascotBuddy } from '../components/ClubMascotBuddy';
 import { FoilPackModal } from '../components/FoilPackModal';
@@ -186,9 +187,14 @@ function safeScrollTop(): void {
 interface GameDayScreenProps {
   onJumpToTab?: (tab: 'roster' | 'skills' | 'league' | 'economy') => void;
   onOpenStory?: () => void;
+  onOpenRelics?: () => void;
 }
 
-export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps = {}) {
+export function GameDayScreen({
+  onJumpToTab,
+  onOpenStory,
+  onOpenRelics,
+}: GameDayScreenProps = {}) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
   const manager = useGameStore((s) => s.manager);
@@ -244,6 +250,8 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const gameLog = useRef<PlayEvent[]>([]);
+  const [entranceCue, setEntranceCue] = useState<PlayerEntranceCue | null>(null);
+  const finishEntrance = useCallback(() => setEntranceCue(null), []);
   const [guidedHalf, setGuidedHalf] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
   const [recentEvents, setRecentEvents] = useState<PlayEvent[]>([]);
@@ -453,6 +461,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     setLastChoreo(null);
     gameLog.current = [];
     setTacticalCall('normal');
+    setEntranceCue(null);
     setGuidedHalf(null);
     setPlaybackEvent(null);
     setSelectedPitchType(null);
@@ -491,6 +500,8 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     if (!clutch) return;
     setActiveOpponentId(opp.id);
     gameLog.current = [...clutch.gameEvents];
+    const openingBatting = (clutch.session.half === 'BOT') === clutch.session.home.isHuman;
+    setEntranceCue(guided ? {role: openingBatting ? 'batter' : 'pitcher'} : null);
     setGuidedHalf(guided ? clutch.session.inning + clutch.session.half : null);
     setShowMore(false);
     setTacticalCall(guided && (clutch.session.half === 'BOT') === clutch.session.home.isHuman ? 'contact' : 'normal');
@@ -532,6 +543,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const applyStepResult = useCallback(
     (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string) => {
       gameLog.current.push(...emitted);
+      setEntranceCue(null);
       setPrePlaySession(liveSession);
       setLiveSession(nextSession);
       setWinProbHistory((prev) => [...prev.slice(-23), estimateHomeWinProbability(nextSession)]);
@@ -956,15 +968,12 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
             onInspect={(player) => setPreGameScoutPlayerId(player.id)}
           />
         )}
-        {/* Top-of-Screen Glowing Foil Pack Alert (Instant Dopamine Hit!) */}
-        {unopenedPacks.length > 0 ? (
+        {unopenedPacks.length > 0 && !isOpeningDay ? (
           <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-r from-[#7209B7] via-[#F72585] to-[#FFC300] text-white flex flex-wrap items-center justify-between gap-2 shadow-[4px_4px_0_#181B2C]">
             <div className="flex items-center gap-2 font-display text-xs sm:text-sm drop-shadow-[1px_1px_0_#181B2C]">
               <Gift className="w-4 h-4 text-[#FFD166] shrink-0" />
               <span>
-                {isOpeningDay
-                  ? `🎁 Opening Day Gift! You have ${unopenedPacks.length} shiny 1994 Foil Pack${unopenedPacks.length === 1 ? '' : 's'}!`
-                  : `You have ${unopenedPacks.length} unopened 1994 Foil Booster Pack${unopenedPacks.length === 1 ? '' : 's'}!`}
+                You have {unopenedPacks.length} unopened 1994 Foil Booster Pack{unopenedPacks.length === 1 ? '' : 's'}!
               </span>
             </div>
             <ComicButton
@@ -1756,7 +1765,29 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           </div>
         ) : null}
 
-        <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
+        <FoilPackModal
+          open={foilModalOpen}
+          onClose={() => setFoilModalOpen(false)}
+          backLabel={
+            humanClub.wins + humanClub.losses === 0
+              ? '⚾ Back to Opening Day'
+              : '⚾ Back to Game Day'
+          }
+          onBackToGame={() => setFoilModalOpen(false)}
+          onViewRelics={
+            onOpenRelics
+              ? () => {
+                  setFoilModalOpen(false);
+                  onOpenRelics();
+                }
+              : onJumpToTab
+                ? () => {
+                    setFoilModalOpen(false);
+                    onJumpToTab('economy');
+                  }
+                : undefined
+          }
+        />
 
         <ArcadeDerbyModal
           open={derbyOpen}
@@ -2038,6 +2069,12 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
+  const offerOpeningPack = eventInGuide && !playing && (changedSides || liveSession.status === 'completed') &&
+    unopenedPacks.some(pack => pack.id === 'pack-opening-day');
+  const openBetweenInningsPack = () => {
+    setWatchMode('paused');
+    setFoilModalOpen(true);
+  };
   const openGamePlayerCard = (playerId: string) => {
     if (watchMode === 'live' || watchMode === 'smart') setWatchMode('paused');
     setInspectedGamePlayerId(playerId);
@@ -2051,6 +2088,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
         className="sticky top-[62px] md:top-2 z-20"
       >
         <ScoreboardStrip
+          clubs={guiding && !showMore ? {away:liveAwayClub.name, home:liveHomeClub.name, humanHome:shown.home.isHuman} : undefined}
           flash={readout ? { ...readout, seq: playbackEvent!.seq } : null}
           awayAbbr={liveAwayClub.colors.monogram}
           awayScore={resultShown?.awayScore ?? shown.away.score}
@@ -2080,6 +2118,9 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           {/* Unified 3D Ballpark + Directly Attached Live Action Bar (always visible together!) */}
           <div className="space-y-2">
             <LiveGameCanvas
+              guided={Boolean(guiding && !showMore)}
+              onEntranceEnd={finishEntrance}
+              entranceCue={guiding && !showMore ? entranceCue : null}
               preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' ? 'power' : 'contact') : pitchTarget) : null}
               awayClub={liveAwayClub}
               homeClub={liveHomeClub}
@@ -2091,7 +2132,10 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
                 setCameraMode(mode);
                 soundEngine.play('ui_pop');
               }}
-              entrance={<BatterEntrance key={picturedBatter.id} player={picturedBatter} />}
+              entrance={guiding ? entranceCue && !showMore &&
+                <BatterEntrance guided key={entranceCue.role === 'pitcher' ? picturedPitcher.id : picturedBatter.id}
+                  player={entranceCue.role === 'pitcher' ? picturedPitcher : picturedBatter} pitching={entranceCue.role === 'pitcher'} />
+                : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}
               celebrateConfetti={Boolean(liveCallout?.confetti)}
               overlay={
                 liveCallout ? (
@@ -2155,22 +2199,29 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
             />
 
             {handoff && !playing && playbackEvent && prePlaySession && lastChoreo ?
-              <RallyResult player={creditedPlayer} gameOver={liveSession.status === 'completed'} before={prePlaySession} event={playbackEvent}
+              <RallyResult detail={scoringDetail(playbackEvent, lastChoreo.play)} player={creditedPlayer} gameOver={liveSession.status === 'completed'} before={prePlaySession} event={playbackEvent}
                 nextLabel={liveSession.status === 'completed' ? 'Box score' : changedSides ? 'Change sides' : stole ? 'Back to the batter' : 'Next batter'}
+                onOpenPack={offerOpeningPack ? openBetweenInningsPack : undefined}
                 onReplay={() => setLastChoreo({...lastChoreo})}
                 onContinue={() => {
+                  setEntranceCue(!changedSides && !stole && liveSession.status !== 'completed' && guidedBatting
+                    ? {role:'batter', outgoingId:playbackEvent.outcome === 'ground_out' ? playbackEvent.batterId : undefined} : null);
                   setLastChoreo(null);
                   setPlaybackEvent(null);
                   if (delayedSummary) { setModalSummary(delayedSummary.summary); setDelayedSummary(null); }
                 }} /> : guiding && <FirstAtBat session={shown} batting={guidedBatting} target={pitchTarget} call={tacticalCall}
               locked={playing} expanded={showMore} powerArmed={Boolean(armedPowerId)} cue={liveCue} onExpand={()=>setShowMore(v=>!v)}
-              onTarget={target=>{setLastChoreo(null);setPlaybackEvent(null);setPitchTarget(target);}}
-              onSwing={call=>{setLastChoreo(null);setPlaybackEvent(null);setTacticalCall(call);}}
+              onTarget={target=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setPitchTarget(target);}}
+              onSwing={call=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setTacticalCall(call);}}
               onPitch={handleNextPitch} onSuggested={()=>{
                 const action = liveCue.suggestedAction;
                 if (action?.type === 'steal' && action.tacticalCall) handleNextPitch(action.tacticalCall);
                 else if (action) handleSuggestedAction(action);
               }} />}
+            {offerOpeningPack && !handoff && liveSession.status === 'in_progress' &&
+              <aside className="rally-gift">
+                <span>Opening Day foil pack</span><button onClick={openBetweenInningsPack}>Open foil pack</button>
+              </aside>}
             {(!guiding || showMore) && replayable && lastChoreo && <button className="atbat-tip"
               onClick={() => setLastChoreo({...lastChoreo})}>Watch again · {playReadout(playbackEvent)?.label}</button>}
             {(!guiding || showMore) && <LiveActionBar
@@ -3007,7 +3058,25 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
         }
       />
 
-      <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
+      <FoilPackModal
+        open={foilModalOpen}
+        onClose={() => setFoilModalOpen(false)}
+        backLabel="⚾ Back to Game Day"
+        onBackToGame={() => setFoilModalOpen(false)}
+        onViewRelics={
+          onOpenRelics
+            ? () => {
+                setFoilModalOpen(false);
+                onOpenRelics();
+              }
+            : onJumpToTab
+              ? () => {
+                  setFoilModalOpen(false);
+                  onJumpToTab('economy');
+                }
+              : undefined
+        }
+      />
     </div>
   );
 }

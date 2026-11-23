@@ -22,7 +22,7 @@ export function createPaintedBat() {
   function place(cel: number, rear: boolean, gripX: number, gripY: number, unit: number, width: number, time: number) {
     barrel.position.set((gripX-128)*unit*width,(249-gripY)*unit,0.027);
     const outward = rear ? 1 : -1;
-    const angle = (cel === 0 ? .59 : .29) + .035 * Math.sin(time * 4);
+    const angle = (cel === 0 ? .98 : .47) + .035 * Math.sin(time * 4);
     barrel.rotation.z = -outward * angle;
     barrel.rotation.x = -.15;
   }

@@ -1,6 +1,9 @@
 export type CharacterAnimClip =
   | 'idle'
   | 'pitch_salute'
+  | 'pitch_gather'
+  | 'glove_tap'
+  | 'catch_frame'
   | 'pitch_set'
   | 'pitch_windup'
   | 'pitch_super'
@@ -37,6 +40,9 @@ export const GLOVE_CONTACT_PHASE = { field_dive: 8 / 16, field_high_jump: 10 / 1
 
 export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   idle: 2.0,
+  pitch_gather: 1.6,
+  glove_tap: 1.4,
+  catch_frame: .36,
   pitch_set: 3.2,
   pitch_salute: .66,
   pitch_windup: 1.35,

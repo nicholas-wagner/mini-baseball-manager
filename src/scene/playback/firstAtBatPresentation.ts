@@ -5,6 +5,11 @@ import {
   type CharacterAnimClip,
 } from "../characters/animationState";
 
+export interface PlayerEntranceCue {
+  role: "pitcher" | "batter";
+  outgoingId?: string;
+}
+
 export type AtBatPreview = PitchTargetIntent | "contact" | "power";
 export function previewShot(intent: AtBatPreview, side: EffectiveBatSide) {
   const sign = side === "R" ? 1 : -1;

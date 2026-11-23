@@ -8,7 +8,7 @@ import type { CameraPresetId } from '../../scene/camera/cameraRig';
 import type { ChoreographedStep } from '../../scene/playback/eventChoreographer';
 import { GameSceneController } from '../../scene/playback/gameSceneController';
 
-import type { AtBatPreview } from '../../scene/playback/firstAtBatPresentation';
+import type { AtBatPreview, PlayerEntranceCue } from '../../scene/playback/firstAtBatPresentation';
 
 export type LiveCameraMode = 'auto' | 'over_shoulder_pitcher' | 'over_shoulder_batter' | 'broadcast_diamond';
 
@@ -31,6 +31,9 @@ interface LiveGameCanvasProps {
   celebrateConfetti?: boolean;
   overlay?: ReactNode;
   entrance?: ReactNode;
+  guided?: boolean;
+  entranceCue?: PlayerEntranceCue | null;
+  onEntranceEnd?: () => void;
 }
 
 export function LiveGameCanvas({
@@ -45,6 +48,8 @@ export function LiveGameCanvas({
   celebrateConfetti = false,
   overlay = null,
   entrance,
+  guided = false,
+  entranceCue = null, onEntranceEnd,
 }: LiveGameCanvasProps) {
   const reducedMotion = useUserPreferencesStore(s => s.reducedMotion);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -88,8 +93,16 @@ export function LiveGameCanvas({
     controllerRef.current?.syncMatchup(awayClub, homeClub, session, choreo, lastEvent);
   }, [awayClub, homeClub, session, choreo, lastEvent]);
 
+  useEffect(() => {
+    if (controllerRef.current) controllerRef.current.setEntrance(entranceCue, onEntranceEnd);
+    else if (entranceCue) {
+      const timer = window.setTimeout(() => onEntranceEnd?.(), 1600);
+      return () => window.clearTimeout(timer);
+    }
+  }, [entranceCue, onEntranceEnd]);
+
   return (
-    <div className="relative w-full h-[204px] sm:h-[320px] lg:h-[370px] rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] overflow-hidden bg-[#63CAFF]">
+    <div className={`relative w-full ${guided ? 'h-[250px] sm:h-[355px] lg:h-[410px]' : 'h-[204px] sm:h-[320px] lg:h-[370px]'} rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] overflow-hidden bg-[#63CAFF]`}>
       <div ref={containerRef} className="w-full h-full" data-testid="live-game-3d-canvas" />
 
       {celebrateConfetti ? (

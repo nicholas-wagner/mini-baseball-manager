@@ -300,6 +300,7 @@ html[data-reduced-motion='true'] .matchup-reaction-pill {
   pointer-events: none;
   animation: enter-print 2.1s both;
 }
+.guided-entrance { animation: none; }
 .batter-entrance img {
   width: 44px;
   height: 55px;

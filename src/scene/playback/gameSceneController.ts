@@ -1,4 +1,4 @@
-import { previewShot, rehearsalPose, targetOffset, type AtBatPreview } from './firstAtBatPresentation';
+import { previewShot, rehearsalPose, targetOffset, type AtBatPreview, type PlayerEntranceCue } from './firstAtBatPresentation';
 import { playReadout } from './playReadout';
 import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
@@ -85,6 +85,46 @@ export class GameSceneController {
   private throws: ThrowsHand = 'R';
   private preview: AtBatPreview | null = null;
   private previewStart = 0;
+  private entrance: PlayerEntranceCue | null = null;
+  private entranceTime = 0;
+  private finishEntrance?: () => void;
+  private battingPlayers: Readonly<Record<string, Player>> = {};
+  private battingColors = FALLBACK_TEAM;
+
+  public setEntrance(cue: PlayerEntranceCue | null, onFinish?: () => void) {
+    if (this.entrance?.outgoingId) {
+      this.welcome.hide();
+      const box = batterBox(this.bats);
+      this.batterRig.root.position.copy(box.position);
+      this.batterRig.logicalYaw = box.yaw;
+    }
+    this.entrance = this.cameraOverride ? null : cue;
+    this.finishEntrance = onFinish;
+    this.entranceTime = 0;
+    if (cue && this.cameraOverride) onFinish?.();
+    const outgoing = this.entrance?.outgoingId && this.battingPlayers[this.entrance.outgoingId];
+    if (outgoing) {
+      this.welcome.set([{ traits: outgoing.traits, team: this.battingColors, jerseyNumber: outgoing.jerseyNumber,
+        throwsHand: outgoing.throws, batSide: resolveEffectiveBatSide(outgoing.bats, this.throws), role: 'batter' }]);
+    }
+  }
+
+  private showGloveTap(time: number) {
+    const outgoing = this.welcome.rigs[0];
+    if (!outgoing) return;
+    const contact = new THREE.Vector3(-4.1, .82, 1.6);
+    const gap = .42 * (1 - THREE.MathUtils.smoothstep(time, 0, .56) + THREE.MathUtils.smoothstep(time, .78, 1.48));
+    for (const [rig, direction] of [[outgoing, 1], [this.batterRig, -1]] as const) {
+      rig.root.visible = true;
+      rig.logicalYaw = direction * 1.25;
+      rig.root.position.set(contact.x-direction*(.64+gap), .04, contact.z);
+      const fist = rig.contactAt('glove_tap', time, rig.root.position, this.camera.position);
+      rig.root.position.x += contact.x - direction * gap - fist.x;
+      rig.root.position.z += contact.z - fist.z;
+      rig.root.position.y += contact.y - fist.y;
+      rig.updatePose('glove_tap', time, undefined, this.camera.position);
+    }
+  }
   public setPreview(intent: AtBatPreview | null) {
     if (intent === this.preview) return;
     this.preview = intent;
@@ -183,6 +223,7 @@ export class GameSceneController {
     choreo?: ChoreographedStep | null,
     event?: PlayEvent | null,
   ): void {
+    if (choreo && this.entrance) this.setEntrance(null);
     const half = event?.type==='pitching_change' && event.pitcherId
       ? session.home.playersById[event.pitcherId] ? 'TOP' : 'BOT'
       : choreo && event ? event.half : session.half;
@@ -211,6 +252,9 @@ export class GameSceneController {
     const battingSide = half === 'TOP' ? session.away : session.home;
     const fieldingTeam = toTeamColors(fieldingClub);
     const battingTeam = toTeamColors(battingClub);
+    this.battingPlayers = battingSide.playersById;
+    this.battingColors = battingTeam;
+    this.ballpark.setPlateTarget(false);
 
     const pitcher = fieldingSide.playersById[(choreo && event?.pitcherId) || fieldingSide.activePitcherId];
     const batterSlot = battingSide.lineup[battingSide.lineupIndex % battingSide.lineup.length];
@@ -423,10 +467,26 @@ export class GameSceneController {
     const swing = this.preview === 'contact' || this.preview === 'power' ? this.preview : null;
     const activePreset = this.cameraOverride ?? this.cameraPreset;
     const preview = this.cameraOverride ? null : this.preview;
-    const targetPose = preview ? previewShot(preview,this.bats)
+    // Loading a texture or compiling the first frame can take longer than the entrance.
+    if (this.entrance) this.entranceTime += Math.min(elapsed, .10);
+    const entranceTime = this.entranceTime;
+    if (this.entrance && (entranceTime >= 1.6 || this.cameraOverride)) {
+      const finished = this.finishEntrance;
+      this.setEntrance(null);
+      finished?.();
+      this.previewStart = this.elapsedSec;
+    }
+    const tap = Boolean(this.entrance?.outgoingId && this.welcome.rigs[0]);
+    const mound = this.defenders.get('P')!.root.position;
+    const targetPose = tap ? {
+      position: {x:-4.1,y:1.25,z:4.65}, lookAt: {x:-4.1,y:1,z:1.6}, fov: 40,
+    } : this.entrance?.role === 'pitcher' ? {
+      position: {x:mound.x+(this.throws === 'R' ? 1 : -1)*.42,y:mound.y+1.21,z:mound.z+1.94},
+      lookAt: {x:mound.x,y:mound.y+1.08,z:mound.z}, fov: 32,
+    } : preview ? previewShot(preview,this.bats)
       : getCameraPresetPose(activePreset, this.elapsedSec, 0, this.throws, this.bats);
     if (this.camera.fov !== targetPose.fov) { this.camera.fov = targetPose.fov; this.camera.updateProjectionMatrix(); }
-    this.cameraPose = preview ? targetPose : dampCameraPose(this.cameraPose, targetPose, dt, 6);
+    this.cameraPose = (preview || this.entrance) ? targetPose : dampCameraPose(this.cameraPose, targetPose, dt, 6);
     this.trauma = Math.max(0, this.trauma - dt * 1.4);
     const shake = computeShakeOffset(this.steadyCamera ? 0 : this.trauma, this.elapsedSec);
 
@@ -441,6 +501,7 @@ export class GameSceneController {
       this.cameraPose.lookAt.z,
     );
 
+    this.ballpark.setPlateTarget(Boolean(this.preview && !swing && !this.entrance && !this.pitch && this.elapsedSec-this.previewStart < 1.65));
     for (const [pos, rig] of this.defenders.entries()) {
       if (this.pitch && (pos === 'P' || pos === 'C')) continue;
       const clip =
@@ -452,13 +513,17 @@ export class GameSceneController {
       if (pos === 'C') {
         const home = DIAMOND_DEFENDER_COORDS.find(coord => coord.pos === 'C')!;
         const offset = targetOffset(this.preview ?? 'attack_zone', this.bats);
-        rig.root.position.set(home.x+offset.x,home.y,home.z);
+        rig.root.position.x = THREE.MathUtils.damp(rig.root.position.x, home.x+offset.x, 14, dt);
         rig.updatePose(this.preview && !swing ? 'catch_target' : clip,this.elapsedSec,undefined,this.camera.position);
         // Keep both cleats planted as the catcher sets a high or low target.
-        rig.root.scale.y = 1 + offset.y;
+        rig.root.scale.y = THREE.MathUtils.damp(rig.root.scale.y, 1+offset.y, 14, dt);
+      } else if (pos === 'P' && this.entrance?.role === 'pitcher') {
+        rig.updatePose('pitch_gather', entranceTime, undefined, this.camera.position);
       } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
     }
     if (this.pitch) this.drawPitch(this.pitch);
+    else if (tap) this.showGloveTap(entranceTime);
+    else if (this.entrance?.role === 'batter') this.batterRig.updatePose('bat_stance', 1.75, undefined, this.camera.position);
     else if (swing) {
       const pose = rehearsalPose(swing,this.elapsedSec-this.previewStart,this.steadyCamera);
       this.batterRig.updatePose(pose.clip,pose.time,undefined,this.camera.position);

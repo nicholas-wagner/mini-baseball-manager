@@ -105,6 +105,9 @@ export function FirstAtBat({
                   </button>
                 ))}
           </div>
+          {batting && <p className="swing-tradeoff" aria-live="polite">
+            {call === 'power' ? 'More power. Easier to miss.' : 'Easier to connect. Less power.'}
+          </p>}
           <button className="atbat-go" disabled={locked} onClick={() => onPitch()}>
             {powerArmed ? "⚡ " : ""}
             {action ?? (batting ? "Next pitch" : "Throw pitch")}

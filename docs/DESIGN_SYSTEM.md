@@ -77,3 +77,5 @@
 Keep the result with the player who made the play until the manager advances. The result panel pairs their illustration with the official call and a short description of the runners. Give **Next batter** the gold primary button and **Watch again** a secondary action. Keep the two swing choices or three pitch targets in the same spot through the half-inning.
 
 For a force at first, let the manager see the mitt, the bag, the batter running through and the umpire in the same shot. A held runner takes a secondary lead. On a gap hit the camera can leave the retrieved ball to follow a runner into third or home. Use the runner’s actual base and destination for the cut.
+
+In the guided half, put the manager’s club first on the compact scoreboard. Show both scores, the occupied bases, inning, outs and count. Tapping the board reveals the line score. Keep the first action visible above the phone navigation. During the featured player’s entrance, leave every pitch and swing choice available. A fixed camera or reduced-motion preference takes precedence over the introductory shot.

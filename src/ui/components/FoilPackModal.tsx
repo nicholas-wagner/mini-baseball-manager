@@ -8,6 +8,9 @@ import { ComicButton } from '../design-system/ComicButton';
 interface FoilPackModalProps {
   open: boolean;
   onClose: () => void;
+  onBackToGame?: () => void;
+  onViewRelics?: () => void;
+  backLabel?: string;
 }
 
 const RARITY_STYLES: Readonly<Record<'common' | 'rare' | 'legendary', string>> = {
@@ -23,7 +26,13 @@ const CARD_KIND_ICONS: Readonly<Record<FoilCardKind, string>> = {
   hype_ticket: '📣 Fan Hype',
 };
 
-export function FoilPackModal({ open, onClose }: FoilPackModalProps) {
+export function FoilPackModal({
+  open,
+  onClose,
+  onBackToGame,
+  onViewRelics,
+  backLabel = '⚾ Back to Opening Day',
+}: FoilPackModalProps) {
   const unopenedPacks = useFoilPackStore((s) => s.unopenedPacks);
   const openedCount = useFoilPackStore((s) => s.openedCount);
   const lastOpened = useFoilPackStore((s) => s.lastOpened);
@@ -185,13 +194,50 @@ export function FoilPackModal({ open, onClose }: FoilPackModalProps) {
               </div>
 
               {allRevealed ? (
-                <div
-                  data-testid="foil-pack-summary"
-                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#D8F3DC] text-[#1B4332] text-xs font-extrabold space-y-0.5"
-                >
-                  {lastOpened.summaryLines.map((line) => (
-                    <div key={line}>✓ {line}</div>
-                  ))}
+                <div className="space-y-2.5">
+                  <div
+                    data-testid="foil-pack-summary"
+                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#D8F3DC] text-[#1B4332] text-xs font-extrabold space-y-0.5"
+                  >
+                    {lastOpened.summaryLines.map((line) => (
+                      <div key={line}>✓ {line}</div>
+                    ))}
+                  </div>
+                  <div
+                    data-testid="foil-pack-next-actions"
+                    className="flex flex-wrap items-center justify-end gap-2"
+                  >
+                    {onViewRelics ? (
+                      <ComicButton
+                        size="sm"
+                        variant="sky"
+                        onClick={() => {
+                          clearLastOpened();
+                          setRevealedSlots([1]);
+                          soundEngine.play('ui_pop');
+                          onViewRelics();
+                        }}
+                      >
+                        🏺 View My Relics
+                      </ComicButton>
+                    ) : null}
+                    <ComicButton
+                      size="md"
+                      variant="turf"
+                      onClick={() => {
+                        clearLastOpened();
+                        setRevealedSlots([1]);
+                        soundEngine.play('ui_pop');
+                        if (onBackToGame) {
+                          onBackToGame();
+                        } else {
+                          onClose();
+                        }
+                      }}
+                    >
+                      {backLabel}
+                    </ComicButton>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center text-[11px] font-extrabold text-[#4A5068]">

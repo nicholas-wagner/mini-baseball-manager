@@ -108,3 +108,11 @@ it("mirrors catcher targets and rehearses each swing once, with a still reduced-
     rehearsalPose("power", 0, true),
   );
 });
+
+it("holds a called strike in the pocket for a nod before the return throw", () => {
+  const play = diamondPlay("called_pitch");
+  expect(actorAt(play, "C", play.finish + .24, "R").clip).toBe("catch_frame");
+  expect(actorAt(play, "C", play.legs[1].start, "R").clip).toBe("catch_throw");
+  const ball = diamondPlay("ball_pitch");
+  expect(actorAt(ball, "C", ball.finish + .24, "L").clip).not.toBe("catch_frame");
+});

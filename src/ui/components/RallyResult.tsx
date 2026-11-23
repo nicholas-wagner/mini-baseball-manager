@@ -4,12 +4,14 @@ import { playReadout } from '../../scene/playback/playReadout';
 import type { Player } from '../../engine/models/player';
 import { PlayerPrint } from './GameDayPrints';
 
-export function RallyResult({ player, event, before, gameOver, nextLabel, onReplay, onContinue }: {
+export function RallyResult({ player, event, before, gameOver, nextLabel, detail, onOpenPack, onReplay, onContinue }: {
   player: Player;
   gameOver: boolean;
   event: PlayEvent;
   before: GameSessionState;
   nextLabel: string;
+  detail?: string;
+  onOpenPack?: () => void;
   onReplay: () => void;
   onContinue: () => void;
 }) {
@@ -32,6 +34,10 @@ export function RallyResult({ player, event, before, gameOver, nextLabel, onRepl
       <h3>{player.name}</h3>
       <p>{runs > 0 && (runs === 1 ? 'One run scores. ' : runs + ' runs score. ')}{baseText}</p>
     </div>
+    {detail && <details className="rally-detail"><summary>Scoring detail</summary><p>{detail}</p></details>}
+    {onOpenPack && <aside className="rally-gift">
+      <span>Opening Day foil pack</span><button onClick={onOpenPack}>Open foil pack</button>
+    </aside>}
     <footer>
       <button className="atbat-tip" onClick={onReplay}>Watch again</button>
       <button className="atbat-go" onClick={onContinue}>{nextLabel}</button>

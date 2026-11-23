@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { choreographPlayEvent } from './eventChoreographer';
-import { playReadout, decisionDelayMs } from './playReadout';
+import { playReadout, decisionDelayMs, scoringDetail } from './playReadout';
 
 const event: PlayEvent = {
   seq: 9,
@@ -38,4 +38,14 @@ it('marks the actual batter destination even when a single advances on a throw',
     lamp: 'outs',
   });
   expect(playReadout({ ...event, outcome: undefined, type: 'pitching_change' })).toBeNull();
+});
+
+it('scores a groundout only when the recorded defender made the replay throw to first', () => {
+  const out: PlayEvent = {...event, batterId: 'b', outcome: 'ground_out', outsAfter: 1,
+    fieldingHighlight: {fielderId:'ss', fielderPos:'SS', anim:'field_run'}};
+  const play = choreographPlayEvent(out, 1).play;
+  expect(scoringDetail(out, play)).toBe('Shortstop to first · 6–3');
+  expect(scoringDetail({...out, fieldingHighlight:undefined}, play)).toBeUndefined();
+  expect(scoringDetail({...out, outcome:'double_play'}, play)).toBeUndefined();
+  expect(scoringDetail({...out, fieldingHighlight:{...out.fieldingHighlight!, fielderPos:'3B'}}, play)).toBeUndefined();
 });

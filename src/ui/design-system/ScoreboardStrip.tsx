@@ -1,4 +1,6 @@
+import { useState } from 'react';
 interface ScoreboardStripProps {
+  clubs?: {away: string; home: string; humanHome: boolean};
   awayAbbr: string;
   awayScore: number;
   awayHits?: number;
@@ -85,6 +87,7 @@ function MiniBasesDiamond({ bases, highlight }: { bases: readonly [boolean, bool
 }
 
 export function ScoreboardStrip({
+  clubs,
   awayAbbr,
   awayScore,
   awayHits = 0,
@@ -104,13 +107,34 @@ export function ScoreboardStrip({
   rivalryLabel,
   flash,
 }: ScoreboardStripProps) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <div
       role="region"
       aria-label="Live Baseball Scoreboard"
       className="bg-[#1B4332] text-[#FBF4E4] border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] rounded-2xl px-2 sm:px-3 py-1.5 sm:py-2 flex flex-wrap items-center justify-between gap-2"
     >
-      {/* Compact R / H / E Line-Score Box */}
+      {clubs && <button className="guided-line" type="button"
+        aria-expanded={expanded} onClick={() => setExpanded(open => !open)}>
+        <span className="sr-only">Toggle line score</span>
+        <span className="guided-teams">
+          {([true,false] as const).map(ours => {
+            const home = ours === clubs.humanHome;
+            return <span key={String(ours)} className="guided-team">
+              <i style={{background:home ? homeColor : awayColor}} />
+              <span>{home ? clubs.home : clubs.away}</span>
+              <b>{home ? homeScore : awayScore}</b>
+            </span>;
+          })}
+        </span>
+        <span className="guided-count">
+          <MiniBasesDiamond key={flash?.seq} bases={bases} highlight={flash?.base} />
+          <span>{half === 'TOP' ? 'Top' : 'Bot'} {inning} · {outs} out{outs === 1 ? '' : 's'}
+            <small data-testid="scoreboard-count-text">{balls}–{strikes} count</small></span>
+          <span aria-hidden="true">{expanded ? '▴' : '▾'}</span>
+        </span>
+      </button>}
+      {(!clubs || expanded) && <>
       <div className="bg-[#122D21] border-2 border-[#0B1E16] rounded-xl px-2 py-1 min-w-[175px] sm:min-w-[215px]">
         <div className="grid grid-cols-[1fr_24px_24px_24px] gap-x-1 text-[9px] font-extrabold uppercase tracking-wider text-[#89C2A5] border-b border-[#245842] pb-0.5">
           <span>TEAM</span>
@@ -153,7 +177,7 @@ export function ScoreboardStrip({
       </div>
 
       {/* Inning + Base Diamond + B/S/O Count Lamps + Numeric Count */}
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
+      {!clubs && <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
         <div className="px-2 sm:px-2.5 py-1 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] font-mono-tabular text-xs sm:text-sm font-extrabold text-[#FFD166]">
           {half === 'TOP' ? '▲' : '▼'} {inning}
         </div>
@@ -190,7 +214,8 @@ export function ScoreboardStrip({
             ⚡ {rivalryLabel}
           </span>
         ) : null}
-      </div>
+      </div>}
+      </>}
     </div>
   );
 }

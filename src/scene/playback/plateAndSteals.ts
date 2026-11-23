@@ -99,6 +99,8 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
   }
   const catcher = { x: sign * (close.kind === 'ball_four' || close.kind === 'ball_pitch' ? .68 : play.legs[0].pitch?.pitchType === 'slider' ? -.28 : close.kind.startsWith('called') ? .30 : 0), y: .04, z: 1.02 };
   if (actor === 'C' && (!close.steal || play.pickup !== 'C' || since < .3)) {
+    if ((close.kind === 'called_pitch' || close.kind === 'called_third') && since >= .06 && since < .39)
+      return pose('catch_frame', since-.06, catcher, Math.PI);
     if (close.kind.endsWith('_pitch') && since >= .39) return pose('catch_throw',Math.min(.62,since-.39),catcher,Math.PI);
     if (close.kind.endsWith('third') && since > .46) return pose('catch_point',since-.46,catcher,Math.PI);
     if (close.steal && play.pickup !== 'C' && since >= .22) {

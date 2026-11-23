@@ -257,3 +257,4 @@
 | TASK-074 | DONE | Card-led Opening Day, timed field calls, signature motions, a roster print gallery and an illustrated rematch recap. [Screenshots and pitch preview](../README.md#your-first-game) |
 | TASK-075 | DONE | Guided first at-bat, legible catches and force plays, signature player reactions and collectible game moments. |
 | TASK-076 | DONE | Opening rally handoffs and replays, field gestures, force-play and baserunning close-ups, and the Play Opening Day entrance. |
+| TASK-077 | DONE | Featured-player entrance, swing and target teaching, compact guided score, teammate reactions, scored replay detail and the between-innings foil pack. |

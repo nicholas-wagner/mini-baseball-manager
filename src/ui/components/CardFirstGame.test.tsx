@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
+import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
 import { GameDayScreen } from '../screens/GameDayScreen';
 
@@ -21,6 +22,14 @@ it('hands the pictured Opening Day player to the manager and lets them inspect e
   const art = opening.getByRole('img') as HTMLImageElement;
   expect(art.src).toMatch(/\.png/);
   fireEvent.click(opening.getByRole('button', { name: /^(Bat|Pitch) with / }));
+  expect(screen.getByTestId('player-entrance')).toHaveTextContent(name);
+  const scoreboard = within(screen.getByRole('region', {name:'Live Baseball Scoreboard'}));
+  const lineScore = scoreboard.getByRole('button', {name:/line score/i});
+  expect(lineScore).toHaveTextContent('Comets');
+  expect(scoreboard.queryByTestId('scoreboard-home-rhe')).toBeNull();
+  fireEvent.click(lineScore);
+  expect(scoreboard.getByTestId('scoreboard-home-rhe')).toBeVisible();
+  fireEvent.click(lineScore);
   const guide = within(screen.getByRole('region', {name:'First at-bat'}));
   expect(guide.getByRole('button',{name:'More controls'})).toBeVisible();
   expect(screen.queryByTestId('fast-sim-toggle')).toBeNull();
@@ -51,6 +60,7 @@ it('replays the same first out and lets the manager hand the rally to the second
     render(<GameDayScreen />);
     fireEvent.click(screen.getByRole('button', {name: /Bat with Marcus/}));
     fireEvent.click(screen.getByRole('button', {name: 'Swing big'}));
+    expect(screen.getByText('More power. Easier to miss.')).toBeVisible();
     fireEvent.click(screen.getByRole('button', {name: 'Swing for power'}));
     act(() => vi.advanceTimersByTime(30000));
     const result = () => within(screen.getByRole('region', {name: 'Play result'}));
@@ -71,6 +81,13 @@ it('replays the same first out and lets the manager hand the rally to the second
       fireEvent.click(screen.getByRole('button', {name:'Swing for power'}));
       act(() => vi.advanceTimersByTime(30000));
     }
+    const inventory = useFoilPackStore.getState().unopenedPacks;
+    fireEvent.click(screen.getByRole('button', {name:'Open foil pack'}));
+    const pack = within(screen.getByRole('dialog', {name:'1994 Foil Card Booster Packs'}));
+    expect(useFoilPackStore.getState().unopenedPacks).toEqual(inventory);
+    fireEvent.click(pack.getByRole('button', {name:/rip open 1994 foil pack/i}));
+    fireEvent.click(pack.getByRole('button', {name:'Close Foil Packs'}));
+    expect(screen.queryByRole('button', {name:'Open foil pack'})).toBeNull();
     fireEvent.click(screen.getByRole('button', {name:'Change sides'}));
     expect(screen.queryByRole('region', {name:'First at-bat'})).toBeNull();
     expect(screen.getByTestId('arcade-bullpen-toggle')).toBeVisible();

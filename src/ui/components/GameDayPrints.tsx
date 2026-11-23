@@ -124,12 +124,12 @@ export function RosterPrintGallery({ players, club }: { players: Player[]; club:
   );
 }
 
-export function BatterEntrance({ player }: { player: Player }) {
+export function BatterEntrance({ player, pitching = false, guided = false }: { player: Player; pitching?: boolean; guided?: boolean }) {
   return (
-    <div className="batter-entrance" aria-hidden="true">
+    <div data-testid="player-entrance" className={guided ? "batter-entrance guided-entrance" : "batter-entrance"} aria-hidden="true">
       <PlayerPrint player={player} />
       <span>
-        At bat
+        {pitching ? 'On the mound' : 'At bat'}
         <br />
         <b>{player.name}</b>
       </span>

@@ -12,19 +12,19 @@ Manage lineups, draft global prospects, develop branching player & manager skill
 
 ## Your first game
 
-Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Choose **Play Opening Day**, then tap the featured player to take over. Coach Pops stays with you through the half-inning. On the mound, choose a target and watch the catcher set up. At bat, try the compact swing or the power swing before you commit. **More controls** opens the full dugout immediately.
+Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Choose **Play Opening Day**, then tap the featured player to take over. Coach Pops stays with you through the half-inning. The camera introduces your featured mini on the mound or in the box. Pick a pitch target to see the catcher move and home plate light up. At bat, choose an easier swing or trade contact for power. Tap the scoreboard for hits and errors. **More controls** opens the full dugout immediately.
 
 | Meet your player | Call your first pitch | Keep a play from the game |
 | :---: | :---: | :---: |
 | ![Opening Day on a phone with the starting player's manga card and the situation](./docs/screenshots/opening-day.webp) | ![Coach Pops asks for an out and the catcher sets up on the corner](./docs/screenshots/first-at-bat.webp) | ![A scorebook print saved from a real game](./docs/screenshots/scorebook-print.webp) |
 
-Marcus Baker grounds out with two runners aboard. His card stays on screen while he runs through first. **Watch again** replays the throw. **Next batter** brings Ethan Torres to the plate with one out and both runners still on.
+Marcus Baker grounds out with two runners aboard. His card stays on screen while he runs through first. **Watch again** replays the throw. **Scoring detail** gives the recorded fielding assist. Tap **Next batter** and Marcus touches gloves with Ethan Torres on his way back. Ethan inherits both runners and one out. After the third out you can open your welcome pack or change sides.
 
-| Marcus’s groundout | Ethan’s turn |
+| Marcus’s groundout | Marcus and Ethan between batters |
 | :---: | :---: |
-| ![The umpire calls Marcus out at first. His card offers Watch again and Next batter.](./docs/screenshots/rally-groundout.webp) | ![Ethan at the plate with two swing choices and a chance to drive in a run.](./docs/screenshots/rally-handoff.webp) |
+| ![The umpire calls Marcus out at first. His card offers Watch again and Next batter.](./docs/screenshots/rally-groundout.webp) | ![Marcus and Ethan touch batting gloves between plate appearances.](./docs/screenshots/rally-handoff.webp) |
 
-[See the power swing preview on a phone](./docs/screenshots/batting-preview.webp).
+[See Jasper’s mound entrance on a phone](./docs/screenshots/mound-entrance.webp) · [See Marcus rehearse his power swing](./docs/screenshots/batting-preview.webp) · [See the third-out pack offer](./docs/screenshots/between-innings.webp).
 
 <details>
 <summary>Watch a third strike, a force at first and a runner rounding third</summary>
