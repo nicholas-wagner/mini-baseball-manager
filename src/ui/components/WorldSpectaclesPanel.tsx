@@ -24,6 +24,7 @@ import {
   runHumanFriendExhibitionDuel,
 } from '../../store/clubHubActions';
 import { ComicButton } from '../design-system/ComicButton';
+import { ArcadeDerbyModal } from './ArcadeDerbyModal';
 
 interface WorldSpectaclesPanelProps {
   club: Club;
@@ -41,6 +42,7 @@ export function WorldSpectaclesPanel({
   onNotice,
 }: WorldSpectaclesPanelProps) {
   const [derbyResult, setDerbyResult] = useState<HomeRunDerbyResult | null>(null);
+  const [arcadeDerbyOpen, setArcadeDerbyOpen] = useState(false);
   const [globalCupResult, setGlobalCupResult] = useState<GlobalCupResult | null>(null);
   const [exportCode, setExportCode] = useState<string>('');
   const [challengerCodeInput, setChallengerCodeInput] = useState<string>('');
@@ -92,6 +94,16 @@ export function WorldSpectaclesPanel({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <ComicButton
+              size="sm"
+              variant="coral"
+              onClick={() => {
+                setArcadeDerbyOpen(true);
+                soundEngine.play('organ_charge');
+              }}
+            >
+              💥 Play 30s Arcade Derby
+            </ComicButton>
             <ComicButton
               size="sm"
               variant="gold"
@@ -427,6 +439,13 @@ export function WorldSpectaclesPanel({
           })}
         </div>
       </div>
+
+      <ArcadeDerbyModal
+        open={arcadeDerbyOpen}
+        club={club}
+        worldSeed={worldSeed}
+        onClose={() => setArcadeDerbyOpen(false)}
+      />
     </div>
   );
 }

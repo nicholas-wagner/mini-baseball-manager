@@ -9,6 +9,10 @@ import {
 } from '../engine/gm/gmSeasonPulse';
 import { SERIES_SWEEP_BONUS_CASH } from '../engine/gm/gameDayMoments';
 import {
+  applyOpeningDaySparkSp,
+  WELCOME_CHECKLIST_CASH_BONUS,
+} from '../engine/gm/openingDayHook';
+import {
   autoTuneLineupForStarter,
   buildSeriesRecapReport,
   type SeriesRecapReport,
@@ -136,6 +140,9 @@ export interface GameStoreState {
   seriesResults: Partial<Record<number, { wins: number; losses: number }>>;
   practiceAvailable: boolean;
   individualDrillsRemaining: number;
+  favoritePlayerIds: string[];
+  welcomeChecklistClaimed: boolean;
+  derbyWins: number;
   lastPracticeFocusLabel: string | null;
   activeGameplan: SeriesGameplanId;
   activeGmInboxEvent: GmInboxEvent | null;
@@ -171,6 +178,13 @@ export interface GameStoreState {
   swapTiredStarterToFresh: (freshPitcherId: string) => boolean;
   autoTuneHumanLineupForStarter: (starterThrows: 'L' | 'R') => { tuned: boolean; summary: string };
   clearLastSeriesRecap: () => void;
+  toggleFavoritePlayer: (playerId: string) => void;
+  customizePlayerProfile: (
+    playerId: string,
+    patch: { nickname?: string; jerseyNumber?: number },
+  ) => void;
+  claimWelcomeChecklistReward: () => { claimed: boolean; cashBonus: number };
+  recordArcadeDerbyWin: (cashBonus: number) => void;
   runPlayoffsAndAdvanceSeason: (
     regulationInnings?: GameLengthInnings,
   ) => {
@@ -265,6 +279,9 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     seriesResults: {},
     practiceAvailable: true,
     individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
+    favoritePlayerIds: [],
+    welcomeChecklistClaimed: false,
+    derbyWins: 0,
     lastPracticeFocusLabel: null,
     activeGameplan: 'balanced',
     activeGmInboxEvent: null,
@@ -288,6 +305,12 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const seed = input.seed ?? newCareerSeed();
       const world = generateSixTierWorld(seed, input);
       const freeAgents = world.freeAgents;
+      const sparkedLeagues: Record<LeagueTierId, Club[]> = {
+        ...world.leagues,
+        rookie: world.leagues.rookie.map((club) =>
+          club.id === world.humanClubId ? applyOpeningDaySparkSp(club) : club,
+        ),
+      };
 
       set((prev) => ({
         worldSeed: seed,
@@ -297,6 +320,9 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         seriesResults: {},
         practiceAvailable: true,
         individualDrillsRemaining: MAX_INDIVIDUAL_DRILLS_PER_ROUND,
+        favoritePlayerIds: [],
+        welcomeChecklistClaimed: false,
+        derbyWins: 0,
         lastPracticeFocusLabel: null,
         activeGameplan: 'balanced',
         activeGmInboxEvent: null,
@@ -308,7 +334,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           name: input.managerName.trim() || 'Skipper',
           avatarSeed: seed,
         }),
-        leagues: world.leagues,
+        leagues: sparkedLeagues,
         freeAgents,
         settings: {
           ...prev.settings,
@@ -559,6 +585,78 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
 
     clearLastSeriesRecap: () => {
       set({ lastSeriesRecap: null });
+    },
+
+    toggleFavoritePlayer: (playerId) => {
+      set((state) => ({
+        favoritePlayerIds: state.favoritePlayerIds.includes(playerId)
+          ? state.favoritePlayerIds.filter((id) => id !== playerId)
+          : [...state.favoritePlayerIds, playerId],
+      }));
+    },
+
+    customizePlayerProfile: (playerId, patch) => {
+      const club = get().getHumanClub();
+      if (!club) return;
+      const cleanNickname = patch.nickname?.trim().slice(0, 20);
+      const cleanJersey =
+        typeof patch.jerseyNumber === 'number' && Number.isFinite(patch.jerseyNumber)
+          ? Math.max(0, Math.min(99, Math.round(patch.jerseyNumber)))
+          : undefined;
+      const updatedClub: Club = {
+        ...club,
+        roster: club.roster.map((p) =>
+          p.id === playerId
+            ? {
+                ...p,
+                nickname: cleanNickname || p.nickname,
+                jerseyNumber: cleanJersey ?? p.jerseyNumber,
+              }
+            : p,
+        ),
+      };
+      set((state) => ({
+        leagues: updateHumanClubInLeagues(state.leagues, updatedClub),
+      }));
+    },
+
+    claimWelcomeChecklistReward: () => {
+      const state = get();
+      const club = state.getHumanClub();
+      if (!club || state.welcomeChecklistClaimed) {
+        return { claimed: false, cashBonus: 0 };
+      }
+      const updatedClub: Club = {
+        ...club,
+        economy: {
+          ...club.economy,
+          cash: club.economy.cash + WELCOME_CHECKLIST_CASH_BONUS,
+          teamHype: Math.min(100, club.economy.teamHype + 10),
+        },
+      };
+      set({
+        welcomeChecklistClaimed: true,
+        leagues: updateHumanClubInLeagues(state.leagues, updatedClub),
+      });
+      return { claimed: true, cashBonus: WELCOME_CHECKLIST_CASH_BONUS };
+    },
+
+    recordArcadeDerbyWin: (cashBonus) => {
+      const state = get();
+      const club = state.getHumanClub();
+      if (!club) return;
+      const updatedClub: Club = {
+        ...club,
+        economy: {
+          ...club.economy,
+          cash: club.economy.cash + Math.max(0, cashBonus),
+          teamHype: Math.min(100, club.economy.teamHype + 8),
+        },
+      };
+      set({
+        derbyWins: state.derbyWins + 1,
+        leagues: updateHumanClubInLeagues(state.leagues, updatedClub),
+      });
     },
 
     runPlayoffsAndAdvanceSeason: (regulationInnings = 5) => {

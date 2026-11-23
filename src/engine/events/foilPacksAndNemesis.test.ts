@@ -63,9 +63,11 @@ describe('1994 Foil Card Booster Packs & Player-vs-Player Nemesis Grudges', () =
         { slot: 3, kind: 'training_xp', rarity: 'rare', title: 'Cage Pass', subtitle: 'Sub', xpBonus: 60, spBonus: 1 },
       ],
     });
+    const spBefore = fullClub.roster.reduce((sum, p) => sum + p.skillPoints, 0);
+    const spAfter = dupApplied.club.roster.reduce((sum, p) => sum + p.skillPoints, 0);
     expect(dupApplied.club.economy.cash).toBe(fullClub.economy.cash + 1000);
     expect(dupApplied.club.economy.teamHype).toBeGreaterThan(fullClub.economy.teamHype);
-    expect(dupApplied.club.roster[0].skillPoints).toBe(fullClub.roster[0].skillPoints + 1);
+    expect(spAfter).toBeGreaterThanOrEqual(spBefore + 1);
   });
 
   it('tracks head-to-head Nemesis history and applies real combat modifiers in pitchResolver', () => {

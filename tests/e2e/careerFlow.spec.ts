@@ -19,6 +19,10 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('manager-action-inbox')).toBeVisible();
   await expect(page.getByTestId('scheduled-matchup-card')).toBeVisible();
   await expect(page.getByTestId('meet-your-squad-card')).toBeVisible();
+  await expect(page.getByTestId('welcome-checklist-strip')).toBeVisible();
+  await expect(page.getByTestId('start-smart-watch-btn')).toBeVisible();
+  await expect(page.getByTestId('open-arcade-derby-btn')).toBeVisible();
+  await expect(page.getByTestId('open-trophy-case-btn')).toBeVisible();
   await expect(page.getByTestId('story-chapter-nudge')).toBeVisible();
   await expect(page.getByTestId('matchup-faceoff-portraits')).toBeVisible();
   await expect(page.getByTestId('schedule-series-pill')).toHaveCount(7);
@@ -52,6 +56,7 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('first-pitch-tip')).toBeVisible();
   await expect(page.getByTestId('arcade-call-bar')).toBeVisible();
   await expect(page.getByTestId('arcade-hype-bar')).toBeVisible();
+  await expect(page.getByTestId('arcade-speed-toggle')).toBeVisible();
   await expect(page.getByTestId('camera-angle-switcher')).toBeVisible();
   await expect(page.getByTestId('smart-watch-toggle')).toBeVisible();
   await expect(page.getByTestId('broadcast-lower-third')).toBeVisible();

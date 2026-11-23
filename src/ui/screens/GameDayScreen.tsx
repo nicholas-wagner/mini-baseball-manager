@@ -29,8 +29,11 @@ import {
 import { evaluatePreGameLineupCheck } from '../../engine/gm/seriesRecap';
 import {
   buildFirstPitchCoachTip,
+  evaluateWelcomeChecklist,
   selectClubSpotlightTrio,
 } from '../../engine/gm/openingDayHook';
+import { getEligibleStealPlays } from '../../engine/simulation/baserunning';
+import { getBattingSide, getDefenderAtPosition, getFieldingSide } from '../../engine/simulation/gameState';
 import { getNextAvailableStoryChapter } from '../../engine/story/storyEngine';
 import { useCareerStoryStore } from '../../store/careerSlots';
 import {
@@ -131,9 +134,11 @@ import { useGameStore, type PostGameSummary } from '../../store/gameStore';
 import { useNemesisStore } from '../../store/nemesisStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
+import { ArcadeDerbyModal } from '../components/ArcadeDerbyModal';
 import { BroadcastHud } from '../components/BroadcastHud';
 import { ClubMascotBuddy } from '../components/ClubMascotBuddy';
 import { FoilPackModal } from '../components/FoilPackModal';
+import { TrophyCaseModal } from '../components/TrophyCaseModal';
 import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { LiveGameCanvas, type LiveCameraMode } from '../components/LiveGameCanvas';
@@ -204,7 +209,15 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const swapTiredStarterToFresh = useGameStore((s) => s.swapTiredStarterToFresh);
   const autoTuneHumanLineupForStarter = useGameStore((s) => s.autoTuneHumanLineupForStarter);
   const clearLastSeriesRecap = useGameStore((s) => s.clearLastSeriesRecap);
+  const favoritePlayerIds = useGameStore((s) => s.favoritePlayerIds);
+  const welcomeChecklistClaimed = useGameStore((s) => s.welcomeChecklistClaimed);
+  const toggleFavoritePlayer = useGameStore((s) => s.toggleFavoritePlayer);
+  const customizePlayerProfile = useGameStore((s) => s.customizePlayerProfile);
+  const claimWelcomeChecklistReward = useGameStore((s) => s.claimWelcomeChecklistReward);
+  const packsOpenedCount = useFoilPackStore((s) => s.openedCount);
   const [gmQuickFeedback, setGmQuickFeedback] = useState<string | null>(null);
+  const [derbyOpen, setDerbyOpen] = useState(false);
+  const [trophyOpen, setTrophyOpen] = useState(false);
 
   const opponents = humanClub
     ? leagues[humanClub.leagueTier].filter((c) => c.id !== humanClub.id)
@@ -369,7 +382,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     [awardFoilPack, commitCompletedGame, pendingLivePlayoff, recordLivePlayoffResult, rivalryPreview],
   );
 
-  const handleStartLiveGame = (autoPlay: boolean) => {
+  const handleStartLiveGame = (initialWatch: boolean | 'smart' = false) => {
     if (!humanClub || !scheduledOpponent) return;
     const opp = scheduledOpponent;
     const isHumanHome = scheduledIsHome;
@@ -417,7 +430,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
       hasNightLights: homeClub.stadium.hasNightLights,
     });
     setGameWeather(rolledWeather);
-    setWatchMode(autoPlay ? 'live' : 'paused');
+    setWatchMode(initialWatch === 'smart' ? 'smart' : initialWatch ? 'live' : 'paused');
     setSmartPauseReason(null);
     setCameraMode('auto');
     bgmEngine.syncStadium(session.ballparkId);
@@ -716,7 +729,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     }
     const delayMs =
       watchMode === 'smart'
-        ? Math.min(lastChoreo?.durationMs ?? 550, 580)
+        ? Math.min(lastChoreo?.durationMs ?? Math.round(580 / speed), Math.round(580 / speed))
         : (lastChoreo?.durationMs ?? Math.round(900 / speed));
     const timer = window.setTimeout(() => {
       handleNextPitch();
@@ -838,6 +851,16 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
       : null;
     const isOpeningDay = humanClub.wins + humanClub.losses === 0;
     const spotlightTrio = isOpeningDay ? selectClubSpotlightTrio(humanClub) : [];
+    const skillsUnlockedCount = humanClub.roster.reduce(
+      (sum, p) => sum + p.unlockedSkillIds.length + p.heritageTierUnlocked,
+      0,
+    );
+    const welcomeChecklist = evaluateWelcomeChecklist({
+      packsOpenedCount,
+      gamesPlayed: humanClub.wins + humanClub.losses,
+      skillsUnlockedCount,
+      rewardClaimed: welcomeChecklistClaimed,
+    });
     const nextStoryBeat = getNextAvailableStoryChapter(storyState, {
       gamesPlayed: humanClub.wins + humanClub.losses,
       seasonNumber,
@@ -1244,7 +1267,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2.5">
                 {!pendingLivePlayoff && !nextScheduled && onJumpToTab ? (
                   <ComicButton
                     variant="gold"
@@ -1267,6 +1290,15 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
                   Start Live 3D Game
                 </ComicButton>
                 <ComicButton
+                  variant="violet"
+                  size="lg"
+                  data-testid="start-smart-watch-btn"
+                  icon={<Sparkles className="w-4 h-4" />}
+                  onClick={() => handleStartLiveGame('smart')}
+                >
+                  ✨ Smart Watch 3D
+                </ComicButton>
+                <ComicButton
                   variant="coral"
                   size="lg"
                   data-testid="start-clutch-moment-btn"
@@ -1282,6 +1314,34 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
                   onClick={handleInstantSimPreGame}
                 >
                   Instant Sim Game
+                </ComicButton>
+              </div>
+
+              {/* Fun Side Activities: 30-Second Playable HR Derby & Trophy Sticker Album */}
+              <div className="flex flex-wrap items-center gap-2">
+                <ComicButton
+                  size="sm"
+                  variant="coral"
+                  data-testid="open-arcade-derby-btn"
+                  icon={<Flame className="w-3.5 h-3.5" />}
+                  onClick={() => {
+                    setDerbyOpen(true);
+                    soundEngine.play('organ_charge');
+                  }}
+                >
+                  💥 30s HR Derby
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant="gold"
+                  data-testid="open-trophy-case-btn"
+                  icon={<Trophy className="w-3.5 h-3.5" />}
+                  onClick={() => {
+                    setTrophyOpen(true);
+                    soundEngine.play('ui_pop');
+                  }}
+                >
+                  🏆 Trophy &amp; Sticker Album
                 </ComicButton>
               </div>
 
@@ -1408,6 +1468,61 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           </ComicCard>
         </div>
 
+        {/* Friendly 3-Step Sandlot Welcome Checklist (Disappears Forever Once Claimed!) */}
+        {welcomeChecklist.showStrip ? (
+          <div
+            data-testid="welcome-checklist-strip"
+            className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#D8F3DC] flex flex-wrap items-center justify-between gap-2 shadow-[3px_3px_0_#181B2C]"
+          >
+            <div className="space-y-1">
+              <div className="font-display text-xs text-[#1B4332]">
+                🌟 SANDLOT STARTER GOALS ({welcomeChecklist.completedCount}/3) — Complete for +$1,000 &amp; Bonus Foil Pack!
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-[11px] font-extrabold">
+                {welcomeChecklist.steps.map((st) => (
+                  <span
+                    key={st.id}
+                    className={`px-2 py-0.5 rounded-lg border border-[#181B2C] ${
+                      st.done ? 'bg-[#2FB356] text-white' : 'bg-[#FFFDF7] text-[#181B2C]'
+                    }`}
+                  >
+                    {st.done ? '✓ ' : ''}
+                    {st.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {welcomeChecklist.canClaimReward ? (
+              <ComicButton
+                size="sm"
+                variant="gold"
+                icon={<Gift className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  const res = claimWelcomeChecklistReward();
+                  if (res.claimed) {
+                    awardFoilPack('sandlot_foil', 'Sandlot Starter Goals Complete!');
+                    soundEngine.play('trophy_fanfare');
+                    setGmQuickFeedback(`🎉 Starter Goals complete! +$${res.cashBonus.toLocaleString()} Cash + 🎁 Foil Pack!`);
+                  }
+                }}
+              >
+                🎁 Claim Starter Reward!
+              </ComicButton>
+            ) : !welcomeChecklist.steps[2].done && onJumpToTab ? (
+              <ComicButton
+                size="sm"
+                variant="violet"
+                onClick={() => {
+                  soundEngine.play('ui_pop');
+                  onJumpToTab('skills');
+                }}
+              >
+                ⚡ Spend Day-1 SP
+              </ComicButton>
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Opening Day Cute "Meet Your 3 Stars" Manga Card Showcase */}
         {spotlightTrio.length > 0 ? (
           <div
@@ -1532,10 +1647,41 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
 
         <FoilPackModal open={foilModalOpen} onClose={() => setFoilModalOpen(false)} />
 
+        <ArcadeDerbyModal
+          open={derbyOpen}
+          club={humanClub}
+          worldSeed={worldSeed}
+          onClose={() => setDerbyOpen(false)}
+        />
+
+        <TrophyCaseModal
+          open={trophyOpen}
+          onClose={() => setTrophyOpen(false)}
+          onInspectPlayerId={(id) => {
+            setTrophyOpen(false);
+            setPreGameScoutPlayerId(id);
+          }}
+        />
+
         <PlayerCardModal
           open={preGameScoutPlayerId !== null}
           entry={activePreGameScoutEntry}
           allEntries={preGameScoutEntries}
+          isFavorite={
+            activePreGameScoutEntry
+              ? favoritePlayerIds.includes(activePreGameScoutEntry.player.id)
+              : false
+          }
+          onToggleFavorite={
+            activePreGameScoutEntry && activePreGameScoutEntry.club.id === humanClub.id
+              ? () => toggleFavoritePlayer(activePreGameScoutEntry.player.id)
+              : undefined
+          }
+          onCustomizePlayer={
+            activePreGameScoutEntry && activePreGameScoutEntry.club.id === humanClub.id
+              ? (patch) => customizePlayerProfile(activePreGameScoutEntry.player.id, patch)
+              : undefined
+          }
           onSelectPlayerId={(id) => setPreGameScoutPlayerId(id)}
           onClose={() => setPreGameScoutPlayerId(null)}
         />
@@ -1609,6 +1755,30 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
     isBatting: humanIsBatting,
     hasThrownPitch: recentEvents.length > 0,
   });
+  const liveBattingSide = getBattingSide(liveSession);
+  const liveFieldingSide = getFieldingSide(liveSession);
+  const quickStealCandidates = humanIsBatting
+    ? getEligibleStealPlays(
+        liveSession.bases,
+        liveBattingSide.playersById,
+        currentPitcher,
+        getDefenderAtPosition(liveFieldingSide, 'C'),
+        liveFieldingSide.pitcherFatigue,
+        liveFieldingSide.catcherPopTimeBonus,
+      )
+    : [];
+  const bestQuickSteal = quickStealCandidates[0]
+    ? {
+        label: quickStealCandidates[0].label,
+        runnerName: quickStealCandidates[0].runnerName,
+        successPct: quickStealCandidates[0].successPct,
+        call: (
+          quickStealCandidates[0].playType === 'steal_2b'
+            ? 'steal'
+            : quickStealCandidates[0].playType
+        ) as TacticalCall,
+      }
+    : null;
   const liveAwayClub = humanSideKey === 'home' ? activeOpponent : humanClub;
   const liveHomeClub = humanSideKey === 'home' ? humanClub : activeOpponent;
   const availableRelievers = liveSession[humanSideKey].bullpenIds.filter(
@@ -1840,6 +2010,13 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
               hypeCost={SPECIAL_ABILITY_HYPE_COST}
               readyPowerLabel={readyPowerOption?.name ?? null}
               powerArmed={Boolean(armedPowerId)}
+              speed={speed}
+              onCycleSpeed={() => {
+                setSpeed((s) => (s === 1 ? 2 : s === 2 ? 4 : 1));
+                soundEngine.play('ui_pop');
+              }}
+              quickStealOption={bestQuickSteal}
+              isBatterFavorite={favoritePlayerIds.includes(currentBatter.id)}
               onArmReadyPower={
                 readyPowerOption
                   ? () => {
@@ -2596,6 +2773,21 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
         batterId={currentBatter.id}
         pitcherId={currentPitcher.id}
         runnerIds={liveRunnerIds}
+        isFavorite={
+          activeInspectedEntry
+            ? favoritePlayerIds.includes(activeInspectedEntry.player.id)
+            : false
+        }
+        onToggleFavorite={
+          activeInspectedEntry && activeInspectedEntry.club.id === humanClub.id
+            ? () => toggleFavoritePlayer(activeInspectedEntry.player.id)
+            : undefined
+        }
+        onCustomizePlayer={
+          activeInspectedEntry && activeInspectedEntry.club.id === humanClub.id
+            ? (patch) => customizePlayerProfile(activeInspectedEntry.player.id, patch)
+            : undefined
+        }
         onSelectPlayerId={(id) => setInspectedGamePlayerId(id)}
         onClose={() => setInspectedGamePlayerId(null)}
       />

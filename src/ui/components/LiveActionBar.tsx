@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FastForward, Play, RefreshCw, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
-import type { FormState } from '../../engine/models/player';
+import { PITCH_TYPE_SHORT_LABELS, type FormState } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
 import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
@@ -39,6 +39,10 @@ interface LiveActionBarProps {
   readyPowerLabel?: string | null;
   powerArmed?: boolean;
   onArmReadyPower?: () => void;
+  speed?: 1 | 2 | 4;
+  onCycleSpeed?: () => void;
+  quickStealOption?: { label: string; runnerName: string; successPct: number; call: TacticalCall } | null;
+  isBatterFavorite?: boolean;
   onNextPitch: () => void;
   onToggleWatchMode: () => void;
   onToggleSmartWatch?: () => void;
@@ -97,6 +101,10 @@ export function LiveActionBar({
   readyPowerLabel = null,
   powerArmed = false,
   onArmReadyPower,
+  speed = 1,
+  onCycleSpeed,
+  quickStealOption = null,
+  isBatterFavorite = false,
   onNextPitch,
   onToggleWatchMode,
   onToggleSmartWatch,
@@ -179,6 +187,25 @@ export function LiveActionBar({
                     {opt.label}
                   </button>
                 ))}
+            {isBatting && quickStealOption ? (
+              <button
+                type="button"
+                data-testid="arcade-steal-btn"
+                disabled={gameCompleted}
+                onClick={() =>
+                  onSelectTacticalCall(
+                    tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
+                  )
+                }
+                className={`px-2 py-1 min-h-[34px] rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                  tacticalCall === quickStealOption.call
+                    ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
+                    : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFC300]'
+                }`}
+              >
+                💨 {quickStealOption.label} ({quickStealOption.successPct}%)
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -244,6 +271,18 @@ export function LiveActionBar({
             onClick={onToggleSmartWatch}
           >
             {watchMode === 'smart' ? '⏸️ Smart ON' : '✨ Smart Watch'}
+          </ComicButton>
+        ) : null}
+
+        {onCycleSpeed ? (
+          <ComicButton
+            size="sm"
+            variant={speed > 1 ? 'gold' : 'cream'}
+            data-testid="arcade-speed-toggle"
+            disabled={gameCompleted}
+            onClick={onCycleSpeed}
+          >
+            ⏩ {speed}x
           </ComicButton>
         ) : null}
 
@@ -488,7 +527,8 @@ export function LiveActionBar({
         >
           <div className="flex flex-wrap items-center gap-1.5 min-w-0">
             <span className="text-[#FFD166] font-extrabold">
-              🏏 {lowerThird.batterName} “{lowerThird.batterNickname}”{formEmoji(lowerThird.batterForm)} (
+              🏏 {isBatterFavorite ? '⭐ ' : ''}
+              {lowerThird.batterName} “{lowerThird.batterNickname}”{formEmoji(lowerThird.batterForm)} (
               {lowerThird.batterLineText})
             </span>
             <span className="text-[#89C2A5]">• On Deck: {lowerThird.onDeckName}</span>
@@ -513,22 +553,33 @@ export function LiveActionBar({
         </div>
       ) : null}
 
-      <div
-        data-testid="live-last-pitch-readout"
-        className="pt-1.5 border-t border-dashed border-[#181B2C]/20 text-[11px] font-bold text-[#181B2C] truncate"
-      >
-        {latestEvent ? (
-          <>
-            <span className="font-extrabold text-[#1B4332] mr-1">
-              [{latestEvent.half} {latestEvent.inning}]
+      <div className="pt-1.5 border-t border-dashed border-[#181B2C]/20 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div
+          data-testid="live-last-pitch-readout"
+          className="font-bold text-[#181B2C] truncate flex-1 min-w-[160px]"
+        >
+          {latestEvent ? (
+            <>
+              <span className="font-extrabold text-[#1B4332] mr-1">
+                [{latestEvent.half} {latestEvent.inning}]
+              </span>
+              {latestEvent.commentary}
+            </>
+          ) : (
+            <span className="text-[#4A5068]">
+              Eyes on the 3D diamond — press {isBatting ? 'Next Pitch' : 'Throw Pitch'} to start!
             </span>
-            {latestEvent.commentary}
-          </>
-        ) : (
-          <span className="text-[#4A5068]">
-            Eyes on the 3D diamond — press {isBatting ? 'Next Pitch' : 'Throw Pitch'} to start!
+          )}
+        </div>
+        {latestEvent?.pitchThrown ? (
+          <span
+            data-testid="last-pitch-radar-pill"
+            className="px-2 py-0.5 rounded-lg bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] font-extrabold shrink-0"
+          >
+            {latestEvent.pitchThrown.mph} mph {PITCH_TYPE_SHORT_LABELS[latestEvent.pitchThrown.pitchType]}
+            {latestEvent.pitchThrown.isFavoritePitch ? ' ★' : ''}
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );

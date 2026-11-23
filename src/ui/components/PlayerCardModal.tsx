@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, Download, FileSearch, X } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, FileSearch, Pencil, Star, X } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
 import type { Club } from '../../engine/models/club';
 import {
@@ -28,6 +29,9 @@ interface PlayerCardModalProps {
   batterId?: string;
   pitcherId?: string;
   runnerIds?: readonly string[];
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
+  onCustomizePlayer?: (patch: { nickname?: string; jerseyNumber?: number }) => void;
   onSelectPlayerId?: (playerId: string) => void;
   onOpenDossier?: (player: Player) => void;
   onDownloadCard?: (player: Player, club: Club) => void;
@@ -41,11 +45,18 @@ export function PlayerCardModal({
   batterId,
   pitcherId,
   runnerIds = [],
+  isFavorite = false,
+  onToggleFavorite,
+  onCustomizePlayer,
   onSelectPlayerId,
   onOpenDossier,
   onDownloadCard,
   onClose,
 }: PlayerCardModalProps) {
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [draftNickname, setDraftNickname] = useState('');
+  const [draftJersey, setDraftJersey] = useState('');
+
   if (!open || !entry) return null;
 
   const { player, club, roleTag, liveStatLine } = entry;
@@ -282,6 +293,94 @@ export function PlayerCardModal({
                         );
                       })}
                     </div>
+                  </div>
+                ) : null}
+
+                {(onToggleFavorite || onCustomizePlayer) ? (
+                  <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onToggleFavorite ? (
+                        <ComicButton
+                          size="sm"
+                          variant={isFavorite ? 'gold' : 'cream'}
+                          data-testid="toggle-favorite-player-btn"
+                          icon={<Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-[#E63946] text-[#E63946]' : ''}`} />}
+                          onClick={() => {
+                            onToggleFavorite();
+                            soundEngine.play('ui_pop');
+                          }}
+                        >
+                          {isFavorite ? '⭐ Club Favorite!' : '☆ Star Favorite'}
+                        </ComicButton>
+                      ) : null}
+                      {onCustomizePlayer ? (
+                        <ComicButton
+                          size="sm"
+                          variant={editingProfile ? 'violet' : 'sky'}
+                          data-testid="edit-nickname-toggle"
+                          icon={<Pencil className="w-3.5 h-3.5" />}
+                          onClick={() => {
+                            setDraftNickname(player.nickname);
+                            setDraftJersey(String(player.jerseyNumber));
+                            setEditingProfile((v) => !v);
+                          }}
+                        >
+                          {editingProfile ? 'Cancel Edit' : '✏️ Nickname & #'}
+                        </ComicButton>
+                      ) : null}
+                    </div>
+                    {editingProfile && onCustomizePlayer ? (
+                      <div className="flex flex-wrap items-end gap-2 pt-1">
+                        <div className="flex-1 min-w-[130px]">
+                          <label
+                            htmlFor="card-custom-nickname"
+                            className="block text-[10px] font-extrabold uppercase text-[#181B2C]"
+                          >
+                            Custom Nickname
+                          </label>
+                          <input
+                            id="card-custom-nickname"
+                            type="text"
+                            maxLength={20}
+                            value={draftNickname}
+                            onChange={(e) => setDraftNickname(e.target.value)}
+                            className="w-full min-h-[36px] px-2 rounded-lg border-2 border-[#181B2C] bg-white text-xs font-bold text-[#181B2C]"
+                          />
+                        </div>
+                        <div className="w-16">
+                          <label
+                            htmlFor="card-custom-jersey"
+                            className="block text-[10px] font-extrabold uppercase text-[#181B2C]"
+                          >
+                            Jersey #
+                          </label>
+                          <input
+                            id="card-custom-jersey"
+                            type="number"
+                            min={0}
+                            max={99}
+                            value={draftJersey}
+                            onChange={(e) => setDraftJersey(e.target.value)}
+                            className="w-full min-h-[36px] px-2 rounded-lg border-2 border-[#181B2C] bg-white text-xs font-mono-tabular font-bold text-[#181B2C]"
+                          />
+                        </div>
+                        <ComicButton
+                          size="sm"
+                          variant="turf"
+                          onClick={() => {
+                            const parsedNum = Number(draftJersey);
+                            onCustomizePlayer({
+                              nickname: draftNickname,
+                              jerseyNumber: Number.isNaN(parsedNum) ? undefined : parsedNum,
+                            });
+                            setEditingProfile(false);
+                            soundEngine.play('level_up');
+                          }}
+                        >
+                          Save Nickname
+                        </ComicButton>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 

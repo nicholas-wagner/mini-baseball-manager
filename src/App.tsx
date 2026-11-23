@@ -29,6 +29,7 @@ import { MusicJukeboxModal } from './ui/components/MusicJukeboxModal';
 import { PwaInstallBanner } from './ui/components/PwaInstallBanner';
 import { SettingsModal } from './ui/components/SettingsModal';
 import { StoryChapterModal } from './ui/components/StoryChapterModal';
+import { TrophyCaseModal } from './ui/components/TrophyCaseModal';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
 import { ComicCard } from './ui/design-system/ComicCard';
 import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
@@ -99,6 +100,7 @@ export function App() {
   const [jukeboxOpen, setJukeboxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [packsOpen, setPacksOpen] = useState(false);
+  const [trophyOpen, setTrophyOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const humanClub = useGameStore((s) => s.getHumanClub());
   const manager = useGameStore((s) => s.manager);
@@ -309,6 +311,19 @@ export function App() {
         type="button"
         onClick={() => {
           soundEngine.play('ui_pop');
+          setTrophyOpen(true);
+        }}
+        className="comic-btn bg-[#FFF8E7] text-[#181B2C] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
+        aria-label="Open Trophy and Sticker Album"
+        title="Trophy & Sticker Album"
+      >
+        <Trophy className="w-3.5 h-3.5 shrink-0 text-[#F77F00]" />
+        <span>Trophy Album</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          soundEngine.play('ui_pop');
           setSettingsOpen(true);
         }}
         className="comic-btn bg-[#E0FBFC] text-[#1D3557] px-2.5 py-2 text-[11px] flex items-center justify-center gap-1.5 min-h-[44px] shrink-0"
@@ -443,6 +458,7 @@ export function App() {
       />
       <MusicJukeboxModal open={jukeboxOpen} onClose={() => setJukeboxOpen(false)} />
       <FoilPackModal open={packsOpen} onClose={() => setPacksOpen(false)} />
+      <TrophyCaseModal open={trophyOpen} onClose={() => setTrophyOpen(false)} />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Clean Mobile Clubhouse Utility Menu (replaces 6 crowded mobile header icons!) */}
@@ -535,6 +551,19 @@ export function App() {
               >
                 <Gift className="w-4 h-4 shrink-0" />
                 <span>1994 Foil Booster Packs{unopenedPackCount > 0 ? ` (${unopenedPackCount})` : ''}</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Open Trophy and Sticker Album"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setTrophyOpen(true);
+                  soundEngine.play('ui_pop');
+                }}
+                className="w-full comic-btn bg-[#FFF8E7] text-[#181B2C] px-3 py-2.5 text-xs flex items-center gap-2 min-h-[44px]"
+              >
+                <Trophy className="w-4 h-4 shrink-0 text-[#F77F00]" />
+                <span>Trophy &amp; Sticker Album</span>
               </button>
               <button
                 type="button"

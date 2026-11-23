@@ -98,6 +98,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const freeAgents = useGameStore((s) => s.freeAgents);
   const individualDrillsRemaining = useGameStore((s) => s.individualDrillsRemaining);
+  const favoritePlayerIds = useGameStore((s) => s.favoritePlayerIds);
+  const toggleFavoritePlayer = useGameStore((s) => s.toggleFavoritePlayer);
+  const customizePlayerProfile = useGameStore((s) => s.customizePlayerProfile);
   const swapLineupSlots = useGameStore((s) => s.swapLineupSlots);
   const assignLineupPlayer = useGameStore((s) => s.assignLineupPlayer);
   const autoOptimizeHumanLineup = useGameStore((s) => s.autoOptimizeHumanLineup);
@@ -490,6 +493,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1">
                             <span className="font-display text-xs text-[#181B2C] truncate">
+                              {favoritePlayerIds.includes(player.id) ? '⭐ ' : ''}
                               {player.name}
                             </span>
                             {posEval.isFavorite ? (
@@ -1000,6 +1004,21 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
         open={cardModalOpen}
         entry={activeCardModalEntry}
         allEntries={orderedRosterEntries}
+        isFavorite={
+          activeCardModalEntry
+            ? favoritePlayerIds.includes(activeCardModalEntry.player.id)
+            : false
+        }
+        onToggleFavorite={
+          activeCardModalEntry
+            ? () => toggleFavoritePlayer(activeCardModalEntry.player.id)
+            : undefined
+        }
+        onCustomizePlayer={
+          activeCardModalEntry
+            ? (patch) => customizePlayerProfile(activeCardModalEntry.player.id, patch)
+            : undefined
+        }
         onSelectPlayerId={(id) => setInspectedPlayerId(id)}
         onOpenDossier={(p) => {
           setInspectedPlayerId(p.id);

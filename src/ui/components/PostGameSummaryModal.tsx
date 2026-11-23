@@ -1,4 +1,5 @@
 import { Coins, Gift, Sparkles, Trophy, Users } from 'lucide-react';
+import { buildMvpDugoutQuote } from '../../engine/gm/openingDayHook';
 import type { Club } from '../../engine/models/club';
 import { isPitcherPosition } from '../../engine/models/player';
 import {
@@ -52,6 +53,15 @@ export function PostGameSummaryModal({
   const rivalScore = summary.isHomeGame ? summary.awayScore : summary.homeScore;
   const levelUps = summary.levelUps ?? [];
   const totalUnspentSp = humanClub.roster.reduce((sum, p) => sum + p.skillPoints, 0);
+  const mvpDelta = summary.result.playerStatDeltas[mvpDomainPlayer.id];
+  const mvpQuote = buildMvpDugoutQuote({
+    playerName: mvpDomainPlayer.name,
+    nickname: mvpDomainPlayer.nickname,
+    won: humanWon,
+    isPitcher: isPitcherPosition(mvpDomainPlayer.position),
+    homeRuns: mvpDelta?.homeRuns ?? 0,
+    strikeouts: mvpDelta?.pitchingStrikeouts ?? 0,
+  });
 
   return (
     <div
@@ -120,6 +130,14 @@ export function PostGameSummaryModal({
                         })()}
                   </div>
                 </div>
+              </div>
+
+              {/* Cute MVP Clubhouse Speech Bubble */}
+              <div
+                data-testid="mvp-dugout-quote"
+                className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] text-xs font-extrabold text-[#1D3557] italic"
+              >
+                💬 {mvpQuote}
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
