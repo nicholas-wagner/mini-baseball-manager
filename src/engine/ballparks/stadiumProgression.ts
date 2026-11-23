@@ -256,3 +256,93 @@ export function upgradeStadiumFacility(
     },
   };
 }
+
+export type StadiumUpgradeCardStatus = 'installed' | 'ready' | 'need_cash' | 'locked_tier';
+
+export interface StadiumUpgradeCardView {
+  id: StadiumUpgradeId;
+  label: string;
+  emoji: string;
+  funPayoff: string;
+  cost: number;
+  minTier: LeagueTierId;
+  status: StadiumUpgradeCardStatus;
+  statusBadge: string;
+}
+
+const TIER_SHORT_LABELS: Readonly<Record<LeagueTierId, string>> = {
+  rookie: 'Rookie',
+  low_a: 'Low-A',
+  high_a: 'High-A',
+  aa: 'AA',
+  aaa: 'AAA',
+  majors: 'Majors',
+};
+
+const UPGRADE_PAYOFF_META: Readonly<
+  Record<StadiumUpgradeId, { emoji: string; funPayoff: string }>
+> = {
+  seating_expansion: {
+    emoji: '🏟️',
+    funPayoff: '+300+ fans per game & bigger gate cash!',
+  },
+  night_lights: {
+    emoji: '💡',
+    funPayoff: 'Unlock dramatic Night Games & +4 Team Hype!',
+  },
+  jumbotron: {
+    emoji: '📺',
+    funPayoff: 'Giant center-field HD board & +5 Team Hype!',
+  },
+  mascot_cannon: {
+    emoji: '🎆',
+    funPayoff: 'Booming HR fireworks blasts & +8 Team Hype!',
+  },
+};
+
+function isFacilityInstalled(club: Club, upgradeId: StadiumUpgradeId): boolean {
+  const profile = STADIUM_TIER_PROFILES[club.leagueTier];
+  if (upgradeId === 'seating_expansion') {
+    return club.stadium.capacity >= profile.maxCapacity && club.stadium.seatingTier >= 4;
+  }
+  if (upgradeId === 'night_lights') return club.stadium.hasNightLights;
+  if (upgradeId === 'jumbotron') return club.stadium.hasJumbotron;
+  return club.stadium.hasMascotCannon;
+}
+
+function resolveUpgradeCardStatus(
+  club: Club,
+  spec: StadiumUpgradeSpec,
+  liveCost: number,
+): { status: StadiumUpgradeCardStatus; statusBadge: string } {
+  if (isFacilityInstalled(club, spec.id)) {
+    return { status: 'installed', statusBadge: '✓ Installed' };
+  }
+  if (!meetsTier(club.leagueTier, spec.minTier)) {
+    return { status: 'locked_tier', statusBadge: `🔒 Unlocks ${TIER_SHORT_LABELS[spec.minTier]}` };
+  }
+  if (club.economy.cash < liveCost) {
+    return { status: 'need_cash', statusBadge: `Need $${liveCost.toLocaleString()}` };
+  }
+  return { status: 'ready', statusBadge: `Build · $${liveCost.toLocaleString()}` };
+}
+
+/** Projects stadium upgrade cards with live pricing, tier-unlock clarity, and kid-friendly payoffs. */
+export function buildStadiumUpgradeCards(club: Club): StadiumUpgradeCardView[] {
+  return STADIUM_UPGRADE_CATALOG.map((spec) => {
+    const liveCost =
+      spec.id === 'seating_expansion' ? computeSeatingExpansionCost(club) : spec.cost;
+    const meta = UPGRADE_PAYOFF_META[spec.id];
+    const { status, statusBadge } = resolveUpgradeCardStatus(club, spec, liveCost);
+    return {
+      id: spec.id,
+      label: spec.label,
+      emoji: meta.emoji,
+      funPayoff: meta.funPayoff,
+      cost: liveCost,
+      minTier: spec.minTier,
+      status,
+      statusBadge,
+    };
+  });
+}

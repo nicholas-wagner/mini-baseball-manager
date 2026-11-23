@@ -332,3 +332,36 @@ export function autoTuneLineupForStarter(
     summary: `Lineup auto-tuned vs ${starterThrows}HP (hot bats & platoon edges prioritized)!`,
   };
 }
+
+export interface LineupChangeSummary {
+  changedCount: number;
+  message: string;
+}
+
+/** Counts changed batting/defensive slots so Auto-Tune & Auto-Optimize clearly confirm what changed. */
+export function summarizeLineupChange(
+  before: readonly LineupSlot[],
+  after: readonly LineupSlot[],
+  contextLabel: string,
+): LineupChangeSummary {
+  let changedCount = 0;
+  const maxLen = Math.max(before.length, after.length);
+  for (let i = 0; i < maxLen; i += 1) {
+    const a = before[i];
+    const b = after[i];
+    if (!a || !b || a.playerId !== b.playerId || a.defensivePosition !== b.defensivePosition) {
+      changedCount += 1;
+    }
+  }
+  if (changedCount === 0) {
+    return {
+      changedCount: 0,
+      message: `Lineup is already locked in at peak strength ${contextLabel} — ready to play!`,
+    };
+  }
+  const slotWord = changedCount === 1 ? 'lineup spot' : 'lineup spots';
+  return {
+    changedCount,
+    message: `Updated ${changedCount} ${slotWord} ${contextLabel}!`,
+  };
+}

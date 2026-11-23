@@ -9,7 +9,10 @@ import {
   evaluateTrophyCaseProgress,
   evaluateWelcomeChecklist,
   selectClubSpotlightTrio,
+  sortPlayersForSkillTree,
 } from './openingDayHook';
+import { buildStadiumUpgradeCards } from '../ballparks/stadiumProgression';
+import { summarizeLineupChange } from './seriesRecap';
 import { buildManagerActionInbox } from './managerActionInbox';
 import { createManagerProfile } from '../models/manager';
 import type { PlayEvent } from '../models/playEvent';
@@ -372,5 +375,66 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
     });
     expect(coldCalm.ringTone).toBe('none');
     expect(coldCalm.badges.some((b) => /cold/i.test(b))).toBe(true);
+  });
+
+  it('sorts Skill Tree players with unspent SP first, then Favorites, then remaining roster', () => {
+    const club = makeClub(1994);
+    const sparked = applyOpeningDaySparkSp(club);
+    const favZeroSp = sparked.roster.find((p) => p.skillPoints === 0)!;
+
+    const sorted = sortPlayersForSkillTree(sparked.roster, [favZeroSp.id]);
+    expect(sorted[0].skillPoints).toBeGreaterThan(0);
+    expect(sorted[1].skillPoints).toBeGreaterThan(0);
+    expect(sorted[2].id).toBe(favZeroSp.id);
+    expect(sorted).toHaveLength(sparked.roster.length);
+  });
+
+  it('builds Stadium Upgrade Cards with accurate tier locks, live seating cost, installed states, and fun payoffs', () => {
+    const rookieClub = makeClub(1994);
+    const rookieCards = buildStadiumUpgradeCards({
+      ...rookieClub,
+      economy: { ...rookieClub.economy, cash: 12_000 },
+    });
+    expect(rookieCards).toHaveLength(4);
+    expect(rookieCards[0].id).toBe('seating_expansion');
+    expect(rookieCards[0].status).toBe('ready');
+    expect(rookieCards[0].funPayoff).toMatch(/fans|gate/i);
+    expect(rookieCards.find((c) => c.id === 'mascot_cannon')?.status).toBe('locked_tier');
+    expect(rookieCards.find((c) => c.id === 'mascot_cannon')?.statusBadge).toMatch(/AA/i);
+
+    const lowCashCards = buildStadiumUpgradeCards({
+      ...rookieClub,
+      economy: { ...rookieClub.economy, cash: 500 },
+    });
+    expect(lowCashCards[0].status).toBe('need_cash');
+
+    const majorsInstalled = buildStadiumUpgradeCards({
+      ...rookieClub,
+      leagueTier: 'majors',
+      economy: { ...rookieClub.economy, cash: 50_000 },
+      stadium: {
+        ...rookieClub.stadium,
+        capacity: 45_000,
+        seatingTier: 4,
+        hasNightLights: true,
+        hasJumbotron: true,
+        hasMascotCannon: true,
+      },
+    });
+    expect(majorsInstalled.every((c) => c.status === 'installed')).toBe(true);
+  });
+
+  it('summarizes lineup changes concretely so Auto-Tune & Auto-Optimize clearly report what changed or if already optimal', () => {
+    const club = makeClub(1994);
+    const same = summarizeLineupChange(club.lineup, club.lineup, 'vs RHP');
+    expect(same.changedCount).toBe(0);
+    expect(same.message).toMatch(/already/i);
+
+    const swapped = [...club.lineup];
+    swapped[0] = { ...club.lineup[1], orderIndex: 0 };
+    swapped[1] = { ...club.lineup[0], orderIndex: 1 };
+    const diff = summarizeLineupChange(club.lineup, swapped, 'vs LHP');
+    expect(diff.changedCount).toBe(2);
+    expect(diff.message).toMatch(/2 lineup spots.*vs LHP/i);
   });
 });

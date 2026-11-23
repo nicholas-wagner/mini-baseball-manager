@@ -26,7 +26,7 @@ import {
   createClutchMomentSession,
   evaluateSeriesStakes,
 } from '../../engine/gm/gameDayMoments';
-import { evaluatePreGameLineupCheck } from '../../engine/gm/seriesRecap';
+import { evaluatePreGameLineupCheck, summarizeLineupChange } from '../../engine/gm/seriesRecap';
 import {
   buildFirstPitchCoachTip,
   evaluateWelcomeChecklist,
@@ -220,6 +220,10 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
   const claimWelcomeChecklistReward = useGameStore((s) => s.claimWelcomeChecklistReward);
   const packsOpenedCount = useFoilPackStore((s) => s.openedCount);
   const [gmQuickFeedback, setGmQuickFeedback] = useState<string | null>(null);
+  const [autoTuneStatus, setAutoTuneStatus] = useState<{
+    starterId: string;
+    message: string;
+  } | null>(null);
   const [derbyOpen, setDerbyOpen] = useState(false);
   const [trophyOpen, setTrophyOpen] = useState(false);
   const [openingSeasonExpanded, setOpeningSeasonExpanded] = useState(false);
@@ -1358,29 +1362,63 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
                   {lineupCheck ? (
                     <div
                       data-testid="pregame-lineup-check"
-                      className="pt-1.5 border-t border-dashed border-[#181B2C]/20 flex flex-wrap items-center justify-between gap-2 text-[11px]"
+                      className="pt-1.5 border-t border-dashed border-[#181B2C]/20 space-y-1.5 text-[11px]"
                     >
-                      <span
-                        className={`font-extrabold ${
-                          lineupCheck.needsAttention ? 'text-[#9D0208]' : 'text-[#1B4332]'
-                        }`}
-                      >
-                        {lineupCheck.badgeText}
-                        {lineupCheck.tips.length > 0 ? `: ${lineupCheck.tips.join(' • ')}` : ''}
-                      </span>
-                      <ComicButton
-                        size="sm"
-                        variant={lineupCheck.needsAttention ? 'gold' : 'cream'}
-                        data-testid="auto-tune-lineup-btn"
-                        icon={<Sparkles className="w-3.5 h-3.5" />}
-                        onClick={() => {
-                          const res = autoTuneHumanLineupForStarter(lineupCheck.starterThrows);
-                          soundEngine.play('level_up');
-                          setGmQuickFeedback(res.summary);
-                        }}
-                      >
-                        ✨ Auto-Tune vs {lineupCheck.starterThrows}HP
-                      </ComicButton>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className={`font-extrabold ${
+                            lineupCheck.needsAttention ? 'text-[#9D0208]' : 'text-[#1B4332]'
+                          }`}
+                        >
+                          {lineupCheck.badgeText}
+                          {lineupCheck.tips.length > 0 ? `: ${lineupCheck.tips.join(' • ')}` : ''}
+                        </span>
+                        {(() => {
+                          const isTuned =
+                            autoTuneStatus?.starterId === probableMatchup.opponentStarter.id;
+                          return (
+                            <ComicButton
+                              size="sm"
+                              variant={
+                                isTuned ? 'turf' : lineupCheck.needsAttention ? 'gold' : 'cream'
+                              }
+                              data-testid="auto-tune-lineup-btn"
+                              data-confirmed={isTuned ? 'true' : undefined}
+                              icon={<Sparkles className="w-3.5 h-3.5" />}
+                              onClick={() => {
+                                const beforeLineup = humanClub.lineup;
+                                autoTuneHumanLineupForStarter(lineupCheck.starterThrows);
+                                const afterLineup =
+                                  useGameStore.getState().getHumanClub()?.lineup ?? beforeLineup;
+                                const diff = summarizeLineupChange(
+                                  beforeLineup,
+                                  afterLineup,
+                                  `vs ${lineupCheck.starterThrows}HP`,
+                                );
+                                soundEngine.play('level_up');
+                                setAutoTuneStatus({
+                                  starterId: probableMatchup.opponentStarter.id,
+                                  message: diff.message,
+                                });
+                                setGmQuickFeedback(`✓ ${diff.message}`);
+                              }}
+                            >
+                              {isTuned
+                                ? `✓ Tuned vs ${lineupCheck.starterThrows}HP!`
+                                : `✨ Auto-Tune vs ${lineupCheck.starterThrows}HP`}
+                            </ComicButton>
+                          );
+                        })()}
+                      </div>
+                      {autoTuneStatus?.starterId === probableMatchup.opponentStarter.id ? (
+                        <div
+                          role="status"
+                          data-testid="auto-tune-feedback"
+                          className="px-2.5 py-1.5 rounded-lg border-2 border-[#1B4332] bg-[#D8F3DC] text-[#1B4332] text-[11px] font-extrabold"
+                        >
+                          ✓ {autoTuneStatus.message}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -1691,6 +1729,7 @@ export function GameDayScreen({ onJumpToTab, onOpenStory }: GameDayScreenProps =
           onSelectGameplan={(plan) => {
             setSeriesGameplan(plan);
             soundEngine.play('ui_pop');
+            setGmQuickFeedback(`✓ Series Gameplan active: ${plan.replace(/_/g, ' ')}!`);
           }}
           onSwapFreshStarter={(freshId) => {
             if (swapTiredStarterToFresh(freshId)) {

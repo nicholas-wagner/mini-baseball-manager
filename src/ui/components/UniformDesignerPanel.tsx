@@ -225,10 +225,21 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
   const [draft, setDraft] = useState<UniformCustomization>(() =>
     extractClubUniformCustomization(club),
   );
+  const [appliedSaved, setAppliedSaved] = useState(false);
   const modelPlayer = club.roster[0];
+
+  const updateDraft = (
+    updater: UniformCustomization | ((prev: UniformCustomization) => UniformCustomization),
+  ) => {
+    setAppliedSaved(false);
+    setDraft(updater);
+  };
 
   const handleApply = () => {
     const res = applyHumanUniformCustomization(draft);
+    if (res.applied) {
+      setAppliedSaved(true);
+    }
     onNotice(
       res.applied
         ? `Updated ${club.city} ${club.name} uniforms (${draft.monogram} • ${draft.jerseyPattern.replace(/_/g, ' ')})!`
@@ -267,13 +278,23 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
           ) : null}
           <ComicButton
             size="md"
-            variant="turf"
+            variant={appliedSaved ? 'gold' : 'turf'}
+            data-confirmed={appliedSaved ? 'true' : undefined}
             icon={<Sparkles className="w-4 h-4" />}
             className="w-full"
             onClick={handleApply}
           >
-            Apply Custom Uniform
+            {appliedSaved ? '✓ Uniform Applied!' : 'Apply Custom Uniform'}
           </ComicButton>
+          {appliedSaved ? (
+            <div
+              role="status"
+              data-testid="uniform-applied-status"
+              className="px-2.5 py-1 rounded-lg border border-[#1B4332] bg-[#D8F3DC] text-[#1B4332] text-[11px] font-extrabold"
+            >
+              ✓ Saved to your 3D ballpark &amp; cards!
+            </div>
+          ) : null}
         </div>
 
         {/* Interactive Controls */}
@@ -290,7 +311,10 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                   size="sm"
                   variant="cream"
                   onClick={() => {
-                    setDraft({ ...preset.config, monogram: draft.monogram || preset.config.monogram });
+                    updateDraft({
+                      ...preset.config,
+                      monogram: draft.monogram || preset.config.monogram,
+                    });
                     soundEngine.play('ui_pop');
                   }}
                 >
@@ -308,7 +332,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                 aria-label="Primary Color"
                 type="color"
                 value={draft.primary}
-                onChange={(e) => setDraft((d) => ({ ...d, primary: e.target.value.toUpperCase() }))}
+                onChange={(e) => updateDraft((d) => ({ ...d, primary: e.target.value.toUpperCase() }))}
                 className="w-full h-11 rounded-lg border-2 border-[#181B2C] cursor-pointer"
               />
             </label>
@@ -318,7 +342,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                 aria-label="Secondary Trim"
                 type="color"
                 value={draft.secondary}
-                onChange={(e) => setDraft((d) => ({ ...d, secondary: e.target.value.toUpperCase() }))}
+                onChange={(e) => updateDraft((d) => ({ ...d, secondary: e.target.value.toUpperCase() }))}
                 className="w-full h-11 rounded-lg border-2 border-[#181B2C] cursor-pointer"
               />
             </label>
@@ -328,7 +352,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                 aria-label="Accent Pop"
                 type="color"
                 value={draft.accent}
-                onChange={(e) => setDraft((d) => ({ ...d, accent: e.target.value.toUpperCase() }))}
+                onChange={(e) => updateDraft((d) => ({ ...d, accent: e.target.value.toUpperCase() }))}
                 className="w-full h-11 rounded-lg border-2 border-[#181B2C] cursor-pointer"
               />
             </label>
@@ -340,7 +364,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                 maxLength={3}
                 value={draft.monogram}
                 onChange={(e) =>
-                  setDraft((d) => ({
+                  updateDraft((d) => ({
                     ...d,
                     monogram: e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3),
                   }))
@@ -360,7 +384,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                   size="sm"
                   variant={draft.jerseyPattern === pat.id ? 'gold' : 'cream'}
                   active={draft.jerseyPattern === pat.id}
-                  onClick={() => setDraft((d) => ({ ...d, jerseyPattern: pat.id }))}
+                  onClick={() => updateDraft((d) => ({ ...d, jerseyPattern: pat.id }))}
                 >
                   {pat.label}
                 </ComicButton>
@@ -379,7 +403,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                     size="sm"
                     variant={draft.capStyle === cap.id ? 'gold' : 'cream'}
                     active={draft.capStyle === cap.id}
-                    onClick={() => setDraft((d) => ({ ...d, capStyle: cap.id }))}
+                    onClick={() => updateDraft((d) => ({ ...d, capStyle: cap.id }))}
                   >
                     {cap.label}
                   </ComicButton>
@@ -396,7 +420,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                     size="sm"
                     variant={draft.stirrupStyle === sock.id ? 'gold' : 'cream'}
                     active={draft.stirrupStyle === sock.id}
-                    onClick={() => setDraft((d) => ({ ...d, stirrupStyle: sock.id }))}
+                    onClick={() => updateDraft((d) => ({ ...d, stirrupStyle: sock.id }))}
                   >
                     {sock.label}
                   </ComicButton>
@@ -415,7 +439,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
                   size="sm"
                   variant={draft.crestEmblem === emblem.id ? 'gold' : 'cream'}
                   active={draft.crestEmblem === emblem.id}
-                  onClick={() => setDraft((d) => ({ ...d, crestEmblem: emblem.id }))}
+                  onClick={() => updateDraft((d) => ({ ...d, crestEmblem: emblem.id }))}
                 >
                   {emblem.label}
                 </ComicButton>

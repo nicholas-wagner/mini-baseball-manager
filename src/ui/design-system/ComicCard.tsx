@@ -42,10 +42,10 @@ export function ComicCard({
               <p className="text-[11px] font-bold text-[#FFD166] mt-1 leading-tight">{subtitle}</p>
             ) : null}
           </div>
-          {badge ? <div className="shrink-0">{badge}</div> : null}
+          {badge ? <div className="min-w-0 max-w-full">{badge}</div> : null}
         </header>
       ) : null}
-      <div className="p-4">{children}</div>
+      <div className="p-3.5 sm:p-4">{children}</div>
     </section>
   );
 }

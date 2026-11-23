@@ -14,10 +14,12 @@ import {
   BALLPARK_CATALOG,
   getBallparkPreset,
 } from '../../engine/ballparks/stadiumCatalog';
+import ballparkArt from '../../art/portraits/illustrations/ballpark.png';
 import {
+  buildStadiumUpgradeCards,
   getStadiumTierProfile,
-  STADIUM_UPGRADE_CATALOG,
 } from '../../engine/ballparks/stadiumProgression';
+import { LEAGUE_TIER_ORDER } from '../../engine/models/club';
 import {
   computeClubStaffPayroll,
   evaluateClubStaffBonuses,
@@ -156,13 +158,17 @@ export function ClubHubScreen() {
         subtitle={`Cash $${club.economy.cash.toLocaleString()} • Home: ${activePark.name} • Staff ${activeStaff.length}/${staffSlotCap}`}
         headerBg="#1B4332"
         badge={
-          <div data-testid="hub-room-tabs" className="flex flex-wrap gap-1.5">
+          <div
+            data-testid="hub-room-tabs"
+            className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 w-full sm:w-auto"
+          >
             <ComicButton
               size="sm"
               variant={activeRoom === 'ballpark_room' ? 'gold' : 'cream'}
               active={activeRoom === 'ballpark_room'}
               icon={<Building2 className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.ballpark_room)}
+              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
               🏟️ Ballpark &amp; Economy
             </ComicButton>
@@ -172,6 +178,7 @@ export function ClubHubScreen() {
               active={activeRoom === 'gear_room'}
               icon={<Palette className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.gear_room)}
+              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
               👕 Uniforms &amp; Gear
             </ComicButton>
@@ -181,6 +188,7 @@ export function ClubHubScreen() {
               active={activeRoom === 'staff_room'}
               icon={<Users className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.staff_room)}
+              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
               👥 Staff &amp; Front Office
             </ComicButton>
@@ -190,6 +198,7 @@ export function ClubHubScreen() {
               active={activeRoom === 'events_room'}
               icon={<Trophy className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.events_room)}
+              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
               🏆 Events &amp; Duels
             </ComicButton>
@@ -284,46 +293,138 @@ export function ClubHubScreen() {
 
         {subTab === 'stadiums' ? (
           <div className="space-y-3">
-            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="font-display text-sm text-[#181B2C]">
-                    Current Home Venue: {activePark.name} ({tierProfile.label})
-                  </div>
-                  <div className="text-xs font-bold text-[#4A5068]">
-                    {activePark.tagline} • Capacity {club.stadium.capacity.toLocaleString()} /{' '}
-                    {tierProfile.maxCapacity.toLocaleString()} fans (Seating Deck Lv.{club.stadium.seatingTier})
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
-                  <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C]">
-                    LF {activePark.factors.leftWallFt} / CF {activePark.factors.centerWallFt} / RF {activePark.factors.rightWallFt} ft
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C]">
-                    HR {activePark.factors.hrFactor.toFixed(2)}x (L {activePark.factors.leftyHrFactor.toFixed(2)}x / R {activePark.factors.rightyHrFactor.toFixed(2)}x)
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C]">
-                    {activePark.factors.isDome ? 'Indoor Dome' : 'Open Air'} • {activePark.factors.surface === 'fast_turf' ? 'Fast Turf' : 'Natural Grass'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5 pt-1 border-t border-dashed border-[#181B2C]/20">
-                {STADIUM_UPGRADE_CATALOG.map((upg) => (
-                  <ComicButton
-                    key={upg.id}
-                    size="sm"
-                    variant="gold"
-                    onClick={() => {
-                      const res = upgradeHumanStadium(upg.id);
-                      setNotice(res.upgraded ? `Upgraded stadium: ${upg.label}!` : (res.reason ?? 'Unavailable.'));
-                      soundEngine.play(res.upgraded ? 'cash_chime' : 'ui_pop');
-                    }}
+            {(() => {
+              const upgradeCards = buildStadiumUpgradeCards(club);
+              const capPct = Math.min(
+                100,
+                Math.round((club.stadium.capacity / Math.max(1, tierProfile.maxCapacity)) * 100),
+              );
+              const tierIdx = LEAGUE_TIER_ORDER.indexOf(club.leagueTier);
+              return (
+                <div className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-3">
+                  {/* Visual Sandlot -> Majors Home Ballpark Showcase */}
+                  <div
+                    data-testid="ballpark-visual-banner"
+                    className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3 items-center"
                   >
-                    + {upg.label} (${upg.cost.toLocaleString()})
-                  </ComicButton>
-                ))}
-              </div>
-            </div>
+                    <div className="relative rounded-xl border-2 border-[#181B2C] overflow-hidden shadow-[3px_3px_0_#181B2C] h-28 sm:h-28 bg-[#63CAFF]">
+                      <img
+                        src={ballparkArt}
+                        alt={`${activePark.name} illustration`}
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-[#181B2C]/90 text-[#FFD166] font-display text-[10px]">
+                        Seating Lv.{club.stadium.seatingTier}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="font-display text-sm text-[#181B2C] leading-tight">
+                        🏟️ {activePark.name} ({tierProfile.label})
+                      </div>
+                      <div className="text-xs font-bold text-[#4A5068]">
+                        {activePark.tagline}
+                      </div>
+                      {/* Capacity Progress Bar + Sandlot -> Majors Ladder */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-extrabold text-[#1B4332]">
+                          <span>
+                            Fans: {club.stadium.capacity.toLocaleString()} /{' '}
+                            {tierProfile.maxCapacity.toLocaleString()}
+                          </span>
+                          <span>{capPct}% Full Tier</span>
+                        </div>
+                        <div className="h-2.5 rounded-full border border-[#181B2C] bg-[#FBF4E4] overflow-hidden">
+                          <div
+                            className="h-full bg-[#2FB356] transition-all"
+                            style={{ width: `${capPct}%` }}
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-1 pt-0.5 text-[9px] font-extrabold">
+                          {(['Rookie', 'Low-A', 'High-A', 'AA', 'AAA', 'Majors'] as const).map(
+                            (step, idx) => (
+                              <span
+                                key={step}
+                                className={`px-1.5 py-0.5 rounded border border-[#181B2C] ${
+                                  idx === tierIdx
+                                    ? 'bg-[#FFC300] text-[#181B2C]'
+                                    : idx < tierIdx
+                                      ? 'bg-[#D8F3DC] text-[#1B4332]'
+                                      : 'bg-[#FBF4E4] text-[#4A5068]'
+                                }`}
+                              >
+                                {idx === tierIdx ? '★ ' : ''}
+                                {step}
+                              </span>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1 text-[10px] font-extrabold pt-0.5">
+                        <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C]">
+                          LF {activePark.factors.leftWallFt} / CF {activePark.factors.centerWallFt} / RF {activePark.factors.rightWallFt} ft
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C]">
+                          HR {activePark.factors.hrFactor.toFixed(2)}x
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C]">
+                          {activePark.factors.isDome ? 'Indoor Dome' : 'Open Air'} • {activePark.factors.surface === 'fast_turf' ? 'Fast Turf' : 'Natural Grass'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fun Payoff Stadium Upgrade Cards (Clear Ready vs Tier-Locked Goals!) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-dashed border-[#181B2C]/20">
+                    {upgradeCards.map((upg) => {
+                      const canBuy = upg.status === 'ready';
+                      const isInstalled = upg.status === 'installed';
+                      const isLocked = upg.status === 'locked_tier';
+                      return (
+                        <div
+                          key={upg.id}
+                          data-testid="stadium-upgrade-card"
+                          className={`p-2.5 rounded-xl border-2 border-[#181B2C] flex flex-col justify-between gap-2 ${
+                            isInstalled
+                              ? 'bg-[#D8F3DC]'
+                              : canBuy
+                                ? 'bg-[#FFF8E7] shadow-[2px_2px_0_#181B2C]'
+                                : 'bg-[#F4F1E8]'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-display text-xs text-[#181B2C]">
+                                {upg.emoji} {upg.label}
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-bold text-[#4A5068] mt-0.5">
+                              {upg.funPayoff}
+                            </p>
+                          </div>
+                          <ComicButton
+                            size="sm"
+                            variant={isInstalled ? 'turf' : canBuy ? 'gold' : 'cream'}
+                            disabled={isInstalled || isLocked || upg.status === 'need_cash'}
+                            onClick={() => {
+                              const res = upgradeHumanStadium(upg.id);
+                              setNotice(
+                                res.upgraded
+                                  ? `Upgraded stadium: ${upg.label}!`
+                                  : (res.reason ?? 'Unavailable.'),
+                              );
+                              soundEngine.play(res.upgraded ? 'cash_chime' : 'ui_pop');
+                            }}
+                            className="w-full"
+                          >
+                            {upg.statusBadge}
+                          </ComicButton>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {BALLPARK_CATALOG.map((park) => {

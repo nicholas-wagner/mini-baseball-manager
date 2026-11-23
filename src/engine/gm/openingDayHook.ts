@@ -375,3 +375,22 @@ export function evaluateMatchupCardSparkle(input: MatchupSparkleInput): MatchupC
     reactionBubble,
   };
 }
+
+/** Sorts Skill Tree players so unspent SP > 0 appear first, followed by Favorites, then the rest. */
+export function sortPlayersForSkillTree(
+  roster: readonly Player[],
+  favoriteIds: readonly string[],
+): Player[] {
+  const favSet = new Set(favoriteIds);
+  return roster
+    .map((player, index) => ({ player, index }))
+    .sort((a, b) => {
+      if (b.player.skillPoints !== a.player.skillPoints) {
+        return b.player.skillPoints - a.player.skillPoints;
+      }
+      const favDiff = Number(favSet.has(b.player.id)) - Number(favSet.has(a.player.id));
+      if (favDiff !== 0) return favDiff;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.player);
+}

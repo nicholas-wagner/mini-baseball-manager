@@ -19,6 +19,7 @@ import {
   TIER_SALARY_CAPS,
   validateSalaryCapRoom,
 } from '../../engine/gm/offseasonEngine';
+import { summarizeLineupChange } from '../../engine/gm/seriesRecap';
 import { MAX_ACTIVE_ROSTER_SIZE } from '../../engine/models/club';
 import {
   BATTED_BALL_TENDENCY_LABELS,
@@ -116,12 +117,13 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
   const [printGallery, setPrintGallery] = useState(false);
   const [rosterView, setRosterView] = useState<'lineup' | 'cards'>('lineup');
-  const [cardFilter, setCardFilter] = useState<'all' | 'lineup' | 'pitchers' | 'bench'>('all');
+  const [cardFilter, setCardFilter] = useState<'all' | 'favorites' | 'lineup' | 'pitchers' | 'bench'>('all');
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [scoutFreeAgentId, setScoutFreeAgentId] = useState<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [dossierOpen, setDossierOpen] = useState(false);
   const [rosterMessage, setRosterMessage] = useState<string | null>(null);
+  const [lineupOptimized, setLineupOptimized] = useState(false);
 
   if (!humanClub) return null;
 
@@ -154,7 +156,13 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
       return;
     }
     if (selectedSlotIdx !== idx) {
+      const playerA = rosterById.get(humanClub.lineup[selectedSlotIdx]?.playerId ?? '');
+      const playerB = rosterById.get(playerId);
       swapLineupSlots(selectedSlotIdx, idx);
+      setLineupOptimized(false);
+      setRosterMessage(
+        `⇄ Swapped #${selectedSlotIdx + 1} ${playerA?.name ?? 'Batter'} ↔ #${idx + 1} ${playerB?.name ?? 'Batter'}!`,
+      );
       soundEngine.play('bat_crack');
     }
     setSelectedSlotIdx(null);
@@ -163,7 +171,10 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   const handleBenchSub = (playerId: string) => {
     setInspectedPlayerId(playerId);
     const targetIdx = selectedSlotIdx ?? 8;
+    const subPlayer = rosterById.get(playerId);
     assignLineupPlayer(targetIdx, playerId);
+    setLineupOptimized(false);
+    setRosterMessage(`✓ Inserted ${subPlayer?.name ?? 'bench player'} into batting slot #${targetIdx + 1}!`);
     setSelectedSlotIdx(null);
     soundEngine.play('ui_pop');
   };
@@ -176,7 +187,12 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
       return;
     }
     if (selectedRotationIdx !== idx) {
+      const spA = rosterById.get(humanClub.rotationIds[selectedRotationIdx] ?? '');
+      const spB = rosterById.get(pitcherId);
       swapRotationOrder(selectedRotationIdx, idx);
+      setRosterMessage(
+        `⇄ Swapped rotation SP${selectedRotationIdx + 1} (${spA?.name ?? 'Pitcher'}) ↔ SP${idx + 1} (${spB?.name ?? 'Pitcher'})!`,
+      );
       soundEngine.play('glove_pop');
     }
     setSelectedRotationIdx(null);
@@ -262,6 +278,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
   });
 
   const filteredBinderEntries = orderedRosterEntries.filter(({ player }) => {
+    if (cardFilter === 'favorites') return favoritePlayerIds.includes(player.id);
     if (cardFilter === 'lineup') return activeLineupIds.has(player.id);
     if (cardFilter === 'pitchers') return isPitcherPosition(player.position);
     if (cardFilter === 'bench') return !isPitcherPosition(player.position) && !activeLineupIds.has(player.id);
@@ -295,14 +312,26 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           <div className="flex flex-wrap gap-2">
             <ComicButton
               size="sm"
-              variant="gold"
+              variant={lineupOptimized ? 'turf' : 'gold'}
+              data-testid="roster-auto-optimize-btn"
+              data-confirmed={lineupOptimized ? 'true' : undefined}
               icon={<Sparkles className="w-4 h-4" />}
               onClick={() => {
+                const beforeLineup = humanClub.lineup;
                 autoOptimizeHumanLineup();
+                const afterLineup =
+                  useGameStore.getState().getHumanClub()?.lineup ?? beforeLineup;
+                const diff = summarizeLineupChange(
+                  beforeLineup,
+                  afterLineup,
+                  'for best OVR & defense',
+                );
+                setLineupOptimized(true);
+                setRosterMessage(`✓ ${diff.message}`);
                 soundEngine.play('level_up');
               }}
             >
-              Auto-Optimize Lineup
+              {lineupOptimized ? '✓ Lineup Optimized!' : 'Auto-Optimize Lineup'}
             </ComicButton>
             <ComicButton
               size="sm"
@@ -325,8 +354,9 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
       >
         {rosterMessage ? (
           <div
+            role="status"
             data-testid="cross-train-feedback"
-            className="mb-3 px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]"
+            className="mb-3 px-3 py-2 rounded-xl border-2 border-[#1B4332] bg-[#D8F3DC] text-xs font-extrabold text-[#1B4332] shadow-[2px_2px_0_#181B2C]"
           >
             {rosterMessage}
           </div>
@@ -383,6 +413,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
               {(
                 [
                   { id: 'all', label: `All (${humanClub.roster.length})` },
+                  { id: 'favorites', label: `⭐ Favorites (${favoritePlayerIds.length})` },
                   { id: 'lineup', label: 'Lineup (9)' },
                   { id: 'pitchers', label: 'Pitchers' },
                   { id: 'bench', label: 'Bench' },
@@ -469,17 +500,18 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                   const posEval = evaluatePositionAssignment(player, slot.defensivePosition);
                   const eligibleList = getEligiblePositions(player).join('/');
                   const isSelected = selectedSlotIdx === idx;
+                  const isFavPlayer = favoritePlayerIds.includes(player.id);
                   return (
                     <div
                       key={slot.orderIndex}
-                      className={`p-2 rounded-xl border-2 border-[#181B2C] flex flex-wrap items-center justify-between gap-2 ${
+                      className={`p-2.5 rounded-xl border-2 border-[#181B2C] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
                         isSelected ? 'bg-[#FFF3BF]' : 'bg-[#FFFDF7]'
                       }`}
                     >
                       <button
                         type="button"
                         onClick={() => setInspectedPlayerId(player.id)}
-                        className="flex items-center gap-2 text-left min-w-0 flex-1 min-h-[44px]"
+                        className="flex items-center gap-2 text-left min-w-0 flex-1 min-h-[44px] cursor-pointer"
                       >
                         <span className="w-7 h-7 rounded-lg bg-[#181B2C] text-[#FFD166] font-display text-xs flex items-center justify-center shrink-0">
                           {idx + 1}
@@ -491,15 +523,26 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                           size="xs"
                           testId="roster-lineup-portrait"
                         />
-                        <span className="px-2 py-0.5 rounded-md bg-[#1B4332] text-[#FBF4E4] font-display text-[11px] shrink-0">
-                          {slot.defensivePosition}
-                        </span>
-                        <FlagBadge nationalityId={player.nationalityId} size="sm" />
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-1">
-                            <span className="font-display text-xs text-[#181B2C] truncate">
-                              {favoritePlayerIds.includes(player.id) ? '⭐ ' : ''}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-display text-sm sm:text-xs text-[#181B2C] leading-tight">
+                              {isFavPlayer ? '⭐ ' : ''}
                               {player.name}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded-md bg-[#1B4332] text-[#FBF4E4] font-display text-[10px] shrink-0">
+                              {slot.defensivePosition}
+                            </span>
+                            <FlagBadge nationalityId={player.nationalityId} size="sm" />
+                            <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] font-extrabold shrink-0">
+                              OVR {ovr}
+                            </span>
+                          </div>
+                          <div
+                            title={`Bats ${player.bats} / Throws ${player.throws}`}
+                            className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] font-bold text-[#4A5068]"
+                          >
+                            <span>
+                              {player.bats}/{player.throws} • {SPECIALIST_LABELS[player.specialistArchetype]} • Pos: {eligibleList}
                             </span>
                             {posEval.isFavorite ? (
                               <span
@@ -519,17 +562,27 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
                             ) : null}
                             {renderFormBadge(player.formState)}
                           </div>
-                          <div
-                            title={`Bats ${player.bats} / Throws ${player.throws}`}
-                            className="text-[11px] font-bold text-[#4A5068]"
-                          >
-                            Bats {player.bats}/Throws {player.throws} • OVR {ovr} •{' '}
-                            {SPECIALIST_LABELS[player.specialistArchetype]} • Pos: {eligibleList}
-                          </div>
                         </div>
                       </button>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-dashed border-[#181B2C]/15">
+                        <button
+                          type="button"
+                          data-testid="roster-star-btn"
+                          aria-pressed={isFavPlayer}
+                          aria-label={`Toggle favorite for ${player.name}`}
+                          onClick={() => {
+                            toggleFavoritePlayer(player.id);
+                            soundEngine.play('ui_pop');
+                          }}
+                          className={`min-h-[44px] min-w-[44px] rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer transition ${
+                            isFavPlayer
+                              ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
+                              : 'bg-[#FBF4E4] text-[#4A5068] hover:bg-[#FFF3BF]'
+                          }`}
+                        >
+                          {isFavPlayer ? '⭐' : '☆'}
+                        </button>
                         <ComicButton
                           size="sm"
                           variant="sky"
