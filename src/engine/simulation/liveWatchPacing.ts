@@ -131,6 +131,64 @@ function buildStealBanner(event: PlayEvent): ComicPopArtBanner {
   };
 }
 
+const HIT_OUTCOMES: ReadonlySet<string> = new Set(['single', 'double', 'triple', 'home_run']);
+
+function detectBatterMilestone(
+  event: PlayEvent,
+  session: GameSessionState,
+): ComicPopArtBanner | null {
+  if (!event.batterId || !event.outcome || !HIT_OUTCOMES.has(event.outcome)) return null;
+  const map = event.half === 'TOP' ? session.boxScore.awayBatters : session.boxScore.homeBatters;
+  const line = map[event.batterId];
+  if (!line) return null;
+  if (event.outcome === 'home_run' && line.homeRuns >= 2) {
+    return {
+      title: `🌟 ${line.homeRuns}-HR MONSTER GAME!!`,
+      subtitle: event.commentary,
+      coachQuip: 'Coach Pops: "Lock up the baseballs! This kid is on another planet!"',
+      bg: '#FFC300',
+      text: '#181B2C',
+      confetti: true,
+    };
+  }
+  if (line.hits === 3) {
+    return {
+      title: '🔥 3-HIT HOT STREAK!!',
+      subtitle: event.commentary,
+      coachQuip: 'Coach Pops: "Seeing beach balls out there — 3 knocks already!"',
+      bg: '#FF4D6D',
+      text: '#FFFFFF',
+      confetti: true,
+    };
+  }
+  return null;
+}
+
+function detectPitcherMilestone(
+  event: PlayEvent,
+  session: GameSessionState,
+): ComicPopArtBanner | null {
+  if (event.outcome !== 'strikeout' || !event.pitcherId) return null;
+  const map = event.half === 'TOP' ? session.boxScore.homePitchers : session.boxScore.awayPitchers;
+  const ks = map[event.pitcherId]?.strikeouts ?? 0;
+  if (ks !== 5 && ks !== 8) return null;
+  return {
+    title: `⚡ ${ks}-K STRIKEOUT GEM!!`,
+    subtitle: event.commentary,
+    coachQuip: 'Coach Pops: "Pure electric filth on the bump today!"',
+    bg: '#7209B7',
+    text: '#FFD166',
+    confetti: true,
+  };
+}
+
+function detectInGameMilestoneBanner(
+  event: PlayEvent,
+  session: GameSessionState,
+): ComicPopArtBanner | null {
+  return detectBatterMilestone(event, session) ?? detectPitcherMilestone(event, session);
+}
+
 /** Builds punchy 90s Saturday-morning cartoon pop-art callouts + Coach Pops dugout quips. */
 export function buildComicPopArtBanner(
   event: PlayEvent | null,
@@ -157,6 +215,8 @@ export function buildComicPopArtBanner(
       confetti: true,
     };
   }
+  const milestone = detectInGameMilestoneBanner(event, session);
+  if (milestone) return milestone;
   if (event.type === 'stolen_base_attempt') {
     return buildStealBanner(event);
   }

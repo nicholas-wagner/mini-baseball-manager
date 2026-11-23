@@ -66,7 +66,8 @@ describe('Broadcast Strike-Zone Plot, Active Special Power Dock & Interactive Pl
     expect(screen.getByTestId('active-powers-dock')).toBeInTheDocument();
     expect(screen.getByTestId('matchup-power-badges')).toBeInTheDocument();
 
-    // Advance pitches until a play resolves cleanly
+    // Advance pitches via Fast Sim menu until a play resolves cleanly
+    fireEvent.click(screen.getByTestId('fast-sim-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /sim at-bat/i }));
     expect(screen.getByTestId('play-by-play-ticker')).toBeInTheDocument();
   });

@@ -1009,6 +1009,7 @@ function mergeBatterLineToDelta(line: BatterBoxLine): PlayerSeasonStats {
   stat.strikeouts = line.strikeouts;
   stat.sacFlies = line.sacFlies;
   stat.stolenBases = line.stolenBases;
+  stat.caughtStealing = line.caughtStealing;
   stat.groundBalls = line.groundBalls;
   stat.lineDrives = line.lineDrives;
   stat.flyBalls = line.flyBalls;
@@ -1059,25 +1060,9 @@ export function buildPlayerStatDeltas(box: GameBoxScore): Record<string, PlayerS
   return deltas;
 }
 
-/** Simulates a complete baseball game (5, 7, or 9 regulation innings + extras) deterministically from seed. */
-export function simFullGame(
-  awayClub: Club,
-  homeClub: Club,
-  seed: number,
-  regulationInnings: GameLengthInnings = 9,
-  gamePressureLevel: GamePressureLevel = 'regular',
-  awayGameplan: SeriesGameplanId = 'balanced',
-  homeGameplan: SeriesGameplanId = 'balanced',
-): GameSessionResult {
-  let state = createGameSession(
-    awayClub,
-    homeClub,
-    seed,
-    gamePressureLevel,
-    regulationInnings,
-    awayGameplan,
-    homeGameplan,
-  );
+/** Completes an already-in-progress game session cleanly, preserving all prior runs, innings, and box score stats. */
+export function simRemainingGame(session: GameSessionState): GameSessionResult {
+  let state = session;
   const events: PlayEvent[] = [];
 
   for (let i = 0; i < 1200 && state.status === 'in_progress'; i += 1) {
@@ -1097,6 +1082,28 @@ export function simFullGame(
   };
 }
 
+/** Simulates a complete baseball game (5, 7, or 9 regulation innings + extras) deterministically from seed. */
+export function simFullGame(
+  awayClub: Club,
+  homeClub: Club,
+  seed: number,
+  regulationInnings: GameLengthInnings = 9,
+  gamePressureLevel: GamePressureLevel = 'regular',
+  awayGameplan: SeriesGameplanId = 'balanced',
+  homeGameplan: SeriesGameplanId = 'balanced',
+): GameSessionResult {
+  const startState = createGameSession(
+    awayClub,
+    homeClub,
+    seed,
+    gamePressureLevel,
+    regulationInnings,
+    awayGameplan,
+    homeGameplan,
+  );
+  return simRemainingGame(startState);
+}
+
 function addStats(base: PlayerSeasonStats, delta: PlayerSeasonStats): PlayerSeasonStats {
   return {
     games: base.games + delta.games,
@@ -1111,6 +1118,7 @@ function addStats(base: PlayerSeasonStats, delta: PlayerSeasonStats): PlayerSeas
     strikeouts: base.strikeouts + delta.strikeouts,
     sacFlies: base.sacFlies + delta.sacFlies,
     stolenBases: base.stolenBases + delta.stolenBases,
+    caughtStealing: (base.caughtStealing ?? 0) + (delta.caughtStealing ?? 0),
     groundBalls: base.groundBalls + delta.groundBalls,
     lineDrives: base.lineDrives + delta.lineDrives,
     flyBalls: base.flyBalls + delta.flyBalls,

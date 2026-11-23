@@ -303,6 +303,7 @@ export interface PlayerSeasonStats {
   strikeouts: number;
   sacFlies: number;
   stolenBases: number;
+  caughtStealing?: number;
   groundBalls: number;
   lineDrives: number;
   flyBalls: number;

@@ -198,6 +198,8 @@ export function createTeamGameSide(club: Club): TeamGameSide {
   const starterId =
     club.rotationIds[club.rotationCursor % Math.max(1, club.rotationIds.length)] ??
     club.roster[club.roster.length - 1].id;
+  const starter = playersById[starterId];
+  const initialPitcherFatigue = starter ? Math.min(55, Math.round(starter.fatigue * 0.6)) : 0;
 
   const coEdSynergy = evaluateCoEdClubhouseSynergy(club.roster);
   const staffBonuses = evaluateClubStaffBonuses(club.coaches.activeStaff ?? []);
@@ -217,7 +219,7 @@ export function createTeamGameSide(club: Club): TeamGameSide {
     bullpenIds: club.bullpenIds,
     usedPitcherIds: [starterId],
     activePitcherId: starterId,
-    pitcherFatigue: 0,
+    pitcherFatigue: initialPitcherFatigue,
     lineupIndex: 0,
     score: 0,
     hits: 0,

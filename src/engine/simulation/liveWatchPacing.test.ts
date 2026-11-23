@@ -153,4 +153,107 @@ describe('Smart 3D Watch Pacing & 90s Comic Pop-Art Callouts', () => {
     expect(buildComicPopArtBanner(makeEvent({ outcome: 'ball' }), session)).toBeNull();
     expect(buildComicPopArtBanner(null, session)).toBeNull();
   });
+
+  it('celebrates in-game milestones (Multi-HR Monster, 3-Hit Hot Streak, 5-K Strikeout Gem) with confetti banners', () => {
+    const session = makeSession();
+    const batterId = session.away.lineup[0].playerId;
+    const pitcherId = session.home.activePitcherId;
+
+    // 2nd HR of the game -> Multi-HR Monster!
+    const multiHrSession = {
+      ...session,
+      boxScore: {
+        ...session.boxScore,
+        awayBatters: {
+          ...session.boxScore.awayBatters,
+          [batterId]: { ...session.boxScore.awayBatters[batterId], hits: 2, homeRuns: 2 },
+        },
+      },
+    };
+    const multiHr = buildComicPopArtBanner(
+      makeEvent({ outcome: 'home_run', batterId, pitcherId, half: 'TOP' }),
+      multiHrSession,
+    );
+    expect(multiHr?.title).toMatch(/2-hr|multi-hr/i);
+    expect(multiHr?.confetti).toBe(true);
+
+    // 3rd hit of the day -> 3-Hit Hot Streak!
+    const threeHitSession = {
+      ...session,
+      boxScore: {
+        ...session.boxScore,
+        awayBatters: {
+          ...session.boxScore.awayBatters,
+          [batterId]: { ...session.boxScore.awayBatters[batterId], hits: 3, homeRuns: 0 },
+        },
+      },
+    };
+    const threeHit = buildComicPopArtBanner(
+      makeEvent({ outcome: 'single', batterId, pitcherId, half: 'TOP' }),
+      threeHitSession,
+    );
+    expect(threeHit?.title).toMatch(/3-hit/i);
+    expect(threeHit?.confetti).toBe(true);
+
+    // 5th strikeout by pitcher -> 5-K Gem!
+    const fiveKSession = {
+      ...session,
+      boxScore: {
+        ...session.boxScore,
+        homePitchers: {
+          ...session.boxScore.homePitchers,
+          [pitcherId]: { ...session.boxScore.homePitchers[pitcherId], strikeouts: 5 },
+        },
+      },
+    };
+    const fiveK = buildComicPopArtBanner(
+      makeEvent({ outcome: 'strikeout', batterId, pitcherId, half: 'TOP' }),
+      fiveKSession,
+    );
+    expect(fiveK?.title).toMatch(/5-k/i);
+    expect(fiveK?.confetti).toBe(true);
+
+    // BOT-half 8-K gem, routine 1-hit non-milestone, and unknown-ID safe fallback
+    const awayPitcherId = session.away.activePitcherId;
+    const homeBatterId = session.home.lineup[0].playerId;
+    const botSession = {
+      ...session,
+      half: 'BOT' as const,
+      boxScore: {
+        ...session.boxScore,
+        homeBatters: {
+          ...session.boxScore.homeBatters,
+          [homeBatterId]: { ...session.boxScore.homeBatters[homeBatterId], hits: 1, homeRuns: 0 },
+        },
+        awayPitchers: {
+          ...session.boxScore.awayPitchers,
+          [awayPitcherId]: { ...session.boxScore.awayPitchers[awayPitcherId], strikeouts: 8 },
+        },
+      },
+    };
+    expect(
+      buildComicPopArtBanner(
+        makeEvent({ outcome: 'strikeout', batterId: homeBatterId, pitcherId: awayPitcherId, half: 'BOT' }),
+        botSession,
+      )?.title,
+    ).toMatch(/8-k/i);
+    expect(
+      buildComicPopArtBanner(
+        makeEvent({ outcome: 'single', batterId: homeBatterId, pitcherId: awayPitcherId, half: 'BOT' }),
+        botSession,
+      ),
+    ).toBeNull();
+    expect(
+      buildComicPopArtBanner(
+        makeEvent({ outcome: 'single', batterId: 'unknown-id', pitcherId: 'unknown-p', half: 'BOT' }),
+        botSession,
+      ),
+    ).toBeNull();
+    expect(
+      buildComicPopArtBanner(
+        makeEvent({ outcome: 'strikeout', batterId: 'unknown-id', pitcherId: 'unknown-p', half: 'TOP' }),
+        botSession,
+      )?.title,
+    ).toMatch(/strike three/i);
+  });
 });

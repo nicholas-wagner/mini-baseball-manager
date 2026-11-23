@@ -3,6 +3,7 @@ import type { PlayEvent } from '../models/playEvent';
 import {
   computePlayerOverall,
   isPitcherPosition,
+  type FormState,
   type GameLengthInnings,
   type GamePressureLevel,
   type Player,
@@ -52,9 +53,13 @@ export interface SeriesStakesSummary {
 
 export interface LiveBroadcastLowerThird {
   batterName: string;
+  batterNickname: string;
+  batterForm: FormState;
   batterLineText: string;
   onDeckName: string;
   pitcherName: string;
+  pitcherNickname: string;
+  pitcherForm: FormState;
   pitchCount: number;
   endurancePct: number;
   enduranceTone: 'fresh' | 'tiring' | 'gassed';
@@ -262,9 +267,13 @@ export function buildLiveBroadcastLowerThird(session: GameSessionState): LiveBro
 
   return {
     batterName: batter.name,
+    batterNickname: batter.nickname,
+    batterForm: batter.formState,
     batterLineText: formatBatterBroadcastLine(batterBox[batter.id]),
     onDeckName,
     pitcherName: pitcher.name,
+    pitcherNickname: pitcher.nickname,
+    pitcherForm: pitcher.formState,
     pitchCount: pitcherStats.pitchCount,
     endurancePct,
     enduranceTone: resolveEnduranceTone(endurancePct),

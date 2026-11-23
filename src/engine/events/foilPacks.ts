@@ -10,6 +10,7 @@ import {
   type BaseballRelic,
   type RelicRarity,
 } from '../rpg/relics';
+import { applyPlayerXpAndLevelUps } from '../simulation/rewards';
 
 export type FoilPackTierId = 'sandlot_foil' | 'rivalry_chrome' | 'championship_holo';
 
@@ -161,15 +162,36 @@ function applyRelicCard(acc: PackRewardAccumulator, card: FoilPackCard): void {
   acc.summaryLines.push(`Duplicate ${card.title} sold for +$1,000 cash!`);
 }
 
+function pickRisingProspectIndex(roster: readonly Player[]): number {
+  let bestIdx = 0;
+  let bestScore = -Infinity;
+  roster.forEach((p, idx) => {
+    const youthBonus = Math.max(0, 28 - p.age) * 3;
+    const score = youthBonus + p.xpGrowthMultiplier * 15 - p.level * 2;
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = idx;
+    }
+  });
+  return bestIdx;
+}
+
 function applyTrainingCard(acc: PackRewardAccumulator, card: FoilPackCard): void {
   if (acc.roster.length === 0) return;
   const xpGain = card.xpBonus ?? 50;
   const spGain = card.spBonus ?? 1;
-  const target = acc.roster[0];
-  acc.roster = acc.roster.map((p, idx) =>
-    idx === 0 ? { ...p, xp: p.xp + xpGain, skillPoints: p.skillPoints + spGain } : p,
+  const targetIdx = pickRisingProspectIndex(acc.roster);
+  const target = acc.roster[targetIdx];
+  const leveled = applyPlayerXpAndLevelUps(target, xpGain);
+  const finalPlayer: Player = {
+    ...leveled,
+    skillPoints: leveled.skillPoints + spGain,
+  };
+  acc.roster = acc.roster.map((p, idx) => (idx === targetIdx ? finalPlayer : p));
+  const lvNote = finalPlayer.level > target.level ? ` (⬆️ LV.${finalPlayer.level}!)` : '';
+  acc.summaryLines.push(
+    `Rising Prospect ${target.name} gained +${xpGain} XP & +${spGain} SP${lvNote}!`,
   );
-  acc.summaryLines.push(`${target.name} gained +${xpGain} XP & +${spGain} SP!`);
 }
 
 function applySingleFoilCard(acc: PackRewardAccumulator, card: FoilPackCard): void {

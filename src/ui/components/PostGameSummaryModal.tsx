@@ -1,4 +1,4 @@
-import { Coins, Sparkles, Trophy, Users } from 'lucide-react';
+import { Coins, Gift, Sparkles, Trophy, Users } from 'lucide-react';
 import type { Club } from '../../engine/models/club';
 import { isPitcherPosition } from '../../engine/models/player';
 import {
@@ -10,31 +10,46 @@ import type { PostGameSummary } from '../../store/gameStore';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { toBaseballCardPlayer } from '../utils/playerCardAdapter';
+import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { FlipBaseballCard } from './FlipBaseballCard';
 
 interface PostGameSummaryModalProps {
   summary: PostGameSummary | null;
   humanClub: Club;
+  opponentClub?: Club | null;
   managerLevel: number;
+  unopenedPackCount?: number;
+  playAgainLabel?: string;
   onClose: () => void;
   onPlayAgain?: () => void;
+  onOpenFoilPacks?: () => void;
   onSpendSkillPoints?: () => void;
 }
 
 export function PostGameSummaryModal({
   summary,
   humanClub,
+  opponentClub = null,
   managerLevel,
+  unopenedPackCount = 0,
+  playAgainLabel,
   onClose,
   onPlayAgain,
+  onOpenFoilPacks,
   onSpendSkillPoints,
 }: PostGameSummaryModalProps) {
   if (!summary) return null;
 
+  const isHumanMvp = summary.mvp.clubId === humanClub.id;
+  const mvpClub = isHumanMvp ? humanClub : (opponentClub ?? humanClub);
   const mvpDomainPlayer =
-    humanClub.roster.find((p) => p.id === summary.mvp.playerId) ?? humanClub.roster[0];
+    mvpClub.roster.find((p) => p.id === summary.mvp.playerId) ??
+    humanClub.roster.find((p) => p.id === summary.mvp.playerId) ??
+    mvpClub.roster[0];
   const mvpCardPlayer = toBaseballCardPlayer(mvpDomainPlayer, 'mvp');
   const humanWon = summary.won;
+  const humanScore = summary.isHomeGame ? summary.homeScore : summary.awayScore;
+  const rivalScore = summary.isHomeGame ? summary.awayScore : summary.homeScore;
   const levelUps = summary.levelUps ?? [];
   const totalUnspentSp = humanClub.roster.reduce((sum, p) => sum + p.skillPoints, 0);
 
@@ -48,7 +63,7 @@ export function PostGameSummaryModal({
       <div className="w-full max-w-3xl my-2 sm:my-auto">
         <ComicCard
           title={humanWon ? 'VICTORY! SANDLOT FINAL' : 'TOUGH LOSS — CLUBHOUSE RECAP'}
-          subtitle={`${humanClub.city} ${humanClub.name} vs ${summary.opponentName} • ${summary.awayScore}-${summary.homeScore}`}
+          subtitle={`${humanClub.city} ${humanClub.name} ${summary.isHomeGame ? 'vs' : '@'} ${summary.opponentName} • ${humanScore}-${rivalScore}`}
           headerBg={humanWon ? '#1B4332' : '#7A1C33'}
           badge={
             <span className="px-2.5 py-1 rounded-full bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C] font-display text-xs">
@@ -59,39 +74,51 @@ export function PostGameSummaryModal({
           <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
             <div className="mx-auto w-full max-w-[260px]">
               <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[#9E1B32]">
-                <Trophy className="w-4 h-4 text-[#FFC300]" /> Game MVP Spotlight
+                <Trophy className="w-4 h-4 text-[#FFC300]" />{' '}
+                {isHumanMvp ? 'Game MVP Spotlight' : 'Rival MVP Spotlight'}
               </div>
               <FlipBaseballCard
                 player={mvpCardPlayer}
                 team={{
-                  primary: humanClub.colors.primary,
-                  secondary: humanClub.colors.secondary,
-                  accent: humanClub.colors.accent,
-                  monogram: humanClub.colors.monogram,
+                  primary: mvpClub.colors.primary,
+                  secondary: mvpClub.colors.secondary,
+                  accent: mvpClub.colors.accent,
+                  monogram: mvpClub.colors.monogram,
                 }}
                 mood={humanWon ? 'fired_up' : 'determined'}
               />
             </div>
 
             <div className="space-y-3">
-              <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7]">
-                <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#4A5068]">
-                  Player of the Game
-                </div>
-                <div className="font-display text-base text-[#181B2C] mt-0.5">
-                  {summary.mvp.playerName}
-                </div>
-                <div className="text-xs font-bold text-[#1B4332] mt-0.5">{summary.mvp.summary}</div>
-                <div className="text-[11px] font-bold text-[#4A5068] mt-1">
-                  {isPitcherPosition(mvpDomainPlayer.position)
-                    ? (() => {
-                        const p = computePitchingSabermetrics(mvpDomainPlayer.seasonStats);
-                        return `Season: ${p.era.toFixed(2)} ERA • ${p.whip.toFixed(2)} WHIP • ${Math.round(p.strikeRate * 100)}% Strk`;
-                      })()
-                    : (() => {
-                        const b = computeBattingSabermetrics(mvpDomainPlayer.seasonStats);
-                        return `Season: ${formatRate3(b.avg)}/${formatRate3(b.obp)}/${formatRate3(b.slg)} (${formatRate3(b.ops)} OPS)`;
-                      })()}
+              {/* Cute Club Mascot Reaction + Player of the Game Banner */}
+              <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex items-center gap-3">
+                <ClubMascotBuddy
+                  mascot={humanClub.mascot}
+                  primaryColor={humanClub.colors.primary}
+                  secondaryColor={humanClub.colors.secondary}
+                  accentColor={humanClub.colors.accent}
+                  mood={humanWon ? 'cheering' : 'determined'}
+                  size="md"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#4A5068]">
+                    {isHumanMvp ? 'Player of the Game' : `Rival Player of the Game (${mvpClub.name})`}
+                  </div>
+                  <div className="font-display text-base text-[#181B2C] mt-0.5 truncate">
+                    {summary.mvp.playerName}
+                  </div>
+                  <div className="text-xs font-bold text-[#1B4332] mt-0.5">{summary.mvp.summary}</div>
+                  <div className="text-[11px] font-bold text-[#4A5068] mt-0.5">
+                    {isPitcherPosition(mvpDomainPlayer.position)
+                      ? (() => {
+                          const p = computePitchingSabermetrics(mvpDomainPlayer.seasonStats);
+                          return `Season: ${p.era.toFixed(2)} ERA • ${p.whip.toFixed(2)} WHIP • ${Math.round(p.strikeRate * 100)}% Strk`;
+                        })()
+                      : (() => {
+                          const b = computeBattingSabermetrics(mvpDomainPlayer.seasonStats);
+                          return `Season: ${formatRate3(b.avg)}/${formatRate3(b.obp)}/${formatRate3(b.slg)} (${formatRate3(b.ops)} OPS)`;
+                        })()}
+                  </div>
                 </div>
               </div>
 
@@ -102,6 +129,7 @@ export function PostGameSummaryModal({
                   </div>
                   <div className="font-display text-base text-[#1B4332] mt-0.5">
                     +${summary.rewards.cashDelta.toLocaleString()}
+                    {summary.sweepBonusAwarded ? ' 🧹' : ''}
                   </div>
                 </div>
 
@@ -199,6 +227,15 @@ export function PostGameSummaryModal({
               ) : null}
 
               <div className="flex flex-wrap gap-2.5 pt-1">
+                {unopenedPackCount > 0 && onOpenFoilPacks ? (
+                  <ComicButton
+                    variant="coral"
+                    icon={<Gift className="w-4 h-4" />}
+                    onClick={onOpenFoilPacks}
+                  >
+                    🎁 Rip Foil Pack ({unopenedPackCount})
+                  </ComicButton>
+                ) : null}
                 {onSpendSkillPoints && totalUnspentSp > 0 ? (
                   <ComicButton variant="violet" onClick={onSpendSkillPoints}>
                     ⚡ Spend Skill Points ({totalUnspentSp} SP)
@@ -206,7 +243,7 @@ export function PostGameSummaryModal({
                 ) : null}
                 {onPlayAgain ? (
                   <ComicButton variant="gold" onClick={onPlayAgain}>
-                    Play Next Game
+                    {playAgainLabel ?? 'Play Next Game'}
                   </ComicButton>
                 ) : null}
                 <ComicButton variant="turf" onClick={onClose}>

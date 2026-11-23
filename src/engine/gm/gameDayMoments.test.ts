@@ -175,6 +175,10 @@ describe('Game Day Moments Engine (Clutch Entry, Series Stakes, Broadcast Lower-
 
     const opening = buildLiveBroadcastLowerThird(session);
     expect(opening.batterName).toBeTruthy();
+    expect(opening.batterNickname).toBeTruthy();
+    expect(opening.batterForm).toBeTruthy();
+    expect(opening.pitcherNickname).toBeTruthy();
+    expect(opening.pitcherForm).toBeTruthy();
     expect(opening.onDeckName).toBeTruthy();
     expect(opening.onDeckName).not.toBe(opening.batterName);
     expect(opening.batterLineText).toMatch(/0-0/);

@@ -71,11 +71,13 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       expect(rpPitchButtons.length).toBeGreaterThanOrEqual(2);
       expect(rpPitchButtons.length).toBeLessThanOrEqual(3);
 
-      // Sim Half-Inn jumps smoothly out of TOP 1
+      // Open Fast Sim menu -> Sim Half-Inn jumps smoothly out of TOP 1
+      await user.click(screen.getByTestId('fast-sim-toggle'));
       await user.click(screen.getByRole('button', { name: /sim half-inn/i }));
       expect(screen.queryByTestId('pitch-selector-bar')).not.toBeInTheDocument();
 
-      // Sim to End completes game cleanly and opens PostGameSummaryModal
+      // Open Fast Sim menu -> Sim to End completes game cleanly and opens PostGameSummaryModal
+      await user.click(screen.getByTestId('fast-sim-toggle'));
       await user.click(screen.getByRole('button', { name: /sim to end/i }));
       expect(await screen.findByRole('dialog', { name: /post-game box score & mvp/i })).toBeInTheDocument();
 

@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Gift, Sparkles, X } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
-import { FOIL_PACK_TIER_LABELS } from '../../engine/events/foilPacks';
+import { FOIL_PACK_TIER_LABELS, type FoilCardKind } from '../../engine/events/foilPacks';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { ComicButton } from '../design-system/ComicButton';
 
@@ -15,15 +16,44 @@ const RARITY_STYLES: Readonly<Record<'common' | 'rare' | 'legendary', string>> =
   legendary: 'bg-gradient-to-br from-[#FFF3BF] via-[#FFD166] to-[#FFADAD] border-[#9D0208]',
 };
 
+const CARD_KIND_ICONS: Readonly<Record<FoilCardKind, string>> = {
+  relic: '🏺 90s Relic',
+  cash_windfall: '💰 Cash Bonus',
+  training_xp: '⚾ Prospect Pass',
+  hype_ticket: '📣 Fan Hype',
+};
+
 export function FoilPackModal({ open, onClose }: FoilPackModalProps) {
   const unopenedPacks = useFoilPackStore((s) => s.unopenedPacks);
   const openedCount = useFoilPackStore((s) => s.openedCount);
   const lastOpened = useFoilPackStore((s) => s.lastOpened);
   const ripNextPack = useFoilPackStore((s) => s.ripNextPack);
   const clearLastOpened = useFoilPackStore((s) => s.clearLastOpened);
+  const [revealedSlots, setRevealedSlots] = useState<number[]>([1]);
 
   if (!open) return null;
   const nextPack = unopenedPacks[0] ?? null;
+  const allRevealed = lastOpened ? revealedSlots.length >= lastOpened.pack.cards.length : false;
+
+  const handleRipPack = () => {
+    const res = ripNextPack();
+    if (res) {
+      // Pop Card #1 right away; Cards #2 & #3 shimmer in foil for tactile tap-to-peel fun!
+      setRevealedSlots([1]);
+      soundEngine.play('trophy_fanfare');
+      soundEngine.play('card_flip');
+    }
+  };
+
+  const handleRevealSlot = (slot: number) => {
+    setRevealedSlots((prev) => (prev.includes(slot) ? prev : [...prev, slot]));
+    soundEngine.play(slot === 3 ? 'cash_chime' : 'card_flip');
+  };
+
+  const handleRevealAll = () => {
+    setRevealedSlots([1, 2, 3]);
+    soundEngine.play('cash_chime');
+  };
 
   return (
     <div
@@ -53,6 +83,7 @@ export function FoilPackModal({ open, onClose }: FoilPackModalProps) {
             aria-label="Close Foil Packs"
             onClick={() => {
               clearLastOpened();
+              setRevealedSlots([1]);
               onClose();
             }}
             className="w-11 h-11 rounded-xl bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] flex items-center justify-center shrink-0 cursor-pointer"
@@ -71,19 +102,13 @@ export function FoilPackModal({ open, onClose }: FoilPackModalProps) {
                 ✨ {nextPack.reason} ✨
               </div>
               <div className="text-xs font-extrabold text-[#FFFDF7]">
-                3 Guaranteed Cards: 90s Relic + Clubhouse Boost + Rare Foil Wildcard!
+                3 Guaranteed Foil Cards: 90s Relic + Prospect/Clubhouse Boost + Rare Wildcard!
               </div>
               <ComicButton
                 variant="gold"
                 size="lg"
                 icon={<Sparkles className="w-4 h-4" />}
-                onClick={() => {
-                  const res = ripNextPack();
-                  if (res) {
-                    soundEngine.play('trophy_fanfare');
-                    soundEngine.play('cash_chime');
-                  }
-                }}
+                onClick={handleRipPack}
               >
                 Rip Open 1994 Foil Pack!
               </ComicButton>
@@ -94,43 +119,85 @@ export function FoilPackModal({ open, onClose }: FoilPackModalProps) {
                 No Unopened Foil Packs Right Now!
               </div>
               <div className="text-xs font-bold text-[#4A5068]">
-                Win any live 3D game, Rivalry matchup, or Playoff clash on Game Day to earn a shiny 1994 Foil Booster Pack!
+                Win any live 3D game, Instant Sim, 3-0 Sweep, or Playoff clash to earn a shiny 1994 Foil Booster Pack!
               </div>
             </div>
           )}
 
           {lastOpened ? (
             <div className="space-y-3">
-              <div className="font-display text-xs uppercase text-[#7209B7]">
-                ✨ Pulls from {lastOpened.pack.tierLabel} (Applied Directly to Your Club!)
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-display text-xs uppercase text-[#7209B7]">
+                  ✨ Pulls from {lastOpened.pack.tierLabel}
+                </div>
+                {!allRevealed ? (
+                  <ComicButton size="sm" variant="gold" onClick={handleRevealAll}>
+                    ✨ Reveal All 3 Cards
+                  </ComicButton>
+                ) : null}
               </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {lastOpened.pack.cards.map((card) => (
-                  <div
-                    key={card.slot}
-                    data-testid="foil-pack-card"
-                    className={`p-3 rounded-xl border-2 shadow-[3px_3px_0_#181B2C] space-y-1.5 ${RARITY_STYLES[card.rarity]}`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[9px] uppercase">
-                        {card.rarity}
-                      </span>
-                      <span className="font-mono-tabular text-[10px] font-extrabold text-[#4A5068]">
-                        CARD #{card.slot}/3
-                      </span>
+                {lastOpened.pack.cards.map((card) => {
+                  const isRevealed = revealedSlots.includes(card.slot);
+                  if (!isRevealed) {
+                    return (
+                      <button
+                        key={card.slot}
+                        type="button"
+                        data-testid="foil-pack-card"
+                        onClick={() => handleRevealSlot(card.slot)}
+                        className="p-4 rounded-xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#7209B7] via-[#F72585] to-[#FFC300] text-white shadow-[3px_3px_0_#181B2C] flex flex-col items-center justify-center gap-2 min-h-[126px] cursor-pointer hover:scale-[1.02] transition-transform"
+                      >
+                        <span className="px-2 py-0.5 rounded-full bg-[#181B2C] text-[#FFD166] font-display text-[10px]">
+                          FOIL CARD #{card.slot}/3
+                        </span>
+                        <span className="font-display text-sm drop-shadow-[1px_1px_0_#181B2C]">
+                          ✨ TAP TO PEEL!
+                        </span>
+                        <span className="text-[10px] font-extrabold text-[#FFFDF7]">
+                          {card.rarity === 'legendary' ? '🌟 HOLO GLOW!' : 'Shiny 1994 Foil'}
+                        </span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <div
+                      key={card.slot}
+                      data-testid="foil-pack-card"
+                      className={`p-3 rounded-xl border-2 shadow-[3px_3px_0_#181B2C] space-y-1.5 ${RARITY_STYLES[card.rarity]}`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[9px] uppercase">
+                          {card.rarity}
+                        </span>
+                        <span className="font-mono-tabular text-[10px] font-extrabold text-[#4A5068]">
+                          {CARD_KIND_ICONS[card.kind]}
+                        </span>
+                      </div>
+                      <div className="font-display text-xs text-[#181B2C] leading-snug">
+                        {card.title}
+                      </div>
+                      <div className="text-[11px] font-bold text-[#4A5068]">{card.subtitle}</div>
                     </div>
-                    <div className="font-display text-xs text-[#181B2C] leading-snug">
-                      {card.title}
-                    </div>
-                    <div className="text-[11px] font-bold text-[#4A5068]">{card.subtitle}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#D8F3DC] text-[#1B4332] text-xs font-extrabold space-y-0.5">
-                {lastOpened.summaryLines.map((line) => (
-                  <div key={line}>✓ {line}</div>
-                ))}
-              </div>
+
+              {allRevealed ? (
+                <div
+                  data-testid="foil-pack-summary"
+                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#D8F3DC] text-[#1B4332] text-xs font-extrabold space-y-0.5"
+                >
+                  {lastOpened.summaryLines.map((line) => (
+                    <div key={line}>✓ {line}</div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-[11px] font-extrabold text-[#4A5068]">
+                  Tap each shimmering foil card to peel it open (all 3 rewards apply automatically to your club)!
+                </div>
+              )}
             </div>
           ) : null}
         </div>

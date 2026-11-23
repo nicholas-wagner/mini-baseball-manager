@@ -115,6 +115,7 @@ export interface StartNewCareerInput {
 export interface PostGameSummary {
   opponentClubId: string;
   opponentName: string;
+  isHomeGame: boolean;
   won: boolean;
   awayScore: number;
   homeScore: number;
@@ -1096,6 +1097,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const summary: PostGameSummary = {
         opponentClubId: opponentClub.id,
         opponentName: `${opponentClub.city} ${opponentClub.name}`,
+        isHomeGame,
         won,
         awayScore: result.awayScore,
         homeScore: result.homeScore,

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FastForward, Play, RefreshCw, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
+import type { FormState } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
 import type { GameDayControlMode } from '../../store/userPreferences';
@@ -52,6 +53,12 @@ const SIMPLE_BAT_APPROACHES: readonly { id: TacticalCall; label: string }[] = [
   { id: 'power', label: 'Power' },
 ];
 
+function formEmoji(form: FormState): string {
+  if (form === 'blazing' || form === 'hot') return ' 🔥';
+  if (form === 'cold' || form === 'frozen') return ' 🧊';
+  return '';
+}
+
 export function LiveActionBar({
   cue,
   matchupLabel,
@@ -84,6 +91,7 @@ export function LiveActionBar({
   onInspectPlayers,
 }: LiveActionBarProps) {
   const [bullpenOpen, setBullpenOpen] = useState(false);
+  const [fastSimOpen, setFastSimOpen] = useState(false);
   const cuePalette =
     cue.urgency === 'high'
       ? 'bg-[#FFF3BF] border-[#E63946] text-[#181B2C]'
@@ -175,7 +183,7 @@ export function LiveActionBar({
         ) : null}
       </div>
 
-      {/* Row 2: One-Tap Primary Action Controls (always right below the 3D field!) */}
+      {/* Row 2: Streamlined Arcade Controller (Pitch + Smart Watch + Fast Sim Drawer + Bullpen + Pro Mode) */}
       <div className="flex flex-wrap items-center gap-2">
         <ComicButton
           size="md"
@@ -184,18 +192,9 @@ export function LiveActionBar({
           icon={<Play className="w-4 h-4" />}
           aria-label={cue.primaryButtonLabel}
           onClick={onNextPitch}
-          className="flex-1 sm:flex-none min-w-[155px]"
+          className="flex-1 sm:flex-none min-w-[145px]"
         >
           {isBatting ? 'Next Pitch' : 'Throw Pitch'}
-        </ComicButton>
-
-        <ComicButton
-          size="sm"
-          variant={watchMode === 'live' ? 'gold' : 'sky'}
-          disabled={gameCompleted}
-          onClick={onToggleWatchMode}
-        >
-          {watchMode === 'live' ? 'Pause Auto' : 'Auto Play 3D'}
         </ComicButton>
 
         {onToggleSmartWatch ? (
@@ -212,44 +211,16 @@ export function LiveActionBar({
 
         <ComicButton
           size="sm"
-          variant="cream"
-          disabled={gameCompleted}
-          icon={<SkipForward className="w-3.5 h-3.5" />}
-          onClick={onSimAtBat}
-        >
-          Sim At-Bat
-        </ComicButton>
-
-        <ComicButton
-          size="sm"
-          variant="cream"
+          variant={fastSimOpen || watchMode === 'live' ? 'gold' : 'cream'}
+          data-testid="fast-sim-toggle"
           disabled={gameCompleted}
           icon={<FastForward className="w-3.5 h-3.5" />}
-          onClick={onSimHalfInning}
+          onClick={() => {
+            setFastSimOpen((open) => !open);
+            setBullpenOpen(false);
+          }}
         >
-          Sim Half-Inn
-        </ComicButton>
-
-        {controlMode === 'advanced' ? (
-          <ComicButton
-            size="sm"
-            variant="violet"
-            disabled={gameCompleted}
-            icon={<Zap className="w-3.5 h-3.5" />}
-            onClick={onClutchSim}
-          >
-            Clutch Sim
-          </ComicButton>
-        ) : null}
-
-        <ComicButton
-          size="sm"
-          variant="gold"
-          disabled={gameCompleted}
-          icon={<FastForward className="w-3.5 h-3.5" />}
-          onClick={onSimToEnd}
-        >
-          Sim to End
+          {watchMode === 'live' ? 'Auto ON ▾' : 'Fast Sim ▾'}
         </ComicButton>
 
         {bullpenOptions.length > 0 && onSelectBullpenReliever ? (
@@ -259,7 +230,10 @@ export function LiveActionBar({
             data-testid="arcade-bullpen-toggle"
             disabled={gameCompleted}
             icon={<RefreshCw className="w-3.5 h-3.5" />}
-            onClick={() => setBullpenOpen((open) => !open)}
+            onClick={() => {
+              setBullpenOpen((open) => !open);
+              setFastSimOpen(false);
+            }}
           >
             📞 Bullpen ({bullpenOptions.length})
           </ComicButton>
@@ -276,6 +250,74 @@ export function LiveActionBar({
           {controlMode === 'simple' ? 'Pro Manager' : 'Simple Arcade'}
         </ComicButton>
       </div>
+
+      {/* Compact Fast Sim Popover Drawer (Auto Play 3D, At-Bat, Half-Inn, Clutch, Sim to End) */}
+      {fastSimOpen ? (
+        <div
+          data-testid="fast-sim-drawer"
+          className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] flex flex-wrap items-center gap-1.5"
+        >
+          <ComicButton
+            size="sm"
+            variant={watchMode === 'live' ? 'coral' : 'sky'}
+            disabled={gameCompleted}
+            onClick={() => {
+              onToggleWatchMode();
+              setFastSimOpen(false);
+            }}
+          >
+            {watchMode === 'live' ? 'Pause Auto' : 'Auto Play 3D'}
+          </ComicButton>
+          <ComicButton
+            size="sm"
+            variant="cream"
+            disabled={gameCompleted}
+            icon={<SkipForward className="w-3.5 h-3.5" />}
+            onClick={() => {
+              onSimAtBat();
+              setFastSimOpen(false);
+            }}
+          >
+            Sim At-Bat
+          </ComicButton>
+          <ComicButton
+            size="sm"
+            variant="cream"
+            disabled={gameCompleted}
+            icon={<FastForward className="w-3.5 h-3.5" />}
+            onClick={() => {
+              onSimHalfInning();
+              setFastSimOpen(false);
+            }}
+          >
+            Sim Half-Inn
+          </ComicButton>
+          <ComicButton
+            size="sm"
+            variant="violet"
+            disabled={gameCompleted}
+            icon={<Zap className="w-3.5 h-3.5" />}
+            onClick={() => {
+              onClutchSim();
+              setFastSimOpen(false);
+            }}
+          >
+            Clutch Sim
+          </ComicButton>
+          <ComicButton
+            size="sm"
+            variant="gold"
+            disabled={gameCompleted}
+            icon={<FastForward className="w-3.5 h-3.5" />}
+            onClick={() => {
+              onSimToEnd();
+              setFastSimOpen(false);
+            }}
+          >
+            Sim to End
+          </ComicButton>
+        </div>
+      ) : null}
 
       {bullpenOpen && bullpenOptions.length > 0 && onSelectBullpenReliever ? (
         <div
@@ -328,12 +370,16 @@ export function LiveActionBar({
         >
           <div className="flex flex-wrap items-center gap-1.5 min-w-0">
             <span className="text-[#FFD166] font-extrabold">
-              🏏 {lowerThird.batterName} ({lowerThird.batterLineText})
+              🏏 {lowerThird.batterName} “{lowerThird.batterNickname}”{formEmoji(lowerThird.batterForm)} (
+              {lowerThird.batterLineText})
             </span>
             <span className="text-[#89C2A5]">• On Deck: {lowerThird.onDeckName}</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 font-mono-tabular">
-            <span className="text-[#E0FBFC]">⚾ {lowerThird.pitcherName}</span>
+            <span className="text-[#E0FBFC]">
+              ⚾ {lowerThird.pitcherName}
+              {formEmoji(lowerThird.pitcherForm)}
+            </span>
             <span
               className={`px-1.5 py-0.5 rounded font-extrabold border border-white/25 ${
                 lowerThird.enduranceTone === 'gassed'

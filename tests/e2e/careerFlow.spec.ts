@@ -80,7 +80,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('active-powers-dock')).toBeVisible();
   await expect(page.getByTestId('mind-games-bar')).toBeVisible();
 
-  // Finish the game -> verify Post-Game Summary top is NOT clipped off mobile screen, and closing scrolls cleanly to top!
+  // Finish the game via Fast Sim -> verify Post-Game Summary top is NOT clipped off mobile screen, mascot cheers, and closing scrolls cleanly to top!
+  await page.getByTestId('fast-sim-toggle').click();
   await page.getByRole('button', { name: /sim to end/i }).click();
   const postGameDialog = page.getByRole('dialog', { name: /post-game box score & mvp/i });
   await expect(postGameDialog).toBeVisible();
@@ -88,9 +89,9 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   expect(postGameHeaderBox).not.toBeNull();
   expect(postGameHeaderBox!.y).toBeGreaterThanOrEqual(0);
   await page.getByRole('button', { name: /back to clubhouse/i }).click();
-  const inboxBox = await page.getByTestId('manager-action-inbox').boundingBox();
-  expect(inboxBox).not.toBeNull();
-  expect(inboxBox!.y).toBeGreaterThanOrEqual(0);
+  const matchupBox = await page.getByTestId('scheduled-matchup-card').boundingBox();
+  expect(matchupBox).not.toBeNull();
+  expect(matchupBox!.y).toBeGreaterThanOrEqual(0);
 
   // Visit Roster -> verify Mobile Roster Card Binder, 1-tap Card modal, Trainer's Table, Dossier & PNG export
   await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();
@@ -183,6 +184,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('foil-pack-modal')).toBeVisible();
   await page.getByRole('button', { name: /rip open 1994 foil pack/i }).click();
   await expect(page.getByTestId('foil-pack-card')).toHaveCount(3);
+  await page.getByRole('button', { name: /reveal all 3 cards/i }).click();
+  await expect(page.getByTestId('foil-pack-summary')).toBeVisible();
   await page.getByRole('button', { name: /close foil packs/i }).click();
 
   await openUtilityItem(/open settings and accessibility/i);
