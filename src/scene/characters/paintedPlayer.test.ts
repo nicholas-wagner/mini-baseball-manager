@@ -219,3 +219,19 @@ it('chokes up on the bat for contact and loads a wider stance for power', () => 
   expect(bat.visible).toBe(true);
   rig.dispose();
 });
+
+it('offers the bullpen ball toward the new pitcher from either camera side', () => {
+  for (const throwsHand of ['L','R'] as const) {
+    const catcher = createPaintedPlayerRig({
+      team: SAMPLE_TEAM_PALETTES[0], jerseyNumber: 9, role: 'catcher', throwsHand, traits: PLAYER_CATALOG[0].traits,
+    });
+    for (const x of [-1, 1]) {
+      catcher.logicalYaw = x * Math.PI / 2;
+      for (const z of [-8, 8]) {
+        const pocket = catcher.contactAt('catch_handoff', .4, catcher.root.position, new Vector3(0, 2, z));
+        expect(x * pocket.x).toBeGreaterThan(.2);
+      }
+    }
+    catcher.dispose();
+  }
+});

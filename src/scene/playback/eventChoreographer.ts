@@ -1,6 +1,6 @@
 import { finishPlay } from './teamReactions';
 import { closeKindFor, stealFrom } from './plateAndSteals';
-import { BASE_PATH_VERTICES, OUTFIELD_STARTS } from './diamondLayout';
+import { BASE_PATH_VERTICES, CATCHER_HOME, OUTFIELD_STARTS, PITCHING_RUBBER } from './diamondLayout';
 export { BASE_PATH_VERTICES } from './diamondLayout';
 import { selectOutfieldKind } from './outfieldPlay';
 import { diamondPlay, type DiamondPlay, selectDiamondPlay, type DiamondPlayKind } from './diamondPlay';
@@ -21,8 +21,8 @@ export interface DefenderCoord {
 }
 
 export const DIAMOND_DEFENDER_COORDS: readonly DefenderCoord[] = [
-  { pos: 'P', x: 0, y: 0.24, z: -10.2, yaw: 0 },
-  { pos: 'C', x: 0, y: 0.04, z: 1.75, yaw: Math.PI },
+  { pos: 'P', ...PITCHING_RUBBER, yaw: 0 },
+  { pos: 'C', ...CATCHER_HOME, yaw: Math.PI },
   { pos: '1B', x: 8.8, y: 0.04, z: -11.4, yaw: 0 },
   { pos: '2B', x: 4.6, y: 0.04, z: -17.6, yaw: 0 },
   { pos: '3B', x: -8.8, y: 0.04, z: -11.4, yaw: 0 },

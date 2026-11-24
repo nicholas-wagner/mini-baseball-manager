@@ -3,10 +3,11 @@ import type { CameraPose, Vec3 } from '../camera/cameraRig';
 import type { CharacterAnimClip } from '../characters/animationState';
 import type { Actor, DiamondPlay, Leg } from './diamondPlay';
 import { actorAt } from './diamondPlay';
-import { BASE_PATH_VERTICES as bags, headingToward, batterBox } from './diamondLayout';
+import { BASE_PATH_VERTICES as bags, CATCHER_HOME, PITCHING_RUBBER, headingToward, batterBox } from './diamondLayout';
 
 type Pose = { pos: Vec3; yaw: number; clip: CharacterAnimClip; local: number };
-const mound = { x: 0, y: 0.24, z: -10.2 };
+const mound = PITCHING_RUBBER;
+const catcherAtMound = { x: -2.05, y: .17, z: -9.8 };
 const fraction = (v: number) => Math.max(0, Math.min(1, v));
 function move(from: Vec3, to: Vec3, u: number) {
   const t = fraction(u);
@@ -26,7 +27,7 @@ export function bullpenPlay(): DiamondPlay {
     pickupAt: 0,
     receiveAt: 2.33,
     finish: 2.33,
-    duration: 3.45,
+    duration: 4.4,
     leadArrival: 0,
     batterArrival: 0,
     unassisted: false,
@@ -78,20 +79,28 @@ export function reactionPose(
   bats: EffectiveBatSide,
 ): Pose | undefined {
   if (play.kind === 'bullpen') {
-    const from = actor === 'P' ? { x: 7.7, y: 0.04, z: -15 } : { x: 0.2, y: 0.04, z: -4.2 };
-    const dest = actor === 'P' ? mound : { x: -1.14, y: 0.24, z: -9.85 };
     if (actor === 'BAT') {
       const box = batterBox(bats);
       return { pos: box.position, yaw: box.yaw, clip: 'bat_stance', local: t };
     }
     if (actor !== 'C' && actor !== 'P') return { ...base, clip: 'field_ready', local: t };
-    const pos = move(from, dest, t / 1.75);
-    const yaw =
-      t < 1.75
-        ? headingToward(from, dest)
-        : headingToward(dest, actor === 'C' ? mound : { x: -1.14, y: 0.24, z: -9.85 });
-    const clip = t < 1.75 ? 'field_run' : actor === 'P' ? 'field_receive' : 'catch_handoff';
-    return { pos, yaw, clip, local: Math.max(0, t < 1.75 ? t : Math.min(0.63, t - 1.72)) };
+    const pitching = actor === 'P';
+    const from = pitching ? { x: 7.7, y: .04, z: -15 } : CATCHER_HOME;
+    const dest = pitching ? mound : catcherAtMound;
+    const arrival = 1.75;
+    if (t < arrival) {
+      return { pos: move(from, dest, t / arrival), yaw: headingToward(from, dest), clip: 'field_run', local: t };
+    }
+    const leave = play.receiveAt + .20;
+    if (t < leave) {
+      return { pos: dest, yaw: headingToward(dest, pitching ? catcherAtMound : mound),
+        clip: pitching ? 'field_receive' : 'catch_handoff', local: t - arrival };
+    }
+    if (pitching) return { pos: mound, yaw: 0, clip: 'pitch_set', local: t - leave };
+    const returning = t < play.duration;
+    return { pos: move(dest, CATCHER_HOME, (t - leave) / (play.duration - leave)),
+      yaw: returning ? headingToward(dest, CATCHER_HOME) : Math.PI,
+      clip: returning ? 'field_run' : 'field_ready', local: t - leave };
   }
   const end = play.ending;
   if (!end || t < end.start) return;
@@ -126,8 +135,9 @@ export function reactionPose(
 export function reactionCamera(play: DiamondPlay, t: number, bats: EffectiveBatSide): CameraPose | undefined {
   if (play.kind === 'bullpen') {
     const runner = actorAt(play, 'P', t, bats).pos;
-    const lookAt = { ...move(runner, mound, 0.32), y: 1.1 };
-    return { lookAt, position: { x: lookAt.x + 2.1, y: 2.85, z: lookAt.z + 5.4 }, fov: 39 };
+    const together = move(catcherAtMound, mound, .5);
+    const lookAt = { ...move(runner, together, fraction(t / play.legs[0].start)), y: 1.05 };
+    return { lookAt, position: { x: lookAt.x + .85, y: 2.85, z: lookAt.z + 6.5 }, fov: 39 };
   }
   const end = play.ending;
   if (!end) return;

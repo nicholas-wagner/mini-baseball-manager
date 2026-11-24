@@ -1954,7 +1954,13 @@ export function GameDayScreen({
   });
   const pendingDecision = Boolean(lastChoreo && revealedPlay !== lastChoreo);
   const playing = Boolean(lastChoreo && finishedPlay !== lastChoreo);
-  const shown = prePlaySession && (pendingDecision || (handoff && changedSides)) ? prePlaySession : liveSession;
+  const pitchingChange = playbackEvent?.type === 'pitching_change';
+  const nextDefensivePitcher = pitchingChange && playbackEvent.pitcherId && playbackEvent.pitcherId !== currentPitcher.id
+    ? liveSession[humanSideKey].playersById[playbackEvent.pitcherId] : undefined;
+  const bullpenMessage = nextDefensivePitcher
+    ? `${nextDefensivePitcher.name} will pitch when your club takes the field.`
+    : playing ? `Pitching change · ${currentPitcher.name} takes the mound.` : `${currentPitcher.name} is ready to pitch.`;
+  const shown = !pitchingChange && prePlaySession && (pendingDecision || (handoff && changedSides)) ? prePlaySession : liveSession;
   const resultShown = handoff && !pendingDecision ? playbackEvent : null;
   const shownBases = resultShown?.basesAfter ?? shown.bases;
   const guidedBatting = (shown.half === 'BOT') === shown.home.isHuman;
@@ -1962,13 +1968,13 @@ export function GameDayScreen({
   const onMoundSide = playbackEvent?.half === 'TOP' ? liveSession.home : liveSession.away;
   const picturedBatter = ((playing || handoff) && playbackEvent?.batterId && atBatSide.playersById[playbackEvent.batterId]) || currentBatter;
   const picturedPitcher = ((playing || handoff) && playbackEvent?.pitcherId && onMoundSide.playersById[playbackEvent.pitcherId]) || currentPitcher;
-  const showNextMatchup = !handoff && !playing && liveSession.status === 'in_progress' && playbackEvent && (
-    (playbackEvent.batterId && playbackEvent.batterId !== currentBatter.id) ||
+  const showNextMatchup = !handoff && (!playing || nextDefensivePitcher) && liveSession.status === 'in_progress' && playbackEvent && (
+    pitchingChange || (playbackEvent.batterId && playbackEvent.batterId !== currentBatter.id) ||
     (playbackEvent.pitcherId && playbackEvent.pitcherId !== currentPitcher.id)
   );
   const readout = pendingDecision || showNextMatchup ? null : playReadout(playbackEvent);
   const liveCallout = pendingDecision || showNextMatchup ? null : buildComicPopArtBanner(playbackEvent, liveSession);
-  const replayable = Boolean(lastChoreo?.play && !playing && watchMode === 'paused' &&
+  const replayable = Boolean(!pitchingChange && lastChoreo?.play && !playing && watchMode === 'paused' &&
     playbackEvent && (stole || (!['called_pitch','missed_pitch','ball_pitch','foul_back'].includes(lastChoreo.play.kind))));
   const liveNemesis = evaluateNemesisMatchup(
     nemesisHistory,
@@ -2139,7 +2145,7 @@ export function GameDayScreen({
               preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' ? 'power' : 'contact') : pitchTarget) : null}
               awayClub={liveAwayClub}
               homeClub={liveHomeClub}
-              session={prePlaySession && lastChoreo && !showNextMatchup ? prePlaySession : liveSession}
+              session={!pitchingChange && prePlaySession && lastChoreo && !showNextMatchup ? prePlaySession : liveSession}
               choreo={showNextMatchup ? null : lastChoreo}
               lastEvent={showNextMatchup ? null : playbackEvent}
               cameraMode={cameraMode}
@@ -2153,7 +2159,17 @@ export function GameDayScreen({
                 : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}
               celebrateConfetti={Boolean(liveCallout?.confetti && !(handoff && !playing))}
               overlay={
-                lastChoreo?.play?.holdForceCall ? (
+                pitchingChange && liveSession.status === 'in_progress' ? (
+                  <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border-2 border-[#172C29] bg-[#FFF7E4] px-3 py-1.5 text-sm font-bold text-[#172C29] shadow-sm">
+                    <span role="status">{bullpenMessage}</span>
+                    {(!playing || nextDefensivePitcher) && watchMode === 'paused' && (
+                      <button type="button" className="pointer-events-auto min-h-11 rounded-lg bg-[#FFCC49] px-3 font-display cursor-pointer"
+                        onClick={() => handleNextPitch(tacticalCall)}>
+                        {humanIsBatting ? 'Face next pitch' : 'Throw next pitch'}
+                      </button>
+                    )}
+                  </div>
+                ) : lastChoreo?.play?.holdForceCall ? (
                   <div className="flex items-center gap-2">
                   <ClubMascotBuddy mascot={humanClub.mascot} primaryColor={humanClub.colors.primary}
                     secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm"

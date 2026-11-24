@@ -24,17 +24,6 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   // Bring the pocket across the leg on the same side of the bag in either handedness.
   function stateAt(actor: Actor, at: number) {
     const state = actorAt(play, actor, at, side);
-    if (play.kind==='bullpen' && actor==='C' && at>1) {
-      const leg=play.legs[0];
-      const hand=actorAt(play,'C',leg.start,side), mitt=actorAt(play,'P',leg.end,side);
-      const view=(fixedShot ?? diamondCamera(play,leg.start,side,throws)).position;
-      cast.C.logicalYaw=hand.yaw;
-      cast.P.logicalYaw=mitt.yaw;
-      const offer=cast.C.contactAt(hand.clip,hand.local,hand.pos,view);
-      const pocket=cast.P.contactAt(mitt.clip,mitt.local,mitt.pos,view);
-      const u=Math.min(1,(at-1)/.95);
-      state.pos={...state.pos,x:state.pos.x+(pocket.x-offer.x)*u*.87,z:state.pos.z+(pocket.z-offer.z)*u*.87};
-    }
     if (!play.close?.steal || actor !== play.pickup) return state;
     const approach = actor === 'C' ? play.pickupAt+.3 : .48;
     if (at < approach) return state;

@@ -9,6 +9,9 @@ export const BASE_PATH_VERTICES: readonly Vec3[] = [
   { x: 0, y: 0.04, z: 0 }, // Home (4)
 ] as const;
 
+export const CATCHER_HOME = { x: 0, y: .04, z: 1.75 } as const;
+export const PITCHING_RUBBER = { x: 0, y: .24, z: -10.2 } as const;
+
 export const INFIELD_DIRT = { radius: 15.2, centerZ: -10.5 } as const;
 export const OUTFIELD_WALL = { radius: 40, centerZ: -3 } as const;
 export const OUTFIELD_STARTS = {

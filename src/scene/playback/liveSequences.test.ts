@@ -142,3 +142,19 @@ it('keeps the first baseman on the bag and turns toward the dugout after the sec
   expect(look.pos).toEqual(catchPose.pos);
   expect(towardCamera).toBeGreaterThan(0);
 });
+
+it('keeps the two players in separate silhouettes and sends the catcher back to the plate', () => {
+  const play = diamondPlay('bullpen');
+  const handoff = play.legs[0];
+  for (const time of [handoff.start, handoff.end]) {
+    const shot = diamondCamera(play, time, 'R');
+    const dx = shot.position.x - shot.lookAt.x;
+    const dz = shot.position.z - shot.lookAt.z;
+    const catcher = actorAt(play, 'C', time, 'R').pos;
+    const pitcher = actorAt(play, 'P', time, 'R').pos;
+    const horizontalGap = Math.abs((catcher.x - pitcher.x) * dz - (catcher.z - pitcher.z) * dx);
+    expect(horizontalGap / Math.hypot(dx, dz)).toBeGreaterThan(1.6);
+  }
+  expect(actorAt(play, 'P', play.duration, 'R').clip).toBe('pitch_set');
+  expect(actorAt(play, 'C', play.duration, 'R').pos.z).toBeGreaterThan(0);
+});

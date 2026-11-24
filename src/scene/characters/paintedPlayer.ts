@@ -335,7 +335,8 @@ export function createPaintedPlayerRig(
     headMat.uniforms.maskHelmet.value = Number(role === 'catcher');
     // Looking directly down a basepath, a tiny camera sway must not reverse the face.
     const travelSide = Math.abs(acrossScreen) > .14 ? acrossScreen : Math.sin(rig.logicalYaw);
-    const actorFlip = (tagging || popping) && rear ? -flip : motionRole === 'runner' ? (travelSide < 0 ? -1 : 1) : flip;
+    const followsHeading = clip === 'catch_handoff' || motionRole === 'runner';
+    const actorFlip = followsHeading ? (travelSide < 0 ? -1 : 1) : (tagging || popping) && rear ? -flip : flip;
     const unit = role === 'pitcher' || plantedRunner || clip === 'field_throw' ? 0.0047 : 0.0057;
     bat.barrel.visible = role === 'batter' && !running && !leading && !sliding && (frame.cel < 2 || brim);
     if (bat.barrel.visible) {

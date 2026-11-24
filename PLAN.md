@@ -30,7 +30,7 @@
 
 **Overall 10X Progress**: `73 / 73` feature slices completed (**100% of 10X Master Roadmap Complete!**)
 
-Post-roadmap Game Day work covers card-led entry (TASK-074), first-at-bat guidance, field reactions and scorebook prints (TASK-075), the guided Opening Day rally with player-credited replays (TASK-076), and the featured-player entrance, compact scoreboard and between-innings pack (TASK-077). TASK-078 brings the actual rally to the first screen and adds set stances, a held force call, defensive credit and sandlot reactions. The Opening Day, live matchup, print gallery and recap previews are in the [README](README.md#your-first-game).
+Post-roadmap Game Day work covers card-led entry (TASK-074), first-at-bat guidance, field reactions and scorebook prints (TASK-075), the guided Opening Day rally with player-credited replays (TASK-076), and the featured-player entrance, compact scoreboard and between-innings pack (TASK-077). TASK-078 brings the actual rally to the first screen and adds set stances, a held force call, defensive credit and sandlot reactions. TASK-079 returns the field to the live matchup after a bullpen change. The Opening Day, live matchup, print gallery and recap previews are in the [README](README.md#your-first-game).
 
 > **Living Showcase Rule**: At every milestone completion—and whenever significant UI, 2.5D chibi, 3D ballpark, or gameplay visuals change—update **`README.md`** (milestone progress, feature highlights, quickstart) and refresh/add real preview screenshots in **`docs/screenshots/`** so the public GitHub homepage always showcases the live state of the game.
 
