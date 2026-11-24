@@ -62,6 +62,7 @@ describe('Cute, Clean & Balanced Gameplay Polish (Drill Quota, Portraits, 4-Room
 
   it('offers 4 cute 1-tap Sandlot starter clubs on ClubCreatorScreen', () => {
     render(<ClubCreatorScreen onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Change club' }));
     expect(screen.getByTestId('quick-club-presets')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /harbor otters/i }));
     expect(screen.getByLabelText(/club city/i)).toHaveValue('Harbor');

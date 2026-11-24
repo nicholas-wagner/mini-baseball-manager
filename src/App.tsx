@@ -1,3 +1,4 @@
+import type { ClutchMomentLaunch } from './engine/gm/gameDayMoments';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   BookOpen,
@@ -79,6 +80,8 @@ export function App() {
     }
     return 'gameday';
   });
+  const [opening, setOpening] = useState<ClutchMomentLaunch | null>(null);
+  const startOpening = (moment: ClutchMomentLaunch) => { setOpening(moment); setActiveTab('gameday'); };
   const [muted, setMuted] = useState(false);
   const [bgmEnabled, setBgmEnabled] = useState(() => bgmEngine.getState().enabled);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -390,7 +393,7 @@ export function App() {
     }
     if (activeTab === 'gameday' || activeTab === 'lab') {
       return humanClub ? (
-        <GameDayScreen
+        <GameDayScreen openingRequest={opening} onOpeningStarted={() => setOpening(null)}
           onJumpToTab={(tab) => {
             if (tab === 'economy') setHubInitialSubTab('stadiums');
             setActiveTab(tab);
@@ -399,35 +402,35 @@ export function App() {
           onOpenRelics={handleOpenRelics}
         />
       ) : (
-        <ClubCreatorScreen onCreated={() => setActiveTab('gameday')} />
+        <ClubCreatorScreen onCreated={startOpening} />
       );
     }
     if (activeTab === 'roster') {
       return humanClub ? (
         <RosterLineupScreen onPlayBall={() => setActiveTab('gameday')} />
       ) : (
-        <ClubCreatorScreen onCreated={() => setActiveTab('roster')} />
+        <ClubCreatorScreen onCreated={startOpening} />
       );
     }
     if (activeTab === 'league') {
       return humanClub ? (
         <LeagueScreen onPlayLivePlayoffGame={() => setActiveTab('gameday')} />
       ) : (
-        <ClubCreatorScreen onCreated={() => setActiveTab('league')} />
+        <ClubCreatorScreen onCreated={startOpening} />
       );
     }
     if (activeTab === 'skills') {
       return humanClub ? (
         <SkillTreeScreen />
       ) : (
-        <ClubCreatorScreen onCreated={() => setActiveTab('skills')} />
+        <ClubCreatorScreen onCreated={startOpening} />
       );
     }
 
     return humanClub ? (
       <ClubHubScreen initialSubTab={hubInitialSubTab} />
     ) : (
-      <ClubCreatorScreen onCreated={() => setActiveTab('economy')} />
+      <ClubCreatorScreen onCreated={startOpening} />
     );
   };
 

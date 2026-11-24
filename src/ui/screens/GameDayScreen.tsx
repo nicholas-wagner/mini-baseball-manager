@@ -1,3 +1,5 @@
+import { FORCE_HOLD_SECONDS } from '../../scene/playback/firstAtBatPresentation';
+import { forceAtFirst } from '../../scene/playback/diamondPlay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ClipboardList,
@@ -23,7 +25,7 @@ import {
 import {
   buildLiveBroadcastLowerThird,
   buildPreGameProbableMatchup,
-  createClutchMomentSession,
+  createClutchMomentSession, type ClutchMomentLaunch,
   evaluateSeriesStakes,
 } from '../../engine/gm/gameDayMoments';
 import { evaluatePreGameLineupCheck, summarizeLineupChange } from '../../engine/gm/seriesRecap';
@@ -185,12 +187,15 @@ function safeScrollTop(): void {
 }
 
 interface GameDayScreenProps {
+  openingRequest?: ClutchMomentLaunch | null;
+  onOpeningStarted?: () => void;
   onJumpToTab?: (tab: 'roster' | 'skills' | 'league' | 'economy') => void;
   onOpenStory?: () => void;
   onOpenRelics?: () => void;
 }
 
 export function GameDayScreen({
+  openingRequest, onOpeningStarted,
   onJumpToTab,
   onOpenStory,
   onOpenRelics,
@@ -345,7 +350,7 @@ export function GameDayScreen({
     });
   }, [humanClub, scheduledOpponent, scheduledIsHome, worldSeed, gameLength, activeGameplan, pendingLivePlayoff]);
   const openingMoment = useMemo(() => !liveSession && humanClub && humanClub.wins + humanClub.losses === 0
-    ? buildScheduledMoment() : null, [buildScheduledMoment, liveSession, humanClub]);
+    ? openingRequest ?? buildScheduledMoment() : null, [openingRequest, buildScheduledMoment, liveSession, humanClub]);
 
   const rivalryPreview = useMemo(() => {
     if (!humanClub || !activeOpponent) return null;
@@ -490,7 +495,7 @@ export function GameDayScreen({
     soundEngine.play(rolledWeather.condition === 'drizzle' ? 'rain_thunder' : 'organ_charge');
   };
 
-  const handleStartClutchMoment = (guided = false) => {
+  const handleStartClutchMoment = useCallback((guided = false) => {
     if (!humanClub || !scheduledOpponent) return;
     const opp = scheduledOpponent;
     const isHumanHome = scheduledIsHome;
@@ -538,7 +543,15 @@ export function GameDayScreen({
     setWatchMode('paused');
     bgmEngine.syncStadium(clutch.session.ballparkId);
     soundEngine.play('clutch_stinger');
-  };
+  }, [humanClub, scheduledOpponent, scheduledIsHome, worldSeed, openingMoment, buildScheduledMoment]);
+
+  const enteredOpening = useRef<ClutchMomentLaunch | null>(null);
+  useEffect(() => {
+    if (!openingRequest || enteredOpening.current === openingRequest) return;
+    enteredOpening.current = openingRequest;
+    handleStartClutchMoment(true);
+    onOpeningStarted?.();
+  }, [openingRequest, handleStartClutchMoment, onOpeningStarted]);
 
   const applyStepResult = useCallback(
     (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string) => {
@@ -567,6 +580,11 @@ export function GameDayScreen({
         const runsScored=lastEvent.half==='BOT' ? lastEvent.homeScore-beforeHome : lastEvent.awayScore-beforeAway;
         const choreo = choreographPlayEvent(lastEvent, speed, basesBefore, {walkoff,runsScored,
           winningRunIndex:walkoff ? Math.max(0,lastEvent.awayScore-beforeHome) : 0});
+        if (guiding && !showMore && choreo.play && forceAtFirst(choreo.play)) {
+          choreo.play.holdForceCall = true;
+          choreo.durationMs += Math.round(FORCE_HOLD_SECONDS * 1000 / speed);
+          choreo.soundCue = 'glove_pop';
+        }
         const relief=emitted.slice(emitted.indexOf(lastEvent)+1).find(e=>e.type==='pitching_change');
         if (watchMode === 'smart' && !walkoff) choreo.durationMs = Math.min(choreo.durationMs, Math.round(580 / speed));
         if (nextSession.status === 'completed') summaryDelay = choreo.durationMs;
@@ -592,7 +610,7 @@ export function GameDayScreen({
       }
       finalizeSessionIfComplete(nextSession, gameLog.current, oppId,summaryDelay);
     },
-    [finalizeSessionIfComplete, speed, watchMode, warmingRelieverIds, liveSession, recordNemesisEvents],
+    [finalizeSessionIfComplete, speed, watchMode, warmingRelieverIds, liveSession, recordNemesisEvents, guiding, showMore],
   );
 
   const resolvePitchCallOption = useCallback(
@@ -1952,9 +1970,6 @@ export function GameDayScreen({
   const liveCallout = pendingDecision || showNextMatchup ? null : buildComicPopArtBanner(playbackEvent, liveSession);
   const replayable = Boolean(lastChoreo?.play && !playing && watchMode === 'paused' &&
     playbackEvent && (stole || (!['called_pitch','missed_pitch','ball_pitch','foul_back'].includes(lastChoreo.play.kind))));
-  const stealingId = stole && prePlaySession?.bases.find(id => id &&
-    prePlaySession.bases.indexOf(id) !== playbackEvent?.basesAfter.indexOf(id));
-  const creditedPlayer = (stealingId && atBatSide.playersById[stealingId]) || picturedBatter;
   const liveNemesis = evaluateNemesisMatchup(
     nemesisHistory,
     currentBatter.id,
@@ -2136,9 +2151,16 @@ export function GameDayScreen({
                 <BatterEntrance guided key={entranceCue.role === 'pitcher' ? picturedPitcher.id : picturedBatter.id}
                   player={entranceCue.role === 'pitcher' ? picturedPitcher : picturedBatter} pitching={entranceCue.role === 'pitcher'} />
                 : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}
-              celebrateConfetti={Boolean(liveCallout?.confetti)}
+              celebrateConfetti={Boolean(liveCallout?.confetti && !(handoff && !playing))}
               overlay={
-                liveCallout ? (
+                lastChoreo?.play?.holdForceCall ? (
+                  <div className="flex items-center gap-2">
+                  <ClubMascotBuddy mascot={humanClub.mascot} primaryColor={humanClub.colors.primary}
+                    secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm"
+                    mood={pendingDecision ? 'watching' : 'peeking'} />
+                  {!pendingDecision && playing && <span className="plate-verdict" role="status">Out at first</span>}
+                  </div>
+                ) : handoff && !playing ? null : liveCallout ? (
                   <div
                     role="status"
                     data-testid="comic-callout-banner"
@@ -2194,12 +2216,12 @@ export function GameDayScreen({
               pitcherPowerArmed={
                 !humanIsBatting && Boolean(armedPowerId) && picturedPitcher.id === currentPitcher.id
               }
-              latestEvent={pendingDecision || showNextMatchup ? null : playbackEvent}
+              latestEvent={pendingDecision || showNextMatchup || (handoff && !playing) || lastChoreo?.play?.holdForceCall ? null : playbackEvent}
               onInspect={openGamePlayerCard}
             />
 
             {handoff && !playing && playbackEvent && prePlaySession && lastChoreo ?
-              <RallyResult detail={scoringDetail(playbackEvent, lastChoreo.play)} player={creditedPlayer} gameOver={liveSession.status === 'completed'} before={prePlaySession} event={playbackEvent}
+              <RallyResult detail={scoringDetail(playbackEvent, lastChoreo.play)} gameOver={liveSession.status === 'completed'} before={prePlaySession} event={playbackEvent}
                 nextLabel={liveSession.status === 'completed' ? 'Box score' : changedSides ? 'Change sides' : stole ? 'Back to the batter' : 'Next batter'}
                 onOpenPack={offerOpeningPack ? openBetweenInningsPack : undefined}
                 onReplay={() => setLastChoreo({...lastChoreo})}

@@ -12,19 +12,19 @@ Manage lineups, draft global prospects, develop branching player & manager skill
 
 ## Your first game
 
-Pick a club and meet the player holding the ball or stepping into the box. The Opening Day card shows the score, runners and outs in a late inning. Choose **Play Opening Day**, then tap the featured player to take over. Coach Pops stays with you through the half-inning. The camera introduces your featured mini on the mound or in the box. Pick a pitch target to see the catcher move and home plate light up. At bat, choose an easier swing or trade contact for power. Tap the scoreboard for hits and errors. **More controls** opens the full dugout immediately.
+Opening Day puts the player from your actual lineup on the first card. Tap **Bat with** or **Pitch with** to take over the pictured rally. **Change club** lets you pick a mascot, uniform or roster before founding your career.
 
-| Meet your player | Call your first pitch | Keep a play from the game |
-| :---: | :---: | :---: |
-| ![Opening Day on a phone with the starting player's manga card and the situation](./docs/screenshots/opening-day.webp) | ![Coach Pops asks for an out and the catcher sets up on the corner](./docs/screenshots/first-at-bat.webp) | ![A scorebook print saved from a real game](./docs/screenshots/scorebook-print.webp) |
+| Meet Marcus | Set up for contact | Set up for power |
+| --- | --- | --- |
+| ![Marcus Baker's Opening Day card and the tying run situation](./docs/screenshots/opening-day.webp) | ![Marcus choking up on the bat with Contact selected](./docs/screenshots/batting-contact.webp) | ![Marcus planting his feet and loading up with Power selected](./docs/screenshots/batting-preview.webp) |
 
-Marcus Baker grounds out with two runners aboard. His card stays on screen while he runs through first. **Watch again** replays the throw. **Scoring detail** gives the recorded fielding assist. Tap **Next batter** and Marcus touches gloves with Ethan Torres on his way back. Ethan inherits both runners and one out. After the third out you can open your welcome pack or change sides.
+Choose **Contact** or **Power** to see your batter set their feet. Tap **Swing** to send the pitch. When you start on defense, pick a target and watch the catcher set up. **More controls** opens the full dugout.
 
-| Marcus’s groundout | Marcus and Ethan between batters |
-| :---: | :---: |
-| ![The umpire calls Marcus out at first. His card offers Watch again and Next batter.](./docs/screenshots/rally-groundout.webp) | ![Marcus and Ethan touch batting gloves between plate appearances.](./docs/screenshots/rally-handoff.webp) |
+| The call at first | Jasper on defense | Players between at-bats |
+| --- | --- | --- |
+| ![The ball beats Marcus to first as the mascot peeks at the umpire](./docs/screenshots/force-call.webp) | ![Jasper Hunter credited with striking out Ariel](./docs/screenshots/defensive-credit.webp) | ![Marcus greets Ethan Torres after the out](./docs/screenshots/rally-handoff.webp) |
 
-[See Jasper’s mound entrance on a phone](./docs/screenshots/mound-entrance.webp) · [See Marcus rehearse his power swing](./docs/screenshots/batting-preview.webp) · [See the third-out pack offer](./docs/screenshots/between-innings.webp).
+Marcus’s groundout leaves two runners aboard for Ethan. **Watch again** replays that throw, **Scoring detail** records the assist, and **Next batter** puts Ethan in the box. The welcome pack arrives between innings. After the game, **Keep this moment** saves a play to your scorebook.
 
 <details>
 <summary>Watch a third strike, a force at first and a runner rounding third</summary>
@@ -91,9 +91,9 @@ Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.g
 
 This repository is structured so both **human contributors** and **AI coding agents** can immediately understand the architecture, invariants, and exact next TDD ticket:
 
-- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 vertical slices) & live Progress Dashboard (**`73 / 73` — 100% Complete!**).
+- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and five Game Day follow-ups through TASK-078.
 - **[docs/SIMULATION_MATH.md](./docs/SIMULATION_MATH.md)** — Full pitch-by-pitch seeded dice-roll formulas, all 15 attribute effects, National/Capstone powers, Weather, Shifts, Mind Games & Nemesis math.
-- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue (`TASK-001`..`TASK-073`).
+- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-078**.
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Canonical TypeScript interfaces, `PlayEvent` stream contracts, and 3D ballpark coordinates.
 - **[docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)** — Exact 90s color tokens, typography, touch targets, and chibi scale units.
 - **[AGENTS.md](./AGENTS.md)** — AI Agent onboarding guide, hard architectural invariants, and Definition of Done.

@@ -204,3 +204,18 @@ it('keeps the receiving uniform resident across live pitcher updates', () => {
   expect(body.material.uniforms.sheet.value).toBe(uniform);
   rig.dispose();
 });
+
+it('chokes up on the bat for contact and loads a wider stance for power', () => {
+  const rig = createPaintedPlayerRig({team:SAMPLE_TEAM_PALETTES[0], jerseyNumber:30,
+    role:'batter', traits:PLAYER_CATALOG[0].traits});
+  const bat = rig.root.getObjectByName('bat barrel')!;
+  const camera = new Vector3(1, 2, -4);
+  rig.updatePose('bat_contact_set', .32, undefined, camera);
+  const grip = bat.getWorldPosition(new Vector3());
+  const angle = bat.rotation.z;
+  rig.updatePose('bat_power_set', .32, undefined, camera);
+  expect(Math.abs(angle - bat.rotation.z)).toBeGreaterThan(.25);
+  expect(bat.getWorldPosition(new Vector3()).distanceTo(grip)).toBeGreaterThan(.09);
+  expect(bat.visible).toBe(true);
+  rig.dispose();
+});

@@ -22,7 +22,7 @@ describe('First-Time Hook Polish Round 7 (Clean Screen 0, Compact Sidebar & Quie
   it('keeps Screen 0 clean before a club exists: hides club tabs & pre-club Foil Pack button while preserving Save Slots', () => {
     render(<App />);
 
-    expect(screen.getByRole('button', { name: /play opening day/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^(Bat|Pitch) with / })).toBeInTheDocument();
     // Uninitialized club tabs and Foil Pack gift CTA must stay hidden until a club is founded
     expect(screen.queryByRole('button', { name: /^roster$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^league$/i })).not.toBeInTheDocument();

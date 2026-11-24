@@ -163,3 +163,11 @@ export function welcomePose(index: number, seconds: number): Pose {
     clip: u < 1 ? 'field_run' : 'celebrate_hr',
   };
 }
+
+// The third-base dugout looks straight down the runner's path to home.
+export const DUGOUT_RAIL = { x: -10.6, z: -6.2, yaw: Math.PI / 4 };
+export function railReaction(play: DiamondPlay, t: number): Pose | undefined {
+  if (!play.outfield || (!play.scorerBase && !play.runnerToThird) || t < play.pickupAt) return;
+  return { pos: { x: DUGOUT_RAIL.x - .39, y: .04, z: DUGOUT_RAIL.z + .26 },
+    yaw: 1.9, clip: 'rail_lean', local: t - play.pickupAt };
+}

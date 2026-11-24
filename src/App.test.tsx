@@ -65,10 +65,10 @@ describe('Mini Baseball Manager — App & Design Lab Integration', () => {
     // Navigate to Play Ball (Club Creator), found a club, then visit live Ballpark & Skill Tree tabs and return to Design Lab
     await user.click(screen.getAllByRole('button', { name: /play ball/i })[0]);
     expect(
-      await screen.findByText(/found your 90s sandlot club/i, {}, { timeout: 10_000 }),
+      await screen.findByText(/your opening day/i, {}, { timeout: 10_000 }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /play opening day/i }));
+    await user.click(screen.getByRole('button', { name: /^(Bat|Pitch) with / }));
     await user.click(screen.getAllByRole('button', { name: /ballpark/i })[0]);
     expect(
       await screen.findByTestId('ballpark-visual-banner', {}, { timeout: 10_000 }),

@@ -1,7 +1,6 @@
 import type { EffectiveBatSide } from "../../engine/handedness/types";
 import type { PitchTargetIntent } from "../../engine/simulation/pitchMindGames";
 import {
-  CLIP_DURATIONS,
   type CharacterAnimClip,
 } from "../characters/animationState";
 
@@ -44,11 +43,13 @@ export function rehearsalPose(
   elapsed: number,
   still: boolean,
 ): { clip: CharacterAnimClip; time: number } {
-  const clip = intent === "contact" ? "bat_swing" : "bat_bomb";
-  const duration = CLIP_DURATIONS[clip];
-  if (still)
-    return { clip, time: duration * (intent === "power" ? 0.32 : 0.12) };
-  if (elapsed >= duration)
-    return { clip: "bat_stance", time: elapsed - duration };
-  return { clip, time: elapsed };
+  return { clip: intent === "contact" ? "bat_contact_set" : "bat_power_set",
+    time: still ? 0.32 : Math.min(0.32, elapsed) };
+}
+
+// Let the signal read while the ball is in the pocket and the cleat is off the bag.
+export const FORCE_HOLD_SECONDS = 0.48;
+export function forceReplayTime(elapsed: number, finish: number) {
+  const signal = finish + 0.14;
+  return elapsed - Math.min(FORCE_HOLD_SECONDS, Math.max(0, elapsed - signal));
 }

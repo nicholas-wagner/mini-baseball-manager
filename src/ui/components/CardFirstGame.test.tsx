@@ -38,8 +38,8 @@ it('hands the pictured Opening Day player to the manager and lets them inspect e
     fireEvent.click(corner);
     expect(guide.getByRole('button',{name:'Pitch to the corner'})).toBeVisible();
   } else {
-    fireEvent.click(guide.getByRole('button',{name:'Swing big'}));
-    expect(guide.getByRole('button',{name:'Swing for power'})).toBeVisible();
+    fireEvent.click(guide.getByRole('button',{name:'Power'}));
+    expect(guide.getByRole('button',{name:'Swing'})).toBeVisible();
   }
   fireEvent.click(guide.getByRole('button',{name:'More controls'}));
   expect(screen.getByTestId('fast-sim-toggle')).toBeVisible();
@@ -59,26 +59,26 @@ it('replays the same first out and lets the manager hand the rally to the second
   try {
     render(<GameDayScreen />);
     fireEvent.click(screen.getByRole('button', {name: /Bat with Marcus/}));
-    fireEvent.click(screen.getByRole('button', {name: 'Swing big'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Power'}));
     expect(screen.getByText('More power. Easier to miss.')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', {name: 'Swing for power'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Swing'}));
     act(() => vi.advanceTimersByTime(30000));
     const result = () => within(screen.getByRole('region', {name: 'Play result'}));
     expect(result().getByRole('heading')).toHaveTextContent('Marcus Baker');
-    expect(result().getByText(/runners stay on first and second/i)).toBeVisible();
+    expect(result().getByText(/Marcus is out at first. Both runners hold./i)).toBeVisible();
     fireEvent.click(result().getByRole('button', {name: 'Watch again'}));
     act(() => vi.advanceTimersByTime(30000));
     expect(result().getByRole('heading')).toHaveTextContent('Marcus Baker');
     fireEvent.click(result().getByRole('button', {name: /Next batter/}));
     expect(screen.getByRole('group', {name: 'Matchup cards'})).toHaveTextContent('Ethan Torres');
     expect(screen.getByRole('region', {name: 'First at-bat'})).toHaveTextContent('One out. A single could score a run.');
-    expect(screen.getByRole('button', {name: 'Make contact'})).toBeVisible();
+    expect(screen.getByRole('button', {name: 'Contact'})).toBeVisible();
     expect(screen.queryByRole('region', {name: 'Play result'})).toBeNull();
     // The guide belongs to this half-inning, including the last out.
     for (let pitches = 0; pitches < 50 && !screen.queryByRole('button', {name:'Change sides'}); pitches++) {
       const next = screen.queryByRole('button', {name:'Next batter'});
       if (next) fireEvent.click(next);
-      fireEvent.click(screen.getByRole('button', {name:'Swing for power'}));
+      fireEvent.click(screen.getByRole('button', {name:'Swing'}));
       act(() => vi.advanceTimersByTime(30000));
     }
     const inventory = useFoilPackStore.getState().unopenedPacks;

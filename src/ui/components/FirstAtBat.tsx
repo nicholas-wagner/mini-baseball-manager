@@ -10,8 +10,8 @@ const pitches = [
   { id: "bury_offspeed", name: "Low and away", action: "Pitch low" },
 ] as const;
 const swings = [
-  { id: "contact", name: "Make contact", action: "Swing for contact" },
-  { id: "power", name: "Swing big", action: "Swing for power" },
+  { id: "contact", name: "Contact" },
+  { id: "power", name: "Power" },
 ] as const;
 
 export function FirstAtBat({
@@ -59,7 +59,7 @@ export function FirstAtBat({
         ? "Get the first out."
         : "Get the next out.";
   const action = batting
-    ? swings.find((s) => s.id === call)?.action
+    ? "Swing"
     : pitches.find((p) => p.id === target)?.action;
   const tip =
     cue.suggestedAction &&

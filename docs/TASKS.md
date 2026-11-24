@@ -258,3 +258,4 @@
 | TASK-075 | DONE | Guided first at-bat, legible catches and force plays, signature player reactions and collectible game moments. |
 | TASK-076 | DONE | Opening rally handoffs and replays, field gestures, force-play and baserunning close-ups, and the Play Opening Day entrance. |
 | TASK-077 | DONE | Featured-player entrance, swing and target teaching, compact guided score, teammate reactions, scored replay detail and the between-innings foil pack. |
+| TASK-078 | DONE | Start with the featured player, hold the selected batting stance, give the sandlot and players signature reactions, and show who decided the play. |

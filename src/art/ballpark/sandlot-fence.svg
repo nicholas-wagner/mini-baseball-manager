@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="208" viewBox="0 0 768 208">
+  <defs>
+    <pattern id="wire" width="36" height="46" patternUnits="userSpaceOnUse">
+      <path d="M-2 22 18-2 38 22 18 47Z" fill="none" stroke="#263e44" stroke-width="2" opacity=".8"/>
+      <path d="m1 22 16-20m4 42 14-18" fill="none" stroke="#cfdbcb" stroke-width="1.1"/>
+    </pattern>
+    <linearGradient id="rail" x2="0" y2="1"><stop stop-color="#adc0a5"/><stop offset=".4" stop-color="#526c60"/><stop offset="1" stop-color="#273c42"/></linearGradient>
+  </defs>
+  <g stroke="#342e39" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <!-- A kid with an oversized glove stands on the lower fence rail. -->
+    <path fill="#d95741" d="m81 140-11 52 70 3-9-53-20-10Z"/>
+    <path fill="#ffcb57" d="m84 139 9-6 10 12 10-12 11 4-3 17-33-1Z"/>
+    <path fill="#834d34" d="m84 102 3 23q6 16 21 16 15 0 21-22l-1-22-28-9Z"/>
+    <path fill="#b67549" d="M83 99q0-23 24-23 26 2 24 28l-4 12q-5 17-20 17-17 0-22-18l-7-4 1-9Z"/>
+    <path fill="#483534" d="m85 105 2-12 9 4 3-10 28 9-2-12-30-9-13 9-3 15Z"/>
+    <path fill="#24736a" d="M77 93q0-26 24-28 23-2 30 24l-26 5-13 9Z"/>
+    <path fill="#e3b35e" d="m81 94 45-10q11-1 18 5-10 6-44 10Z"/>
+    <path d="m96 109 4-1m14-1 4 1m-14 11q5 4 10-2" fill="none"/>
+    <path fill="#b67549" d="m84 149-9 11-18-27-10 7 20 38q7 10 17 2l10-17"/>
+    <path fill="#bb7e3c" d="m43 142-13-13q-7-12-3-18 3-2 6 3l2-15q2-6 6 0l2 13 2-19q3-5 6 0l1 18 3-15q4-3 5 2l-2 19 5-5q6-2 4 6l-10 20Z"/>
+    <path d="m37 119 6 9 10 2m-3-16-4 8" fill="none" stroke="#79522f"/>
+    <!-- A ponytailed fan in a striped baseball shirt holds a handmade pennant. -->
+    <path fill="#663d36" d="M574 117q-21-21-34-4-9 12 1 24 3-10 14-8-6 8-1 16l21-11Z"/>
+    <path fill="#f1bb86" d="M560 90q5-21 28-21 25 2 26 29l-5 19q-5 17-23 17-18-1-23-19l-7-4q-5-10 4-11Z"/>
+    <path fill="#644239" d="M557 105q-6-32 21-39 23-6 35 13l2 17-12-14q-3 12-19 14l3-7-18 13-3 12Z"/>
+    <path fill="#e6a345" d="M553 90q-2-23 15-30 21-9 35 3l9 15-28 7Z"/>
+    <path fill="#2a6774" d="m553 89 49-15q12-1 21 3-7 8-42 15Z"/>
+    <path d="m575 106 5-1m16-2 4 1m-19 14q6 6 14-2" fill="none"/>
+    <path fill="#f7e6ba" d="m568 132 14-4q8 13 17 1l13 4 13 22-14 9-4 30-58 1 5-41Z"/>
+    <path d="m559 158 48-3m-51 15 54-4m-57 15 56-4" fill="none" stroke="#388585" stroke-width="5"/>
+    <path fill="#f1bb86" d="m611 151 10-4 12-18 9 5-12 27q-6 10-17 6l-8-9"/>
+    <path d="m632 147 14-97" stroke="#673e30" stroke-width="4"/>
+    <path fill="#e7624a" d="m647 48 55 22-59 10Z"/>
+    <path fill="#ffdb7f" d="m655 56 6 7 11 1-9 5-4 7-2-8-8-5Z" stroke="none"/>
+  </g>
+  <rect x="0" y="63" width="768" height="145" fill="url(#wire)"/>
+  <g stroke="#304747" stroke-width="2" fill="url(#rail)">
+    <rect x="0" y="60" width="768" height="6" rx="3"/>
+    <path d="M6 60h6v148H6zm248 0h6v148h-6zm252 0h6v148h-6zm250 0h6v148h-6Z"/>
+  </g>
+</svg>

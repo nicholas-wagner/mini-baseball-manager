@@ -1,3 +1,4 @@
+import { FORCE_HOLD_SECONDS } from './firstAtBatPresentation';
 import type { AtBatOutcome, PlayEvent } from '../../engine/models/playEvent';
 import type { ChoreographedStep } from './eventChoreographer';
 
@@ -48,7 +49,7 @@ export function playReadout(event?: PlayEvent | null) {
 
 export function decisionDelayMs(step: ChoreographedStep) {
   const play = step.play ?? step.close ?? step.outfield;
-  return play ? (step.durationMs * play.finish) / play.duration : 0;
+  return play ? (step.durationMs * play.finish) / (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0)) : 0;
 }
 
 /** Score the assist only when the official event and the visible throw agree. */

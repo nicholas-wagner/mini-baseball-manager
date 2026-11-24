@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import './mascotCap.css';
-export type MascotMood = 'happy' | 'cheering' | 'rally' | 'determined';
+export type MascotMood = 'happy' | 'cheering' | 'rally' | 'determined' | 'watching' | 'peeking';
 
 interface ClubMascotBuddyProps {
   mascot: string;
@@ -66,7 +66,7 @@ export function ClubMascotBuddy({
         isCheering ? 'animate-bounce' : ''
       }`}
     >
-      <svg viewBox="0 0 64 64" className="w-full h-full" role="img" aria-label={`${mascot} mascot`}>
+      <svg viewBox="0 0 64 64" className="w-full h-full" role="img" aria-label={mascot + (mood === 'watching' ? ' covers its eyes' : mood === 'peeking' ? ' peeks at the call' : ' mascot')}>
         <defs>
           <radialGradient id={`mb-bg-${uid}`} cx="50%" cy="40%" r="60%">
             <stop offset="0%" stopColor="#FFFDF7" />
@@ -208,6 +208,12 @@ export function ClubMascotBuddy({
             strokeLinecap="round"
           />
         )}
+        {(mood === 'watching' || mood === 'peeking') && <g stroke="#302636" strokeWidth="1.8" fill={palette.fur}>
+          <g transform="rotate(-18 23 37)"><ellipse cx="24" cy="35" rx="7" ry="8" /><path d="m20 31 1 4m3-5 1 4" fill="none"/></g>
+          <g className="mascot-peek-paw" transform={mood === 'peeking' ? 'translate(4 10)' : undefined}>
+            <ellipse cx="40" cy="35" rx="7" ry="8"/><path d="m38 30-1 4m5-3-1 4" fill="none"/>
+          </g>
+        </g>}
       </svg>
     </div>
   );

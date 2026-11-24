@@ -42,6 +42,7 @@ export interface DiamondPlay {
   leadArrival: number;
   duration: number;
   unassisted: boolean;
+  holdForceCall?: boolean;
   reliefStrikeout?: boolean;
   runnerToThird?: 1 | 2;
   scorerBase?: 1 | 2 | 3;
@@ -213,7 +214,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     }
   } else {
     const isPickup = actor === play.pickup;
-    const stop = isPickup ? play.fieldAt : actor === '1B' ? { ...first, x: first.x - .44, z: first.z - .35 }
+    const stop = isPickup ? play.fieldAt : actor === '1B' ? { ...first, x: first.x + .16, z: first.z - .44 }
       : actor === '2B' ? { ...second, x: second.x - .34, z: second.z - .28 } : pos;
     const arrive = isPickup ? play.pickupAt - 0.18 : play.receiveAt - 0.24;
     const u = progress(time, plate + 0.05, arrive);

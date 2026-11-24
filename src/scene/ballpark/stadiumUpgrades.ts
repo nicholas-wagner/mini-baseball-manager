@@ -1,3 +1,4 @@
+import sandlotFence from '../../art/ballpark/sandlot-fence.svg?url';
 import * as THREE from 'three';
 import {
   getBallparkPreset,
@@ -221,6 +222,16 @@ export function createStadiumEvolutionOverlay(
   const group = new THREE.Group();
   group.name = `stadium-evolution-${spec.tier}-${spec.ballparkId}`;
 
+  if (spec.tier === 'rookie') {
+    const texture = new THREE.TextureLoader().load(sandlotFence);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const fence = new THREE.Mesh(new THREE.PlaneGeometry(13.5, 3.66),
+      new THREE.MeshBasicMaterial({map:texture, transparent:true, depthWrite:false, side:THREE.DoubleSide}));
+    fence.name = 'sandlot fence fans';
+    fence.position.set(0, 2.14, 7.25);
+    fence.rotation.y = Math.PI;
+    group.add(fence);
+  }
   buildUpperDecks(spec, group);
   buildLuxurySuitesAndDome(spec, group);
   buildJumbotronAndCannon(spec, group);
@@ -230,7 +241,10 @@ export function createStadiumEvolutionOverlay(
     group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose();
-        for (const mat of [obj.material].flat()) mat.dispose();
+        for (const mat of [obj.material].flat()) {
+          if (mat.map instanceof THREE.Texture) mat.map.dispose();
+          mat.dispose();
+        }
       }
     });
   };

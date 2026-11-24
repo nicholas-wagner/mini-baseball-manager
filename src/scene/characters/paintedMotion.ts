@@ -49,6 +49,14 @@ export function paintedMotion(
     lean = -0.045 * load + 0.059 * drive;
     tilt = 0.065 * load - 0.055 * drive;
     squash = 0.025 + 0.035 * load - 0.025 * drive;
+    if (clip === 'bat_power_set') {
+      const load = clamp(seconds / .32);
+      cel = Number(load > .45);
+      lean = -.13 * load;
+      shift = -.14 * load;
+      squash = .085 * load;
+      tilt = .1 * load;
+    }
     if (clip === 'bat_bomb') {
       lean -= .10 * load;
       shift += .11 * (drive-load);

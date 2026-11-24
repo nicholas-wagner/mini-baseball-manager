@@ -17,9 +17,10 @@ describe('App — Production Hidden Design Lab with 5x "d" Secret Toggle', () =>
 
     // 1. Default landing is Play Ball (Club Creator), NOT Design Lab, and Design Lab tab is hidden
     expect(screen.queryByRole('button', { name: /design lab/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /play opening day/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^(Bat|Pitch) with / })).toBeInTheDocument();
 
     // 2. Typing "d" 5 times inside a text input must NOT reveal Design Lab
+    fireEvent.click(screen.getByRole("button", { name: "Change club" }));
     const inputs = screen.getAllByRole('textbox');
     for (let i = 0; i < 5; i += 1) {
       fireEvent.keyDown(inputs[0], { key: 'd' });
@@ -40,6 +41,6 @@ describe('App — Production Hidden Design Lab with 5x "d" Secret Toggle', () =>
       fireEvent.keyDown(window, { key: 'd' });
     }
     expect(screen.queryByRole('button', { name: /design lab/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /play opening day/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^(Bat|Pitch) with / })).toBeInTheDocument();
   });
 });

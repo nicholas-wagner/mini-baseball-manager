@@ -10,6 +10,8 @@ describe('ClubCreatorScreen — Fair Starting Roster Presets (TASK-064)', () => 
     const onCreated = vi.fn();
     render(<ClubCreatorScreen onCreated={onCreated} />);
 
+    expect(screen.queryByRole('button', { name: /all rookies/i })).toBeNull();
+    await user.click(screen.getByRole('button', {name: 'Change club'}));
     for (const label of [
       'Balanced',
       'All Rookies',
@@ -22,7 +24,8 @@ describe('ClubCreatorScreen — Fair Starting Roster Presets (TASK-064)', () => 
     }
 
     await user.click(screen.getByRole('button', { name: /all rookies/i }));
-    await user.click(screen.getByRole('button', { name: /play opening day/i }));
+    await user.click(screen.getByRole('button', {name:'Use this club'}));
+    await user.click(screen.getByRole('button', { name: /^(Bat|Pitch) with / }));
 
     expect(onCreated).toHaveBeenCalledTimes(1);
     const club = useGameStore.getState().getHumanClub()!;
@@ -40,7 +43,7 @@ it('deals a fresh roster when founding two clubs with the default choices', asyn
   try {
     const found = async () => {
       const view = render(<ClubCreatorScreen onCreated={() => {}} />);
-      await userEvent.click(screen.getByRole('button', { name: /play opening day/i }));
+      await userEvent.click(screen.getByRole('button', { name: /^(Bat|Pitch) with / }));
       const ids = useGameStore.getState().getHumanClub()!.roster.map(p => p.id);
       view.unmount();
       return ids;

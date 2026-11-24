@@ -25,6 +25,7 @@ export interface PaintedPlayerOptions {
   sprintSpeed?: number;
   reassurePitcher?: boolean;
   quietInfielder?: boolean;
+  quietPitcher?: boolean;
 }
 
 export interface PaintedPlayerRig {
@@ -197,6 +198,7 @@ export function createPaintedPlayerRig(
     const popping = clip === 'catch_throw' || clip === 'catch_point' || clip==='catch_handoff';
     const basePlayPose = sliding || tagging || popping;
     const tapping = clip === 'glove_tap';
+    const brim = clip === 'helmet_tip' && time > .28 && time < 1.08;
     const leading = tapping || clip === 'runner_lead' || clip==='runner_push' || (role==='batter' && clip==='celebrate_hr');
     const pitching = role==='pitcher' && ['idle','field_ready','pitch_gather','pitch_set','pitch_windup','pitch_super','practice_bullpen'].includes(clip);
     const motionRole = running || leading || sliding ? 'runner' : role==='pitcher' && !pitching && clip!=='celebrate_hr' ? 'fielder' : role;
@@ -296,9 +298,20 @@ export function createPaintedPlayerRig(
       frame.shift = 0;
       frame.squash = 0;
     }
-    const bodySheet = cheering || tapping ? 'welcome' : basePlayPose ? 'baseplays' : receiving ? 'receivers' : stride ? 'strides' : running ? `play-${view}-${a.bottoms}` as const
+    if (brim) {
+      frame.cel = runnerRow[a.bottoms] + 2;
+      frame.tilt = .16 * Math.sin(Math.PI * (time - .28) / .80);
+    }
+    if (clip === 'rail_lean') {
+      frame.cel = runnerRow[a.bottoms] + 1;
+      const leanOver = THREE.MathUtils.smoothstep(time, 0, .46);
+      frame.lean = -.19 * leanOver;
+      frame.shift = .12 * leanOver;
+      frame.tilt = -.08 * leanOver;
+    }
+    const bodySheet = cheering || tapping || brim || clip === 'rail_lean' ? 'welcome' : basePlayPose ? 'baseplays' : receiving ? 'receivers' : stride ? 'strides' : running ? `play-${view}-${a.bottoms}` as const
       : leading ? 'runners' : (clip === 'field_throw' || (role === 'pitcher' && !pitching)) ? (rear ? `rear-${a.bottoms}` as const : a.bottoms) : style.body;
-    const registration = bodySheet==='welcome' ? (tapping ? [126,92,235,113] : [126,92,40,54]) : anchors[bodySheet][frame.cel];
+    const registration = bodySheet==='welcome' ? (brim ? [126,92,99,138] : tapping || clip === 'rail_lean' ? [126,92,235,113] : [126,92,40,54]) : anchors[bodySheet][frame.cel];
     const [nx,ny,contactX,contactY]=registration;
     const emotion = mood
       ? mood === 'happy'
@@ -316,6 +329,7 @@ export function createPaintedPlayerRig(
     headMat.uniforms.sheet.value = sheet(headSheet);
     const rows = basePlayPose ? 6 : 3;
     bodyMat.uniforms.rows.value = rows;
+    bodyMat.uniforms.stanceWidth.value = clip === 'bat_power_set' ? .65 * Math.min(1, time / .32) : 0;
     bodyMat.uniforms.cell.value.set(frame.cel % 4, rows-1-Math.floor(frame.cel/4));
     headMat.uniforms.cell.value.set(faceCell % 4, 2 - Math.floor(faceCell / 4));
     headMat.uniforms.maskHelmet.value = Number(role === 'catcher');
@@ -323,8 +337,14 @@ export function createPaintedPlayerRig(
     const travelSide = Math.abs(acrossScreen) > .14 ? acrossScreen : Math.sin(rig.logicalYaw);
     const actorFlip = (tagging || popping) && rear ? -flip : motionRole === 'runner' ? (travelSide < 0 ? -1 : 1) : flip;
     const unit = role === 'pitcher' || plantedRunner || clip === 'field_throw' ? 0.0047 : 0.0057;
-    bat.barrel.visible = role === 'batter' && !running && !leading && !sliding && frame.cel < 2;
-    if (bat.barrel.visible) bat.place(frame.cel, rear, contactX, contactY, unit, width, time);
+    bat.barrel.visible = role === 'batter' && !running && !leading && !sliding && (frame.cel < 2 || brim);
+    if (bat.barrel.visible) {
+      bat.place(frame.cel, rear, contactX, contactY, unit, width, time);
+      // Keep the loaded barrel clear of the helmet silhouette in either batter's box.
+      if (clip === 'bat_power_set') bat.barrel.rotation.z = (rear ? -1 : 1) * 1.38;
+      if (clip === 'bat_contact_set') bat.barrel.translateY(-.17 * Math.min(1, time / .32));
+      if (brim) bat.barrel.rotation.z = (rear ? -1 : 1) * 2.29;
+    }
     const headUnit = 0.00455 * (a.headShape === 'chubby' ? 1.05 : 1);
     const rotationSign = rear ? -1 : 1;
     billboard.position.set(0, floor + frame.hop * height, 0);
@@ -335,14 +355,14 @@ export function createPaintedPlayerRig(
     actor.rotation.z = actorFlip * rotationSign * frame.lean - (running ? .10 * acrossScreen : 0);
     actor.scale.set(actorFlip * height * (1 + frame.squash * 0.45), height * (1 - frame.squash), 1);
     // At contact the illustrated barrel reaches across the plate in either camera.
-    const swingMirror = role === 'batter' && !rear && !running && !leading && !sliding && frame.cel >= 2 ? -1 : 1;
+    const swingMirror = role === 'batter' && !rear && !running && !leading && !sliding && !brim && frame.cel >= 2 ? -1 : 1;
     body.scale.set(swingMirror * 256 * unit * width, 256 * unit, 1);
     body.position.set(0, 121 * unit, 0.018);
     body.geometry = pitching && delivery ? delivery.geometry : quad;
     if (pitching && delivery) {
       delivery.fitGrip(body, registration, frame.pitchPhase);
     }
-    if (role==='batter' && frame.cel>=2 && !running && !leading) {
+    if (!brim && role==='batter' && frame.cel>=2 && !running && !leading) {
       // Hands painted into the swing and bunt cels, measured wrist-to-wrist.
       const grip = frame.cel===3 ? [128,139] : a.bottoms==='pants' ? [146,rear?126:137] :
         a.bottoms==='shorts' ? [143,rear?129:130] : [140,rear?122:122];
@@ -371,11 +391,13 @@ export function createPaintedPlayerRig(
       }
       else actor.position.x += .032 * beat * actorFlip;
     }
-    const roll = clip === 'pitch_set' && opt.traits.seed % 3 === 0;
+    const roll = clip === 'pitch_set' && (opt.quietPitcher || opt.traits.seed % 3 === 0);
     if (clip === 'pitch_gather') {
       const close = THREE.MathUtils.smoothstep(time, .18, .92);
       ball.position.set(.027 * (1-close), -.024 + .018*close, .07-.10*close);
-      ball.rotation.x = close * 2;
+      const rub = opt.quietPitcher ? Math.sin(time * 16) * (1 - close) : 0;
+      ball.position.x += .025 * rub;
+      ball.rotation.x = close * 2 + rub;
       frame.held = close < .97;
     }
     if (pitching) {

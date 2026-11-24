@@ -1,6 +1,6 @@
 import type { playReadout } from './playReadout';
 import { BASE_PATH_VERTICES } from './diamondLayout';
-import { welcomePose } from './teamReactions';
+import { railReaction, welcomePose } from './teamReactions';
 import type { CameraPose } from '../camera/cameraRig';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import type { PerspectiveCamera } from 'three';
@@ -79,7 +79,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   if (play.unassisted && previous < play.finish && seconds >= play.finish) {
     const base = actorAt(play, '1B', play.finish, side).pos;
     vfx.impact(base, '#A9EDDC');
-    vfx.spawnComicCallout('OUT!', base, '#167457', true);
+    if (!play.holdForceCall) vfx.spawnComicCallout('OUT!', base, '#167457', true);
   }
   for (const leg of play.legs) {
     if (previous >= leg.end || seconds < leg.end) continue;
@@ -97,7 +97,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     }
     if (leg.end === play.finish || (play.kind === 'double_play' && leg.to === '2B')) {
       const call = play.kind === 'bunt_single' ? 'SAFE!' : play.kind === 'fielding_error' ? 'ERROR!' : leg.end !== play.finish ? 'ONE!' : play.kind === 'double_play' ? 'TURN TWO!' : 'OUT!';
-      vfx.spawnComicCallout(call, at, '#167457', true);
+      if (!play.holdForceCall || leg.end !== play.finish) vfx.spawnComicCallout(call, at, '#167457', true);
     }
   }
 
@@ -140,14 +140,16 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const bag=force ? BASE_PATH_VERTICES[1] : play.fieldAt;
     const dx=shot.position.x-bag.x,dz=shot.position.z-bag.z;
     const distance=Math.max(.01,Math.hypot(dx,dz));
-    ump.sprite.position.set(bag.x+(-1.5*dx-.76*dz)/distance,.045,bag.z+(-1.5*dz+.76*dx)/distance);
+    const sidestep = force ? 2.25 : -.76;
+    ump.sprite.position.set(bag.x+(-1.5*dx+sidestep*dz)/distance,.045,bag.z+(-1.5*dz-sidestep*dx)/distance);
     ump.signal(play.kind==='steal_safe',t-play.finish);
   }
   teammates.forEach((member,index)=>{
     const ending=play.ending;
-    member.root.visible=Boolean(ending?.kind==='walkoff' && t>=ending.start);
-    if (!member.root.visible || !ending) return;
-    const pose=welcomePose(index,t-ending.start);
+    const pose = ending?.kind === 'walkoff' && t >= ending.start
+      ? welcomePose(index,t-ending.start) : index === 0 ? railReaction(play,t) : undefined;
+    member.root.visible = Boolean(pose);
+    if (!pose) return;
     member.root.position.copy(pose.pos);
     member.logicalYaw=pose.yaw;
     member.updatePose(pose.clip,pose.local,undefined,camera.position);

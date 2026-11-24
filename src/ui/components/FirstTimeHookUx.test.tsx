@@ -26,6 +26,7 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
 
   it('gives ClubCreatorScreen a 5-second toy box hero with cute Mascot Animal Picker and above-the-fold Play Ball CTA', () => {
     render(<ClubCreatorScreen onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Change club' }));
 
     expect(screen.getByTestId('club-mascot-buddy')).toBeInTheDocument();
     expect(screen.getByTestId('mascot-animal-picker')).toBeInTheDocument();
@@ -35,7 +36,7 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
     expect(screen.getByRole('textbox', { name: /^mascot$/i })).toHaveValue('Splash Otter');
 
     // Primary Play Opening Day button appears BEFORE the deeper Starting Roster Build cards!
-    const startBtn = screen.getByRole('button', { name: /play opening day/i });
+    const startBtn = screen.getByRole('button', { name: /use this club/i });
     const rosterBuildHeading = screen.getByText(/starting roster build/i);
     expect(
       Boolean(startBtn.compareDocumentPosition(rosterBuildHeading) & Node.DOCUMENT_POSITION_FOLLOWING),

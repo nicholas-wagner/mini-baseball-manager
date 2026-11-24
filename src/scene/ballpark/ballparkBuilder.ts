@@ -1,3 +1,4 @@
+import { DUGOUT_RAIL } from '../playback/teamReactions';
 import * as THREE from 'three';
 import { BATTERS_BOX, INFIELD_DIRT, OUTFIELD_WALL, batterBox } from '../playback/diamondLayout';
 import { createClayTexture, createFloodlights, createHorizon } from './parkScenery';
@@ -405,6 +406,20 @@ export function createMiniBallpark(): BallparkEnvironment {
   rightFoul.rotation.z = -Math.PI / 4;
   rightFoul.position.set(15.9, 0.032, -15.9);
   group.add(rightFoul);
+
+  const rail = new THREE.Group();
+  rail.position.set(DUGOUT_RAIL.x, 0, DUGOUT_RAIL.z);
+  rail.rotation.y = DUGOUT_RAIL.yaw;
+  const railWood = createToonMaterial(0x906437);
+  for (const offset of [-2.1, 0, 2.1]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(.11, .9, .11), railWood);
+    post.position.set(0, .45, offset);
+    rail.add(post);
+  }
+  const railing = new THREE.Mesh(new THREE.BoxGeometry(.14, .14, 4.5), railWood);
+  railing.position.y = .88;
+  rail.add(railing);
+  group.add(rail);
 
   // Curved iconic green outfield fence + yellow home-run cap rail
   const { radius: wallRadius, centerZ } = OUTFIELD_WALL;

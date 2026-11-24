@@ -49,6 +49,15 @@
   <path class="seam" d="m224 105 2 6m4-4 2 6m-14 1 5 2"/>
   <use xlink:href="#jersey"/>
 </g>
+<g id="brim">
+  <path class="skin" d="M87 93Q71 102 78 119L89 135 98 131 91 111 103 103Z"/>
+  <path class="uniform" d="m88 130 9-5 10 9-2 9-8 2-9-8Z"/>
+  <path class="skin" d="M152 94Q166 93 176 80L190 54 185 28 198 22 206 55Q204 65 198 74L184 100Q174 115 157 113Z"/>
+  <path class="red" d="m184 32 15-6 3 9-16 6Z"/>
+  <path class="uniform" d="m183 27-2-10-15-4q-6-4-1-7l19 2 5-4 9 4 3 12-4 8-10 4Z"/>
+  <path class="seam" d="m184 11 4 8m5-10 2 7m-96 119 5 2"/>
+  <use xlink:href="#jersey"/>
+</g>
 <g id="poses" stroke="var(--ink,#30232c)" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
 <g transform="translate(0 0)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#arms"/></g>
 <g transform="translate(0 256)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#arms"/></g>
@@ -56,6 +65,9 @@
 <g transform="translate(256 0)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#tap"/></g>
 <g transform="translate(256 256)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#tap"/></g>
 <g transform="translate(256 512)"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/><use xlink:href="#tap"/></g>
+<g transform="translate(512 0)"><use xlink:href="#stancelegs"/><use xlink:href="#longlegs"/><use xlink:href="#brim"/></g>
+<g transform="translate(512 256)"><use xlink:href="#stancelegs"/><use xlink:href="#shortlegs"/><use xlink:href="#brim"/></g>
+<g transform="translate(512 512)"><use xlink:href="#stancelegs"/><use xlink:href="#skirt"/><use xlink:href="#brim"/></g>
 </g>
     <filter id="mask" color-interpolation-filters="sRGB"><feColorMatrix values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  1 0 0 0 0"/></filter>
   </defs>

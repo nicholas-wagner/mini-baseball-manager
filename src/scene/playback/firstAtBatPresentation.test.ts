@@ -93,7 +93,7 @@ it("gives the reliever one short fist pump only after a pressure strikeout reach
     "pitch_salute",
   );
 });
-it("mirrors catcher targets and rehearses each swing once, with a still reduced-motion pose", () => {
+it("mirrors catcher targets and holds each distinct stance until the pitch, with a still reduced-motion pose", () => {
   expect(targetOffset("paint_corners", "R").x).toBe(
     -targetOffset("paint_corners", "L").x,
   );
@@ -103,7 +103,10 @@ it("mirrors catcher targets and rehearses each swing once, with a still reduced-
   expect(rehearsalPose("contact", 0.1, false)).not.toEqual(
     rehearsalPose("power", 0.1, false),
   );
-  expect(rehearsalPose("power", 3, false).clip).toBe("bat_stance");
+  for (const choice of ["contact", "power"] as const) {
+    expect(rehearsalPose(choice, 3, false)).toEqual(rehearsalPose(choice, 7, false));
+    expect(rehearsalPose(choice, 3, false)).toEqual(rehearsalPose(choice, 0, true));
+  }
   expect(rehearsalPose("power", 3, true)).toEqual(
     rehearsalPose("power", 0, true),
   );

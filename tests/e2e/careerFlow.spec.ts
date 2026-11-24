@@ -8,12 +8,16 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
 
   // Production launch lands straight on Play Ball / Club Creator with cute quick-pick clubs, fanned manga cards, mascot picker & Design Lab hidden
   await expect(page.getByRole('button', { name: /design lab/i })).toHaveCount(0);
+  await page.getByRole('button', {name:'Change club'}).click();
   await expect(page.getByTestId('quick-club-presets')).toBeVisible();
   await expect(page.getByTestId('creator-manga-fan')).toBeVisible();
   await expect(page.getByTestId('mascot-animal-picker')).toBeVisible();
-  const startBtn = page.getByRole('button', { name: /play opening day/i });
+  await page.getByRole('button', {name:'Use this club'}).click();
+  const startBtn = page.getByRole('button', { name: /^(Bat|Pitch) with / });
   await expect(startBtn).toBeVisible();
   await startBtn.click();
+  await expect(page.getByRole('region', {name:'First at-bat'})).toBeVisible();
+  await page.reload();
 
   // Calm Opening Day lands with Opening Day Print + Meet Your 3 Stars + 1-tap Full Season & GM Options toggle
   await expect(page.getByTestId('ballpark-soundboard')).toHaveCount(0);

@@ -49,3 +49,14 @@ it('scores a groundout only when the recorded defender made the replay throw to 
   expect(scoringDetail({...out, outcome:'double_play'}, play)).toBeUndefined();
   expect(scoringDetail({...out, fieldingHighlight:{...out.fieldingHighlight!, fielderPos:'3B'}}, play)).toBeUndefined();
 });
+
+it('holds the umpire signal with the runner still short of first, then resumes the run-through', async () => {
+  const { diamondPlay } = await import('./diamondPlay');
+  const { forceReplayTime } = await import('./firstAtBatPresentation');
+  const play = diamondPlay('ground_out');
+  const caught = play.finish + .14;
+  expect(forceReplayTime(caught, play.finish)).toBeCloseTo(caught);
+  expect(forceReplayTime(caught + .30, play.finish)).toBeCloseTo(caught);
+  expect(caught).toBeLessThan(play.batterArrival);
+  expect(forceReplayTime(play.duration + .48, play.finish)).toBeCloseTo(play.duration);
+});

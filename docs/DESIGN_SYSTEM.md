@@ -63,7 +63,6 @@
 - Live mini players use shared painted body cels, a registered head and player-specific details. Align the mitt, bat and ball with the painted grip in both camera directions. Idle mannerisms rotate around that grip.
 - Use the player's catalog ID for card art in every club. Show the full 4:5 illustration on card fronts. Keep enlargement keyboard-accessible and preserve the original aspect ratio.
 - Give the opening hitter one objective. Show the chosen pitch target or rehearsal on the field before the manager commits. Keep the advanced dugout one tap away. During a routine pitch hold the camera through reception. Show the runner and first baseman in one frame for the force.
-- For a first-use playtest, hand someone a fresh, muted game on a phone. Let them play one at-bat unaided, then ask what they were trying to do, what decided the play and which player they remember. Ask an experienced fan to find the fuller controls and a returning player to find their saved print.
 - Show the count change on the catch and the base highlight on the play. Keep the named Opening Day action and the postgame next action within a 390×844 viewport. Reserve at least 44px for pitch calls and camera controls.
 - **Over-the-Shoulder 3D Camera Presets**:
   - `behind_pitcher`: Positioned behind pitcher's throwing shoulder looking down the lane toward home plate (`pos ≈ [1.8, 3.0, -14.2]`, `lookAt ≈ [0, 1.1, 2.0]`).
@@ -79,3 +78,7 @@ Keep the result with the player who made the play until the manager advances. Th
 For a force at first, let the manager see the mitt, the bag, the batter running through and the umpire in the same shot. A held runner takes a secondary lead. On a gap hit the camera can leave the retrieved ball to follow a runner into third or home. Use the runner’s actual base and destination for the cut.
 
 In the guided half, put the manager’s club first on the compact scoreboard. Show both scores, the occupied bases, inning, outs and count. Tapping the board reveals the line score. Keep the first action visible above the phone navigation. During the featured player’s entrance, leave every pitch and swing choice available. A fixed camera or reduced-motion preference takes precedence over the introductory shot.
+
+The first screen offers the actual featured player and the stakes, with the club and mascot alongside **Change club**. Choosing **Contact** or **Power** holds the corresponding grip and stance until **Swing**. At first base, hold the umpire’s signal with the runner still short of the bag. The mascot peeks and the glove pop marks the catch. Use the result card to explain the runners and credit a defensive out to the recorded fielder or strikeout pitcher.
+
+For the first-use playtest, start the clock at the first card. Watch for a first call within 15 seconds and whether the player chooses the next batter unaided. Afterward ask which player they remember and what made the runner safe or out. Try this on a muted phone with a younger newcomer, a character-focused teen and a longtime baseball fan. Ask the fan to find the full controls and a returning player to find their saved print.

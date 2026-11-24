@@ -8,3 +8,6 @@
   38% { transform: translateY(-2px) rotate(-18deg); }
   77% { transform: rotate(3deg); }
 }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) .mascot-peek-paw { transition: transform 180ms ease-out; }
+}

@@ -162,7 +162,7 @@ export interface GameStoreState {
   lastOffseasonTransitions: readonly TierPromotionTransition[];
   activeOffseason: OffseasonState | null;
   getHumanClub: () => Club | null;
-  startNewCareer: (input: StartNewCareerInput) => void;
+  startNewCareer: (input: StartNewCareerInput | PreparedCareer) => void;
   simNextSeriesRound: (
     regulationInnings?: GameLengthInnings,
   ) => {
@@ -273,6 +273,16 @@ export function newCareerSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
+/** Prepare the same seeded roster for the first card and the career the manager accepts. */
+export function prepareCareer(input: StartNewCareerInput) {
+  const seed = input.seed ?? newCareerSeed();
+  const world = generateSixTierWorld(seed, input);
+  world.leagues.rookie = world.leagues.rookie.map(club =>
+    club.id === world.humanClubId ? applyOpeningDaySparkSp(club) : club);
+  return { input, seed, world };
+}
+type PreparedCareer = ReturnType<typeof prepareCareer>;
+
 export function createGameStore(repository: SaveRepository = createSaveRepository()) {
   return create<GameStoreState>()((set, get) => ({
     worldSeed: 1994,
@@ -304,17 +314,8 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
 
     getHumanClub: () => findClubAcrossLeagues(get().leagues, get().humanClubId),
 
-    startNewCareer: (input) => {
-      const seed = input.seed ?? newCareerSeed();
-      const world = generateSixTierWorld(seed, input);
-      const freeAgents = world.freeAgents;
-      const sparkedLeagues: Record<LeagueTierId, Club[]> = {
-        ...world.leagues,
-        rookie: world.leagues.rookie.map((club) =>
-          club.id === world.humanClubId ? applyOpeningDaySparkSp(club) : club,
-        ),
-      };
-
+    startNewCareer: (request) => {
+      const { input, seed, world } = 'world' in request ? request : prepareCareer(request);
       set((prev) => ({
         worldSeed: seed,
         seasonNumber: 1,
@@ -337,8 +338,8 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           name: input.managerName.trim() || 'Skipper',
           avatarSeed: seed,
         }),
-        leagues: sparkedLeagues,
-        freeAgents,
+        leagues: world.leagues,
+        freeAgents: world.freeAgents,
         settings: {
           ...prev.settings,
           enableInjuries: input.enableInjuries ?? true,

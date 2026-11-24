@@ -1,4 +1,4 @@
-import { previewShot, rehearsalPose, targetOffset, type AtBatPreview, type PlayerEntranceCue } from './firstAtBatPresentation';
+import { FORCE_HOLD_SECONDS, forceReplayTime, previewShot, rehearsalPose, targetOffset, type AtBatPreview, type PlayerEntranceCue } from './firstAtBatPresentation';
 import { playReadout } from './playReadout';
 import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
@@ -81,6 +81,7 @@ export class GameSceneController {
 
   private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
+  private batterRitual: CharacterAnimClip = 'bat_stance';
   private bats: EffectiveBatSide = 'R';
   private throws: ThrowsHand = 'R';
   private preview: AtBatPreview | null = null;
@@ -261,6 +262,7 @@ export class GameSceneController {
     const batter = (choreo && event?.batterId && battingSide.playersById[event.batterId]) || battingSide.playersById[batterSlot.playerId];
     const effectiveBat = resolveEffectiveBatSide(batter.bats, pitcher.throws);
 
+    this.batterRitual = batter.traits.seed % 3 === 0 || batter.personality === 'superstitious' ? 'helmet_tip' : 'bat_stance';
     this.bats = effectiveBat;
     this.throws = pitcher.throws;
     this.batterRig.updateAppearance({
@@ -291,6 +293,7 @@ export class GameSceneController {
       rig.updateAppearance({
         traits: defender.traits,
         quietInfielder: defender.personality === 'quiet_assassin',
+        quietPitcher: defender.personality === 'quiet_assassin',
         reassurePitcher: coord.pos === 'C' && (session.balls >= 2 || fieldingSide.pitcherFatigue >= 60 || session.bases.filter(Boolean).length >= 2),
         team: fieldingTeam,
         jerseyNumber: defender.jerseyNumber,
@@ -334,6 +337,11 @@ export class GameSceneController {
     }
     const play = choreo?.play ?? choreo?.close ?? choreo?.outfield ?? (choreo?.infield ? diamondPlay(choreo.infield, choreo.highlightFielderPos) : undefined);
     if (play && choreo) {
+      if (play.outfield && (play.scorerBase || play.runnerToThird) && play.ending?.kind !== 'walkoff') {
+        const candidates = battingClub.roster.filter(p => p.id !== batter.id && !bases.includes(p.id));
+        const buddy = candidates.find(p => p.personality === 'showboat' || p.personality === 'prankster') ?? candidates[0];
+        if (buddy) this.welcome.set([{traits:buddy.traits,jerseyNumber:buddy.jerseyNumber,throwsHand:buddy.throws,team:battingTeam,role:'fielder'}]);
+      }
       if (play.ending?.kind==='walkoff') {
         const teammates=battingSide.lineup.map(slot=>battingSide.playersById[slot.playerId])
           .filter(p=>p && p.id!==batter.id && !bases.includes(p.id)).slice(0,2);
@@ -351,7 +359,7 @@ export class GameSceneController {
           if (dest >= 0) return dest + 1;
           return play.outfield?.caught && play.kind !== 'sac_fly' ? i + 1 : 4;
         }) : undefined,
-        start: this.elapsedSec, rate: play.duration * 1000 / choreo.durationMs };
+        start: this.elapsedSec, rate: (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0)) * 1000 / choreo.durationMs };
       return;
     }
     if (choreo) {
@@ -438,10 +446,12 @@ export class GameSceneController {
   private updateScene(dt: number, elapsed: number): void {
     if (this.replay) {
       const { play, cast, start, rate, runnerDestinations } = this.replay;
-      const t = (this.elapsedSec - start) * rate;
+      const clock = (this.elapsedSec - start) * rate;
+      const previous = clock - elapsed * rate;
+      const t = play.holdForceCall ? forceReplayTime(clock, play.finish) : clock;
       const fixedShot = this.cameraOverride
         ? getCameraPresetPose(this.cameraOverride,this.elapsedSec,0,this.throws,this.bats) : undefined;
-      renderDiamondPlay(play, cast, this.bats, t, t - elapsed * rate, this.camera, this.container.clientHeight,
+      renderDiamondPlay(play, cast, this.bats, t, play.holdForceCall ? forceReplayTime(previous, play.finish) : previous, this.camera, this.container.clientHeight,
         this.vfx, this.throws, fixedShot, this.welcome.rigs, this.replay.readout);
       this.runnerRigs.forEach((runner, i) => {
         if (!runner.root.visible || ((play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
@@ -523,7 +533,7 @@ export class GameSceneController {
     }
     if (this.pitch) this.drawPitch(this.pitch);
     else if (tap) this.showGloveTap(entranceTime);
-    else if (this.entrance?.role === 'batter') this.batterRig.updatePose('bat_stance', 1.75, undefined, this.camera.position);
+    else if (this.entrance?.role === 'batter') this.batterRig.updatePose(this.batterRitual, entranceTime, undefined, this.camera.position);
     else if (swing) {
       const pose = rehearsalPose(swing,this.elapsedSec-this.previewStart,this.steadyCamera);
       this.batterRig.updatePose(pose.clip,pose.time,undefined,this.camera.position);

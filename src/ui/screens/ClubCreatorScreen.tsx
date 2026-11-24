@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dices, Play, Sparkles } from 'lucide-react';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { ILLUSTRATED_PLAYER_POOL } from '../../art/portraits/illustratedPlayerPool';
@@ -9,14 +9,19 @@ import {
   type StartingRosterPreset,
 } from '../../engine/gm/rosterPresets';
 import { createSeededRng } from '../../engine/rng/seededRng';
-import { newCareerSeed, useGameStore } from '../../store/gameStore';
+import { createClutchMomentSession, type ClutchMomentLaunch } from '../../engine/gm/gameDayMoments';
+import { getHumanSeasonSchedule } from '../../engine/league/seasonEngine';
+import type { Player } from '../../engine/models/player';
+import { PlayerCardModal } from '../components/PlayerCardModal';
+import { OpeningDayPrint } from '../components/GameDayPrints';
+import { newCareerSeed, prepareCareer, useGameStore } from '../../store/gameStore';
 import { ClubMascotBuddy } from '../components/ClubMascotBuddy';
 import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
 interface ClubCreatorScreenProps {
-  onCreated: () => void;
+  onCreated: (opening: ClutchMomentLaunch) => void;
 }
 
 const EXTRA_CITIES = ['Cedar', 'Harbor', 'Meteor', 'Oakwood', 'Rocket', 'Clover'] as const;
@@ -112,26 +117,44 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
     soundEngine.play('ui_pop');
   };
 
+  const [editing, setEditing] = useState(false);
+  const [inspected, setInspected] = useState<Player | null>(null);
+  const opening = useMemo(() => {
+    if (editing) return null;
+    const draft = prepareCareer({ city, clubName, mascot, monogram, managerName, startingPreset,
+      primaryColor: palette.primary, secondaryColor: palette.secondary, accentColor: palette.accent,
+      enableInjuries, enableIllnesses, seed: seedNonce });
+    const { rookie } = draft.world.leagues;
+    const homeClub = rookie.find(club => club.id === draft.world.humanClubId)!;
+    const series = getHumanSeasonSchedule(rookie, homeClub.id, 0).nextSeries!;
+    const moment = createClutchMomentSession({
+      homeClub: series.isHome ? homeClub : series.opponent,
+      awayClub: series.isHome ? series.opponent : homeClub,
+      regulationInnings: 5, seed: draft.seed + 1,
+    });
+    return { draft, club: homeClub, series, moment };
+  }, [editing, city, clubName, mascot, monogram, managerName, startingPreset, palette, enableInjuries, enableIllnesses, seedNonce]);
+
+  if (opening) {
+    const { club, series, moment, draft } = opening;
+    return <section className="opening-cover" aria-label="Your club">
+      <div className="opening-club">
+        <ClubMascotBuddy mascot={club.mascot} primaryColor={club.colors.primary} secondaryColor={club.colors.secondary}
+          accentColor={club.colors.accent} size="md" />
+        <div><strong data-testid="creator-club-identity">{club.city} {club.name}</strong><small>{club.mascot}</small></div>
+        <button onClick={() => setEditing(true)}>Change club</button>
+      </div>
+      <OpeningDayPrint cover session={moment.session} opponentLabel={(series.isHome ? 'vs ' : '@ ') + series.opponent.name}
+        onInspect={setInspected} onStart={() => { startNewCareer(draft); onCreated(moment); }} />
+      <PlayerCardModal open={!!inspected} entry={inspected && {player:inspected, club, roleTag:'Opening Day'}}
+        onClose={() => setInspected(null)} />
+    </section>;
+  }
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    startNewCareer({
-      city,
-      clubName,
-      mascot,
-      monogram,
-      primaryColor: palette.primary,
-      secondaryColor: palette.secondary,
-      accentColor: palette.accent,
-      managerName,
-      startingPreset,
-      enableInjuries,
-      enableIllnesses,
-      seed: seedNonce,
-    });
-    soundEngine.play('organ_charge');
-    onCreated();
+    setEditing(false);
   };
-
   return (
     <div className="max-w-4xl mx-auto">
       <ComicCard
@@ -217,7 +240,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                   icon={<Play className="w-4 h-4" />}
                   className="flex-1 sm:flex-none"
                 >
-                  Play Opening Day
+                  Use this club
                 </ComicButton>
                 <ComicButton
                   variant="sky"
@@ -531,6 +554,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
               </div>
             </div>
           </div>
+          <ComicButton type="submit" size="lg" variant="turf">Back to Opening Day</ComicButton>
         </form>
       </ComicCard>
     </div>

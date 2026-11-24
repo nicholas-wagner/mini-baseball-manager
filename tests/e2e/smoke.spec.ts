@@ -7,7 +7,7 @@ test('Design Lab is hidden by default in production, toggles on 5x "d", and resp
 
   // Hidden by default in production; users land directly in Play Ball (Club Creator)
   await expect(page.getByRole('button', { name: /design lab/i })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /play opening day/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^(Bat|Pitch) with / })).toBeVisible();
 
   // Secret 5x "d" shortcut reveals and opens Design Lab
   for (let i = 0; i < 5; i += 1) {

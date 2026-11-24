@@ -7,6 +7,10 @@ export type CharacterAnimClip =
   | 'pitch_set'
   | 'pitch_windup'
   | 'pitch_super'
+  | 'bat_contact_set'
+  | 'bat_power_set'
+  | 'helmet_tip'
+  | 'rail_lean'
   | 'bat_stance'
   | 'bat_swing'
   | 'bat_bunt'
@@ -47,6 +51,10 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   pitch_salute: .66,
   pitch_windup: 1.35,
   pitch_super: 1.65,
+  bat_contact_set: 1,
+  bat_power_set: 1,
+  helmet_tip: 1.6,
+  rail_lean: 1,
   bat_stance: 1.8,
   bat_swing: 0.95,
   bat_bunt: 0.9,

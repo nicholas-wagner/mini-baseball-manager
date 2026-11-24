@@ -46,13 +46,26 @@ function describeSituation(s: GameSessionState) {
   );
 }
 
+function openingObjective(s: GameSessionState, batting: boolean) {
+  const ours = s.home.isHuman ? s.home.score : s.away.score;
+  const theirs = s.home.isHuman ? s.away.score : s.home.score;
+  const aboard = s.bases.filter(Boolean).length;
+  if (!batting) return s.outs === 2 ? 'Get the last out of the inning.' :
+    aboard ? 'Get an out before the runners score.' : 'Get the batter out.';
+  if (theirs > ours && theirs - ours <= aboard) return 'The tying run is on base. Bring it home.';
+  if (s.bases[1] || s.bases[2]) return 'A hit could bring a runner home.';
+  return aboard ? 'Move your runner around the bases.' : 'Get on base and start a rally.';
+}
+
 export function OpeningDayPrint({
+  cover = false,
   session,
   opponentLabel,
   onStart,
   onInspect,
 }: {
   session: GameSessionState;
+  cover?: boolean;
   opponentLabel?: string;
   onStart: () => void;
   onInspect: (player: Player) => void;
@@ -60,7 +73,7 @@ export function OpeningDayPrint({
   const batting = (session.half === 'BOT') === session.home.isHuman;
   const player = batting ? getCurrentBatter(session) : getCurrentPitcher(session);
   return (
-    <section className="opening-print" aria-label="Opening Day feature">
+    <section className={cover ? "opening-print opening-feature" : "opening-print"} aria-label="Opening Day feature">
       <button
         className="opening-art"
         aria-label={'Inspect ' + player.name + ' card'}
@@ -73,13 +86,14 @@ export function OpeningDayPrint({
       </button>
       <div className="opening-copy">
         <p className="print-kicker">
-          Opening Day{opponentLabel ? ` · ${opponentLabel}` : ''}
+          {cover ? 'Your Opening Day' : 'Opening Day'}{opponentLabel ? ` · ${opponentLabel}` : ''}
         </p>
         <h2>{player.name}</h2>
         <p className="opening-inning">
           {session.half === 'TOP' ? 'Top' : 'Bottom'} of inning {session.inning}
         </p>
         <p>{describeSituation(session)}</p>
+        {cover && <p className="opening-objective">{openingObjective(session, batting)}</p>}
         <button className="opening-start" onClick={onStart}>
           {batting ? 'Bat' : 'Pitch'} with {player.name.split(' ')[0]}{' '}
           <ArrowRight size={18} aria-hidden="true" />

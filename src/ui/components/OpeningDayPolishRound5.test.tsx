@@ -42,6 +42,7 @@ describe('Opening Day Polish Round 5 (Clean Badges, Unified Opening Story, 2-Row
 
   it('fans 3 real manga player cards in the ClubCreatorScreen hero beside the mascot', () => {
     render(<ClubCreatorScreen onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Change club' }));
 
     const fan = screen.getByTestId('creator-manga-fan');
     const imgs = within(fan).getAllByRole('img') as HTMLImageElement[];
