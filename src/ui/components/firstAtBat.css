@@ -6,6 +6,12 @@
   padding: 6px 12px 10px;
   box-shadow: 3px 3px #192735;
 }
+.atbat-guide.is-expanded {
+  padding: 0 10px;
+}
+.atbat-guide.is-expanded header button {
+  min-height: 36px;
+}
 .atbat-guide header {
   display: flex;
   align-items: center;
@@ -51,7 +57,9 @@
 }
 .atbat-choices button {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px;
+  padding: 0 4px;
+  line-height: 1.15;
   background: #fffdf8;
 }
 .atbat-choices button[aria-pressed="true"] {
@@ -137,8 +145,13 @@
   .guided-game .atbat-guide { padding:4px 10px 10px; }
   .guided-game .rally-result footer { flex-direction:column; gap:0; align-items:stretch; }
 
-  .live-game:not(.guided-game) [data-testid=live-action-bar] { display:flex; flex-direction:column; gap:8px; }
-  .live-game:not(.guided-game) [data-testid=live-control-grid] { order:-1; }
+  .live-game:not(.guided-game) [data-testid=live-action-bar] { display:flex; flex-direction:column; gap:6px; padding:8px; }
+  .live-game:not(.guided-game) [data-testid=live-control-grid] { order:-2; }
+  .live-game:not(.guided-game) [data-testid=live-calls-block] { order:-1; }
+  .live-game:not(.guided-game) [data-testid=live-last-pitch-strip] { order:0; }
+  .live-game:not(.guided-game) [data-testid=live-pitcher-fatigue-strip] { order:1; }
+  .live-game:not(.guided-game) [data-testid=coach-action-cue] { order:2; }
+  .live-game:not(.guided-game) [data-testid=broadcast-lower-third] { order:3; }
   .opening-feature .opening-art { width:min(44vw,25svh,200px); }
 }
 @media (orientation:landscape) and (max-height:540px) and (max-width:1024px) {

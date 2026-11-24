@@ -9,12 +9,11 @@ import type {
 import { ArcadeTimingMeter } from "./ArcadeTimingMeter";
 import "./firstAtBat.css";
 
-const pitches = PITCH_CALL_GUIDE.filter(
-  (p) => p.id === "attack_zone" || p.id === "paint_corners" || p.id === "bury_offspeed",
-);
+const pitches = PITCH_CALL_GUIDE;
 const swings = [
   { id: "contact" as const, name: "Contact" },
   { id: "power" as const, name: "Power" },
+  { id: "bunt" as const, name: "🏏 Bunt" },
 ] as const;
 
 export function FirstAtBat({
@@ -72,18 +71,27 @@ export function FirstAtBat({
         ? "Get the first out."
         : "Get the next out.";
   const activePitch = pitches.find((p) => p.id === target) ?? pitches[0];
-  const action = batting ? "Swing" : activePitch.actionLabel;
+  const action = batting
+    ? call === "bunt"
+      ? "Lay down bunt"
+      : "Swing"
+    : activePitch.actionLabel;
   const tradeoffText = batting
-    ? call === "power"
-      ? "More power. Easier to miss."
-      : "Easier to connect. Less power."
+    ? call === "bunt"
+      ? "Tap down the line. Great with speed or runners."
+      : call === "power"
+        ? "More power. Easier to miss."
+        : "Easier to connect. Less power."
     : activePitch.tradeoff;
   const tip =
     cue.suggestedAction &&
     ((batting && cue.kind === "steal_opportunity") ||
       (!batting && cue.kind === "pitcher_gassed"));
   return (
-    <section className="atbat-guide" aria-label="First at-bat">
+    <section
+      className={expanded ? "atbat-guide is-expanded" : "atbat-guide"}
+      aria-label="First at-bat"
+    >
       <header>
         <span>Coach Pops</span>
         <div className="atbat-header-actions">
@@ -113,11 +121,11 @@ export function FirstAtBat({
           </button>
         </div>
       </header>
-      <h3>
-        {score} {objective}
-      </h3>
       {!expanded && (
         <>
+          <h3>
+            {score} {objective}
+          </h3>
           <div
             className="atbat-choices"
             role="group"
@@ -141,7 +149,7 @@ export function FirstAtBat({
                     aria-pressed={p.id === target}
                     onClick={() => onTarget(p.id)}
                   >
-                    {p.label}
+                    {p.id === "high_heat" ? "🔥 Heat" : p.label}
                   </button>
                 ))}
           </div>

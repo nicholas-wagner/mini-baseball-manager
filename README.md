@@ -20,7 +20,7 @@ Opening Day puts the player from your actual lineup on the first card. Tap **Bat
 
 Choose **Contact** or **Power** to set the batter’s stance, then tap **Swing**. On defense, choose **Corner** and look for the gold ring around the catcher’s mitt. **Matchup** opens handedness, favorite pitch and endurance. **Options** holds timing and signature powers.
 
-On a phone, **Dugout** opens your career tabs. Visit the roster and tap **Play Ball** to return to the same batter, count and runners. Rotate the phone for the field on the left and the calls on the right. **More controls** opens the full tactical controls.
+On a phone, **Dugout** opens your career tabs. Visit the roster and tap **Play Ball** to return to the same batter, count and runners. Rotate the phone for the field on the left and the calls on the right. **More controls** opens the one-screen mobile Arcade cockpit with single-row R/H/E scoreboard, pitch/swing calls, Catcher's Pitch Sign strip, Hype Power button, 1-tap defensive **Shift** drawer, and live last-pitch radar readout all above the fold.
 
 | Pitching on a compact phone | Batting in landscape |
 | --- | --- |

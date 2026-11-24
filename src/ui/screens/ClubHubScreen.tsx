@@ -177,7 +177,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.ballpark_room)}
               className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
-              🏟️ Ballpark &amp; Economy
+              Ballpark &amp; Economy
             </ComicButton>
             <ComicButton
               size="sm"
@@ -187,7 +187,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.gear_room)}
               className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
-              👕 Uniforms &amp; Gear
+              Uniforms &amp; Gear
             </ComicButton>
             <ComicButton
               size="sm"
@@ -197,7 +197,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.staff_room)}
               className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
-              👥 Staff &amp; Front Office
+              Staff &amp; Front Office
             </ComicButton>
             <ComicButton
               size="sm"
@@ -207,7 +207,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.events_room)}
               className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
             >
-              🏆 Events &amp; Duels
+              Events &amp; Duels
             </ComicButton>
           </div>
         }

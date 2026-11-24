@@ -258,12 +258,12 @@ export function buildMatchupScoutLine(
   const pitches = pitBox?.pitchesThrown ?? 0;
   const endPct = fatigueToEndurance(pitchingSide.pitcherFatigue);
   const favPitch = pitcher.pitchArsenal
-    ? ` • ★ ${PITCH_TYPE_SHORT_LABELS[pitcher.pitchArsenal.favoritePitch]}`
+    ? `·★${PITCH_TYPE_SHORT_LABELS[pitcher.pitchArsenal.favoritePitch]}`
     : '';
 
   return {
-    batterLine: `${batSide} • ${formatBatterScoutStat(batter)}${formatScoutFormTag(batter.formState)}`,
-    pitcherLine: `${pitcher.throws}HP • ${pitches} P • ${endPct}%${favPitch}`,
+    batterLine: `${batSide} · ${formatBatterScoutStat(batter)}${formatScoutFormTag(batter.formState)}`,
+    pitcherLine: `${pitcher.throws}HP·${pitches}P·${endPct}%${favPitch}`,
   };
 }
 

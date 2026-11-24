@@ -136,6 +136,7 @@ import {
   type GameSessionState,
 } from '../../engine/simulation/gameState';
 import {
+  DEFENSIVE_SHIFTS,
   estimateHomeWinProbability,
   evaluateBullpenWarmup,
   tickBullpenWarmups,
@@ -2333,7 +2334,8 @@ export function GameDayScreen({
         className="live-score-row sticky top-[62px] md:top-2 z-20"
       >
         <ScoreboardStrip
-          clubs={guiding && !showMore ? {away:liveAwayClub.name, home:liveHomeClub.name, humanHome:shown.home.isHuman} : undefined}
+          clubs={{ away: liveAwayClub.name, home: liveHomeClub.name, humanHome: shown.home.isHuman }}
+          desktopFull={!(guiding && !showMore)}
           flash={readout ? { ...readout, seq: playbackEvent!.seq } : null}
           awayAbbr={liveAwayClub.colors.monogram}
           awayScore={resultShown?.awayScore ?? shown.away.score}
@@ -2540,6 +2542,17 @@ export function GameDayScreen({
               firstPitchTip={firstPitchTip}
               bullpenOptions={humanIsBatting ? [] : arcadeBullpenOptions}
               buntPreviewLine={buntPreviewLine}
+              defensiveShift={defensiveShift}
+              onSelectDefensiveShift={(shift) => {
+                setDefensiveShift(shift);
+                soundEngine.play('ui_pop');
+              }}
+              aiDefenseShiftLabel={
+                humanIsBatting
+                  ? (DEFENSIVE_SHIFTS.find((s) => s.id === chooseAiDefensiveShift(liveSession))
+                      ?.shortLabel ?? null)
+                  : null
+              }
               pitcherArsenal={humanIsBatting ? [] : livePitcherSignOptions}
               selectedPitchType={selectedPitchType}
               onSelectPitchType={(pt) => {

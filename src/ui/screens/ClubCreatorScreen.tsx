@@ -150,20 +150,54 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
     return { draft, club: homeClub, series, moment };
   }, [editing, city, clubName, mascot, monogram, managerName, startingPreset, palette, enableInjuries, enableIllnesses, seedNonce]);
 
+  const handleCycleCoverMascot = () => {
+    const currentIdx = MASCOT_ANIMAL_OPTIONS.findIndex(
+      (opt) => mascot.toLowerCase().includes(opt.id) || mascot === opt.mascotName,
+    );
+    const nextOpt = MASCOT_ANIMAL_OPTIONS[(currentIdx + 1) % MASCOT_ANIMAL_OPTIONS.length];
+    setMascot(nextOpt.mascotName);
+    setTipCount((n) => n + 1);
+    soundEngine.play('ui_pop');
+  };
+
   if (opening) {
     const { club, series, moment, draft } = opening;
     return <section className="opening-cover" aria-label="Your club">
       <div className="opening-club">
-        <ClubMascotBuddy
-          mascot={club.mascot}
-          primaryColor={club.colors.primary}
-          secondaryColor={club.colors.secondary}
-          accentColor={club.colors.accent}
-          mood="happy"
-          size="md"
-        />
-        <div><strong data-testid="creator-club-identity">{club.city} {club.name}</strong><small>{club.mascot}</small></div>
-        <button onClick={() => setEditing(true)}>Change club</button>
+        <button
+          type="button"
+          data-testid="cover-mascot-cycle-btn"
+          aria-label="Cycle mascot buddy"
+          title="Tap to swap your cute mascot buddy!"
+          onClick={handleCycleCoverMascot}
+          className="opening-mascot-btn"
+        >
+          <ClubMascotBuddy
+            mascot={club.mascot}
+            primaryColor={club.colors.primary}
+            secondaryColor={club.colors.secondary}
+            accentColor={club.colors.accent}
+            mood={tipCount > 0 ? 'cheering' : 'happy'}
+            size="md"
+          />
+        </button>
+        <div className="min-w-0 flex-1">
+          <strong data-testid="creator-club-identity">{club.city} {club.name}</strong>
+          <small>{club.mascot} · tap mascot</small>
+          {tipCount > 0 ? (
+            <div data-testid="cover-mascot-quip" className="opening-mascot-quip">
+              {mascotCheer}
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          aria-label="Change club"
+          className="opening-customize-pill"
+          onClick={() => setEditing(true)}
+        >
+          🎨 Customize
+        </button>
       </div>
       <OpeningDayPrint cover session={moment.session} opponentLabel={(series.isHome ? 'vs ' : '@ ') + series.opponent.name}
         onInspect={setInspected} onStart={() => {

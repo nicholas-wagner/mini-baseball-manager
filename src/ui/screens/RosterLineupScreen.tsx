@@ -307,9 +307,9 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <ComicCard
-        title={`${humanClub.city} ${humanClub.name} Clubhouse`}
+        title={`${humanClub.city} ${humanClub.name} Roster`}
         subtitle={`Record ${humanClub.wins}-${humanClub.losses} • Roster ${humanClub.roster.length}/${MAX_ACTIVE_ROSTER_SIZE} • Payroll $${clubPayroll.toLocaleString()}/$${salaryCap.toLocaleString()} • Cash $${humanClub.economy.cash.toLocaleString()} • Hype ${humanClub.economy.teamHype}/100`}
         headerBg={humanClub.colors.secondary}
         badge={
@@ -381,67 +381,75 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
         ) : null}
 
         {rosterView === 'lineup' ? (
-          <div
+          <details
             data-testid="coed-synergy-banner"
-            className="mb-3 px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-[#1D3557]"
+            className="mb-2.5 px-3 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] text-xs font-bold text-[#1D3557]"
           >
-            <span className="font-display">
-              Clubhouse Synergy: {coEdSynergy.label} ({coEdSynergy.maleCount}M / {coEdSynergy.femaleCount}F)
-            </span>
-            <span>{coEdSynergy.summary}</span>
-          </div>
+            <summary className="cursor-pointer font-display text-[11px] sm:text-xs flex items-center justify-between gap-2 list-none">
+              <span className="truncate">
+                ✨ Synergy: {coEdSynergy.label} ({coEdSynergy.maleCount}M / {coEdSynergy.femaleCount}F)
+              </span>
+              <span className="text-[10px] font-heading font-extrabold underline shrink-0">
+                Details ▾
+              </span>
+            </summary>
+            <p className="mt-1 text-[11px] font-bold text-[#1D3557]/90">{coEdSynergy.summary}</p>
+          </details>
         ) : null}
 
-        {/* Mobile & Desktop Quick Switch: Lineup vs Stat Card Binder vs Illustrated Print Gallery */}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4]">
-          <div className="flex flex-wrap gap-2">
+        {/* Crisp 1-Row 3-Column Segmented Switch: Lineup | Cards | Gallery */}
+        <div className="mb-3 space-y-1 p-1.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4]">
+          <div data-testid="roster-view-tabs" className="grid grid-cols-3 gap-1.5 w-full">
             <ComicButton
               size="sm"
               data-testid="roster-view-lineup-btn"
               variant={rosterView === 'lineup' ? 'gold' : 'cream'}
               active={rosterView === 'lineup'}
+              className="w-full px-1.5 text-[11px] sm:text-xs whitespace-nowrap"
               onClick={() => {
                 setRosterView('lineup');
                 setPrintGallery(false);
                 soundEngine.play('ui_pop');
               }}
             >
-              📋 Lineup &amp; Roster
+              📋 Lineup
             </ComicButton>
             <ComicButton
               size="sm"
               data-testid="roster-view-cards-btn"
               variant={rosterView === 'cards' && !printGallery ? 'coral' : 'cream'}
               active={rosterView === 'cards' && !printGallery}
+              className="w-full px-1.5 text-[11px] sm:text-xs whitespace-nowrap"
               onClick={() => {
                 setRosterView('cards');
                 setPrintGallery(false);
                 soundEngine.play('card_flip');
               }}
             >
-              🃏 Roster Cards ({humanClub.roster.length})
+              🃏 Cards ({humanClub.roster.length})
             </ComicButton>
             <ComicButton
               size="sm"
               data-testid="roster-view-gallery-btn"
               variant={rosterView === 'cards' && printGallery ? 'turf' : 'cream'}
               active={rosterView === 'cards' && printGallery}
+              className="w-full px-1.5 text-[11px] sm:text-xs whitespace-nowrap"
               onClick={() => {
                 setRosterView('cards');
                 setPrintGallery(true);
                 soundEngine.play('card_flip');
               }}
             >
-              🖼️ Art Gallery
+              🖼️ Gallery
             </ComicButton>
           </div>
-          <span className="text-[11px] font-bold text-[#4A5068]">
+          <div className="text-[10.5px] font-bold text-[#4A5068] px-1">
             {rosterView === 'cards'
               ? printGallery
                 ? 'Tap a print to enlarge it.'
                 : 'Tap any card to flip, star, or nickname!'
-              : 'Tap 🃏 Card on any player to inspect instantly'}
-          </span>
+              : 'Tap any player row to flip their illustrated 90s card'}
+          </div>
         </div>
 
         {rosterView === 'cards' ? (
@@ -599,16 +607,18 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                   return (
                     <div
                       key={slot.orderIndex}
-                      className={`p-2.5 rounded-xl border-2 border-[#181B2C] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+                      className={`p-2 rounded-xl border-2 border-[#181B2C] flex items-center justify-between gap-1.5 ${
                         isSelected ? 'bg-[#FFF3BF]' : 'bg-[#FFFDF7]'
                       }`}
                     >
                       <button
                         type="button"
-                        onClick={() => setInspectedPlayerId(player.id)}
+                        data-testid="roster-open-card-btn"
+                        aria-label={`View card for ${player.name}`}
+                        onClick={() => openCardModalFor(player.id)}
                         className="flex items-center gap-2 text-left min-w-0 flex-1 min-h-[44px] cursor-pointer"
                       >
-                        <span className="w-7 h-7 rounded-lg bg-[#181B2C] text-[#FFD166] font-display text-xs flex items-center justify-center shrink-0">
+                        <span className="w-6 h-6 rounded-lg bg-[#181B2C] text-[#FFD166] font-display text-[11px] flex items-center justify-center shrink-0">
                           {idx + 1}
                         </span>
                         <PlayerPortraitBadge
@@ -619,30 +629,31 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                           testId="roster-lineup-portrait"
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-display text-sm sm:text-xs text-[#181B2C] leading-tight">
-                              {isFavPlayer ? '⭐ ' : ''}
-                              {player.name}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded-md bg-[#1B4332] text-[#FBF4E4] font-display text-[10px] shrink-0">
+                          <div className="font-display text-xs sm:text-sm text-[#181B2C] leading-tight truncate">
+                            {isFavPlayer ? '⭐ ' : ''}
+                            {player.name}
+                          </div>
+                          <div
+                            title={`Bats ${player.bats} / Throws ${player.throws} • Pos: ${eligibleList}`}
+                            className="mt-1 flex flex-wrap items-center gap-1 text-[10px] font-bold text-[#4A5068]"
+                          >
+                            <span className="px-1 py-0.5 rounded bg-[#1B4332] text-[#FBF4E4] font-display text-[9px] shrink-0">
                               {slot.defensivePosition}
                             </span>
                             <FlagBadge nationalityId={player.nationalityId} size="sm" />
-                            <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] font-extrabold shrink-0">
-                              OVR {ovr}
+                            <span className="px-1 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[9px] font-extrabold shrink-0">
+                              {ovr}
                             </span>
-                          </div>
-                          <div
-                            title={`Bats ${player.bats} / Throws ${player.throws}`}
-                            className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] font-bold text-[#4A5068]"
-                          >
-                            <span>
-                              {player.bats}/{player.throws} • {SPECIALIST_LABELS[player.specialistArchetype]} • Pos: {eligibleList}
+                            <span className="shrink-0">
+                              {player.bats}/{player.throws}
+                            </span>
+                            <span className="hidden sm:inline truncate">
+                              · {SPECIALIST_LABELS[player.specialistArchetype]}
                             </span>
                             {posEval.isFavorite ? (
                               <span
                                 title="Natural Favorite Position (+5 Fielding boost!)"
-                                className="px-1.5 py-0.5 rounded bg-[#FFC300] text-[#181B2C] text-[10px] font-extrabold"
+                                className="px-1 py-0.5 rounded bg-[#FFC300] text-[#181B2C] text-[9px] font-extrabold shrink-0"
                               >
                                 ★ FAV
                               </span>
@@ -650,9 +661,9 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                             {posEval.isOutOfPosition ? (
                               <span
                                 title="Learning Position (Out of Position — Auto-Optimize or Cross-Train!)"
-                                className="px-1.5 py-0.5 rounded bg-[#FF4D6D] text-white text-[10px] font-extrabold"
+                                className="px-1 py-0.5 rounded bg-[#FF4D6D] text-white text-[9px] font-extrabold shrink-0"
                               >
-                                ⚠️ Learning Pos
+                                ⚠️ Pos
                               </span>
                             ) : null}
                             {renderFormBadge(player.formState)}
@@ -660,7 +671,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                         </div>
                       </button>
 
-                      <div className="flex items-center justify-end gap-1.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-dashed border-[#181B2C]/15">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           data-testid="roster-star-btn"
@@ -670,7 +681,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                             toggleFavoritePlayer(player.id);
                             soundEngine.play('ui_pop');
                           }}
-                          className={`min-h-[44px] min-w-[44px] rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer transition ${
+                          className={`min-h-[38px] min-w-[36px] rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer transition ${
                             isFavPlayer
                               ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
                               : 'bg-[#FBF4E4] text-[#4A5068] hover:bg-[#FFF3BF]'
@@ -680,22 +691,15 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                         </button>
                         <ComicButton
                           size="sm"
-                          variant="sky"
-                          data-testid="roster-open-card-btn"
-                          aria-label={`View card for ${player.name}`}
-                          onClick={() => openCardModalFor(player.id)}
-                        >
-                          🃏 Card
-                        </ComicButton>
-                        <ComicButton
-                          size="sm"
                           variant={isSelected ? 'coral' : 'cream'}
                           active={isSelected}
                           icon={<ArrowLeftRight className="w-3.5 h-3.5" />}
                           aria-label={`Swap slot ${idx + 1}`}
                           onClick={() => handleSlotSwapClick(idx, player.id)}
+                          className="px-1.5 sm:px-2.5 min-h-[38px] text-[10.5px] sm:text-xs"
                         >
-                          {isSelected ? 'Selected' : 'Swap'}
+                          <span className="hidden sm:inline">{isSelected ? 'Selected' : 'Swap'}</span>
+                          <span className="sm:hidden">{isSelected ? 'Pick' : 'Swap'}</span>
                         </ComicButton>
                       </div>
                     </div>

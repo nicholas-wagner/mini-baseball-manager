@@ -1,6 +1,8 @@
 import { useState } from 'react';
 interface ScoreboardStripProps {
   clubs?: {away: string; home: string; humanHome: boolean};
+  /** When true alongside `clubs`, shows the compact 1-line expandable bar on mobile (<640px) and the full R/H/E strip on desktop (>=640px). */
+  desktopFull?: boolean;
   awayAbbr: string;
   awayScore: number;
   awayHits?: number;
@@ -88,6 +90,7 @@ function MiniBasesDiamond({ bases, highlight }: { bases: readonly [boolean, bool
 
 export function ScoreboardStrip({
   clubs,
+  desktopFull = false,
   awayAbbr,
   awayScore,
   awayHits = 0,
@@ -108,13 +111,15 @@ export function ScoreboardStrip({
   flash,
 }: ScoreboardStripProps) {
   const [expanded, setExpanded] = useState(false);
+  const guidedCollapsible = Boolean(clubs && !desktopFull);
+  const showFullBlock = !guidedCollapsible || expanded;
   return (
     <div
       role="region"
       aria-label="Live Baseball Scoreboard"
-      className="bg-[#1B4332] text-[#FBF4E4] border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] rounded-2xl px-2 sm:px-3 py-1.5 sm:py-2 flex flex-wrap items-center justify-between gap-2"
+      className="bg-[#1B4332] text-[#FBF4E4] border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] rounded-2xl px-2 sm:px-3 py-1 sm:py-2 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2"
     >
-      {clubs && <button className="guided-line" type="button"
+      {guidedCollapsible && clubs && <button className="guided-line" type="button"
         aria-expanded={expanded} onClick={() => setExpanded(open => !open)}>
         <span className="sr-only">Toggle line score</span>
         <span className="guided-teams">
@@ -134,9 +139,9 @@ export function ScoreboardStrip({
           <span aria-hidden="true">{expanded ? '▴' : '▾'}</span>
         </span>
       </button>}
-      {(!clubs || expanded) && <>
-      <div className="bg-[#122D21] border-2 border-[#0B1E16] rounded-xl px-2 py-1 min-w-[175px] sm:min-w-[215px]">
-        <div className="grid grid-cols-[1fr_24px_24px_24px] gap-x-1 text-[9px] font-extrabold uppercase tracking-wider text-[#89C2A5] border-b border-[#245842] pb-0.5">
+      {showFullBlock && <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full">
+      <div className="bg-[#122D21] border-2 border-[#0B1E16] rounded-xl px-1.5 sm:px-2 py-0.5 sm:py-1 min-w-[136px] sm:min-w-[215px]">
+        <div className="hidden sm:grid grid-cols-[1fr_24px_24px_24px] gap-x-1 text-[9px] font-extrabold uppercase tracking-wider text-[#89C2A5] border-b border-[#245842] pb-0.5">
           <span>TEAM</span>
           <span className="text-center text-[#FFC300]">R</span>
           <span className="text-center">H</span>
@@ -145,11 +150,11 @@ export function ScoreboardStrip({
 
         <div
           data-testid="scoreboard-away-rhe"
-          className="grid grid-cols-[1fr_24px_24px_24px] gap-x-1 items-center text-xs sm:text-sm font-mono-tabular pt-0.5"
+          className="grid grid-cols-[1fr_20px_20px_20px] sm:grid-cols-[1fr_24px_24px_24px] gap-x-0.5 sm:gap-x-1 items-center text-[11px] sm:text-sm font-mono-tabular sm:pt-0.5"
         >
-          <span className="flex items-center gap-1.5 font-display text-[11px] sm:text-xs tracking-wider">
+          <span className="flex items-center gap-1 sm:gap-1.5 font-display text-[10.5px] sm:text-xs tracking-wider">
             <span
-              className="w-2.5 h-2.5 rounded-full border border-white/80 shrink-0"
+              className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-white/80 shrink-0"
               style={{ backgroundColor: awayColor }}
             />
             <span className={half === 'TOP' ? 'text-[#FFD166]' : 'text-[#FBF4E4]'}>{awayAbbr}</span>
@@ -161,11 +166,11 @@ export function ScoreboardStrip({
 
         <div
           data-testid="scoreboard-home-rhe"
-          className="grid grid-cols-[1fr_24px_24px_24px] gap-x-1 items-center text-xs sm:text-sm font-mono-tabular"
+          className="grid grid-cols-[1fr_20px_20px_20px] sm:grid-cols-[1fr_24px_24px_24px] gap-x-0.5 sm:gap-x-1 items-center text-[11px] sm:text-sm font-mono-tabular"
         >
-          <span className="flex items-center gap-1.5 font-display text-[11px] sm:text-xs tracking-wider">
+          <span className="flex items-center gap-1 sm:gap-1.5 font-display text-[10.5px] sm:text-xs tracking-wider">
             <span
-              className="w-2.5 h-2.5 rounded-full border border-white/80 shrink-0"
+              className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border border-white/80 shrink-0"
               style={{ backgroundColor: homeColor }}
             />
             <span className={half === 'BOT' ? 'text-[#FFD166]' : 'text-[#FBF4E4]'}>{homeAbbr}</span>
@@ -177,27 +182,27 @@ export function ScoreboardStrip({
       </div>
 
       {/* Inning + Base Diamond + B/S/O Count Lamps + Numeric Count */}
-      {!clubs && <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
-        <div className="px-2 sm:px-2.5 py-1 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] font-mono-tabular text-xs sm:text-sm font-extrabold text-[#FFD166]">
+      {!guidedCollapsible && <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+        <div className="px-1.5 sm:px-2.5 py-1 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] font-mono-tabular text-[11px] sm:text-sm font-extrabold text-[#FFD166] whitespace-nowrap">
           {half === 'TOP' ? '▲' : '▼'} {inning}
         </div>
 
-        <div className="px-1.5 py-0.5 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] flex items-center gap-1.5">
+        <div className="px-1.5 py-0.5 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] flex items-center gap-1 sm:gap-1.5">
           <MiniBasesDiamond key={flash?.seq} bases={bases} highlight={flash?.base} />
           <div className="flex flex-col leading-tight">
             <span
               data-testid="scoreboard-count-text"
-              className="font-mono-tabular text-xs font-extrabold text-[#FFD166]"
+              className="font-mono-tabular text-[11px] sm:text-xs font-extrabold text-[#FFD166]"
             >
               {balls}-{strikes}
             </span>
-            <span className="font-mono-tabular text-[9px] font-extrabold text-[#FF8FA3]">
+            <span className="font-mono-tabular text-[8.5px] sm:text-[9px] font-extrabold text-[#FF8FA3] whitespace-nowrap">
               {outs} OUT{outs === 1 ? '' : 'S'}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] font-extrabold tracking-wider text-[#B8DEC9] bg-[#122D21] px-2 py-1 rounded-xl border-2 border-[#0B1E16]">
+        <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 text-[10px] font-extrabold tracking-wider text-[#B8DEC9] bg-[#122D21] px-2 py-1 rounded-xl border-2 border-[#0B1E16]">
           <span key={'Balls' + flash?.seq} className={'flex items-center gap-1 rounded ' + (flash?.lamp === 'balls' ? 'count-flash' : '')} aria-label={`Balls ${balls}`}>
             B <LedDots count={balls} max={3} activeColor="#2FB356" />
           </span>
@@ -215,7 +220,7 @@ export function ScoreboardStrip({
           </span>
         ) : null}
       </div>}
-      </>}
+      </div>}
     </div>
   );
 }
