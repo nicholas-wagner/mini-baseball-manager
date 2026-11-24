@@ -274,6 +274,16 @@ export function GameDayScreen({
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const gameLog = useRef<PlayEvent[]>([]);
   const guidedPitchEvents = useRef(new Set<number>());
+  const fullSeasonSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (openingSeasonExpanded) {
+      fullSeasonSectionRef.current?.scrollIntoView?.({
+        behavior: 'auto',
+        block: 'start',
+      });
+    }
+  }, [openingSeasonExpanded]);
   const [entranceCue, setEntranceCue] = useState<PlayerEntranceCue | null>(null);
   const finishEntrance = useCallback(() => setEntranceCue(null), []);
   const [guidedHalf, setGuidedHalf] = useState<string | null>(null);
@@ -1129,21 +1139,21 @@ export function GameDayScreen({
           </div>
         ) : null}
 
-        {/* Opening Day Cute "Meet Your 3 Stars" Manga Card Showcase (Moment #3 on Opening Day!) */}
+        {/* Opening Day Cute "Meet Your 3 Stars" Manga Card Showcase (Compact 3-col strip on mobile!) */}
         {spotlightTrio.length > 0 ? (
           <div
             data-testid="meet-your-squad-card"
-            className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFF8E7] shadow-[4px_4px_0_#181B2C] space-y-2.5"
+            className="p-2.5 sm:p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFF8E7] shadow-[4px_4px_0_#181B2C] space-y-2"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-display text-xs sm:text-sm text-[#181B2C]">
-                🌟 MEET YOUR {humanClub.name.toUpperCase()} STARS! (Tap Any Card to Flip!)
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-display text-[11px] sm:text-sm text-[#181B2C] leading-tight">
+                🌟 MEET YOUR {humanClub.name.toUpperCase()} STARS! (Tap to Flip)
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-[#FFC300] border border-[#181B2C] text-[10px] font-extrabold text-[#181B2C]">
+              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-[#FFC300] border border-[#181B2C] text-[10px] font-extrabold text-[#181B2C] shrink-0">
                 OPENING DAY SQUAD
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div data-testid="squad-star-grid" className="grid grid-cols-3 gap-1.5 sm:gap-2">
               {spotlightTrio.map((star) => (
                 <button
                   key={star.player.id}
@@ -1153,7 +1163,7 @@ export function GameDayScreen({
                     setPreGameScoutPlayerId(star.player.id);
                     soundEngine.play('card_flip');
                   }}
-                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] flex items-center gap-2.5 text-left cursor-pointer shadow-[2px_2px_0_#181B2C]"
+                  className="p-1.5 sm:p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] flex flex-col sm:flex-row items-center text-center sm:text-left gap-1 sm:gap-2.5 cursor-pointer shadow-[2px_2px_0_#181B2C] min-w-0"
                 >
                   <PlayerPortraitBadge
                     player={star.player}
@@ -1161,14 +1171,15 @@ export function GameDayScreen({
                     accentColor={humanClub.colors.accent}
                     size="sm"
                   />
-                  <div className="min-w-0">
-                    <div className="text-[9px] font-extrabold uppercase text-[#7209B7]">
+                  <div className="min-w-0 w-full">
+                    <div className="text-[8.5px] sm:text-[9px] font-extrabold uppercase text-[#7209B7] truncate">
                       {star.roleBadge}
                     </div>
-                    <div className="font-display text-xs text-[#181B2C] truncate">
-                      {star.player.name} ({star.player.position})
+                    <div className="font-display text-[10.5px] sm:text-xs text-[#181B2C] leading-tight truncate">
+                      {star.player.name}
+                      <span className="hidden sm:inline"> ({star.player.position})</span>
                     </div>
-                    <div className="text-[10px] font-bold text-[#4A5068] truncate">
+                    <div className="hidden sm:block text-[10px] font-bold text-[#4A5068] truncate">
                       {star.tagline}
                     </div>
                   </div>
@@ -1178,7 +1189,7 @@ export function GameDayScreen({
           </div>
         ) : null}
 
-        {/* Calm Opening Day Progressive Disclosure Toggle (Auto-expands once Game 1 is complete!) */}
+        {/* Calm Opening Day Progressive Disclosure Toggle (Auto-scrolls newly revealed options into view on mobile!) */}
         {isOpeningDay ? (
           <button
             type="button"
@@ -1188,24 +1199,24 @@ export function GameDayScreen({
               setOpeningSeasonExpanded((v) => !v);
               soundEngine.play('ui_pop');
             }}
-            className="w-full p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C] flex flex-wrap items-center justify-between gap-2 text-left cursor-pointer min-h-[48px] transition"
+            className="w-full p-2.5 sm:p-3 rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C] flex items-center justify-between gap-2 text-left cursor-pointer min-h-[48px] transition"
           >
             <div className="min-w-0">
               <div className="font-display text-xs sm:text-sm text-[#181B2C]">
                 📋 Full Season &amp; GM Options {openingSeasonExpanded ? '▴' : '▾'}
               </div>
-              <div className="text-[11px] font-bold text-[#4A5068]">
-                Full 5/7/9-Inn Game • 7-Series Schedule • 30s HR Derby • Trophy Album • GM Clipboard
+              <div className="text-[10.5px] sm:text-[11px] font-bold text-[#4A5068] truncate sm:whitespace-normal">
+                5/7/9-Inn Game • 7-Series Schedule • HR Derby • GM Clipboard
               </div>
             </div>
-            <span className="px-2.5 py-1 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] text-[#1D3557] font-display text-[11px] shrink-0">
-              {openingSeasonExpanded ? 'Hide Options' : 'Show Options'}
+            <span className="px-2.5 py-1 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] text-[#1D3557] font-display text-[10.5px] sm:text-[11px] shrink-0">
+              {openingSeasonExpanded ? 'Hide' : 'Show Options'}
             </span>
           </button>
         ) : null}
 
         {showFullSeasonHub ? (
-          <div className="space-y-4">
+          <div ref={fullSeasonSectionRef} className="space-y-4 scroll-mt-20">
         {lastSeriesRecap ? (
           <div
             data-testid="series-recap-card"

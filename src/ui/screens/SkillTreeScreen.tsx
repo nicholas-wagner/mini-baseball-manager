@@ -206,53 +206,66 @@ export function SkillTreeScreen() {
         subtitle={`${humanClub.city} ${humanClub.name} • Cash $${humanClub.economy.cash.toLocaleString()} • Spend SP to evolve specialists & unlock scarce finishers`}
         headerBg="#1D3557"
       >
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {/* Roster Selector Strip (SP-ready players & ⭐ Favorites sorted first!) */}
-          <div data-testid="skill-tree-player-strip" className="flex gap-2 overflow-x-auto pb-1">
-            {sortedRoster.map((p) => {
-              const selected = p.id === player.id;
-              const isFav = favoritePlayerIds.includes(p.id);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPlayerId(p.id);
-                    setActiveBranch(null);
-                    setFeedback(null);
-                  }}
-                  className={`shrink-0 px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] text-left min-h-[44px] cursor-pointer transition ${
-                    selected
-                      ? 'bg-[#FFC300] shadow-[3px_3px_0_#181B2C]'
-                      : p.skillPoints > 0
-                        ? 'bg-[#FFF3BF]'
-                        : 'bg-[#FFFDF7]'
-                  }`}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-[#4A5068]">
+              <span>Select Player (swipe →)</span>
+              {sortedRoster.filter((p) => p.skillPoints > 0).length > 0 ? (
+                <span
+                  data-testid="skill-tree-ready-hint"
+                  className="px-1.5 py-0.5 rounded bg-[#E63946] text-white text-[9.5px] font-display"
                 >
-                  <div className="flex items-center gap-1.5 font-display text-xs text-[#181B2C]">
-                    <PlayerPortraitBadge
-                      player={p}
-                      primaryColor={humanClub.colors.primary}
-                      accentColor={humanClub.colors.accent}
-                      size="xs"
-                    />
-                    <FlagBadge nationalityId={p.nationalityId} size="sm" />
-                    <span>
-                      {isFav ? '⭐ ' : ''}
-                      {p.position} {p.name}
-                    </span>
-                    {p.skillPoints > 0 ? (
-                      <span className="px-1.5 py-0.5 rounded bg-[#E63946] text-white text-[9px] font-display">
-                        ⚡ {p.skillPoints} SP
+                  ⚡ {sortedRoster.filter((p) => p.skillPoints > 0).length} ready →
+                </span>
+              ) : null}
+            </div>
+            <div data-testid="skill-tree-player-strip" className="flex gap-2 overflow-x-auto pb-1">
+              {sortedRoster.map((p) => {
+                const selected = p.id === player.id;
+                const isFav = favoritePlayerIds.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPlayerId(p.id);
+                      setActiveBranch(null);
+                      setFeedback(null);
+                    }}
+                    className={`shrink-0 px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] text-left min-h-[44px] cursor-pointer transition ${
+                      selected
+                        ? 'bg-[#FFC300] shadow-[3px_3px_0_#181B2C]'
+                        : p.skillPoints > 0
+                          ? 'bg-[#FFF3BF]'
+                          : 'bg-[#FFFDF7]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-display text-xs text-[#181B2C]">
+                      <PlayerPortraitBadge
+                        player={p}
+                        primaryColor={humanClub.colors.primary}
+                        accentColor={humanClub.colors.accent}
+                        size="xs"
+                      />
+                      <FlagBadge nationalityId={p.nationalityId} size="sm" />
+                      <span>
+                        {isFav ? '⭐ ' : ''}
+                        {p.position} {p.name}
                       </span>
-                    ) : null}
-                  </div>
-                  <div className="text-[10px] font-extrabold text-[#4A5068]">
-                    LV.{p.level} • {p.skillPoints} SP • OVR {computePlayerOverall(p)}
-                  </div>
-                </button>
-              );
-            })}
+                      {p.skillPoints > 0 ? (
+                        <span className="px-1.5 py-0.5 rounded bg-[#E63946] text-white text-[9px] font-display">
+                          ⚡ {p.skillPoints} SP
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-[10px] font-extrabold text-[#4A5068]">
+                      LV.{p.level} • {p.skillPoints} SP • OVR {computePlayerOverall(p)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {feedback ? (
@@ -264,27 +277,30 @@ export function SkillTreeScreen() {
             </div>
           ) : null}
 
-          {/* Selected Player Summary Header with Cute Manga Portrait */}
-          <div className="p-2.5 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2.5 min-w-0">
+          {/* Compact Selected Player Summary Bar */}
+          <div
+            data-testid="skill-tree-player-summary"
+            className="p-2 sm:p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2"
+          >
+            <div className="flex items-center gap-2 min-w-0">
               <PlayerPortraitBadge
                 player={player}
                 primaryColor={humanClub.colors.primary}
                 accentColor={humanClub.colors.accent}
-                size="md"
+                size="xs"
                 testId="skill-tree-player-portrait"
               />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <FlagBadge nationalityId={player.nationalityId} />
-                  <span className="font-display text-sm text-[#181B2C]">
+                  <FlagBadge nationalityId={player.nationalityId} size="sm" />
+                  <span className="font-display text-xs sm:text-sm text-[#181B2C] truncate">
                     {player.name} ({player.position})
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[11px]">
+                  <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[10px]">
                     {player.skillPoints} SP Available
                   </span>
                 </div>
-                <div className="text-[11px] font-bold text-[#4A5068] mt-0.5">
+                <div className="text-[10.5px] font-bold text-[#4A5068]">
                   {SPECIALIST_LABELS[player.specialistArchetype]} • Powers:{' '}
                   {player.equippedPowerIds.length}/{maxPowerSlots} • Heritage:{' '}
                   {player.heritageTierUnlocked}/3
@@ -304,11 +320,11 @@ export function SkillTreeScreen() {
           </div>
 
           {/* 3-Tier Cultural Heritage Branch (TASK-020) */}
-          <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#F6EEFF] space-y-2.5">
+          <div className="p-2.5 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#F6EEFF] space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 font-display text-xs text-[#4A148C]">
-                <Star className="w-4 h-4 fill-[#FFC300] text-[#181B2C]" />
-                {heritageBranch.nationName} Heritage Branch: {heritageBranch.ability.name} (
+                <Star className="w-4 h-4 fill-[#FFC300] text-[#181B2C] shrink-0" />
+                {heritageBranch.nationName} Heritage: {heritageBranch.ability.name} (
                 {heritageBranch.ability.mythOrAnimal})
               </div>
               <ComicButton
@@ -322,21 +338,21 @@ export function SkillTreeScreen() {
                   : `Unlock Tier ${player.heritageTierUnlocked + 1} (${nextHeritage.nextTier?.spCost ?? 0} SP)`}
               </ComicButton>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               {heritageBranch.tiers.map((tierNode) => {
                 const owned = player.heritageTierUnlocked >= tierNode.tier;
                 return (
                   <div
                     key={tierNode.tier}
-                    className={`p-2.5 rounded-xl border-2 border-[#181B2C] ${
+                    className={`p-2 sm:p-2.5 rounded-xl border-2 border-[#181B2C] ${
                       owned ? 'bg-[#D8F3DC]' : 'bg-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-xs font-display text-[#181B2C]">
-                      <span>{tierNode.title}</span>
-                      <span>{owned ? '✓' : `${tierNode.spCost} SP`}</span>
+                    <div className="flex items-center justify-between gap-1 text-[10px] sm:text-xs font-display text-[#181B2C]">
+                      <span className="truncate">Tier {tierNode.tier}</span>
+                      <span className="shrink-0">{owned ? '✓' : `${tierNode.spCost} SP`}</span>
                     </div>
-                    <p className="text-[11px] font-bold text-[#4A5068] mt-1">
+                    <p className="text-[10px] sm:text-[11px] font-bold text-[#4A5068] mt-1 leading-snug">
                       {tierNode.description}
                     </p>
                   </div>

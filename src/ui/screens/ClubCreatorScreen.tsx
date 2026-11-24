@@ -222,16 +222,29 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
         title="⚾ FOUND YOUR 90s SANDLOT CLUB — PICK YOUR TEAM!"
         subtitle="Jump onto the 3D Sandlot diamond in 5 seconds • Collect 90s manga cards & chase the Mini Majors!"
         headerBg="#1B4332"
+        badge={
+          <button
+            type="button"
+            data-testid="creator-back-btn"
+            onClick={() => {
+              setEditing(false);
+              soundEngine.play('ui_pop');
+            }}
+            className="px-2.5 py-1.5 min-h-[38px] rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-[#181B2C] font-heading font-extrabold text-xs shadow-[2px_2px_0_#181B2C] cursor-pointer whitespace-nowrap"
+          >
+            ← Back
+          </button>
+        }
       >
-        <form onSubmit={handleSubmit} className="club-customizer space-y-4">
+        <form onSubmit={handleSubmit} className="club-customizer space-y-3">
           {/* 1. Above-the-Fold 5-Second Toy Box Hero (Quick Club + Cute Mascot + Fanned Manga Cards + BIG PLAY BUTTON!) */}
-          <div className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_270px] gap-4 items-center">
-            <div className="space-y-3">
-              <div data-testid="quick-club-presets" className="space-y-1.5">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+          <div className="p-2.5 sm:p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_270px] gap-2.5 sm:gap-4 items-center">
+            <div className="space-y-2.5">
+              <div data-testid="quick-club-presets" className="space-y-1">
+                <div className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
                   ⚡ Step 1: Pick a Cute Starter Club
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
                   {QUICK_STARTER_CLUBS.map((preset) => {
                     const isActive = city === preset.city && clubName === preset.clubName;
                     return (
@@ -246,13 +259,13 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                           setPaletteIndex(preset.paletteIndex % SAMPLE_TEAM_PALETTES.length);
                           soundEngine.play('ui_pop');
                         }}
-                        className={`p-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[52px] cursor-pointer transition ${
+                        className={`p-1.5 sm:p-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[46px] cursor-pointer transition ${
                           isActive
                             ? 'bg-[#FFC300] shadow-[3px_3px_0_#181B2C]'
                             : 'bg-[#FFFDF7] hover:bg-[#FFF3BF]'
                         }`}
                       >
-                        <div className="font-display text-xs text-[#181B2C]">
+                        <div className="font-display text-[11px] sm:text-xs text-[#181B2C] leading-tight">
                           {preset.emoji} {preset.label}
                         </div>
                         <div className="text-[10px] font-bold text-[#4A5068] truncate">
@@ -264,11 +277,14 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                 </div>
               </div>
 
-              <div data-testid="mascot-animal-picker" className="space-y-1.5">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+              <div data-testid="mascot-animal-picker" className="space-y-1">
+                <div className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
                   🐾 Step 2: Pick Your Team Mascot Buddy
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div
+                  data-testid="mascot-picker-grid"
+                  className="grid grid-cols-5 gap-1 sm:gap-1.5"
+                >
                   {MASCOT_ANIMAL_OPTIONS.map((opt) => {
                     const selected = mascot.toLowerCase().includes(opt.id) || mascot === opt.mascotName;
                     return (
@@ -280,23 +296,27 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                           setTipCount(n => n + 1);
                           soundEngine.play('ui_pop');
                         }}
-                        className={`px-2.5 py-1.5 min-h-[44px] rounded-xl border-2 border-[#181B2C] text-xs font-extrabold cursor-pointer transition ${
+                        className={`px-1 py-1 min-h-[44px] rounded-xl border-2 border-[#181B2C] flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[10.5px] sm:text-xs font-extrabold cursor-pointer transition ${
                           selected
                             ? 'bg-[#FF4D6D] text-white shadow-[2px_2px_0_#181B2C]'
                             : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
                         }`}
                       >
-                        {opt.emoji} {opt.label}
+                        <span aria-hidden="true">{opt.emoji}</span>
+                        <span>{opt.label}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <div
+                data-testid="creator-primary-actions"
+                className="grid grid-cols-[1fr_auto] sm:flex sm:flex-wrap items-center gap-2 pt-0.5"
+              >
                 <ComicButton
                   type="submit"
-                  size="lg"
+                  size="md"
                   variant="turf"
                   icon={<Play className="w-4 h-4" />}
                   className="club-confirm flex-1 sm:flex-none whitespace-nowrap"
@@ -307,9 +327,12 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                   variant="sky"
                   size="md"
                   icon={<Dices className="w-4 h-4" />}
+                  aria-label="Randomize Club"
                   onClick={handleRandomize}
+                  className="px-3 whitespace-nowrap"
                 >
-                  Randomize Club
+                  <span className="hidden sm:inline">Randomize Club</span>
+                  <span className="sm:hidden">Random</span>
                 </ComicButton>
               </div>
             </div>

@@ -214,15 +214,16 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
             >
               Sim Next 3-Game Series
             </ComicButton>
-            <ComicButton
-              size="sm"
-              variant="turf"
-              icon={<Trophy className="w-4 h-4" />}
-              disabled={!regularSeasonDone || Boolean(activeOffseason)}
-              onClick={handleOpenOffseason}
-            >
-              Playoffs &amp; Offseason
-            </ComicButton>
+            {regularSeasonDone && !activeOffseason ? (
+              <ComicButton
+                size="sm"
+                variant="turf"
+                icon={<Trophy className="w-4 h-4" />}
+                onClick={handleOpenOffseason}
+              >
+                Playoffs &amp; Offseason
+              </ComicButton>
+            ) : null}
           </div>
         }
       >
@@ -450,21 +451,21 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
           {!activeOffseason ? (
             <div
               data-testid="playoff-bracket-panel"
-              className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2.5 shadow-[3px_3px_0_#181B2C]"
+              className="p-2.5 sm:p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2 shadow-[3px_3px_0_#181B2C]"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="font-display text-xs sm:text-sm text-[#181B2C]">
-                    🏆 {LEAGUE_TIER_LABELS[humanClub.leagueTier].toUpperCase()} — BEST-OF-3 PLAYOFF BRACKET
+                <div className="min-w-0">
+                  <div className="font-display text-[11px] sm:text-sm text-[#181B2C]">
+                    🏆 {LEAGUE_TIER_LABELS[humanClub.leagueTier].toUpperCase()} — PLAYOFF PICTURE
                   </div>
-                  <div className="text-[11px] font-bold text-[#4A5068]">
+                  <div className="text-[10.5px] sm:text-[11px] font-bold text-[#4A5068] truncate sm:whitespace-normal">
                     {activeTierBracket
                       ? activeTierBracket.championClubId
                         ? `Champion crowned: ${humanTierClubsById[activeTierBracket.championClubId]?.name ?? 'Winner'}! Proceed to Offseason HQ.`
                         : 'Play your club’s playoff games live in 3D or sim game-by-game!'
                       : regularSeasonDone
                         ? 'Regular season complete! Launch the interactive Best-of-3 Postseason Bracket.'
-                        : `Projected Top-4 Playoff Picture: #1 ${humanTierStandings[0]?.clubName ?? ''} vs #4 ${humanTierStandings[3]?.clubName ?? ''} • #2 ${humanTierStandings[1]?.clubName ?? ''} vs #3 ${humanTierStandings[2]?.clubName ?? ''}`}
+                        : `#1 ${humanTierStandings[0]?.clubName ?? ''} vs #4 ${humanTierStandings[3]?.clubName ?? ''} • #2 ${humanTierStandings[1]?.clubName ?? ''} vs #3 ${humanTierStandings[2]?.clubName ?? ''}`}
                   </div>
                 </div>
                 {regularSeasonDone && !activeTierBracket ? (
@@ -556,19 +557,37 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
             </div>
           ) : null}
 
-          {/* 6-Tier Pyramid Tabs */}
-          <div className="flex flex-wrap gap-1.5">
+          {/* 6-Tier Pyramid Tabs (Single-row horizontal strip on mobile so all 8 standings clubs fit above the fold!) */}
+          <div
+            data-testid="league-tier-tabs"
+            className="flex flex-nowrap sm:flex-wrap gap-1.5 overflow-x-auto pb-0.5"
+          >
             {LEAGUE_TIER_ORDER.map((tier) => {
               const isHumanTier = tier === humanClub.leagueTier;
+              const shortTierLabel =
+                tier === 'rookie'
+                  ? 'Rookie'
+                  : tier === 'low_a'
+                    ? 'Low-A'
+                    : tier === 'high_a'
+                      ? 'High-A'
+                      : tier === 'aa'
+                        ? 'AA'
+                        : tier === 'aaa'
+                          ? 'AAA'
+                          : 'Majors';
               return (
                 <ComicButton
                   key={tier}
                   size="sm"
                   variant={activeTier === tier ? 'gold' : isHumanTier ? 'sky' : 'cream'}
                   active={activeTier === tier}
+                  aria-label={`${LEAGUE_TIER_LABELS[tier]}${isHumanTier ? ' ★' : ''}`}
                   onClick={() => setSelectedTier(tier)}
+                  className="shrink-0 whitespace-nowrap px-2.5 text-[11px] sm:text-xs"
                 >
-                  {LEAGUE_TIER_LABELS[tier]}
+                  <span className="hidden sm:inline">{LEAGUE_TIER_LABELS[tier]}</span>
+                  <span className="sm:hidden">{shortTierLabel}</span>
                   {isHumanTier ? ' ★' : ''}
                 </ComicButton>
               );
@@ -578,27 +597,31 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
           {/* Standings Table */}
           <div className="overflow-x-auto rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7]">
             <table className="w-full text-left text-xs font-bold text-[#181B2C]">
-              <thead className="bg-[#181B2C] text-[#FFD166] font-display text-[11px]">
+              <thead className="bg-[#181B2C] text-[#FFD166] font-display text-[10.5px] sm:text-[11px]">
                 <tr>
-                  <th className="px-3 py-2">#</th>
-                  <th className="px-3 py-2">Club ({LEAGUE_TIER_LABELS[activeTier]})</th>
-                  <th className="px-2 py-2 text-right">W</th>
-                  <th className="px-2 py-2 text-right">L</th>
-                  <th className="px-2 py-2 text-right">PCT</th>
-                  <th className="px-2 py-2 text-right">GB</th>
-                  <th className="px-3 py-2 text-right">Zone</th>
+                  <th className="px-2 sm:px-3 py-1.5 sm:py-2">#</th>
+                  <th className="px-2 sm:px-3 py-1.5 sm:py-2">
+                    Club<span className="hidden sm:inline"> ({LEAGUE_TIER_LABELS[activeTier]})</span>
+                  </th>
+                  <th className="px-1.5 sm:px-2 py-1.5 sm:py-2 text-right">W</th>
+                  <th className="px-1.5 sm:px-2 py-1.5 sm:py-2 text-right">L</th>
+                  <th className="px-1.5 sm:px-2 py-1.5 sm:py-2 text-right">PCT</th>
+                  <th className="hidden sm:table-cell px-2 py-2 text-right">GB</th>
+                  <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-right">Zone</th>
                 </tr>
               </thead>
               <tbody>
-                {standings.map((row) => (
+                {standings.map((row) => {
+                  const rowClub = tierClubs.find((c) => c.id === row.clubId);
+                  return (
                   <tr
                     key={row.clubId}
                     className={`border-t border-[#181B2C]/15 ${
                       row.isHuman ? 'bg-[#FFF3BF]' : ''
                     }`}
                   >
-                    <td className="px-3 py-2 font-display">{row.rank}</td>
-                    <td className="px-3 py-2 font-extrabold">
+                    <td className="px-2 sm:px-3 py-1.5 font-display">{row.rank}</td>
+                    <td className="px-2 sm:px-3 py-1.5 font-extrabold max-w-[140px] sm:max-w-none">
                       <button
                         type="button"
                         data-testid="standings-club-btn"
@@ -616,34 +639,42 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                           });
                           soundEngine.play('card_flip');
                         }}
-                        className="text-left hover:text-[#E63946] hover:underline cursor-pointer"
+                        className="flex items-center gap-1.5 text-left hover:text-[#E63946] hover:underline cursor-pointer min-w-0 max-w-full"
                       >
-                        🃏 {row.clubName} {row.isHuman ? '(YOU)' : ''}
+                        <span
+                          aria-hidden="true"
+                          className="w-2.5 h-2.5 rounded-full border border-[#181B2C] shrink-0"
+                          style={{ backgroundColor: rowClub?.colors.primary ?? '#1B4332' }}
+                        />
+                        <span className="truncate">
+                          {row.clubName} {row.isHuman ? '(YOU)' : ''}
+                        </span>
                       </button>
                     </td>
-                    <td className="px-2 py-2 text-right font-mono-tabular">{row.wins}</td>
-                    <td className="px-2 py-2 text-right font-mono-tabular">{row.losses}</td>
-                    <td className="px-2 py-2 text-right font-mono-tabular">
+                    <td className="px-1.5 sm:px-2 py-1.5 text-right font-mono-tabular">{row.wins}</td>
+                    <td className="px-1.5 sm:px-2 py-1.5 text-right font-mono-tabular">{row.losses}</td>
+                    <td className="px-1.5 sm:px-2 py-1.5 text-right font-mono-tabular">
                       {formatRate3(row.winPct)}
                     </td>
-                    <td className="px-2 py-2 text-right font-mono-tabular">
+                    <td className="hidden sm:table-cell px-2 py-1.5 text-right font-mono-tabular">
                       {row.gamesBack === 0 ? '—' : row.gamesBack.toFixed(1)}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-2 sm:px-3 py-1.5 text-right whitespace-nowrap">
                       {row.rank <= 4 ? (
-                        <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[10px] text-[#1B4332]">
+                        <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[9.5px] sm:text-[10px] text-[#1B4332]">
                           Playoffs
                         </span>
                       ) : row.rank === 8 && activeTier !== 'rookie' ? (
-                        <span className="px-1.5 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[10px] text-[#9D0208]">
-                          Relegation
+                        <span className="px-1.5 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[9.5px] sm:text-[10px] text-[#9D0208]">
+                          Releg.
                         </span>
                       ) : (
                         <span className="text-[10px] text-[#4A5068]">Safe</span>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

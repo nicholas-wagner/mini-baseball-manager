@@ -2,15 +2,15 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(105px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(96px, 0.72fr) minmax(0, 1.28fr);
   align-items: center;
-  gap: clamp(12px, 3vw, 38px);
-  padding: clamp(14px, 2.4vw, 32px);
+  gap: clamp(10px, 2.6vw, 38px);
+  padding: clamp(12px, 2.2vw, 32px);
   overflow: hidden;
   border: 3px solid #181b2c;
   border-radius: 16px;
   box-shadow: 4px 4px #181b2c;
-  background: linear-gradient(113deg, #114b45 0 37%, #edac4c 37% 38%, #fff6df 38%);
+  background: linear-gradient(108deg, #114b45 0 33%, #edac4c 33% 34%, #fff6df 34%);
   color: #192232;
 }
 .opening-print::before {

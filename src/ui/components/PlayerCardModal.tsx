@@ -156,8 +156,8 @@ export function PlayerCardModal({
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 md:grid-cols-[270px_1fr] gap-4 items-start">
-              <div className="mx-auto w-full max-w-[270px] space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-[270px_1fr] gap-2.5 sm:gap-4 items-start">
+              <div className="mx-auto w-full max-w-[244px] sm:max-w-[270px] space-y-2">
                 <FlipBaseballCard
                   player={toBaseballCardPlayer(player)}
                   team={teamColors}
@@ -190,13 +190,13 @@ export function PlayerCardModal({
                 ) : null}
               </div>
 
-              <div className="space-y-2.5 min-w-0">
+              <div className="space-y-2 min-w-0">
                 {(onToggleFavorite || onCustomizePlayer) ? (
                   <div
                     data-testid="card-modal-personalize-bar"
-                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2"
+                    className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2"
                   >
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
                       {onToggleFavorite ? (
                         <ComicButton
                           size="sm"
@@ -207,8 +207,9 @@ export function PlayerCardModal({
                             onToggleFavorite();
                             soundEngine.play('ui_pop');
                           }}
+                          className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
                         >
-                          {isFavorite ? '⭐ Club Favorite!' : '☆ Star Favorite'}
+                          {isFavorite ? 'Club Favorite!' : 'Star Favorite'}
                         </ComicButton>
                       ) : null}
                       {onCustomizePlayer ? (
@@ -222,8 +223,9 @@ export function PlayerCardModal({
                             setDraftJersey(String(player.jerseyNumber));
                             setEditingProfile((v) => !v);
                           }}
+                          className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
                         >
-                          {editingProfile ? 'Cancel Edit' : '✏️ Nickname & #'}
+                          {editingProfile ? 'Cancel Edit' : 'Nickname & #'}
                         </ComicButton>
                       ) : null}
                     </div>

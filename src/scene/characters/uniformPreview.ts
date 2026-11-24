@@ -10,9 +10,9 @@ export type PreviewOptions = PaintedPlayerOptions & { clip?: CharacterAnimClip }
 export function createUniformPreview(container: HTMLElement, options: PreviewOptions) {
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   const scene = new THREE.Scene();
-  const camera = new THREE.OrthographicCamera(-1, 1, 1.1, -1.1, .1, 12);
-  camera.position.set(0, 1.08, 5);
-  camera.lookAt(0, .98, 0);
+  const camera = new THREE.OrthographicCamera(-1.26, 1.26, 1.34, -1.16, .1, 12);
+  camera.position.set(-0.08, 1.06, 5);
+  camera.lookAt(-0.08, 0.98, 0);
   const rig = createPaintedPlayerRig(options);
   scene.add(rig.root);
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));

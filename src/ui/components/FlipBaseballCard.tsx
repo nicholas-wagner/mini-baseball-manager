@@ -162,14 +162,28 @@ export function FlipBaseballCard({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 px-2.5 pt-2 text-[10px] font-bold text-[#4A5068]">
+              <div
+                data-testid="card-meta-strip"
+                className="flex items-center gap-1.5 px-2.5 pt-1.5 text-[10px] font-bold text-[#4A5068]"
+              >
                 <span aria-label={`Club ${team.monogram}`} className="rounded px-1 leading-4 font-display text-white" style={{ backgroundColor: team.secondary }}>
                   {team.monogram}
                 </span>
                 <FlagBadge nationalityId={player.nationalityId} label={nationality.shortCode} />
                 <span className="font-mono-tabular">LV.{player.level}</span>
+                {!onSelect ? (
+                  <button
+                    type="button"
+                    onClick={() => setFlipped(true)}
+                    aria-label={`Flip ${player.name} card to stats`}
+                    className="ml-auto min-h-[34px] py-0.5 px-2 rounded-lg bg-[#F1E4C8] text-[#181B2C] border-2 border-[#181B2C] font-heading font-bold text-[10.5px] inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE8A3]"
+                  >
+                    <RotateCw className="w-3 h-3" />
+                    Stats
+                  </button>
+                ) : null}
               </div>
-              <div className="flex flex-wrap gap-1 p-2.5">
+              <div className="flex flex-wrap gap-1 px-2.5 py-2">
                 <span
                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-[#181B2C] text-[10px] font-extrabold text-white"
                   style={{ backgroundColor: '#7209B7' }}
@@ -189,9 +203,9 @@ export function FlipBaseballCard({
               </div>
             </div>
 
-            {/* Card Footer Actions */}
-            <div className="px-2.5 pb-2 flex items-center justify-between gap-1.5">
-              {onSelect ? (
+            {/* Card Footer Actions (shown when Send-to-3D selector is also present) */}
+            {onSelect ? (
+              <div className="px-2.5 pb-2 flex items-center justify-between gap-1.5">
                 <button
                   type="button"
                   onClick={onSelect}
@@ -199,17 +213,17 @@ export function FlipBaseballCard({
                 >
                   {selected ? 'On 3D Field ✓' : 'Send to 3D'}
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setFlipped(true)}
-                aria-label={`Flip ${player.name} card to stats`}
-                className="min-h-11 py-1 px-2 rounded-lg bg-[#F1E4C8] text-[#181B2C] border-2 border-[#181B2C] font-heading font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE8A3]"
-              >
-                <RotateCw className="w-3 h-3" />
-                Stats
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setFlipped(true)}
+                  aria-label={`Flip ${player.name} card to stats`}
+                  className="min-h-11 py-1 px-2 rounded-lg bg-[#F1E4C8] text-[#181B2C] border-2 border-[#181B2C] font-heading font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE8A3]"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  Stats
+                </button>
+              </div>
+            ) : null}
           </div>
         </article>
 

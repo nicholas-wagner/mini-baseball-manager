@@ -305,16 +305,20 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
         {/* Interactive Controls */}
         <div className="space-y-3">
           {/* 1-Tap 90s Team Kit Presets */}
-          <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+          <div className="p-2.5 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
             <div className="font-display text-xs uppercase text-[#181B2C]">
               1-Tap 90s Throwback Presets
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div
+              data-testid="uniform-presets-grid"
+              className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5"
+            >
               {UNIFORM_PRESETS.map((preset) => (
                 <ComicButton
                   key={preset.id}
                   size="sm"
                   variant="cream"
+                  className="w-full sm:w-auto px-2 text-[11px] sm:text-xs leading-tight"
                   onClick={() => {
                     updateDraft({
                       ...preset.config,
