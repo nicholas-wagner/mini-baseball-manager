@@ -38,6 +38,10 @@ TASK-088 keeps the Opening Day Customize button at the 44-pixel touch minimum on
 
 ---
 
+### Game Day manager decisions
+
+- [x] TASK-090 adds nine Game Day and career features. Managers can wave a runner home, read the relay and tag, scout a venue and adjust the lineup, accept a catcher’s sequence, and choose Smart Watch stops. Player cards describe the painted rig’s habits and chart recent fair contact. Gazette captions and out-of-town finals cover the club’s season.
+
 ## The 10X Vision — What Makes This a Cult Classic
 
 **Mini Baseball Manager** is an offline-first, cross-platform web & Android PWA where you are **General Manager, Field Manager, and Ballpark Architect** of a charming baseball dynasty — blending:
@@ -250,6 +254,8 @@ Grow the permanent catalog to **3,000 distinct players across all six tiers**, w
 | 2026-11-24 | Opening Day on compact phones (TASK-086) | Keep the chosen call visible through rotation, show which runner a sacrifice helped, and let the manager keep the play. Personalized club setup and roster tools use the same compact layout. | Measure comprehension and voluntary continuation in the muted first-use playtest. |
 
 ---
+
+The TASK-090 league board settles one scheduled neutral game when the live game changes sides. The series simulation recognizes the settled fixture, so replaying a half or resuming a career cannot add the same league win twice.
 
 ## Ideas & Backlog Parking Lot
 

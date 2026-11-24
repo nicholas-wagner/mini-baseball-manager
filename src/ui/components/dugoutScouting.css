@@ -1,0 +1,152 @@
+.park-scout,
+.watch-settings,
+.gazette-wire,
+.third-call,
+.out-of-town {
+  border: 2px solid #213b34;
+  border-radius: 0.7rem;
+  background: #fff7e4;
+  color: #19352e;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.82rem;
+}
+.park-scout > summary {
+  display: list-item;
+  cursor: pointer;
+  align-content: center;
+  min-height: 44px;
+  font-weight: 800;
+}
+.park-report,
+.park-order,
+.spray-chart {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.park-report svg {
+  width: 35%;
+  max-width: 140px;
+  flex-shrink: 0;
+  background: #183f34;
+  border-radius: 0.4rem;
+}
+.park-order {
+  margin-top: 0.55rem;
+}
+.park-order select,
+.watch-settings select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #76897a;
+  background: #fffdf5;
+  border-radius: 0.4rem;
+  padding: 0 0.45rem;
+  min-height: 44px;
+}
+.park-order button,
+.third-call button,
+.catcher-sign {
+  min-height: 44px;
+  border: 2px solid #19352e;
+  border-radius: 0.55rem;
+  padding: 0 0.65rem;
+  background: #ffcc49;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.park-order button:disabled {
+  opacity: 0.5;
+}
+.watch-settings {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  font-weight: 700;
+}
+.spray-chart svg {
+  width: 65px;
+}
+.spray-chart,
+.spray-empty {
+  font-size: 0.7rem;
+}
+.third-call {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  box-shadow: 2px 3px #19352e;
+}
+.third-call p {
+  width: 100%;
+  text-align: center;
+}
+.third-call button:last-child {
+  background: #fffdf5;
+}
+.out-of-town {
+  background: #204e3c;
+  color: #fff8d7;
+  border: 4px double #e6ce95;
+  font-family: monospace;
+  letter-spacing: 0.02em;
+}
+.out-of-town.ribbon {
+  background: #15253a;
+  color: #ffce65;
+  border-color: #5aa0af;
+}
+.out-of-town strong {
+  display: block;
+}
+.gazette-wire {
+  border-left: 5px solid #ac5638;
+}
+.catcher-sign {
+  white-space: normal;
+  font-size: 0.73rem;
+}
+.runner-report {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+.runner-report img {
+  width: 45px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 0.35rem;
+}
+.runner-report p {
+  width: auto;
+  text-align: left;
+}
+.runner-report b {
+  display: block;
+  font-size: 1rem;
+}
+.third-call button {
+  min-width: 8rem;
+}
+.third-call button:disabled {
+  opacity: 0.65;
+}
+.field-wire {
+  position: absolute;
+  z-index: 12;
+  bottom: 0.4rem;
+  left: 0.4rem;
+  right: 3.5rem;
+  max-width: 26rem;
+  pointer-events: none;
+}
+.field-wire .gazette-wire,
+.field-wire .out-of-town {
+  font-size: clamp(0.68rem, 2.6vw, 0.83rem);
+  line-height: 1.25;
+  padding: 0.38rem 0.55rem;
+}

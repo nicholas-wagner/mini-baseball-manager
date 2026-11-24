@@ -113,6 +113,7 @@ export interface PlayEvent {
     calloutText: string;
     vfxColor: string;
   };
+  thirdBase?: { runnerId: string; position: 'LF' | 'CF' | 'RF'; arm: number; odds: number; close: boolean; result: 'held' | 'safe' | 'out' };
   ballFlight?: {
     style: BallVfxStyle;
     landingX: number;

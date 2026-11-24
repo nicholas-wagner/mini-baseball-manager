@@ -11,6 +11,7 @@ import {
   LEAGUE_TIER_ORDER,
   type Club,
   type LeagueTierId,
+  type LeagueWireFinal,
 } from '../models/club';
 import {
   createEmptySeasonStats,
@@ -395,6 +396,83 @@ function findHumanOpponentId(away: Club, home: Club): string | null {
   return null;
 }
 
+export function seriesRoundSeed(worldSeed: number, season: number, round: number, tier: LeagueTierId) {
+  return worldSeed + season * 10000 + round * 500 + LEAGUE_TIER_ORDER.indexOf(tier) * 71;
+}
+
+function scheduledWireMatch(clubs: readonly Club[], roundIndex: number) {
+  const round = generateTierSchedule(clubs.map((c) => c.id))[roundIndex];
+  const human = clubs.find((c) => c.isHuman);
+  const index =
+    round?.matchups.findIndex((m) => m.awayClubId !== human?.id && m.homeClubId !== human?.id) ?? -1;
+  if (index < 0) return null;
+  return { fixture: round.matchups[index], index };
+}
+
+/** The same neutral fixture supplies the live board and the standings at game completion. */
+export function featuredLeagueGame(
+  clubs: readonly Club[],
+  roundIndex: number,
+  seed: number,
+  innings: GameLengthInnings,
+  gameIndex: number,
+) {
+  const match = scheduledWireMatch(clubs, roundIndex);
+  if (!match || !Number.isInteger(gameIndex) || gameIndex < 0 || gameIndex >= match.fixture.gamesCount)
+    return null;
+  const { index, fixture } = match;
+  const byId = new Map(clubs.map((c) => [c.id, c]));
+  let away = byId.get(fixture.awayClubId)!;
+  let home = byId.get(fixture.homeClubId)!;
+  // Catch up older saves whose neutral games used to settle only at the series boundary.
+  const previous = clubs.find((club) => club.isHuman)?.leagueWireFinal;
+  let game = previous?.roundSeed === seed ? previous.gameIndex + 1 : 0;
+  for (; game <= gameIndex; game++) {
+    const result = simFullGame(away, home, seed + index * 31 + game * 7, innings);
+    const homeWon = result.winnerClubId === home.id;
+    const updatedAway = applyGameStatDeltasToClub(
+      away,
+      result.playerStatDeltas,
+      !homeWon,
+      result.events,
+    );
+    const updatedHome = applyGameStatDeltasToClub(home, result.playerStatDeltas, homeWon, result.events);
+    if (game === gameIndex) return { away, home, result, updatedAway, updatedHome, matchupIndex: index };
+    away = updatedAway;
+    home = updatedHome;
+  }
+  return null;
+}
+
+export function settleLeagueWire(
+  clubs: Club[],
+  roundIndex: number,
+  seed: number,
+  innings: GameLengthInnings,
+  gameIndex: number,
+): Club[] {
+  const game = featuredLeagueGame(clubs, roundIndex, seed, innings, gameIndex);
+  if (!game) return clubs;
+  const winner = game.result.winnerClubId === game.home.id ? game.updatedHome : game.updatedAway;
+  const final: LeagueWireFinal = {
+    roundSeed: seed,
+    matchupIndex: game.matchupIndex,
+    gameIndex,
+    awayName: game.away.name,
+    homeName: game.home.name,
+    awayScore: game.result.awayScore,
+    homeScore: game.result.homeScore,
+    winnerName: winner.name,
+    winnerWins: winner.wins,
+  };
+  return clubs.map((club) => {
+    if (club.isHuman) return { ...club, leagueWireFinal: final };
+    if (club.id === game.away.id) return game.updatedAway;
+    if (club.id === game.home.id) return game.updatedHome;
+    return club;
+  });
+}
+
 function simulateMatchupGames(
   map: Map<string, Club>,
   match: SeriesMatchup,
@@ -404,13 +482,14 @@ function simulateMatchupGames(
   humanGameplan: SeriesGameplanId,
   humanGamesAlreadyPlayed: number,
   humanGamesOut: HumanSeriesGameLog[],
+  neutralGamesPlayed: number,
 ): { simulated: number; humanOpponentId: string | null } {
   const initialAway = map.get(match.awayClubId);
   const initialHome = map.get(match.homeClubId);
   if (!initialAway || !initialHome) return { simulated: 0, humanOpponentId: null };
 
   const humanOpponentId = findHumanOpponentId(initialAway, initialHome);
-  const startGame = humanOpponentId ? Math.max(0, humanGamesAlreadyPlayed) : 0;
+  const startGame = humanOpponentId ? Math.max(0, humanGamesAlreadyPlayed) : neutralGamesPlayed;
   let simulated = 0;
 
   for (let g = startGame; g < match.gamesCount; g += 1) {
@@ -426,8 +505,8 @@ function simulateMatchupGames(
       home.isHuman ? humanGameplan : 'balanced',
     );
     const homeWon = result.winnerClubId === home.id;
-    map.set(home.id, applyGameStatDeltasToClub(home, result.playerStatDeltas, homeWon));
-    map.set(away.id, applyGameStatDeltasToClub(away, result.playerStatDeltas, !homeWon));
+    map.set(home.id, applyGameStatDeltasToClub(home, result.playerStatDeltas, homeWon, result.events));
+    map.set(away.id, applyGameStatDeltasToClub(away, result.playerStatDeltas, !homeWon, result.events));
     if (humanOpponentId) {
       humanGamesOut.push(
         buildHumanGameLog(g + 1, home.isHuman, homeWon, result.homeScore, result.awayScore),
@@ -463,7 +542,9 @@ export function simulateSeriesRound(
   let gamesSimulated = 0;
   let humanOpponentId: string | null = null;
 
+  const wire = clubs.find(c => c.isHuman)?.leagueWireFinal;
   round.matchups.forEach((match, matchIdx) => {
+    const neutralGamesPlayed = wire?.roundSeed === seed && wire.matchupIndex === matchIdx ? wire.gameIndex + 1 : 0;
     const res = simulateMatchupGames(
       map,
       match,
@@ -473,6 +554,7 @@ export function simulateSeriesRound(
       humanGameplan,
       humanGamesAlreadyPlayed,
       humanGames,
+      neutralGamesPlayed,
     );
     gamesSimulated += res.simulated;
     if (res.humanOpponentId) humanOpponentId = res.humanOpponentId;

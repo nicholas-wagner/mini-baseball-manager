@@ -61,7 +61,9 @@ import {
   createCrosstownStarterRivalry,
 } from '../../engine/league/rivalryEngine';
 import { evaluateNemesisMatchup } from '../../engine/league/nemesisTracker';
-import { getHumanSeasonSchedule } from '../../engine/league/seasonEngine';
+import { catcherSign, personalWatchStop, gazetteCaption, recentContact } from '../../engine/simulation/dugoutCalls';
+import { GazetteCall, ThirdBaseDecision, LeagueWire, ParkLineupCard, WatchSettings } from '../components/DugoutScouting';
+import { seriesRoundSeed, getHumanSeasonSchedule } from '../../engine/league/seasonEngine';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import {
   evaluateWeatherSimulationImpact,
@@ -158,7 +160,7 @@ import {
   type CelebrationStickerUnlock,
 } from '../../engine/gm/celebrationStickers';
 import { FirstAtBat } from '../components/FirstAtBat';
-import { BatterEntrance, MatchupPrints, OpeningDayPrint } from '../components/GameDayPrints';
+import { PlayerPrint, BatterEntrance, MatchupPrints, OpeningDayPrint } from '../components/GameDayPrints';
 import type { PlayerEntranceCue } from '../../scene/playback/firstAtBatPresentation';
 import { decisionDelayMs, scoringDetail, playReadout } from '../../scene/playback/playReadout';
 import { BroadcastHud } from '../components/BroadcastHud';
@@ -194,6 +196,8 @@ const GAME_LENGTH_OPTIONS: readonly { innings: GameLengthInnings; label: string 
   { innings: 7, label: '7 Inn (Quick)' },
   { innings: 9, label: '9 Inn (Classic)' },
 ];
+
+function playGazetteCrowd() { soundEngine.play('crowd_cheer'); }
 
 function safeScrollTop(): void {
   try {
@@ -280,6 +284,12 @@ export function GameDayScreen({
   const [gameLength, setGameLength] = useState<GameLengthInnings>(5);
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
+  const [watchChoice, setWatchChoice] = useState('highlights');
+  const lastStop = useRef<string | null>(null);
+  const [thirdDecision, setThirdDecision] = useState<{
+    event: PlayEvent; film: ChoreographedStep; call: TacticalCall;
+    options: Parameters<typeof stepPitch>[2]; hold: ReturnType<typeof stepPitch>;
+  } | null>(null);
   const gameLog = useRef<PlayEvent[]>([]);
   const guidedPitchEvents = useRef(new Set<number>());
   const fullSeasonSectionRef = useRef<HTMLDivElement | null>(null);
@@ -398,6 +408,16 @@ export function GameDayScreen({
     return buildRivalryShowdownPreview(humanClub, activeOpponent, starterRecord);
   }, [humanClub, activeOpponent]);
 
+  const boardTier = humanClub?.leagueTier;
+  const inRegularGame = Boolean(liveSession && liveSession.status === 'in_progress' && !pendingLivePlayoff);
+  const innings = liveSession?.regulationInnings ?? gameLength;
+  const settleWire = useGameStore(state => state.settleOutOfTownGame);
+  useEffect(() => {
+    if (inRegularGame && changedSides) settleWire(innings);
+  },[inRegularGame,changedSides,settleWire,innings]);
+  const final = humanClub?.leagueWireFinal;
+  const roundSeed = seriesRoundSeed(worldSeed,seasonNumber,currentSeriesIndex,boardTier ?? 'rookie');
+  const leagueBoard = changedSides && inRegularGame && final?.roundSeed === roundSeed && final.gameIndex === currentGameInSeries ? final : null;
   const hasLiveSession = liveSession !== null;
   useEffect(() => { onLiveChange?.(hasLiveSession); }, [hasLiveSession, onLiveChange]);
   useEffect(() => {
@@ -510,6 +530,7 @@ export function GameDayScreen({
       isHumanHome ? 'balanced' : activeGameplan,
       isHumanHome ? activeGameplan : 'balanced',
     );
+    lastStop.current = null;
     setActiveOpponentId(opp.id);
     setLiveSession(session);
     setRecentEvents([]);
@@ -563,6 +584,7 @@ export function GameDayScreen({
     if (!clutch) return;
     setActiveOpponentId(opp.id);
     guidedPitchEvents.current.clear();
+    lastStop.current = null;
     gameLog.current = [...clutch.gameEvents];
     const openingBatting = (clutch.session.half === 'BOT') === clutch.session.home.isHuman;
     setEntranceCue(guided ? {role: openingBatting ? 'batter' : 'pitcher'} : null);
@@ -613,7 +635,7 @@ export function GameDayScreen({
   }, [openingRequest, handleStartClutchMoment, onOpeningStarted]);
 
   const applyStepResult = useCallback(
-    (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string, calledTarget?: PitchTargetIntent) => {
+    (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string, calledTarget?: PitchTargetIntent, resumeAt?: number) => {
       gameLog.current.push(...emitted);
       setClutchRecap(null);
       setEntranceCue(null);
@@ -654,6 +676,10 @@ export function GameDayScreen({
         const runsScored=lastEvent.half==='BOT' ? lastEvent.homeScore-beforeHome : lastEvent.awayScore-beforeAway;
         const choreo = choreographPlayEvent(lastEvent, speed, basesBefore, {walkoff,runsScored,
           winningRunIndex:walkoff ? Math.max(0,lastEvent.awayScore-beforeHome) : 0});
+        if (resumeAt && choreo.play) {
+          choreo.startAt = resumeAt;
+          choreo.durationMs = Math.round(choreo.durationMs * (1-resumeAt/choreo.play.duration));
+        }
         if (choreo.play?.close && calledTarget) choreo.play.pitchTarget = calledTarget;
         if (guiding && !showMore && choreo.play && forceAtFirst(choreo.play)) {
           choreo.play.holdForceCall = true;
@@ -736,11 +762,18 @@ export function GameDayScreen({
   const handleNextPitch = useCallback((call = tacticalCall, timingGrade?: ArcadeTimingGrade) => {
     if (!liveSession || liveSession.status === 'completed') return;
     const isolated = resolveLiveStepInputs(liveSession, call, timingGrade);
-    const { nextSession, events } = stepPitch(
-      liveSession,
-      isolated.tacticalCall,
-      isolated.options,
-    );
+    if (thirdDecision) return;
+    const managed = watchMode === 'paused' && getBattingSide(liveSession).isHuman;
+    const options = { ...isolated.options, thirdBaseCall:managed ? 'hold' as const : 'coach' as const };
+    const result = stepPitch(liveSession, isolated.tacticalCall, options);
+    const {nextSession, events} = result;
+    const choice = managed && events.find(e => e.thirdBase?.close);
+    if (choice) {
+      const film = choreographPlayEvent(choice, speed, liveSession.bases);
+      film.freezeAt = film.play!.pickupAt;
+      setThirdDecision({event:choice,film,call:isolated.tacticalCall,options,hold:result});
+      return;
+    }
     if (guiding && !showMore) {
       for (const event of events) guidedPitchEvents.current.add(event.seq);
     }
@@ -757,7 +790,7 @@ export function GameDayScreen({
     ) {
       setTacticalCall('normal');
     }
-  }, [activeOpponentId, applyStepResult, guiding, liveSession, resolveLiveStepInputs, showMore, tacticalCall]);
+  }, [activeOpponentId, applyStepResult, guiding, liveSession, resolveLiveStepInputs, showMore, tacticalCall, thirdDecision, watchMode, speed]);
 
   const handleSimAtBat = () => {
     if (!liveSession || liveSession.status === 'completed') return;
@@ -867,9 +900,14 @@ export function GameDayScreen({
         moundVisitUsed,
       });
       const decision = shouldSmartAutoPause(liveSession, playbackEvent, cueNow);
-      if (decision.pause && playbackEvent) {
+      const reason = watchChoice === 'highlights' ? (playbackEvent && decision.reason) : personalWatchStop(liveSession, watchChoice);
+      const stopKey = watchChoice === 'highlights' ? String(playbackEvent?.seq)
+        : [watchChoice,reason,liveSession.inning,liveSession.half].join('/');
+      if (!reason) lastStop.current = null;
+      if (reason && stopKey !== lastStop.current) {
+        lastStop.current = stopKey;
         setWatchMode('paused');
-        setSmartPauseReason(decision.reason);
+        setSmartPauseReason(reason);
         return undefined;
       }
     }
@@ -891,7 +929,7 @@ export function GameDayScreen({
     playbackEvent,
     speed,
     tacticalCall,
-    watchMode,
+    watchMode, watchChoice,
   ]);
 
   if (!humanClub) return null;
@@ -1495,6 +1533,8 @@ export function GameDayScreen({
                 </div>
               </div>
 
+              {scheduledOpponent && <ParkLineupCard club={humanClub} park={getBallparkPreset((scheduledIsHome ? humanClub : scheduledOpponent).stadium.ballparkId)}
+                onSwap={useGameStore.getState().swapLineupSlots}/>}
               {probableMatchup && scheduledOpponent ? (
                 <div
                   data-testid="probable-matchup-strip"
@@ -2382,6 +2422,19 @@ export function GameDayScreen({
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
+  const sign = !humanIsBatting ? catcherSign(liveSession) : null;
+  const acceptSign = sign && <button className="catcher-sign" onClick={()=>{
+    setSelectedPitchType(sign.pitch);
+    setPitchTarget(sign.target);
+    setLastChoreo(null);
+    setPlaybackEvent(null);
+    setEntranceCue(null);
+  }}>Catcher’s sign · {sign.text}</button>;
+  const firstLook = liveSession.status === 'in_progress' && liveSession.balls + liveSession.strikes === 0 &&
+    !gameLog.current.some(e=>e.batterId === currentBatter.id && e.pitchThrown);
+  const formerPitcher = currentPitcher.formerClubIds.includes(getBattingSide(liveSession).clubId);
+  const caption = firstLook && formerPitcher ? gazetteCaption(currentPitcher, getBattingSide(liveSession)) : firstLook && (currentBatter.formerClubIds.includes(getFieldingSide(liveSession).clubId) || getBattingSide(liveSession).lineupIndex === 0)
+    ? gazetteCaption(currentBatter, getFieldingSide(liveSession)) : null;
   const advancedFrom = handoff && !playing ? lastChoreo?.play?.buntAdvances?.at(-1) : undefined;
   const offerOpeningPack = eventInGuide && !playing && (changedSides || liveSession.status === 'completed') &&
     unopenedPacks.some(pack => pack.id === 'pack-opening-day');
@@ -2395,12 +2448,7 @@ export function GameDayScreen({
     soundEngine.play('card_flip');
   };
 
-  return (
-    <div className={guiding && !showMore ? 'live-game guided-game space-y-3' : 'live-game space-y-3'}>
-      <div
-        data-testid="sticky-live-scoreboard"
-        className="live-score-row sticky top-[62px] md:top-2 z-20"
-      >
+  const scoreboard = (
         <ScoreboardStrip
           clubs={{ away: liveAwayClub.name, home: liveHomeClub.name, humanHome: shown.home.isHuman }}
           desktopFull={!(guiding && !showMore)}
@@ -2426,6 +2474,41 @@ export function GameDayScreen({
             Boolean(shownBases[2]),
           ]}
         />
+  );
+  const changeCamera = (mode: LiveCameraMode) => {
+    setCameraMode(mode);
+    soundEngine.play('ui_pop');
+  };
+  const replayFromPitch = () => {
+    if (!lastChoreo) return;
+    const { play, startAt, durationMs } = lastChoreo;
+    setLastChoreo({...lastChoreo, startAt:undefined, durationMs:startAt && play ? Math.round(durationMs * play.duration / (play.duration-startAt)) : durationMs});
+  };
+  if (thirdDecision) {
+    const {event,film,options,hold,call} = thirdDecision;
+    const choice = event.thirdBase!;
+    const runner = getBattingSide(liveSession).playersById[choice.runnerId];
+    const resolve = (send:boolean) => {
+      const result = send ? stepPitch(liveSession,call,{...options,thirdBaseCall:'send'}) : hold;
+      if (guiding && !showMore) result.events.forEach(e=>guidedPitchEvents.current.add(e.seq));
+      setThirdDecision(null);
+      setArmedPowerId(null);
+      applyStepResult(result.nextSession,result.events,activeOpponentId,options?.pitchTarget,film.freezeAt);
+    };
+    return <ThirdBaseDecision key={event.seq} portrait={<PlayerPrint player={runner}/>} runner={runner.name} arm={choice.arm} position={choice.position}
+      arrivalMs={film.durationMs * film.freezeAt! / film.play!.duration} onResolve={resolve}>
+      {scoreboard}
+      <LiveGameCanvas guided awayClub={liveAwayClub} homeClub={liveHomeClub} session={liveSession}
+        choreo={film} lastEvent={event} cameraMode={cameraMode} onChangeCameraMode={changeCamera} />
+    </ThirdBaseDecision>;
+  }
+  return (
+    <div className={guiding && !showMore ? 'live-game guided-game space-y-3' : 'live-game space-y-3'}>
+      <div
+        data-testid="sticky-live-scoreboard"
+        className="live-score-row sticky top-[62px] md:top-2 z-20"
+      >
+        {scoreboard}
         {onOpenDugout && <button type="button" className="dugout-launch" onClick={() => {
           setWatchMode('paused');
           onOpenDugout();
@@ -2454,14 +2537,14 @@ export function GameDayScreen({
               choreo={showNextMatchup ? null : lastChoreo}
               lastEvent={showNextMatchup ? null : playbackEvent}
               cameraMode={cameraMode}
-              onChangeCameraMode={(mode) => {
-                setCameraMode(mode);
-                soundEngine.play('ui_pop');
-              }}
-              entrance={guiding ? entranceCue && !showMore &&
+              onChangeCameraMode={changeCamera}
+              entrance={<>
+                {leagueBoard && !pendingDecision ? <div className="field-wire"><LeagueWire game={leagueBoard} club={humanClub} venueTier={liveHomeClub.leagueTier}/></div>
+                  : caption && !playing && !entranceCue ? <div className="field-wire"><GazetteCall key={caption} caption={caption} onCrowd={playGazetteCrowd}/></div> : null}
+                {guiding ? entranceCue && !showMore &&
                 <BatterEntrance guided key={entranceCue.role === 'pitcher' ? picturedPitcher.id : picturedBatter.id}
                   player={entranceCue.role === 'pitcher' ? picturedPitcher : picturedBatter} pitching={entranceCue.role === 'pitcher'} />
-                : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}
+                : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}</>}
               celebrateConfetti={celebrateScore && !(handoff && !playing)}
               overlay={
                 guiding && !showMore && advancedFrom && prePlaySession ? (
@@ -2561,11 +2644,13 @@ export function GameDayScreen({
               );
             })()}
 
+            {smartPauseReason && watchMode === 'paused' && <p role="status" className="gazette-wire">Smart Watch paused · {smartPauseReason}</p>}
+            {guiding && !showMore && !playing && !handoff && acceptSign}
             {handoff && !playing && playbackEvent && prePlaySession && lastChoreo ?
               <RallyResult detail={scoringDetail(playbackEvent, lastChoreo.play)} gameOver={liveSession.status === 'completed'} before={prePlaySession} event={playbackEvent}
                 nextLabel={liveSession.status === 'completed' ? 'Box score' : changedSides ? 'Change sides' : stole ? 'Back to the batter' : 'Next batter'}
                 onOpenPack={offerOpeningPack ? openBetweenInningsPack : undefined}
-                onReplay={() => setLastChoreo({...lastChoreo})}
+                onReplay={replayFromPitch}
                 onContinue={() => {
                   setEntranceCue(!changedSides && !stole && liveSession.status !== 'completed' && guidedBatting
                     ? {role:'batter', outgoingId:playbackEvent.outsAfter > playbackEvent.outsBefore && !playbackEvent.basesAfter.includes(playbackEvent.batterId ?? '') ? playbackEvent.batterId : undefined} : null);
@@ -2603,8 +2688,10 @@ export function GameDayScreen({
                 <span>Opening Day foil pack</span><button onClick={openBetweenInningsPack}>Open foil pack</button>
               </aside>}
             {(!guiding || showMore) && replayable && lastChoreo && <button className="atbat-tip"
-              onClick={() => setLastChoreo({...lastChoreo})}>Watch again · {playReadout(playbackEvent)?.label}</button>}
+              onClick={replayFromPitch}>Watch again · {playReadout(playbackEvent)?.label}</button>}
             {(!guiding || showMore) && <LiveActionBar
+              watchSettings={<WatchSettings side={{...humanClub,lineup:[...liveSession[humanSideKey].lineup]}} value={watchChoice} onChange={v=>{lastStop.current=null; setWatchChoice(v)}}/>}
+              catcherSuggestion={acceptSign}
               cue={liveCue}
               matchupLabel={`${currentBatter.name} vs ${currentPitcher.name}`}
               basesLabel={`Bases: ${liveSession.bases.map((b, idx) => (b ? `${idx + 1}B` : '·')).join(' ')}`}
@@ -3430,7 +3517,8 @@ export function GameDayScreen({
 
       <PlayerCardModal
         open={inspectedGamePlayerId !== null}
-        entry={activeInspectedEntry}
+        entry={activeInspectedEntry && {...activeInspectedEntry,player:{...activeInspectedEntry.player,
+          recentContact: liveSession.status === 'completed' ? activeInspectedEntry.player.recentContact : recentContact(activeInspectedEntry.player,gameLog.current)}}}
         allEntries={gameCardEntries}
         batterId={currentBatter.id}
         pitcherId={currentPitcher.id}

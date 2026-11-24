@@ -1,3 +1,4 @@
+import { readThirdBase, recentContact } from './dugoutCalls';
 import type { SeriesGameplanId } from '../gm/gmSeasonPulse';
 import type { Club } from '../models/club';
 import type { PlayEvent, TacticalCall } from '../models/playEvent';
@@ -113,6 +114,7 @@ function makeEvent(
     isClutchMoment: isClutchSituation(state),
     leverageIndex: getCurrentLeverage(state).leverageIndex,
     specialPowerTriggered: partial.specialPowerTriggered,
+    thirdBase: partial.thirdBase,
     ballFlight: partial.ballFlight,
     fieldingHighlight: partial.fieldingHighlight,
     pitchThrown: partial.pitchThrown,
@@ -445,6 +447,33 @@ function applyOutRunnerMovement(
   }
 }
 
+function applyHitAdvance(
+  state: GameSessionState,
+  res: PitchResolution,
+  batterId: string,
+  batterLine: BatterBoxLine,
+  pitcherLine: PitcherBoxLine,
+) {
+  const batting = getBattingSide(state);
+  updateHitStats(batting, batterLine, pitcherLine, res);
+  const { basesAfter, runsScoredIds } = advanceHitRunners(state.bases, batterId, res.totalBases!);
+  const call = res.thirdBase;
+  const scores =
+    call && call.result !== 'safe' ? runsScoredIds.filter((id) => id !== call.runnerId) : runsScoredIds;
+  state.bases = basesAfter;
+  if (call?.result === 'held') state.bases[2] = call.runnerId;
+  if (call?.result === 'out') {
+    state.outs++;
+    pitcherLine.outsRecorded++;
+    const defense = state.half === 'TOP' ? state.boxScore.homeBatters : state.boxScore.awayBatters;
+    const side = getFieldingSide(state);
+    defense[getDefenderAtPosition(side, call.position).id].assists++;
+    defense[getDefenderAtPosition(side, call.position === 'RF' ? '2B' : 'SS').id].assists++;
+    defense[getDefenderAtPosition(side, 'C').id].putouts++;
+  }
+  recordRunsScored(state, batting, pitcherLine, batterLine, scores, true);
+}
+
 function applyRunnerMovementForPlateOutcome(
   state: GameSessionState,
   res: PitchResolution,
@@ -475,10 +504,7 @@ function applyRunnerMovementForPlateOutcome(
   }
 
   if (res.totalBases) {
-    updateHitStats(batting, batterLine, pitcherLine, res);
-    const advanced = advanceHitRunners(state.bases, batterId, res.totalBases);
-    state.bases = advanced.basesAfter;
-    recordRunsScored(state, batting, pitcherLine, batterLine, advanced.runsScoredIds, true);
+    applyHitAdvance(state, res, batterId, batterLine, pitcherLine);
     return;
   }
 
@@ -572,6 +598,7 @@ function applyPlateComplete(
     pitcherId,
     outcome: res.outcome,
     specialPowerTriggered: res.specialPowerTriggered,
+    thirdBase: res.thirdBase,
     ballFlight: res.ballFlight,
     fieldingHighlight: res.fieldingHighlight,
     pitchThrown: res.pitchThrown,
@@ -962,6 +989,31 @@ function recordPitchFatigueIfThrown(
   next.abilityCooldowns = tickAbilityCooldownsOnPitch(next.abilityCooldowns, pitcher.id);
 }
 
+function resolveThirdBaseCall(
+  next: GameSessionState,
+  resolution: PitchResolution,
+  rng: ReturnType<typeof createSeededRng>,
+  options: StepPitchOptions,
+) {
+  const thirdBaseCall = options.thirdBaseCall;
+  if (thirdBaseCall)
+    resolution.thirdBase = readThirdBase(
+      next,
+      resolution,
+      rng,
+      thirdBaseCall === 'coach' ? undefined : thirdBaseCall,
+    );
+  if (resolution.thirdBase) {
+    const result = {
+      held: 'holds at third',
+      safe: 'beats the relay home',
+      out: 'is tagged out at home',
+    }[resolution.thirdBase.result];
+    resolution.commentary +=
+      ' ' + getBattingSide(next).playersById[resolution.thirdBase.runnerId].name + ' ' + result + '.';
+  }
+}
+
 /** Advances the deterministic baseball simulation by one pitch or tactical action. */
 export function stepPitch(
   session: GameSessionState,
@@ -1041,6 +1093,7 @@ export function stepPitch(
     stealDefenseCall: resolveStealDefenseCall(tacticalCall, safeOpts.stealDefenseCall),
   });
 
+  resolveThirdBaseCall(next, resolution, rng, safeOpts);
   events.push(dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
   advanceHalfOrFinish(next, events);
   if (next.status === 'in_progress' && next.balls === 0 && next.strikes === 0) {
@@ -1279,6 +1332,7 @@ export function applyGameStatDeltasToClub(
   club: Club,
   deltas: Readonly<Record<string, PlayerSeasonStats>>,
   won: boolean,
+  events: readonly PlayEvent[] = [],
 ): Club {
   const nextStreak = won
     ? club.streak > 0
@@ -1299,6 +1353,7 @@ export function applyGameStatDeltasToClub(
       if (!delta) return player;
       return {
         ...player,
+        recentContact: recentContact(player, events),
         seasonStats: addStats(player.seasonStats, delta),
         careerStats: addStats(player.careerStats, delta),
       };

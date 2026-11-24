@@ -32,7 +32,7 @@ export function playReadout(event?: PlayEvent | null) {
   const strike = outcome === 'called_strike' || outcome === 'swinging_strike';
   const count = strike ? event.strikes : event.balls;
   const words = ['', ' one', ' two', ' three', ' four'];
-  const baseLabel =
+  const baseLabel = event.thirdBase ? {safe:"Safe at home",out:"Out at home",held:"Held at third"}[event.thirdBase.result] :
     outcome === 'fly_out' && outsAfter - outsBefore >= 2
       ? 'Thrown out tagging'
       : outcome === 'fly_out' && event.battedBallType === 'pop_up'
@@ -58,7 +58,7 @@ export function playReadout(event?: PlayEvent | null) {
 
 export function decisionDelayMs(step: ChoreographedStep) {
   const play = step.play ?? step.close ?? step.outfield;
-  return play ? (step.durationMs * play.finish) / (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0)) : 0;
+  return play ? (step.durationMs * (play.finish - (step.startAt ?? 0))) / (play.duration - (step.startAt ?? 0) + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0)) : 0;
 }
 
 /** Score the assist only when the official event and the visible throw agree. */

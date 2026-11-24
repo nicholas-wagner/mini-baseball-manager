@@ -47,7 +47,8 @@ export function finishPlay(play: DiamondPlay, thirdOut: boolean, walkoff: boolea
         end: cutoff.end + 1.34,
       } as const;
       play.legs.push(relay);
-      play.leadArrival = relay.end - 0.22;
+      play.leadArrival = relay.end + (play.plateDecision === 'out' ? .24 : -.22);
+      if (play.plateDecision) play.finish = Math.max(relay.end, play.leadArrival) + .22;
       play.duration = Math.max(play.duration, relay.end + 0.68);
     }
   }
@@ -55,7 +56,7 @@ export function finishPlay(play: DiamondPlay, thirdOut: boolean, walkoff: boolea
     const stealHome = play.kind === 'steal_safe' && play.close?.fromBase === 3;
     const runnerWins = Boolean(scorerBase || stealHome);
     const touch = runnerWins ? play.leadArrival : play.batterArrival;
-    play.ending = { kind: 'walkoff', start: touch, scorer: runnerWins ? 'RUN' : 'BAT' };
+    play.ending = { kind: 'walkoff', start: play.plateDecision ? play.finish + .25 : touch, scorer: runnerWins ? 'RUN' : 'BAT' };
     play.duration = Math.max(play.duration, touch + 2.05);
   } else if (thirdOut) {
     const start = play.finish + 0.72;

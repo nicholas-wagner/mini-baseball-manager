@@ -120,7 +120,10 @@ export function outfieldDefenderAt(play: DiamondPlay, outfield: NonNullable<Diam
     arrive = pickupAt + .1;
   } else if (outfield.bags > 0 && (actor === '1B' || actor === '2B' || actor === '3B')) {
     const bag = BASE_PATH_VERTICES[actor === '1B' ? 1 : actor === '2B' ? 2 : 3];
-    stop = { x: bag.x + (actor === '3B' ? .85 : -.85), y: .04, z: bag.z - .65 };
+    // On a relay home the third baseman backs up inside the diamond and leaves the runner's lane clear.
+    stop = actor === '3B' && play.plateDecision
+      ? {x:bag.x+2.15, y:.04, z:bag.z+.45}
+      : {x:bag.x + (actor === '3B' ? .85 : -.85), y:.04, z:bag.z-.65};
   } else if (isOutfielder(actor)) {
     // The adjacent outfielder shades behind the play to back up a miss.
     const cover = actor === 'CF' || (pickup === 'CF' && actor === (fieldAt.x < 0 ? 'LF' : 'RF'));

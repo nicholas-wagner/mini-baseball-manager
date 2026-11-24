@@ -48,6 +48,10 @@ export function RallyResult({ event, before, gameOver, nextLabel, detail, onOpen
   const player = (defense.isHuman && madeOut && winningDefender) || subject;
   const first = subject.name.split(' ')[0];
   let verdict = describeBatter(first, event);
+  if (event.thirdBase) {
+    const name = offense.playersById[event.thirdBase.runnerId].name;
+    verdict += ' ' + name + {held:' holds at third.',safe:' beats the relay home.',out:' is tagged out at home.'}[event.thirdBase.result];
+  }
   if (steal) verdict = first + (madeOut ? ' is caught stealing.' : ' steals a base.');
   if (player === pitcher && event.outcome === 'strikeout') verdict = pitcher.name.split(' ')[0] + ' strikes out ' + first + '.';
   const bases = ['first', 'second', 'third'].filter((_, i) => event.basesAfter[i]);

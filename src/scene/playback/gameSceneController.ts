@@ -80,7 +80,7 @@ export class GameSceneController {
   private elapsedSec = 0;
   private trauma = 0;
 
-  private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
+  private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; freezeAt?: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
   private targetRing = new THREE.Mesh(new THREE.RingGeometry(.19, .23, 40),
     new THREE.MeshBasicMaterial({ color: 0xffdc66, transparent: true, depthTest: false, depthWrite: false }));
@@ -361,7 +361,8 @@ export class GameSceneController {
       const at = (pos: DiamondDefenderPos) => this.defenders.get(pos)!;
       const reliefStrikeout = pitcher.position === 'RP' && event?.outcome === 'strikeout'
         && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
-      this.replay = { play: reliefStrikeout ? {...play,reliefStrikeout:true} : play, readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
+      const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
+      this.replay = { freezeAt:choreo.freezeAt, play: reliefStrikeout ? {...play,reliefStrikeout:true} : play, readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
         BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.runnerToThird ? play.runnerToThird-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
         runnerDestinations: (play.outfield || play.close || play.kind === 'bunt_single' || play.kind === 'fielding_error') && event ? bases.map((id, i) => {
@@ -370,7 +371,7 @@ export class GameSceneController {
           if (dest >= 0) return dest + 1;
           return play.outfield?.caught && play.kind !== 'sac_fly' ? i + 1 : 4;
         }) : undefined,
-        start: this.elapsedSec, rate: (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0)) * 1000 / choreo.durationMs };
+        start: this.elapsedSec - (choreo.startAt ?? 0) / rate, rate };
       return;
     }
     if (choreo) {
@@ -464,8 +465,10 @@ export class GameSceneController {
   private updateScene(dt: number, elapsed: number): void {
     if (this.replay) {
       const { play, cast, start, rate, runnerDestinations } = this.replay;
-      const clock = (this.elapsedSec - start) * rate;
-      const previous = clock - elapsed * rate;
+      const raw = (this.elapsedSec - start) * rate;
+      const limit = this.replay.freezeAt ?? Infinity;
+      const clock = Math.min(raw, limit);
+      const previous = Math.min(raw - elapsed * rate, limit);
       const t = play.holdForceCall ? forceReplayTime(clock, play.finish) : clock;
       const fixedShot = this.cameraOverride
         ? getCameraPresetPose(this.cameraOverride,this.elapsedSec,0,this.throws,this.bats) : undefined;

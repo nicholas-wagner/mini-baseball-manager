@@ -96,6 +96,7 @@ const NEUTRAL_WEATHER: WeatherSimulationImpact = {
 };
 
 export interface PitchResolution {
+  thirdBase?: PlayEvent['thirdBase'];
   kind: 'pitch_event' | 'plate_complete' | 'steal_attempt';
   outcome: AtBatOutcome;
   totalBases?: 1 | 2 | 3 | 4;

@@ -61,6 +61,18 @@ Each of the 3,000 players keeps their illustration when they change clubs. Open 
 
 ---
 
+## Calling the game
+
+On a close single with a runner rounding third, the field holds at the bag. Read the outfielder’s arm and choose **Send home** or **Hold at third**. Watch the cutoff throw and the catcher’s tag, then check the result in the scorebook.
+
+| The third-base call on Android | The third-base call on desktop |
+| --- | --- |
+| ![The runner at third with the send and hold buttons on a phone](./docs/screenshots/third-base-phone.webp) | ![The manager reads the outfielder’s arm with the field and score in view](./docs/screenshots/third-base-desktop.webp) |
+
+Open **Park scouting** before first pitch to see the fence distances and move a hitter up the order. Flip a player’s card for their stance habit. Hitters also carry their last six recorded batted-ball locations between games. During an at-bat, the catcher can suggest the next pitch and location from the sequence just thrown.
+
+In **Tactics**, choose when **Smart Watch** should pause for you, including a particular hitter, the tying run reaching base, or a tiring starter. The **Sandlot Gazette** calls selected career matchups. Between innings, the out-of-town board posts a final from another scheduled game in your tier.
+
 ## Core Pillars
 
 - **GM-First Core Loop, Predetermined Home & Away Schedule, Sports-Page Recaps & Special Skill Trees**: Start a club in seconds and play through a predetermined **7-Series (21-Game) Home & Away Season Schedule** with live **3-Game Series Scoreboards** (*Rubber Matches*, *3-0 Sweep Bonuses*, and Road Trips inside rival 3D ballparks!), **Sports-Page Post-Series Recap Cards** (3 game scores, clickable Series MVP card & standings movement), **Pre-Game Probable Pitcher & Free-Agent Scout Cards** + 1-tap **Auto-Tune Lineup vs LHP/RHP**, clickable **League Leaders & Rival Club Cards**, and **Coach Pops' Manager Clipboard** — track your live **Promotion Chase & Season Owner Goal**, pick **1 focused Team Practice per game/series** (*Batting Cage*, *Bullpen Lab*, *Full-Squad*, or *Rest & Film*) and a **Pre-Series Gameplan** (*Balanced*, *Swing for the Fences*, *Small-Ball Chaos*, or *Bullpen Lockdown*) with real simulation trade-offs, react to **Incoming AI Trade Offers & Clubhouse Dilemmas**, spotlight **Hot-Hand / Breakout Watch** stars, swap tired starters in 1 tap, and let **1-tap Sim Next 3-Game Series** automatically grow core ratings while earning **Skill Points (SP)** for unified **Player & Manager Skill Trees** (with live nav badges for `🩺` injuries, `⚡` ready SP, `🏆` Playoffs, and `⬆` Ballpark upgrades).

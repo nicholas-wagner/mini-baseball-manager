@@ -265,8 +265,9 @@ export function applyPostGameProgression(
   rewards: PostGameRewards,
   statDeltas: Readonly<Record<string, PlayerSeasonStats>>,
   won: boolean,
+  events: readonly import('../models/playEvent').PlayEvent[] = [],
 ): { club: Club; manager: ManagerProfile } {
-  const clubWithStats = applyGameStatDeltasToClub(club, statDeltas, won);
+  const clubWithStats = applyGameStatDeltasToClub(club, statDeltas, won, events);
   const aura = evaluateClubhouseMentalAura(clubWithStats.roster);
   const moraleShift = (won ? 4 : -4) + aura.moraleRecoveryBonus;
   const updatedRoster = clubWithStats.roster.map((player) => {

@@ -35,6 +35,8 @@ export interface PitcherSignOption {
 }
 
 interface LiveActionBarProps {
+  watchSettings?: React.ReactNode;
+  catcherSuggestion?: React.ReactNode;
   cue: LiveActionCue;
   matchupLabel: string;
   basesLabel: string;
@@ -122,7 +124,7 @@ export function LiveActionBar({
   onSelectDefensiveShift,
   aiDefenseShiftLabel = null,
   pitcherArsenal = [],
-  selectedPitchType = null,
+  watchSettings, catcherSuggestion, selectedPitchType = null,
   onSelectPitchType,
   pitcherEndurance,
   pitcherEnduranceTier = 'fresh',
@@ -445,6 +447,7 @@ export function LiveActionBar({
             onClick={() => setTacticsOpen(!tacticsOpen)}>Tactics</button>
         </div>
 
+        {catcherSuggestion}
         {/* Optional Interactive Arcade Sweet-Spot Timing Bar anchored directly under thumb controls */}
         {arcadeTimingEnabled && !gameCompleted ? (
           <ArcadeTimingMeter
@@ -457,6 +460,7 @@ export function LiveActionBar({
         ) : null}
 
         <div id={tacticsId} className="tactics-panel" data-open={tacticsOpen}>
+          {watchSettings}
           <div className="tactics-buttons">
           {onToggleSmartWatch ? (
             <ComicButton

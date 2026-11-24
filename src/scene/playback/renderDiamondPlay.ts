@@ -25,7 +25,8 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   // Bring the pocket across the leg on the same side of the bag in either handedness.
   function stateAt(actor: Actor, at: number) {
     const state = actorAt(play, actor, at, side);
-    if (!play.close?.steal || actor !== play.pickup) return state;
+    const plateTag = play.plateDecision === 'out' && actor === 'C';
+    if (!plateTag && (!play.close?.steal || actor !== play.pickup)) return state;
     const approach = actor === 'C' ? play.pickupAt+.3 : .48;
     if (at < approach) return state;
     const receiver = cast[actor];
@@ -91,6 +92,10 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     }
   }
 
+  if (play.plateDecision && previous < play.finish && seconds >= play.finish) {
+    const call = {safe:'SAFE AT HOME!',out:'OUT AT HOME!',held:'HELD AT THIRD'}[play.plateDecision];
+    vfx.spawnComicCallout(call, actorAt(play,'RUN',play.finish,side).pos,play.plateDecision === 'out' ? '#C1394C' : '#167457',true);
+  }
   if (play.outfield && (play.kind === 'double' || play.kind === 'triple' || play.kind === 'sac_fly')) {
     const tag = play.kind === 'sac_fly';
     const arrival = tag ? play.leadArrival : play.batterArrival;
@@ -125,14 +130,17 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     }
   }
   const ump = vfx.umpire;
-  ump.sprite.visible=Boolean(((play.close?.steal && t>play.pickupAt+.62) || (force && t>play.finish-.30 && (fixedShot || !buntFollowBase(play, t)))) && (!play.ending || t<play.ending.start));
+  const atHome = Boolean(play.plateDecision && play.plateDecision !== 'held' && t > play.finish-.5);
+  const stealing = play.close?.steal && t > play.pickupAt + .62;
+  const atFirst = force && t > play.finish - .30 && (fixedShot || !buntFollowBase(play, t));
+  ump.sprite.visible = Boolean((atHome || stealing || atFirst) && (!play.ending || t < play.ending.start));
   if (ump.sprite.visible) {
-    const bag=force ? BASE_PATH_VERTICES[1] : play.fieldAt;
+    const bag=atHome ? BASE_PATH_VERTICES[0] : force ? BASE_PATH_VERTICES[1] : play.fieldAt;
     const dx=shot.position.x-bag.x,dz=shot.position.z-bag.z;
     const distance=Math.max(.01,Math.hypot(dx,dz));
     const sidestep = force ? 2.25 : -.76;
     ump.sprite.position.set(bag.x+(-1.5*dx+sidestep*dz)/distance,.045,bag.z+(-1.5*dz-sidestep*dx)/distance);
-    ump.signal(play.kind==='steal_safe',t-play.finish);
+    ump.signal(play.kind==='steal_safe' || play.plateDecision==='safe',t-play.finish);
   }
   teammates.forEach((member,index)=>{
     const ending=play.ending;

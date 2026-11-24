@@ -1,3 +1,5 @@
+import { SprayChart } from './DugoutScouting';
+import type { ContactPoint } from '../../engine/simulation/dugoutCalls';
 import { useState } from 'react';
 import { RotateCw, Sparkles, Star } from 'lucide-react';
 import { EnlargePrint } from './EnlargePrint';
@@ -48,6 +50,8 @@ export interface BaseballCardPlayer {
   /** Role-specific derived sabermetric stat line (Pitchers: ERA/WHIP/K9/Strk%; Hitters: AVG/OBP/OPS/FPCT). */
   statLine?: string;
   bio: string;
+  habit?: string;
+  contactPoints?: readonly ContactPoint[];
 }
 
 interface FlipBaseballCardProps {
@@ -268,6 +272,8 @@ export function FlipBaseballCard({
               ) : null}
             </div>
 
+            {player.habit && <strong className="mt-1 text-[11px]">{player.habit}</strong>}
+            {player.contactPoints && <SprayChart points={player.contactPoints}/>}
             <p className="my-2 border-l-[3px] pl-2 text-[11px] italic leading-snug" style={{ borderColor: team.primary }}>
               {player.bio}
             </p>

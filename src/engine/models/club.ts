@@ -115,7 +115,20 @@ export const MAX_ACTIVE_ROSTER_SIZE = 20;
 export const MIN_ACTIVE_ROSTER_SIZE = 15;
 export const MAX_ACADEMY_ROSTER_SIZE = 6;
 
+export interface LeagueWireFinal {
+  roundSeed: number;
+  matchupIndex: number;
+  gameIndex: number;
+  awayName: string;
+  homeName: string;
+  awayScore: number;
+  homeScore: number;
+  winnerName: string;
+  winnerWins: number;
+}
+
 export interface Club {
+  leagueWireFinal?: LeagueWireFinal;
   keepsakes?: ScorebookMoment[];
   earnedStickerIds?: string[];
   id: string;

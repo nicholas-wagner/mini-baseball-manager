@@ -34,6 +34,8 @@ export const DIAMOND_DEFENDER_COORDS: readonly DefenderCoord[] = [
 ] as const;
 
 export interface ChoreographedStep {
+  startAt?: number;
+  freezeAt?: number;
   play?: DiamondPlay;
   close?: DiamondPlay;
   infield?: DiamondPlayKind;
@@ -308,7 +310,13 @@ export function choreographPlayEvent(
         timed.runnerToThird = ([2, 1] as const).find(base => basesBefore?.[base - 1] === event.basesAfter[2]);
         if (timed.runnerToThird) timed.leadArrival = timed.pickupAt + 1.35;
       }
-      finishPlay(timed,event.outsAfter===3,Boolean(context.walkoff),scorer);
+      if (event.thirdBase) {
+        timed.plateDecision = event.thirdBase.result;
+        timed.runnerToThird = 2;
+        timed.leadArrival = timed.pickupAt;
+      }
+      const sending = event.thirdBase && event.thirdBase.result !== 'held';
+      finishPlay(timed,event.outsAfter===3,Boolean(context.walkoff),sending ? 2 : scorer);
     }
     return {
       play:timed, infield, outfield, close, basesBefore,

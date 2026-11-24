@@ -49,6 +49,8 @@ import type { FieldPosition } from '../engine/handedness/types';
 import {
   advanceOffseasonWorld,
   generateSixTierWorld,
+  settleLeagueWire,
+  seriesRoundSeed,
   simulateBestOfThreePlayoffs,
   simulateSeriesRound,
   type TierPlayoffResult,
@@ -163,6 +165,7 @@ export interface GameStoreState {
   activeOffseason: OffseasonState | null;
   getHumanClub: () => Club | null;
   startNewCareer: (input: StartNewCareerInput | PreparedCareer) => void;
+  settleOutOfTownGame: (innings: GameLengthInnings) => void;
   simNextSeriesRound: (
     regulationInnings?: GameLengthInnings,
   ) => {
@@ -354,6 +357,16 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       }));
     },
 
+    settleOutOfTownGame: (innings) => {
+      const state = get();
+      const club = state.getHumanClub();
+      if (!club || state.currentSeriesIndex >= 7) return;
+      const tier = club.leagueTier;
+      const seed = seriesRoundSeed(state.worldSeed,state.seasonNumber,state.currentSeriesIndex,tier);
+      const clubs = settleLeagueWire(state.leagues[tier], state.currentSeriesIndex, seed, innings, state.currentGameInSeries);
+      if (clubs !== state.leagues[tier]) set({leagues:{...state.leagues,[tier]:clubs}});
+    },
+
     simNextSeriesRound: (regulationInnings = 5) => {
       const state = get();
       if (state.currentSeriesIndex >= 7) {
@@ -365,13 +378,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const nextLeagues = { ...state.leagues };
       let humanSeriesGames: readonly import('../engine/league/seasonEngine').HumanSeriesGameLog[] = [];
       let humanOpponentId: string | null = null;
-      LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
+      LEAGUE_TIER_ORDER.forEach((tier) => {
         if (nextLeagues[tier].length < 2) return;
         const roundSeed =
-          state.worldSeed +
-          state.seasonNumber * 10000 +
-          state.currentSeriesIndex * 500 +
-          tierIdx * 71;
+          seriesRoundSeed(state.worldSeed, state.seasonNumber, state.currentSeriesIndex, tier);
         const simRes = simulateSeriesRound(
           nextLeagues[tier],
           state.currentSeriesIndex,
@@ -1136,11 +1146,13 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         rewards,
         result.playerStatDeltas,
         won,
+        result.events,
       );
       const updatedOpponent = applyGameStatDeltasToClub(
         opponentClub,
         result.playerStatDeltas,
         !won,
+        result.events,
       );
 
       let nextLeagues = updateHumanClubInLeagues(leagues, progressed.club);
@@ -1158,6 +1170,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       let sweepBonusAwarded = false;
 
       if (state.currentSeriesIndex < 7) {
+        const tier = humanClub.leagueTier;
         const prevRec = state.seriesResults[state.currentSeriesIndex] ?? { wins: 0, losses: 0 };
         const updatedSeriesWins = prevRec.wins + (won ? 1 : 0);
         const updatedSeriesLosses = prevRec.losses + (won ? 0 : 1);
@@ -1167,26 +1180,28 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         };
 
         const candidateGame = state.currentGameInSeries + 1;
+        if (candidateGame >= 3 && updatedSeriesWins >= 3 && updatedSeriesLosses === 0) {
+          sweepBonusAwarded = true;
+          const sweptClub: Club = {
+            ...progressed.club,
+            economy: {
+              ...progressed.club.economy,
+              cash: progressed.club.economy.cash + SERIES_SWEEP_BONUS_CASH,
+            },
+          };
+          nextLeagues = updateHumanClubInLeagues(nextLeagues, sweptClub);
+        }
+        const roundSeed = seriesRoundSeed(state.worldSeed, state.seasonNumber, state.currentSeriesIndex, tier);
+        nextLeagues[tier] = settleLeagueWire(
+          nextLeagues[tier], state.currentSeriesIndex, roundSeed,
+          result.finalState.regulationInnings, state.currentGameInSeries,
+        );
         if (candidateGame >= 3) {
-          if (updatedSeriesWins >= 3 && updatedSeriesLosses === 0) {
-            sweepBonusAwarded = true;
-            const sweptClub: Club = {
-              ...progressed.club,
-              economy: {
-                ...progressed.club.economy,
-                cash: progressed.club.economy.cash + SERIES_SWEEP_BONUS_CASH,
-              },
-            };
-            nextLeagues = updateHumanClubInLeagues(nextLeagues, sweptClub);
-          }
           // Completed all 3 games of the current scheduled series — sync other AI matchups cleanly!
-          LEAGUE_TIER_ORDER.forEach((tier, tierIdx) => {
+          LEAGUE_TIER_ORDER.forEach((tier) => {
             if (nextLeagues[tier].length < 2) return;
             const roundSeed =
-              state.worldSeed +
-              state.seasonNumber * 10000 +
-              state.currentSeriesIndex * 500 +
-              tierIdx * 71;
+              seriesRoundSeed(state.worldSeed, state.seasonNumber, state.currentSeriesIndex, tier);
             nextLeagues[tier] = simulateSeriesRound(
               nextLeagues[tier],
               state.currentSeriesIndex,

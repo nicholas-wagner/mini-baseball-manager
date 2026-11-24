@@ -716,3 +716,7 @@ Game Day advances the simulation once per manager action. It keeps the pre-play 
 The featured-player cue identifies the batting or pitching role. A handoff after a batting out carries the outgoing batter’s ID so the scene can dress the second rig from the same roster. Replay scoring text requires the recorded fielding position and the animated throw to agree. The between-innings pack button opens the existing welcome pack in inventory.
 
 Game Day stays mounted in a career-keyed React Activity during a visit to another tab. Hiding the game suspends timers and disposes the WebGL scene. Returning restores the same session, selected call and replay handoff. The selected pitch target travels with the recorded close play so a replay can reproduce the catcher’s setup.
+
+A managed single can stage a decision while its runner rounds third. The live session and game log advance only when the manager chooses. Both calls use the same pre-pitch session and isolated pitch inputs. The recorded third-base result drives runner advances, fielding credits, camera cuts and the scoring call.
+
+Players retain up to six fair-contact locations. Older careers start recording locations on their next game. The out-of-town final belongs to the scheduled series and game, and its two clubs receive their record and stat updates once.

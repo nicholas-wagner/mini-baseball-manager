@@ -1,3 +1,4 @@
+import { OUTFIELD_WALL } from '../playback/diamondLayout';
 import sandlotFence from '../../art/ballpark/sandlot-fence.svg?url';
 import * as THREE from 'three';
 import {
@@ -232,6 +233,28 @@ export function createStadiumEvolutionOverlay(
     fence.rotation.y = Math.PI;
     group.add(fence);
   }
+  const dimensions = getBallparkPreset(spec.ballparkId).factors;
+  const markers = [dimensions.leftWallFt, dimensions.centerWallFt, dimensions.rightWallFt];
+  markers.forEach((feet, i) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 64;
+    const ink = canvas.getContext('2d');
+    if (!ink) return;
+    ink.fillStyle = '#174833';
+    ink.fillRect(0, 0, 128, 64);
+    ink.fillStyle = '#fff2cb';
+    ink.textAlign = 'center';
+    ink.font = 'bold 50px monospace';
+    ink.fillText(String(feet), 64, 50);
+    const material = new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(canvas) });
+    const marker = new THREE.Mesh(new THREE.PlaneGeometry(3.6,1.8),material);
+    const angle = (i-1)*.72;
+    const radius = OUTFIELD_WALL.radius-.58;
+    marker.position.set(Math.sin(angle)*radius,1.9,OUTFIELD_WALL.centerZ-Math.cos(angle)*radius);
+    marker.lookAt(0,1.9,OUTFIELD_WALL.centerZ);
+    group.add(marker);
+  });
   buildUpperDecks(spec, group);
   buildLuxurySuitesAndDome(spec, group);
   buildJumbotronAndCannon(spec, group);

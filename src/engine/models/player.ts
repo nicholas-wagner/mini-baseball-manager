@@ -377,6 +377,7 @@ export interface Player {
 
   // Club & History
   contract: PlayerContract;
+  recentContact?: { x: number; z: number }[];
   formerClubIds: string[];
   seasonStats: PlayerSeasonStats;
   careerStats: PlayerSeasonStats;

@@ -55,6 +55,7 @@ export interface DiamondPlay {
   holdForceCall?: boolean;
   pitchTarget?: PitchTargetIntent;
   reliefStrikeout?: boolean;
+  plateDecision?: 'out' | 'safe' | 'held';
   runnerToThird?: 1 | 2;
   scorerBase?: 1 | 2 | 3;
   ending?: {kind: 'third_out' | 'walkoff'; start: number; scorer: 'BAT' | 'RUN'};
@@ -174,6 +175,14 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
   let pos = starts[actor];
   const leadBase = play.scorerBase ?? play.runnerToThird;
   if (actor === 'RUN' && play.buntAdvances && play.scorerBase) return buntRunnerPose(play, play.scorerBase, time);
+  if (actor === 'RUN' && play.plateDecision) {
+    const third = BASE_PATH_VERTICES[3];
+    if (time <= play.pickupAt || play.plateDecision === 'held')
+      return runBases(BASE_PATH_VERTICES[2],2,3,time,plate+.10,play.pickupAt);
+    const pose = runBases(third,3,4,time,play.pickupAt,play.leadArrival);
+    if (time > play.leadArrival-.36) return {...pose, clip:play.plateDecision === 'out' ? 'runner_slide' as const : 'slide_safe' as const, local:Math.min(.55,time-play.leadArrival+.36)};
+    return pose;
+  }
   if (actor === 'RUN' && leadBase && !play.close?.steal) {
     const go = (play.outfield?.caught ? play.pickupAt : plate) + .10;
     return runBases(BASE_PATH_VERTICES[leadBase],leadBase,play.scorerBase ? 4 : 3,time,go,play.leadArrival);
@@ -184,7 +193,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     if (relay) {
       const target = {x:.45,y:.04,z:-.40};
       pos = between(pos,target,progress(time,plate+.18,relay.start));
-      return {pos,yaw:headingToward(pos,play.fieldAt),clip:time < relay.end-.25 ? 'field_ready' as const : 'catch_receive' as const,local:.22};
+      return {pos,yaw:headingToward(pos,play.fieldAt),clip:play.plateDecision === 'out' && time >= relay.end ? 'field_tag' as const : time < relay.end-.25 ? 'field_ready' as const : 'catch_receive' as const,local:.22};
     }
   }
   if ((actor === 'P' || actor === 'C') && play.pickup === actor &&
@@ -370,6 +379,16 @@ export function buntFollowBase(play: DiamondPlay, time: number) {
 }
 
 export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSide, throws: ThrowsHand = 'R'): CameraPose {
+  if (play.plateDecision && t >= play.legs[0].end + .1 && t < (play.ending?.start ?? Infinity)) {
+    const atThird = t >= play.pickupAt - .35 && (play.plateDecision === 'held' || t < play.pickupAt + .16);
+    if (atThird) {
+      const third = BASE_PATH_VERTICES[3];
+      return { position: {x: third.x-3.9, y:2.8, z:third.z+4.7}, lookAt:{x:third.x+.25,y:.88,z:third.z-.8}, fov:42 };
+    }
+    if (t < play.receiveAt)
+      return {position:{x:-5,y:16,z:10},lookAt:{x:0,y:.7,z:-13},fov:50};
+    return {position:{x:3.1,y:1.6,z:4.3},lookAt:{x:-.55,y:.62,z:-.55},fov:43};
+  }
   const reaction = reactionCamera(play,t,bats);
   if (reaction) return reaction;
   const plate = play.legs[0].end;

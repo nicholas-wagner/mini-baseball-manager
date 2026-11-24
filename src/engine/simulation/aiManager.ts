@@ -22,6 +22,7 @@ import type { WeatherSimulationImpact } from './weather';
 import type { DefensiveShiftId } from './winProbability';
 
 export interface StepPitchOptions {
+  thirdBaseCall?: 'send' | 'hold' | 'coach';
   requestedPitchType?: PitchType;
   requestedPowerId?: string;
   defensiveShift?: DefensiveShiftId;

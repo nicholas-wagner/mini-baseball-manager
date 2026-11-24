@@ -113,7 +113,7 @@ export function computePitchEnduranceDrain(
   return Number((1.18 * staminaFactor * ROLE_DRAIN_SCALE[role] * stressFactor * paceScale).toFixed(3));
 }
 
-function classifyEnduranceTier(endurance: number): PitcherEnduranceTier {
+export function classifyEnduranceTier(endurance: number): PitcherEnduranceTier {
   if (endurance >= 75) return 'fresh';
   if (endurance >= 55) return 'solid';
   if (endurance >= 36) return 'tiring';

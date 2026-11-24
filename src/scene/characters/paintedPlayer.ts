@@ -1,3 +1,4 @@
+import { stanceHabit } from '../../engine/simulation/dugoutCalls';
 import { createPitchDelivery } from './pitchDelivery';
 import { createPaintedBat } from './paintedBat';
 import * as THREE from 'three';
@@ -377,22 +378,23 @@ export function createPaintedPlayerRig(
     headJoint.rotation.z = rotationSign * frame.tilt;
     if (clip === 'catch_frame') headJoint.position.y -= .035 * Math.sin(Math.PI * Math.min(1, time / .32));
     bodyMat.uniforms.sleeve.value.set(0, rear ? .59 : .46);
+    const habit = stanceHabit(opt.traits.seed, role === 'pitcher', opt.quietPitcher);
     if (clip === 'bat_stance') {
       // Each player keeps a quiet pre-pitch habit through changes of club or uniform.
       const beat = Math.pow(Math.max(0,Math.sin(time*3.6 + (opt.traits.seed % 13))),4);
-      if (opt.traits.seed % 3 === 0) {
+      if (habit === 'nod') {
         headJoint.rotation.z += .085 * beat;
         bodyMat.uniforms.sleeve.value.x = beat * (rear ? -1 : 1);
       }
-      else if (opt.traits.seed % 3 === 1 && bat.barrel.visible) {
+      else if (habit === 'tap' && bat.barrel.visible) {
         // Two taps from the painted grip, then a pause in the loaded stance.
         const cycle = (time + Math.abs(opt.traits.seed % 5) * .17) % 3.6;
         const tap = (start: number) => Math.sin(Math.PI * Math.min(1, Math.max(0, (cycle - start) / .52))) ** 2;
         bat.barrel.rotation.z += (rear ? 1 : -1) * 2.72 * (tap(.10) + tap(.70));
       }
-      else actor.position.x += .032 * beat * actorFlip;
+      else actor.position.x += .085 * beat * actorFlip;
     }
-    const roll = clip === 'pitch_set' && (opt.quietPitcher || opt.traits.seed % 3 === 0);
+    const roll = clip === 'pitch_set' && (habit === 'rub' || habit === 'roll');
     if (clip === 'pitch_gather') {
       const close = THREE.MathUtils.smoothstep(time, .18, .92);
       ball.position.set(.027 * (1-close), -.024 + .018*close, .07-.10*close);
@@ -407,6 +409,8 @@ export function createPaintedPlayerRig(
       const rollPhase = roll ? Math.min(time % CLIP_DURATIONS.pitch_set, 1.3) : Math.min(frame.pitchPhase, .58);
       ball.rotation.z = (opt.traits.seed % 2 ? 1 : -1) * rollPhase * 9;
     }
+    if (clip === 'pitch_set' && habit === 'rub') ball.position.x += .035 * Math.sin(time * 16);
+    if (clip === 'pitch_set' && habit === 'set') actor.scale.y *= 1.045;
     if (sliding) headJoint.rotation.z = actorFlip * (clip==='slide_safe' ? -.14 : .12);
 
     if (clip === 'runner_glance') {

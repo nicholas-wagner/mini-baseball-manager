@@ -1,3 +1,4 @@
+import { HABIT_CAPTIONS, stanceHabit } from '../../engine/simulation/dugoutCalls';
 import type { CardRarity, PortraitMood } from '../../art/portraits/types';
 import {
   computePlayerOverall,
@@ -69,6 +70,8 @@ export function toBaseballCardPlayer(
     },
     cardStatRows: cardProfile.ratings,
     statLine: cardProfile.statLine,
+    habit: HABIT_CAPTIONS[stanceHabit(player.traits.seed, isPitcherPosition(player.position), player.personality === 'quiet_assassin')],
+    contactPoints: isPitcherPosition(player.position) ? undefined : player.recentContact ?? [],
     bio: resolvePlayerCardBio(player),
   };
 }
