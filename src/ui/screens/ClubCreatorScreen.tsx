@@ -4,6 +4,11 @@ import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { ILLUSTRATED_PLAYER_POOL } from '../../art/portraits/illustratedPlayerPool';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
 import { soundEngine } from '../../audio/soundEngine';
+import { DERBY_WIN_CASH } from '../../engine/events/arcadeDerby';
+import {
+  detectDerbyCelebrationSticker,
+  type CelebrationStickerUnlock,
+} from '../../engine/gm/celebrationStickers';
 import { buildMascotCheerQuip } from '../../engine/gm/openingDayHook';
 import {
   STARTING_ROSTER_PRESETS,
@@ -18,6 +23,8 @@ import {
   type ManagerBackstoryId,
 } from '../../engine/story/backstories';
 import { useCareerStoryStore } from '../../store/careerSlots';
+import { ArcadeDerbyModal } from '../components/ArcadeDerbyModal';
+import { CelebrationStickerToast } from '../components/CelebrationStickerToast';
 import { PlayerCardModal } from '../components/PlayerCardModal';
 import { OpeningDayPrint } from '../components/GameDayPrints';
 import { newCareerSeed, prepareCareer, useGameStore } from '../../store/gameStore';
@@ -86,6 +93,8 @@ const MASCOT_ANIMAL_OPTIONS = [
 
 export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const startNewCareer = useGameStore((s) => s.startNewCareer);
+  const recordArcadeDerbyWin = useGameStore((s) => s.recordArcadeDerbyWin);
+  const unlockCelebrationSticker = useGameStore((s) => s.unlockCelebrationSticker);
   const chooseCareerBackstory = useCareerStoryStore((s) => s.chooseCareerBackstory);
 
   const [city, setCity] = useState('Sandlot');
@@ -142,6 +151,11 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
 
   const [editing, setEditing] = useState(false);
   const [inspected, setInspected] = useState<Player | null>(null);
+  const [openingSidePref, setOpeningSidePref] = useState<'auto' | 'batting' | 'pitching'>('auto');
+  const [coverDerbyOpen, setCoverDerbyOpen] = useState(false);
+  const [pendingCoverDerbyWins, setPendingCoverDerbyWins] = useState(0);
+  const [pendingCoverStickers, setPendingCoverStickers] = useState<string[]>([]);
+  const [coverStickerToast, setCoverStickerToast] = useState<CelebrationStickerUnlock | null>(null);
   const opening = useMemo(() => {
     if (editing) return null;
     const draft = prepareCareer({ city, clubName, mascot, monogram, managerName, startingPreset,
@@ -155,10 +169,12 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
       awayClub: series.isHome ? series.opponent : homeClub,
       regulationInnings: 5,
       seed: draft.seed + 1,
+      preferHumanBattingFirst: openingSidePref === 'batting',
+      preferHumanPitchingFirst: openingSidePref === 'pitching',
       chargeOpeningPower: true,
     });
     return { draft, club: homeClub, series, moment };
-  }, [editing, city, clubName, mascot, monogram, managerName, startingPreset, palette, enableInjuries, enableIllnesses, seedNonce]);
+  }, [editing, city, clubName, mascot, monogram, managerName, startingPreset, palette, enableInjuries, enableIllnesses, seedNonce, openingSidePref]);
 
   const handleCycleCoverMascot = () => {
     const currentIdx = MASCOT_ANIMAL_OPTIONS.findIndex(
@@ -172,6 +188,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
 
   if (opening) {
     const { club, series, moment, draft } = opening;
+    const currentlyBatting = (moment.session.half === 'BOT') === moment.session.home.isHuman;
     return <section className="opening-cover" aria-label="Your club">
       <div className="opening-club">
         <button
@@ -209,14 +226,59 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
           🎨 Customize
         </button>
       </div>
-      <OpeningDayPrint cover session={moment.session} opponentLabel={(series.isHome ? 'vs ' : '@ ') + series.opponent.name}
-        onInspect={setInspected} onStart={() => {
+      <OpeningDayPrint
+        cover
+        session={moment.session}
+        opponentLabel={(series.isHome ? 'vs ' : '@ ') + series.opponent.name}
+        onInspect={setInspected}
+        onToggleSide={() => {
+          setOpeningSidePref(currentlyBatting ? 'pitching' : 'batting');
+          soundEngine.play('card_flip');
+        }}
+        onOpenDerby={() => {
+          setCoverDerbyOpen(true);
+          soundEngine.play('organ_charge');
+        }}
+        onStart={() => {
           startNewCareer(draft);
           if (backstoryId !== 'sandlot_hero') {
             chooseCareerBackstory(backstoryId);
           }
+          for (let i = 0; i < pendingCoverDerbyWins; i += 1) {
+            recordArcadeDerbyWin(DERBY_WIN_CASH);
+          }
+          for (const stickerId of pendingCoverStickers) {
+            unlockCelebrationSticker(stickerId);
+          }
           onCreated(moment);
-        }} />
+        }}
+      />
+      <ArcadeDerbyModal
+        open={coverDerbyOpen}
+        club={club}
+        worldSeed={draft.seed}
+        onWin={() => setPendingCoverDerbyWins((n) => n + 1)}
+        onHomeRun={(sluggerName) => {
+          const unlock = detectDerbyCelebrationSticker({
+            homeRuns: 1,
+            sluggerName,
+            earnedStickerIds: pendingCoverStickers,
+            mascotName: club.mascot,
+          });
+          if (unlock) {
+            setPendingCoverStickers((prev) =>
+              prev.includes(unlock.sticker.id) ? prev : [...prev, unlock.sticker.id],
+            );
+            setCoverStickerToast(unlock);
+          }
+        }}
+        onClose={() => setCoverDerbyOpen(false)}
+      />
+      <CelebrationStickerToast
+        unlock={coverStickerToast}
+        club={club}
+        onDismiss={() => setCoverStickerToast(null)}
+      />
       <PlayerCardModal open={!!inspected} entry={inspected && {player:inspected, club, roleTag:'Opening Day'}}
         onClose={() => setInspected(null)} />
     </section>;

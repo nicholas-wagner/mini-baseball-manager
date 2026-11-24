@@ -38,6 +38,8 @@ export interface ClutchMomentInput {
   pressureLevel?: GamePressureLevel;
   /** When true (Opening Day), wait until the human club is batting in a late inning. */
   preferHumanBattingFirst?: boolean;
+  /** When true (Opening Day), wait until the human club is pitching in a late inning. */
+  preferHumanPitchingFirst?: boolean;
   /** When true (Opening Day), ensure the human side starts with a charged Signature Power. */
   chargeOpeningPower?: boolean;
 }
@@ -105,12 +107,29 @@ function isHumanBattingNow(session: GameSessionState): boolean {
   return (session.half === 'BOT') === session.home.isHuman;
 }
 
+type OpeningSidePreference = 'auto' | 'batting' | 'pitching';
+
+function resolveSidePreference(input: ClutchMomentInput): OpeningSidePreference {
+  if (input.preferHumanBattingFirst) return 'batting';
+  if (input.preferHumanPitchingFirst) return 'pitching';
+  return 'auto';
+}
+
+function matchesSidePreference(
+  session: GameSessionState,
+  sidePref: OpeningSidePreference,
+): boolean {
+  if (sidePref === 'batting') return isHumanBattingNow(session);
+  if (sidePref === 'pitching') return !isHumanBattingNow(session);
+  return true;
+}
+
 function isClutchJumpStop(
   session: GameSessionState,
   targetInning: number,
-  preferHumanBattingFirst: boolean,
+  sidePref: OpeningSidePreference,
 ): boolean {
-  if (preferHumanBattingFirst && !isHumanBattingNow(session)) return false;
+  if (!matchesSidePreference(session, sidePref)) return false;
   if (session.inning >= session.regulationInnings) return true;
   if (session.inning < targetInning) return false;
   const diff = Math.abs(session.away.score - session.home.score);
@@ -149,31 +168,45 @@ function applyOpeningPowerCharge(session: GameSessionState): GameSessionState {
   };
 }
 
+function pickFallbackSession(
+  sidePref: OpeningSidePreference,
+  lastHumanBatting: GameSessionState | null,
+  lastHumanPitching: GameSessionState | null,
+  lastPlayable: GameSessionState,
+): GameSessionState {
+  if (sidePref === 'batting' && lastHumanBatting) return lastHumanBatting;
+  if (sidePref === 'pitching' && lastHumanPitching) return lastHumanPitching;
+  return lastPlayable;
+}
+
 function advanceToClutchStop(
   initial: GameSessionState,
   targetInning: number,
-  preferHumanBattingFirst: boolean,
+  sidePref: OpeningSidePreference,
 ): { finalSession: GameSessionState; allEvents: PlayEvent[] } {
   let current = initial;
   let lastPlayable = initial;
-  let lastHumanBatting: GameSessionState | null = null;
+  let lastHumanBatting: GameSessionState | null = isHumanBattingNow(initial) ? initial : null;
+  let lastHumanPitching: GameSessionState | null = !isHumanBattingNow(initial) ? initial : null;
   const allEvents: PlayEvent[] = [];
 
   for (let i = 0; i < 450; i += 1) {
     if (current.status === 'completed') break;
-    if (isClutchJumpStop(current, targetInning, preferHumanBattingFirst)) break;
+    if (isClutchJumpStop(current, targetInning, sidePref)) break;
     const step = stepPitch(current, 'normal');
     if (step.nextSession.status === 'in_progress') {
       lastPlayable = step.nextSession;
       if (isHumanBattingNow(step.nextSession)) {
         lastHumanBatting = step.nextSession;
+      } else {
+        lastHumanPitching = step.nextSession;
       }
     }
     current = step.nextSession;
     allEvents.push(...step.events);
   }
 
-  const fallback = preferHumanBattingFirst && lastHumanBatting ? lastHumanBatting : lastPlayable;
+  const fallback = pickFallbackSession(sidePref, lastHumanBatting, lastHumanPitching, lastPlayable);
   return {
     finalSession: current.status === 'in_progress' ? current : fallback,
     allEvents,
@@ -192,11 +225,7 @@ export function createClutchMomentSession(input: ClutchMomentInput): ClutchMomen
     input.homeGameplan ?? 'balanced',
   );
   const targetInning = Math.max(2, input.regulationInnings - 1);
-  const stepped = advanceToClutchStop(
-    initial,
-    targetInning,
-    Boolean(input.preferHumanBattingFirst),
-  );
+  const stepped = advanceToClutchStop(initial, targetInning, resolveSidePreference(input));
   const finalSession = input.chargeOpeningPower
     ? applyOpeningPowerCharge(stepped.finalSession)
     : stepped.finalSession;

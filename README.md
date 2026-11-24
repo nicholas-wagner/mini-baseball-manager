@@ -105,9 +105,9 @@ Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.g
 
 This repository is structured so both **human contributors** and **AI coding agents** can immediately understand the architecture, invariants, and exact next TDD ticket:
 
-- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-087.
+- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-088.
 - **[docs/SIMULATION_MATH.md](./docs/SIMULATION_MATH.md)** — Full pitch-by-pitch seeded dice-roll formulas, all 15 attribute effects, National/Capstone powers, Weather, Shifts, Mind Games & Nemesis math.
-- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-087**.
+- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-088**.
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Canonical TypeScript interfaces, `PlayEvent` stream contracts, and 3D ballpark coordinates.
 - **[docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)** — Exact 90s color tokens, typography, touch targets, and chibi scale units.
 - **[AGENTS.md](./AGENTS.md)** — AI Agent onboarding guide, hard architectural invariants, and Definition of Done.

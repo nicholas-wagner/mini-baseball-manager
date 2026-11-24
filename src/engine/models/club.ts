@@ -117,6 +117,7 @@ export const MAX_ACADEMY_ROSTER_SIZE = 6;
 
 export interface Club {
   keepsakes?: ScorebookMoment[];
+  earnedStickerIds?: string[];
   id: string;
   isHuman: boolean;
   city: string;

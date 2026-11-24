@@ -23,9 +23,18 @@ interface ArcadeDerbyModalProps {
   club: Club;
   worldSeed: number;
   onClose: () => void;
+  onWin?: () => void;
+  onHomeRun?: (sluggerName: string) => void;
 }
 
-export function ArcadeDerbyModal({ open, club, worldSeed, onClose }: ArcadeDerbyModalProps) {
+export function ArcadeDerbyModal({
+  open,
+  club,
+  worldSeed,
+  onClose,
+  onWin,
+  onHomeRun,
+}: ArcadeDerbyModalProps) {
   const recordArcadeDerbyWin = useGameStore((s) => s.recordArcadeDerbyWin);
   const awardPack = useFoilPackStore((s) => s.awardPack);
 
@@ -92,6 +101,7 @@ export function ArcadeDerbyModal({ open, club, worldSeed, onClose }: ArcadeDerby
     if (res.outcome === 'home_run') {
       soundEngine.play('bat_crack');
       soundEngine.play('crowd_cheer');
+      onHomeRun?.(slugger.name);
     } else {
       soundEngine.play('ui_pop');
     }
@@ -102,6 +112,7 @@ export function ArcadeDerbyModal({ open, club, worldSeed, onClose }: ArcadeDerby
         setRewardGranted(true);
         recordArcadeDerbyWin(DERBY_WIN_CASH);
         awardPack('sandlot_foil', `Home Run Derby Champ (${slugger.name}: ${nextHrs} HR)!`);
+        onWin?.();
         soundEngine.play('trophy_fanfare');
       }
     }

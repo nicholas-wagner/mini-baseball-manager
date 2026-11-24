@@ -501,17 +501,64 @@ button.gallery-tile {
 .opening-feature .opening-art span { padding: 5px 2px; }
 .opening-feature .opening-objective { font-weight: 850; margin: 14px 0; line-height: 1.25; font-size: clamp(18px, 2.5vw, 28px); }
 .opening-feature .opening-start { padding: 10px 19px; }
+.opening-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opening-quick-pills {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 24rem;
+}
+.opening-quick-pill {
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid #182632;
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 1.1;
+  box-shadow: 2px 2px 0 #182632;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.opening-side-pill {
+  background: #e0fbfc;
+  color: #152f2e;
+}
+.opening-derby-pill {
+  background: #ffe5ec;
+  color: #9d0208;
+}
 @media (max-width: 560px) {
   .opening-cover { margin: 4px auto; }
   .opening-club { padding: 8px 12px; gap: 8px; }
   .opening-club small { font-size: 11.5px; }
   .opening-club .opening-customize-pill { padding: 4px 10px; }
-  .opening-feature { grid-template-columns: 1fr; gap: 12px; padding: 14px 18px 16px;
-    background: repeating-linear-gradient(110deg,transparent 0 32px,#ffffff06 32px 58px), linear-gradient(173deg,#24614f 0 45%,#e1b355 45% 46%,#fff4d9 46%); }
-  .opening-feature .opening-art { width: min(44vw, 178px); justify-self: center; }
-  .opening-feature .opening-copy h2 { font-size: clamp(27px, 7.6vw, 35px); margin: 3px 0 6px; }
-  .opening-feature .opening-objective { margin: 8px 0 10px; font-size: 18px; }
+  .opening-feature { grid-template-columns: 1fr; gap: 10px; padding: 12px 16px 14px;
+    background: repeating-linear-gradient(110deg,transparent 0 32px,#ffffff06 32px 58px), linear-gradient(173deg,#24614f 0 43%,#e1b355 43% 44%,#fff4d9 44%); }
+  .opening-feature .opening-art { width: min(40vw, 162px); justify-self: center; }
+  .opening-feature .opening-copy h2 { font-size: clamp(25px, 7.2vw, 33px); margin: 2px 0 5px; }
+  .opening-feature .opening-objective { margin: 6px 0 8px; font-size: 17px; }
   .opening-feature .opening-start { width: 100%; }
+  .opening-quick-pills { max-width: none; width: 100%; }
+}
+@media (max-width: 560px) and (max-height: 700px) {
+  .opening-club { padding: 6px 10px; }
+  .opening-feature { gap: 8px; padding: 8px 14px 10px;
+    background: repeating-linear-gradient(110deg,transparent 0 32px,#ffffff06 32px 58px), linear-gradient(173deg,#24614f 0 38%,#e1b355 38% 39%,#fff4d9 39%); }
+  .opening-feature .opening-art { width: min(33vw, 122px); padding: 4px 4px 0; }
+  .opening-feature .opening-art span { padding: 2px 2px; font-size: 10px; line-height: 14px; }
+  .opening-feature .opening-copy h2 { font-size: clamp(22px, 6.4vw, 27px); margin: 2px 0 3px; }
+  .opening-inning + p { margin: 1px 0 5px; font-size: 12.5px; }
+  .opening-feature .opening-objective { margin: 4px 0 6px; font-size: 15px; line-height: 1.2; }
+  .opening-actions { gap: 6px; }
 }
 
 @media (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
@@ -520,8 +567,10 @@ button.gallery-tile {
   .career-shell:has(.opening-cover) main { padding:5px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left)); }
   .opening-cover { margin:0 auto; }
   .opening-club { padding:4px 14px; }
-  .opening-cover .opening-feature { grid-template-columns:minmax(100px,1fr) minmax(0,1.7fr); gap:14px; min-height:0; padding:10px 16px; }
+  .opening-cover .opening-feature { grid-template-columns:minmax(100px,1fr) minmax(0,1.7fr); gap:14px; min-height:0; padding:8px 16px; }
   .opening-cover .opening-art { width:min(100%,35svh); justify-self:center; }
-  .opening-cover .opening-copy h2 { font-size:clamp(24px,4vw,34px); margin:2px 0; }
-  .opening-cover .opening-objective { margin:6px 0; font-size:18px; }
+  .opening-cover .opening-copy h2 { font-size:clamp(22px,3.8vw,32px); margin:2px 0; }
+  .opening-cover .opening-objective { margin:4px 0 6px; font-size:15px; }
+  .opening-actions { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .opening-quick-pills { display: flex; flex-wrap: wrap; width: auto; max-width: none; gap: 6px; }
 }

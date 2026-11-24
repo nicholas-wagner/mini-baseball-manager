@@ -181,6 +181,7 @@ export interface GameStoreState {
   autoTuneHumanLineupForStarter: (starterThrows: 'L' | 'R') => { tuned: boolean; summary: string };
   clearLastSeriesRecap: () => void;
   keepScorebookMoment: (id: string) => void;
+  unlockCelebrationSticker: (stickerId: string) => boolean;
   toggleFavoritePlayer: (playerId: string) => void;
   customizePlayerProfile: (
     playerId: string,
@@ -597,6 +598,18 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const moment = state.lastPostGameSummary?.moments?.find(item => item.id === id);
       if (!club || !moment || club.keepsakes?.some(item => item.id === id)) return;
       set({leagues:updateHumanClubInLeagues(state.leagues, {...club, keepsakes:[moment, ...(club.keepsakes ?? [])]})});
+    },
+    unlockCelebrationSticker: (stickerId) => {
+      const state = get();
+      const club = state.getHumanClub();
+      if (!club || club.earnedStickerIds?.includes(stickerId)) return false;
+      set({
+        leagues: updateHumanClubInLeagues(state.leagues, {
+          ...club,
+          earnedStickerIds: [...(club.earnedStickerIds ?? []), stickerId],
+        }),
+      });
+      return true;
     },
     toggleFavoritePlayer: (playerId) => {
       set((state) => ({

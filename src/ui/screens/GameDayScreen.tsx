@@ -150,7 +150,13 @@ import { useNemesisStore } from '../../store/nemesisStore';
 import { usePostseasonStore } from '../../store/postseasonStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { ArcadeDerbyModal } from '../components/ArcadeDerbyModal';
+import { CelebrationStickerToast } from '../components/CelebrationStickerToast';
 import { RallyResult } from '../components/RallyResult';
+import {
+  detectDerbyCelebrationSticker,
+  detectLiveCelebrationSticker,
+  type CelebrationStickerUnlock,
+} from '../../engine/gm/celebrationStickers';
 import { FirstAtBat } from '../components/FirstAtBat';
 import { BatterEntrance, MatchupPrints, OpeningDayPrint } from '../components/GameDayPrints';
 import type { PlayerEntranceCue } from '../../scene/playback/firstAtBatPresentation';
@@ -244,6 +250,7 @@ export function GameDayScreen({
   const favoritePlayerIds = useGameStore((s) => s.favoritePlayerIds);
   const welcomeChecklistClaimed = useGameStore((s) => s.welcomeChecklistClaimed);
   const toggleFavoritePlayer = useGameStore((s) => s.toggleFavoritePlayer);
+  const unlockCelebrationSticker = useGameStore((s) => s.unlockCelebrationSticker);
   const customizePlayerProfile = useGameStore((s) => s.customizePlayerProfile);
   const claimWelcomeChecklistReward = useGameStore((s) => s.claimWelcomeChecklistReward);
   const packsOpenedCount = useFoilPackStore((s) => s.openedCount);
@@ -254,6 +261,7 @@ export function GameDayScreen({
   } | null>(null);
   const [derbyOpen, setDerbyOpen] = useState(false);
   const [trophyOpen, setTrophyOpen] = useState(false);
+  const [stickerToast, setStickerToast] = useState<CelebrationStickerUnlock | null>(null);
   const [openingSeasonExpanded, setOpeningSeasonExpanded] = useState(false);
   const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
 
@@ -403,9 +411,21 @@ export function GameDayScreen({
         if (outcome === 'home_run' || outcome === 'strikeout') triggerHapticPulse(outcome);
         if (outcome === 'single' || outcome === 'double' || outcome === 'triple') triggerHapticPulse('hit');
       }
+      if (playbackEvent && prePlaySession && humanClub) {
+        const unlock = detectLiveCelebrationSticker({
+          event: playbackEvent,
+          before: prePlaySession,
+          earnedStickerIds: humanClub.earnedStickerIds ?? [],
+          mascotName: humanClub.mascot,
+        });
+        if (unlock && unlockCelebrationSticker(unlock.sticker.id)) {
+          setStickerToast(unlock);
+          soundEngine.play('trophy_fanfare');
+        }
+      }
     }, decisionMs);
     return () => window.clearTimeout(timer);
-  }, [lastChoreo, playbackEvent, revealedPlay]);
+  }, [lastChoreo, playbackEvent, prePlaySession, revealedPlay, humanClub, unlockCelebrationSticker]);
   useEffect(() => {
     if (!lastChoreo || finishedPlay === lastChoreo) return;
     const timer = window.setTimeout(() => setFinishedPlay(lastChoreo), lastChoreo.durationMs);
@@ -2011,7 +2031,29 @@ export function GameDayScreen({
           open={derbyOpen}
           club={humanClub}
           worldSeed={worldSeed}
+          onHomeRun={(sluggerName) => {
+            const unlock = detectDerbyCelebrationSticker({
+              homeRuns: 1,
+              sluggerName,
+              earnedStickerIds: humanClub.earnedStickerIds ?? [],
+              mascotName: humanClub.mascot,
+            });
+            if (unlock && unlockCelebrationSticker(unlock.sticker.id)) {
+              setStickerToast(unlock);
+            }
+          }}
           onClose={() => setDerbyOpen(false)}
+        />
+
+        <CelebrationStickerToast
+          unlock={stickerToast}
+          club={humanClub}
+          onOpenAlbum={() => {
+            setStickerToast(null);
+            setDerbyOpen(false);
+            setTrophyOpen(true);
+          }}
+          onDismiss={() => setStickerToast(null)}
         />
 
         <TrophyCaseModal
@@ -3440,6 +3482,25 @@ export function GameDayScreen({
               }
             : undefined
         }
+      />
+
+      <CelebrationStickerToast
+        unlock={stickerToast}
+        club={humanClub}
+        onOpenAlbum={() => {
+          setStickerToast(null);
+          setTrophyOpen(true);
+        }}
+        onDismiss={() => setStickerToast(null)}
+      />
+
+      <TrophyCaseModal
+        open={trophyOpen}
+        onClose={() => setTrophyOpen(false)}
+        onInspectPlayerId={(id) => {
+          setTrophyOpen(false);
+          setInspectedGamePlayerId(id);
+        }}
       />
 
       <FoilPackModal

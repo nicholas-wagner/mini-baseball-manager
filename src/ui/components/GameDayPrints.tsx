@@ -64,12 +64,16 @@ export function OpeningDayPrint({
   opponentLabel,
   onStart,
   onInspect,
+  onToggleSide,
+  onOpenDerby,
 }: {
   session: GameSessionState;
   cover?: boolean;
   opponentLabel?: string;
   onStart: () => void;
   onInspect: (player: Player) => void;
+  onToggleSide?: () => void;
+  onOpenDerby?: () => void;
 }) {
   const batting = (session.half === 'BOT') === session.home.isHuman;
   const player = batting ? getCurrentBatter(session) : getCurrentPitcher(session);
@@ -95,10 +99,38 @@ export function OpeningDayPrint({
         </p>
         <p>{describeSituation(session)}</p>
         {cover && <p className="opening-objective">{openingObjective(session, batting)}</p>}
-        <button className="opening-start" onClick={onStart}>
-          {batting ? 'Bat' : 'Pitch'} with {player.name.split(' ')[0]}{' '}
-          <ArrowRight size={18} aria-hidden="true" />
-        </button>
+        <div className="opening-actions">
+          <button className="opening-start" onClick={onStart}>
+            {batting ? 'Bat' : 'Pitch'} with {player.name.split(' ')[0]}{' '}
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
+          {cover && (onToggleSide || onOpenDerby) ? (
+            <div className="opening-quick-pills">
+              {onToggleSide ? (
+                <button
+                  type="button"
+                  data-testid="opening-side-toggle"
+                  className="opening-quick-pill opening-side-pill"
+                  aria-label={batting ? 'Switch Opening Day to pitching first' : 'Switch Opening Day to batting first'}
+                  onClick={onToggleSide}
+                >
+                  {batting ? '🔥 Pitch First' : '⚾ Bat First'}
+                </button>
+              ) : null}
+              {onOpenDerby ? (
+                <button
+                  type="button"
+                  data-testid="opening-derby-btn"
+                  className="opening-quick-pill opening-derby-pill"
+                  aria-label="Play 30-Second Home Run Derby"
+                  onClick={onOpenDerby}
+                >
+                  💥 30s HR Derby
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </section>
   );

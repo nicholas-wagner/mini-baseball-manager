@@ -1,6 +1,7 @@
 import { ScorebookPrint } from './ScorebookPrint';
 import { Heart, Sparkles, Trophy, X } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
+import { buildStickerAlbumShelf } from '../../engine/gm/celebrationStickers';
 import { evaluateTrophyCaseProgress } from '../../engine/gm/openingDayHook';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
@@ -33,6 +34,9 @@ export function TrophyCaseModal({ open, onClose, onInspectPlayerId }: TrophyCase
     sweepsCount,
     favoriteCount: favoritePlayerIds.length,
   });
+  const liveStickers = buildStickerAlbumShelf(club.earnedStickerIds ?? []);
+  const totalStickersUnlocked = progress.unlockedCount + liveStickers.unlockedCount;
+  const totalStickersCount = progress.badges.length + liveStickers.totalCount;
   const favoritePlayers = club.roster.filter((p) => favoritePlayerIds.includes(p.id));
 
   return (
@@ -45,7 +49,7 @@ export function TrophyCaseModal({ open, onClose, onInspectPlayerId }: TrophyCase
       <div data-testid="trophy-case-modal" className="w-full max-w-3xl my-2 sm:my-auto">
         <ComicCard
           title={`🏆 ${club.name.toUpperCase()} TROPHY & STICKER ALBUM`}
-          subtitle={`${progress.unlockedCount}/${progress.badges.length} Stickers Collected • ${progress.packsOpenedCount} Foil Packs Ripped • ${progress.relicsOwnedCount} Relics Equipped`}
+          subtitle={`${totalStickersUnlocked}/${totalStickersCount} Stickers Collected • ${progress.packsOpenedCount} Foil Packs Ripped • ${progress.relicsOwnedCount} Relics Equipped`}
           headerBg="#7209B7"
           badge={
             <button
@@ -83,12 +87,60 @@ export function TrophyCaseModal({ open, onClose, onInspectPlayerId }: TrophyCase
               <div className="flex flex-wrap gap-1.5 text-[11px] font-extrabold">
                 <span className="px-2 py-1 rounded-lg border-2 border-[#181B2C] bg-[#FFC300] text-[#181B2C]">
                   <Trophy className="w-3.5 h-3.5 inline mr-1" />
-                  {progress.unlockedCount}/{progress.badges.length} Stickers
+                  {totalStickersUnlocked}/{totalStickersCount} Stickers
                 </span>
                 <span className="px-2 py-1 rounded-lg border-2 border-[#181B2C] bg-[#FFE5EC] text-[#9D0208]">
                   <Heart className="w-3.5 h-3.5 inline mr-1" />
                   {progress.favoriteCount} Favorites
                 </span>
+              </div>
+            </div>
+
+            {/* Live Diamond Moment Stickers (6 Collectible Pop-Up Stamps!) */}
+            <div className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-display text-xs text-[#7209B7] flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-[#F77F00] shrink-0" />
+                  LIVE DIAMOND STICKERS ({liveStickers.unlockedCount}/{liveStickers.totalCount})
+                </div>
+                <span className="text-[10px] font-extrabold text-[#4A5068]">
+                  Earned live on the field &amp; in HR Derby!
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {liveStickers.stickers.map((sticker) => (
+                  <div
+                    key={sticker.id}
+                    data-testid="live-moment-sticker"
+                    style={sticker.unlocked ? { backgroundColor: sticker.accentBg } : undefined}
+                    className={`p-2 rounded-xl border-2 border-[#181B2C] transition ${
+                      sticker.unlocked
+                        ? 'shadow-[2px_2px_0_#181B2C]'
+                        : 'bg-[#F1E4C8]/65 opacity-70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-lg leading-none">
+                        {sticker.unlocked ? sticker.emoji : '🔒'}
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded font-display text-[8.5px] border border-[#181B2C] ${
+                          sticker.unlocked
+                            ? 'bg-[#2FB356] text-white'
+                            : 'bg-[#FFFDF7] text-[#4A5068]'
+                        }`}
+                      >
+                        {sticker.unlocked ? 'EARNED ✓' : 'LOCKED'}
+                      </span>
+                    </div>
+                    <div className="font-display text-[11px] text-[#181B2C] mt-1 leading-tight">
+                      {sticker.title}
+                    </div>
+                    <div className="text-[10px] font-bold text-[#4A5068] leading-snug">
+                      {sticker.detail}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
