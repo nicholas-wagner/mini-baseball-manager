@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createClub } from '../engine/gm/rosterFactory';
+import { generateSixTierWorld } from '../engine/league/seasonEngine';
 import { createManagerProfile } from '../engine/models/manager';
 import { createSeededRng } from '../engine/rng/seededRng';
 import { migrateSavePayload } from './migrations';
@@ -148,5 +149,90 @@ describe('Local Multi-Slot Persistence & Schema Migrations', () => {
         expect(player.pitchArsenal).toBeUndefined();
       }
     }
+  });
+
+  it('stores compact JSON under browser 5M-char localStorage quota and falls back cleanly on QuotaExceededError', async () => {
+    const QUOTA_CHARS = 5_000_000;
+    const data = new Map<string, string>();
+    const quotaStorage: Storage = {
+      get length() {
+        return data.size;
+      },
+      clear: () => data.clear(),
+      getItem: (key: string) => data.get(key) ?? null,
+      key: (index: number) => Array.from(data.keys())[index] ?? null,
+      removeItem: (key: string) => {
+        data.delete(key);
+      },
+      setItem: (key: string, value: string) => {
+        const nextTotal =
+          Array.from(data.entries())
+            .filter(([k]) => k !== key)
+            .reduce((sum, [k, v]) => sum + k.length + v.length, 0) +
+          key.length +
+          value.length;
+        if (nextTotal > QUOTA_CHARS) {
+          throw new DOMException(
+            'The 5000000-code unit storage quota has been exceeded.',
+            'QuotaExceededError',
+          );
+        }
+        data.set(key, value);
+      },
+    };
+
+    const world = generateSixTierWorld(1994, {
+      city: 'Sandlot',
+      clubName: 'Comets',
+      mascot: 'Rocket Dog',
+      monogram: 'SC',
+      primaryColor: '#E63946',
+      secondaryColor: '#1D3557',
+      accentColor: '#FFD166',
+    });
+    const fullSave: SaveFileV1 = {
+      schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
+      savedAtIso: '2026-11-24T12:00:00.000Z',
+      worldSeed: 1994,
+      seasonNumber: 1,
+      currentSeriesIndex: 0,
+      humanClubId: world.humanClubId,
+      manager: createManagerProfile({ name: 'Coach Skip', avatarSeed: 1994 }),
+      leagues: world.leagues,
+      freeAgents: world.freeAgents,
+      rivalries: [],
+      trophies: [],
+      newspaperArchive: [],
+      unlockedCosmeticIds: [],
+      settings: {
+        muted: false,
+        volume: 0.75,
+        defaultGameSpeed: 1,
+        defaultWatchMode: 'live',
+        reducedMotion: false,
+        hapticsEnabled: true,
+        enableInjuries: true,
+        enableIllnesses: true,
+      },
+    };
+
+    const repo = createSaveRepository(quotaStorage);
+    // Slot 1 must fit inside real 5M-char browser localStorage when stored compactly
+    await repo.saveSlot('slot-1', fullSave);
+    const storedSlot1 = quotaStorage.getItem('mbm.save.v1.slot-1');
+    expect(storedSlot1).not.toBeNull();
+    expect(storedSlot1!.length).toBeLessThan(QUOTA_CHARS);
+
+    // Even when saving additional full slots exceeds 5M-char localStorage quota, save/load/list must never throw!
+    await expect(repo.saveSlot('slot-2', fullSave)).resolves.toMatchObject({ slotId: 'slot-2' });
+    await expect(repo.saveSlot('slot-3', fullSave)).resolves.toMatchObject({ slotId: 'slot-3' });
+
+    const loaded3 = await repo.loadSlot('slot-3');
+    expect(loaded3?.humanClubId).toBe(fullSave.humanClubId);
+    const listed = await repo.listSlots();
+    expect(listed.map((s) => s.slotId).sort()).toEqual(['slot-1', 'slot-2', 'slot-3']);
+
+    await repo.deleteSlot('slot-3');
+    expect(await repo.loadSlot('slot-3')).toBeNull();
   });
 });

@@ -37,6 +37,7 @@ export function SaveSlotsModal({ open, onClose, repository }: SaveSlotsModalProp
   const humanClubId = useGameStore((s) => s.humanClubId);
   const manager = useGameStore((s) => s.manager);
   const leagues = useGameStore((s) => s.leagues);
+  const freeAgents = useGameStore((s) => s.freeAgents);
   const settings = useGameStore((s) => s.settings);
   const exportCurrentCareerJson = useGameStore((s) => s.exportCurrentCareerJson);
   const importCareerJson = useGameStore((s) => s.importCareerJson);
@@ -60,24 +61,29 @@ export function SaveSlotsModal({ open, onClose, repository }: SaveSlotsModalProp
       return;
     }
     setErrorMessage(null);
-    await repo.saveSlot(slotId, {
-      schemaVersion: 1,
-      savedAtIso: new Date().toISOString(),
-      worldSeed,
-      seasonNumber,
-      currentSeriesIndex,
-      humanClubId,
-      manager,
-      leagues,
-      rivalries: [],
-      trophies: [],
-      newspaperArchive: [],
-      unlockedCosmeticIds: [],
-      settings,
-    });
-    soundEngine.play('cash_chime');
-    setStatusMessage(`Saved career to ${SLOT_LABELS[slotId]}.`);
-    await refreshSlots();
+    try {
+      await repo.saveSlot(slotId, {
+        schemaVersion: 1,
+        savedAtIso: new Date().toISOString(),
+        worldSeed,
+        seasonNumber,
+        currentSeriesIndex,
+        humanClubId,
+        manager,
+        leagues,
+        freeAgents,
+        rivalries: [],
+        trophies: [],
+        newspaperArchive: [],
+        unlockedCosmeticIds: [],
+        settings,
+      });
+      soundEngine.play('cash_chime');
+      setStatusMessage(`Saved career to ${SLOT_LABELS[slotId]}.`);
+      await refreshSlots();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Unable to save slot.');
+    }
   };
 
   const handleLoadSlot = async (slotId: SaveSlotId) => {

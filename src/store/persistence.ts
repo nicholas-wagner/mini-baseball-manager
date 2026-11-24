@@ -103,6 +103,39 @@ function extractSlotMetadata(slotId: SaveSlotId, save: SaveFileV1): SaveSlotMeta
   };
 }
 
+function readFromIndexedDbBestEffort(slotId: SaveSlotId): Promise<string | null> {
+  if (typeof indexedDB === 'undefined' || typeof indexedDB.open !== 'function') {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('mini_baseball_manager_db', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('saves')) {
+          db.createObjectStore('saves');
+        }
+      };
+      req.onerror = () => resolve(null);
+      req.onsuccess = () => {
+        try {
+          const db = req.result;
+          const tx = db.transaction('saves', 'readonly');
+          const getReq = tx.objectStore('saves').get(slotId);
+          getReq.onsuccess = () => {
+            resolve(typeof getReq.result === 'string' ? getReq.result : null);
+          };
+          getReq.onerror = () => resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 function syncToIndexedDbBestEffort(slotId: SaveSlotId, json: string | null): void {
   if (typeof indexedDB === 'undefined' || typeof indexedDB.open !== 'function') return;
   try {
@@ -139,50 +172,73 @@ export function importSaveJson(rawJson: string): SaveFileV1 {
   return migrateSavePayload(parsed);
 }
 
-/** Creates an offline-first repository using localStorage + best-effort IndexedDB mirroring. */
+/** Creates an offline-first repository using compact localStorage + IndexedDB mirroring + safe fallback. */
 export function createSaveRepository(customStorage?: Storage): SaveRepository {
   const memoryFallback = new Map<string, string>();
   const resolveStorage = (): Storage | null => {
     if (customStorage) return customStorage;
-    if (
-      typeof window !== 'undefined' &&
-      typeof window.localStorage?.getItem === 'function' &&
-      typeof window.localStorage?.setItem === 'function'
-    ) {
-      return window.localStorage;
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.localStorage?.getItem === 'function' &&
+        typeof window.localStorage?.setItem === 'function'
+      ) {
+        return window.localStorage;
+      }
+    } catch {
+      return null;
     }
     return null;
   };
 
   const readRaw = (key: string): string | null => {
     const storage = resolveStorage();
-    return storage ? storage.getItem(key) : (memoryFallback.get(key) ?? null);
+    if (storage) {
+      try {
+        const stored = storage.getItem(key);
+        if (stored !== null) return stored;
+      } catch {
+        // Fall through to in-memory mirror when storage access is restricted.
+      }
+    }
+    return memoryFallback.get(key) ?? null;
   };
 
   const writeRaw = (key: string, value: string): void => {
+    memoryFallback.set(key, value);
     const storage = resolveStorage();
-    if (storage) storage.setItem(key, value);
-    else memoryFallback.set(key, value);
+    if (!storage) return;
+    try {
+      storage.setItem(key, value);
+    } catch {
+      // Never crash on browser localStorage QuotaExceededError; IndexedDB + memory mirror retain the slot.
+    }
   };
 
   const removeRaw = (key: string): void => {
+    memoryFallback.delete(key);
     const storage = resolveStorage();
-    if (storage) storage.removeItem(key);
-    else memoryFallback.delete(key);
+    if (!storage) return;
+    try {
+      storage.removeItem(key);
+    } catch {
+      // Ignore storage removal errors in restricted browser contexts.
+    }
   };
 
   return {
     async saveSlot(slotId, payload) {
       const meta = extractSlotMetadata(slotId, payload);
-      const serialized = exportSaveJson(payload);
-      writeRaw(`${SLOT_STORAGE_PREFIX}${slotId}`, serialized);
+      const compactSerialized = JSON.stringify(payload);
+      writeRaw(`${SLOT_STORAGE_PREFIX}${slotId}`, compactSerialized);
       writeRaw(`${META_STORAGE_PREFIX}${slotId}`, JSON.stringify(meta));
-      syncToIndexedDbBestEffort(slotId, serialized);
+      syncToIndexedDbBestEffort(slotId, compactSerialized);
       return meta;
     },
 
     async loadSlot(slotId) {
-      const raw = readRaw(`${SLOT_STORAGE_PREFIX}${slotId}`);
+      const raw =
+        readRaw(`${SLOT_STORAGE_PREFIX}${slotId}`) ?? (await readFromIndexedDbBestEffort(slotId));
       if (!raw) return null;
       return importSaveJson(raw);
     },
