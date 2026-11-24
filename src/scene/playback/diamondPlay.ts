@@ -1,3 +1,4 @@
+import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
 import { pitchSeconds, shapePitch, type PitchFlight } from './pitchFlight';
 import { reactionCamera, reactionPose, bullpenPlay } from './teamReactions';
 import { buildClosePlay, closeActorAt, closeCamera, isCloseKind, type CloseAction, type CloseKind } from './plateAndSteals';
@@ -52,6 +53,7 @@ export interface DiamondPlay {
   buntAttempt?: boolean;
   buntAdvances?: (1 | 2 | 3)[];
   holdForceCall?: boolean;
+  pitchTarget?: PitchTargetIntent;
   reliefStrikeout?: boolean;
   runnerToThird?: 1 | 2;
   scorerBase?: 1 | 2 | 3;

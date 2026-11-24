@@ -198,6 +198,8 @@ function safeScrollTop(): void {
 }
 
 interface GameDayScreenProps {
+  onLiveChange?: (live: boolean) => void;
+  onOpenDugout?: () => void;
   openingRequest?: ClutchMomentLaunch | null;
   onOpeningStarted?: () => void;
   onJumpToTab?: (tab: 'roster' | 'skills' | 'league' | 'economy') => void;
@@ -207,7 +209,7 @@ interface GameDayScreenProps {
 }
 
 export function GameDayScreen({
-  openingRequest, onOpeningStarted,
+  openingRequest, onOpeningStarted, onLiveChange, onOpenDugout,
   onJumpToTab,
   onOpenStory,
   onOpenRelics,
@@ -376,8 +378,9 @@ export function GameDayScreen({
   }, [humanClub, activeOpponent]);
 
   const hasLiveSession = liveSession !== null;
+  useEffect(() => { onLiveChange?.(hasLiveSession); }, [hasLiveSession, onLiveChange]);
   useEffect(() => {
-    if (!lastChoreo) return;
+    if (!lastChoreo || revealedPlay === lastChoreo) return;
     const decisionMs = decisionDelayMs(lastChoreo);
     const timer = window.setTimeout(() => {
       setRevealedPlay(lastChoreo);
@@ -388,9 +391,13 @@ export function GameDayScreen({
         if (outcome === 'single' || outcome === 'double' || outcome === 'triple') triggerHapticPulse('hit');
       }
     }, decisionMs);
-    const finish = window.setTimeout(() => setFinishedPlay(lastChoreo), lastChoreo.durationMs);
-    return () => { window.clearTimeout(timer); window.clearTimeout(finish); };
-  }, [lastChoreo, playbackEvent]);
+    return () => window.clearTimeout(timer);
+  }, [lastChoreo, playbackEvent, revealedPlay]);
+  useEffect(() => {
+    if (!lastChoreo || finishedPlay === lastChoreo) return;
+    const timer = window.setTimeout(() => setFinishedPlay(lastChoreo), lastChoreo.durationMs);
+    return () => window.clearTimeout(timer);
+  }, [lastChoreo, finishedPlay]);
 
   useEffect(() => {
     safeScrollTop();
@@ -571,7 +578,7 @@ export function GameDayScreen({
   }, [openingRequest, handleStartClutchMoment, onOpeningStarted]);
 
   const applyStepResult = useCallback(
-    (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string) => {
+    (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string, calledTarget?: PitchTargetIntent) => {
       gameLog.current.push(...emitted);
       setEntranceCue(null);
       setPrePlaySession(liveSession);
@@ -611,6 +618,7 @@ export function GameDayScreen({
         const runsScored=lastEvent.half==='BOT' ? lastEvent.homeScore-beforeHome : lastEvent.awayScore-beforeAway;
         const choreo = choreographPlayEvent(lastEvent, speed, basesBefore, {walkoff,runsScored,
           winningRunIndex:walkoff ? Math.max(0,lastEvent.awayScore-beforeHome) : 0});
+        if (choreo.play?.close && calledTarget) choreo.play.pitchTarget = calledTarget;
         if (guiding && !showMore && choreo.play && forceAtFirst(choreo.play)) {
           choreo.play.holdForceCall = true;
           choreo.durationMs += Math.round(FORCE_HOLD_SECONDS * 1000 / speed);
@@ -698,7 +706,7 @@ export function GameDayScreen({
       isolated.options,
     );
     setArmedPowerId(null);
-    applyStepResult(nextSession, events, activeOpponentId);
+    applyStepResult(nextSession, events, activeOpponentId, isolated.options.pitchTarget);
     if (
       call === 'steal' ||
       call === 'steal_3b' ||
@@ -2186,6 +2194,10 @@ export function GameDayScreen({
   const buntCall = buntAdvance && `Out at first · ${describeBuntAdvance(buntAdvance)}`;
   const readout = pendingDecision || showNextMatchup ? null : playReadout(playbackEvent);
   const liveCallout = pendingDecision || showNextMatchup ? null : buildComicPopArtBanner(playbackEvent, liveSession);
+  const scoredOnPlay = playbackEvent && prePlaySession && (prePlaySession.home.isHuman
+    ? playbackEvent.homeScore > prePlaySession.home.score
+    : playbackEvent.awayScore > prePlaySession.away.score);
+  const celebrateScore = Boolean(liveCallout?.confetti && scoredOnPlay);
   const replayable = Boolean(!pitchingChange && lastChoreo?.play && !playing && watchMode === 'paused' &&
     playbackEvent && (stole || (!['called_pitch','missed_pitch','ball_pitch','foul_back'].includes(lastChoreo.play.kind))));
   const liveNemesis = evaluateNemesisMatchup(
@@ -2315,10 +2327,10 @@ export function GameDayScreen({
   };
 
   return (
-    <div className="space-y-3">
+    <div className={guiding && !showMore ? 'live-game guided-game space-y-3' : 'live-game space-y-3'}>
       <div
         data-testid="sticky-live-scoreboard"
-        className="sticky top-[62px] md:top-2 z-20"
+        className="live-score-row sticky top-[62px] md:top-2 z-20"
       >
         <ScoreboardStrip
           clubs={guiding && !showMore ? {away:liveAwayClub.name, home:liveHomeClub.name, humanHome:shown.home.isHuman} : undefined}
@@ -2344,6 +2356,10 @@ export function GameDayScreen({
             Boolean(shownBases[2]),
           ]}
         />
+        {onOpenDugout && <button type="button" className="dugout-launch" onClick={() => {
+          setWatchMode('paused');
+          onOpenDugout();
+        }}>Dugout</button>}
       </div>
 
       <div
@@ -2355,8 +2371,9 @@ export function GameDayScreen({
       >
         <div className="space-y-3">
           {/* Unified 3D Ballpark + Directly Attached Live Action Bar (always visible together!) */}
-          <div className="space-y-2">
+          <div className="live-field-controls space-y-2">
             <LiveGameCanvas
+              playFinished={Boolean(lastChoreo && !playing)}
               guided={Boolean(guiding && !showMore)}
               onEntranceEnd={finishEntrance}
               entranceCue={guiding && !showMore ? entranceCue : null}
@@ -2375,7 +2392,7 @@ export function GameDayScreen({
                 <BatterEntrance guided key={entranceCue.role === 'pitcher' ? picturedPitcher.id : picturedBatter.id}
                   player={entranceCue.role === 'pitcher' ? picturedPitcher : picturedBatter} pitching={entranceCue.role === 'pitcher'} />
                 : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}
-              celebrateConfetti={Boolean(liveCallout?.confetti && !(handoff && !playing))}
+              celebrateConfetti={celebrateScore && !(handoff && !playing)}
               overlay={
                 pitchingChange && liveSession.status === 'in_progress' ? (
                   <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border-2 border-[#172C29] bg-[#FFF7E4] px-3 py-1.5 text-sm font-bold text-[#172C29] shadow-sm">
@@ -2401,7 +2418,7 @@ export function GameDayScreen({
                     className="px-3 py-1.5 rounded-xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] flex items-center justify-center gap-2 max-w-[95%] text-center"
                     style={{ backgroundColor: liveCallout.bg, color: liveCallout.text }}
                   >
-                    {liveCallout.confetti ? (
+                    {celebrateScore ? (
                       <ClubMascotBuddy
                         mascot={humanClub.mascot}
                         primaryColor={humanClub.colors.primary}
@@ -2436,7 +2453,7 @@ export function GameDayScreen({
             {(() => {
               const scoutLine = buildMatchupScoutLine(picturedBatter, picturedPitcher, shown);
               return (
-                <MatchupPrints
+                <MatchupPrints guided={guiding && !showMore}
                   memories={humanClub.keepsakes}
                   batter={picturedBatter}
                   pitcher={picturedPitcher}
@@ -2476,7 +2493,7 @@ export function GameDayScreen({
                 onReplay={() => setLastChoreo({...lastChoreo})}
                 onContinue={() => {
                   setEntranceCue(!changedSides && !stole && liveSession.status !== 'completed' && guidedBatting
-                    ? {role:'batter', outgoingId:playbackEvent.outcome === 'ground_out' ? playbackEvent.batterId : undefined} : null);
+                    ? {role:'batter', outgoingId:playbackEvent.outsAfter > playbackEvent.outsBefore && !playbackEvent.basesAfter.includes(playbackEvent.batterId ?? '') ? playbackEvent.batterId : undefined} : null);
                   setLastChoreo(null);
                   setPlaybackEvent(null);
                   if (delayedSummary) { setModalSummary(delayedSummary.summary); setDelayedSummary(null); }

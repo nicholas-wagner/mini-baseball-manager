@@ -7,7 +7,7 @@ import pending from '../../art/portraits/illustrations/portrait-pending.svg';
 import { evaluateMatchupCardSparkle } from '../../engine/gm/openingDayHook';
 import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
 import type { PlayEvent } from '../../engine/models/playEvent';
-import type { Player } from '../../engine/models/player';
+import { PITCH_TYPE_LABELS, type Player } from '../../engine/models/player';
 import type { GameSessionState } from '../../engine/simulation/gameState';
 import { getCurrentBatter, getCurrentPitcher } from '../../engine/simulation/gameState';
 import './gameDayPrints.css';
@@ -153,6 +153,7 @@ export function BatterEntrance({ player, pitching = false, guided = false }: { p
 }
 
 export function MatchupPrints({
+  guided = false,
   batter,
   pitcher,
   memories = [],
@@ -170,6 +171,7 @@ export function MatchupPrints({
   latestEvent = null,
   onInspect,
 }: {
+  guided?: boolean;
   batter: Player;
   pitcher: Player;
   memories?: readonly ScorebookMoment[];
@@ -187,6 +189,11 @@ export function MatchupPrints({
   latestEvent?: PlayEvent | null;
   onInspect: (id: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const tired = pitcherEnduranceTier && ['tiring', 'fatigued', 'gassed'].includes(pitcherEnduranceTier);
+  const clue = tired ? pitcher.name.split(' ')[0] + ' is tiring.' :
+    batter.ratings.speed >= 75 ? batter.name.split(' ')[0] + ' runs fast.' :
+    pitcher.name.split(' ')[0] + (pitcher.throws === 'L' ? ' throws left-handed.' : ' throws right-handed.');
   const entries = [
     {
       player: batter,
@@ -216,6 +223,7 @@ export function MatchupPrints({
     },
   ];
   return (
+    <div className={guided ? 'matchup-wrap guided-matchup' : 'matchup-wrap'}>
     <div className="matchup-prints" role="group" aria-label="Matchup cards">
       {entries.map(({ player, role, scoutLine, sparkle }) => {
         const memory = memories.find((m) => m.playerId === player.id);
@@ -275,6 +283,21 @@ export function MatchupPrints({
           </button>
         );
       })}
+    </div>
+    {guided && <>
+      <div className="matchup-clue"><span>{clue}</span><button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>Matchup</button></div>
+      {expanded && <section aria-label="Matchup scouting" className="matchup-scouting">
+        <h3>{batter.name}</h3>
+        <p>{batter.bats === 'S' ? 'Switch hitter' : batter.bats === 'L' ? 'Bats left' : 'Bats right'} · Contact {batter.ratings.contact} · Power {batter.ratings.power} · Speed {batter.ratings.speed}</p>
+        <h3>{pitcher.name}</h3>
+        <p>Throws {pitcher.throws === 'L' ? 'left' : 'right'}{pitcher.pitchArsenal && ' · Favorite pitch: ' + PITCH_TYPE_LABELS[pitcher.pitchArsenal.favoritePitch]}</p>
+        <p>Endurance {pitcherEndurance}%{pitcherFatigueDropTag && ' · ' + pitcherFatigueDropTag}</p>
+        {[batter, pitcher].map(player => {
+          const memory = memories.find(moment => moment.playerId === player.id);
+          return memory && <p key={player.id}>From your scorebook · {memory.caption}</p>;
+        })}
+      </section>}
+    </>}
     </div>
   );
 }

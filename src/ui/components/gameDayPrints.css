@@ -492,3 +492,15 @@ button.gallery-tile {
   .opening-feature .opening-copy h2 { font-size: clamp(29px, 8vw, 37px); }
   .opening-feature .opening-start { width: 100%; }
 }
+
+@media (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
+  .career-shell:has(.opening-cover) > aside { display:none; }
+  .career-shell:has(.opening-cover) > div > header { display:flex; }
+  .career-shell:has(.opening-cover) main { padding:5px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left)); }
+  .opening-cover { margin:0 auto; }
+  .opening-club { padding:4px 14px; }
+  .opening-cover .opening-feature { grid-template-columns:minmax(100px,1fr) minmax(0,1.7fr); gap:14px; min-height:0; padding:10px 16px; }
+  .opening-cover .opening-art { width:min(100%,35svh); justify-self:center; }
+  .opening-cover .opening-copy h2 { font-size:clamp(24px,4vw,34px); margin:2px 0; }
+  .opening-cover .opening-objective { margin:6px 0; font-size:18px; }
+}

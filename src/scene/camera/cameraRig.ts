@@ -20,6 +20,14 @@ export interface CameraPose {
   fov: number;
 }
 
+/** Keep the battery and both sides of a base play inside a tall phone's field. */
+export function fitFieldOfView(verticalDegrees: number, aspect: number): number {
+  const minimumAspect = 1.2;
+  if (aspect >= minimumAspect) return verticalDegrees;
+  const halfAngle = verticalDegrees * Math.PI / 360;
+  return Math.atan(Math.tan(halfAngle) * minimumAspect / aspect) * 360 / Math.PI;
+}
+
 export const CAMERA_PRESET_LABELS: Record<CameraPresetId, string> = {
   over_shoulder_pitcher: 'Pitcher OTS 3D',
   over_shoulder_batter: 'Batter OTS 3D',

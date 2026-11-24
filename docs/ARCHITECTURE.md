@@ -713,4 +713,6 @@ export interface SaveFileV1 {
 
 Game Day advances the simulation once per manager action. It keeps the pre-play session and the chosen event alongside the choreography. Replaying starts a new presentation clock for that event. The scorebook, player totals and career rewards are written only by the original simulation action. Opening Day guidance is scoped to the starting inning and half. A third out or walk-off can finish its field sequence before the manager changes sides or opens the final box score.
 
-The featured-player cue identifies the batting or pitching role. A groundout handoff carries the outgoing batter’s ID so the scene can dress the second rig from the same roster. Replay scoring text requires the recorded fielding position and the animated throw to agree. The between-innings pack button opens the existing welcome pack in inventory.
+The featured-player cue identifies the batting or pitching role. A handoff after a batting out carries the outgoing batter’s ID so the scene can dress the second rig from the same roster. Replay scoring text requires the recorded fielding position and the animated throw to agree. The between-innings pack button opens the existing welcome pack in inventory.
+
+Game Day stays mounted in a career-keyed React Activity during a visit to another tab. Hiding the game suspends timers and disposes the WebGL scene. Returning restores the same session, selected call and replay handoff. The selected pitch target travels with the recorded close play so a replay can reproduce the catcher’s setup.

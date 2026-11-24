@@ -12,7 +12,7 @@ interface BeforeInstallPromptEvent extends Event {
  * Stays completely unobtrusive (zero vertical space consumed) unless the browser
  * explicitly offers a native install prompt. Offline-first readiness is built-in.
  */
-export function PwaInstallBanner() {
+export function PwaInstallBanner({ deferred = false }: { deferred?: boolean } = {}) {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [isOffline, setIsOffline] = useState<boolean>(
@@ -39,7 +39,7 @@ export function PwaInstallBanner() {
 
   const showInstall = Boolean(installEvent && !dismissed);
 
-  if (!showInstall) {
+  if (!showInstall || deferred) {
     return null;
   }
 

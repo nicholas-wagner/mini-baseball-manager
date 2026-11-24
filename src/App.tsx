@@ -1,5 +1,5 @@
 import type { ClutchMomentLaunch } from './engine/gm/gameDayMoments';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Activity, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Building2,
@@ -94,6 +94,22 @@ export function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hubInitialSubTab, setHubInitialSubTab] = useState<'stadiums' | 'relics' | 'uniforms'>('stadiums');
   const humanClub = useGameStore((s) => s.getHumanClub());
+  const slotId = useCareerStoryStore(s => s.activeSlotId);
+  const worldSeed = useGameStore(s => s.worldSeed);
+  const careerKey = slotId + '/' + worldSeed + '/' + humanClub?.id;
+  const [liveCareer, setLiveCareer] = useState<string | null>(null);
+  const onLiveChange = useCallback((live: boolean) => setLiveCareer(live ? careerKey : null), [careerKey]);
+  const onGameDay = activeTab === 'gameday' || (activeTab === 'lab' && !designLabVisible);
+  const inDugout = onGameDay && liveCareer === careerKey && Boolean(humanClub);
+  const menuRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = menuRef.current;
+    if (mobileMenuOpen) {
+      if (dialog?.showModal) dialog.showModal();
+      else dialog?.setAttribute('open', '');
+    }
+    return () => dialog?.close?.();
+  }, [mobileMenuOpen]);
   const manager = useGameStore((s) => s.manager);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
   const unopenedPackCount = useFoilPackStore((s) => s.unopenedPacks.length);
@@ -398,21 +414,7 @@ export function App() {
     if (activeTab === 'lab' && designLabVisible) {
       return <DesignLabScreen />;
     }
-    if (activeTab === 'gameday' || activeTab === 'lab') {
-      return humanClub ? (
-        <GameDayScreen openingRequest={opening} onOpeningStarted={() => setOpening(null)}
-          onJumpToTab={(tab) => {
-            if (tab === 'economy') setHubInitialSubTab('stadiums');
-            setActiveTab(tab);
-          }}
-          onOpenStory={() => setStoryOpen(true)}
-          onOpenRelics={handleOpenRelics}
-          onOpenUniforms={handleOpenUniforms}
-        />
-      ) : (
-        <ClubCreatorScreen onCreated={startOpening} />
-      );
-    }
+    if (onGameDay) return humanClub ? null : <ClubCreatorScreen onCreated={startOpening} />;
     if (activeTab === 'roster') {
       return humanClub ? (
         <RosterLineupScreen
@@ -453,6 +455,7 @@ export function App() {
           ? `${humanClub.leagueTier.toUpperCase()} LEAGUE • ${humanClub.wins}-${humanClub.losses}`
           : 'Rookie Sandlot League'
       }
+      liveGame={inDugout}
       navItems={visibleNavItems}
       activeTab={activeTab}
       onSelectTab={(id) => {
@@ -465,7 +468,7 @@ export function App() {
       utilityActions={desktopUtilityActions}
       mobileUtilityActions={mobileUtilityActions}
     >
-      <PwaInstallBanner />
+      <PwaInstallBanner deferred={!humanClub || inDugout} />
       <Suspense
         fallback={
           <div className="p-6 text-center font-display text-sm text-[#181B2C] bg-[#FFFDF7] rounded-2xl border-2 border-[#181B2C] shadow-[4px_4px_0_#181B2C]">
@@ -473,6 +476,17 @@ export function App() {
           </div>
         }
       >
+        {humanClub && (onGameDay || liveCareer === careerKey) && (
+          <Activity key={careerKey} mode={onGameDay ? 'visible' : 'hidden'}>
+            <GameDayScreen openingRequest={opening} onOpeningStarted={() => setOpening(null)}
+              onLiveChange={onLiveChange} onOpenDugout={() => setMobileMenuOpen(true)}
+              onJumpToTab={tab => {
+                if (tab === 'economy') setHubInitialSubTab('stadiums');
+                setActiveTab(tab);
+              }}
+              onOpenStory={() => setStoryOpen(true)} onOpenRelics={handleOpenRelics} onOpenUniforms={handleOpenUniforms} />
+          </Activity>
+        )}
         {renderMainContent()}
       </Suspense>
       <DugoutGuideModal
@@ -513,26 +527,34 @@ export function App() {
 
       {/* Clean Mobile Clubhouse Utility Menu (replaces 6 crowded mobile header icons!) */}
       {mobileMenuOpen ? (
-        <div
+        <dialog ref={menuRef} onCancel={() => setMobileMenuOpen(false)}
           data-testid="mobile-clubhouse-menu"
-          className="fixed inset-0 z-50 bg-[#181B2C]/75 p-4 flex items-start justify-center overflow-y-auto"
+          className="club-menu-dialog"
           role="dialog"
           aria-modal="true"
-          aria-label="Clubhouse Menu"
+          aria-label={inDugout ? 'Dugout' : 'Clubhouse Menu'}
         >
           <div className="w-full max-w-sm mt-6 rounded-2xl border-[3px] border-[#181B2C] bg-[#FBF4E4] shadow-[6px_6px_0_#181B2C] overflow-hidden">
             <div className="px-4 py-3 bg-[#1B4332] text-[#FBF4E4] border-b-[3px] border-[#181B2C] flex items-center justify-between">
-              <span className="font-display text-sm tracking-wide">⚾ CLUBHOUSE MENU</span>
+              <span className="font-display text-sm tracking-wide">{inDugout ? 'Dugout' : '⚾ CLUBHOUSE MENU'}</span>
               <button
                 type="button"
                 aria-label="Close clubhouse menu"
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-9 h-9 rounded-xl bg-[#FFFDF7] text-[#181B2C] border-2 border-[#181B2C] flex items-center justify-center cursor-pointer"
+                className="w-12 h-12 rounded-xl bg-[#FFFDF7] text-[#181B2C] border-2 border-[#181B2C] flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-3 space-y-2">
+              {inDugout && <nav aria-label="Dugout destinations" className="grid grid-cols-2 gap-2">
+                {visibleNavItems.map(item => <button key={item.id} type="button" className="dugout-link" onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (item.id === 'economy') setHubInitialSubTab('stadiums');
+                  setActiveTab(item.id as TabId);
+                }}>{item.icon}{item.id === 'gameday' ? 'Back to play' : item.label}</button>)}
+                <button className="dugout-link" onClick={handleToggleMute}>{muted ? 'Unmute audio' : 'Mute audio'}</button>
+              </nav>}
               <button
                 type="button"
                 aria-label="Open Dugout Guide"
@@ -633,7 +655,7 @@ export function App() {
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       ) : null}
     </AppShell>
   );

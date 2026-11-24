@@ -18,7 +18,13 @@ Opening Day puts the player from your actual lineup on the first card. Tap **Bat
 | --- | --- | --- |
 | ![Marcus Baker's Opening Day card and the tying run situation](./docs/screenshots/opening-day.webp) | ![Marcus choking up on the bat with Contact selected](./docs/screenshots/batting-contact.webp) | ![Marcus planting his feet and loading up with Power selected](./docs/screenshots/batting-preview.webp) |
 
-Choose **Contact** or **Power** to see your batter set their feet. Tap **Swing** to send the pitch. When you start on defense, pick a target and watch the catcher set up. **More controls** opens the full dugout.
+Choose **Contact** or **Power** to set the batter’s stance, then tap **Swing**. On defense, choose **Corner** and look for the gold ring around the catcher’s mitt. **Matchup** opens handedness, favorite pitch and endurance. **Options** holds timing and signature powers.
+
+On a phone, **Dugout** opens your career tabs. Visit the roster and tap **Play Ball** to return to the same batter, count and runners. Rotate the phone for the field on the left and the calls on the right. **More controls** opens the full tactical controls.
+
+| Pitching on a compact phone | Batting in landscape |
+| --- | --- |
+| ![Jasper aims at the corner with the field, count and pitch button visible on a 360 by 640 phone](./docs/screenshots/compact-pitch.webp) | ![Marcus sets up for a power swing with the controls beside the diamond on a rotated phone](./docs/screenshots/landscape-at-bat.webp) |
 
 | The call at first | Jasper on defense | Players between at-bats |
 | --- | --- | --- |
@@ -43,7 +49,7 @@ On a sacrifice bunt, watch the batter run through first and the baserunner stop 
 
 ### The card collection
 
-After a win or a loss, **Keep this moment** saves the illustrated player, opponent, inning, play and score to the club’s Trophy Album. The most recently saved play for that player appears beside their next live matchup card.
+After a win or a loss, **Keep this moment** saves the illustrated player, opponent, inning, play and score to the club’s Trophy Album. The most recently saved play for that player appears in their next live matchup’s scouting details.
 
 Each of the 3,000 players keeps their illustration when they change clubs. Open either live matchup card to inspect the hitter or pitcher. In the roster binder, choose **Print gallery** to browse a wall of illustrations. Tap a print to enlarge it. Switch back to **Stat cards** and flip one for the player’s role-specific ratings. The MVP gets a foil front and a headline drawn from that game’s box score.
 
@@ -95,9 +101,9 @@ Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.g
 
 This repository is structured so both **human contributors** and **AI coding agents** can immediately understand the architecture, invariants, and exact next TDD ticket:
 
-- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-082.
+- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-083.
 - **[docs/SIMULATION_MATH.md](./docs/SIMULATION_MATH.md)** — Full pitch-by-pitch seeded dice-roll formulas, all 15 attribute effects, National/Capstone powers, Weather, Shifts, Mind Games & Nemesis math.
-- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-082**.
+- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-083**.
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Canonical TypeScript interfaces, `PlayEvent` stream contracts, and 3D ballpark coordinates.
 - **[docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)** — Exact 90s color tokens, typography, touch targets, and chibi scale units.
 - **[AGENTS.md](./AGENTS.md)** — AI Agent onboarding guide, hard architectural invariants, and Definition of Done.

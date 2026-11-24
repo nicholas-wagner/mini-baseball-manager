@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeShakeOffset,
+  fitFieldOfView,
   dampCameraPose,
   getCameraPresetPose,
   type CameraPresetId,
@@ -64,4 +65,11 @@ describe('Over-the-Shoulder 3D Camera Rig', () => {
     expect(rhbCam.position.x).toBeLessThan(0);
     expect(lhbCam.position.x).toBeGreaterThan(0);
   });
+});
+
+it('preserves the horizontal field of view for a tall phone without changing a wide shot', () => {
+  const horizontalSpan = (fov: number, aspect: number) => Math.tan(fov * Math.PI / 360) * aspect;
+  const tallPhone = 368 / 420;
+  expect(horizontalSpan(fitFieldOfView(39, tallPhone), tallPhone)).toBeCloseTo(horizontalSpan(39, 1.2));
+  expect(fitFieldOfView(39, 1.8)).toBe(39);
 });

@@ -119,3 +119,13 @@ it("holds a called strike in the pocket for a nod before the return throw", () =
   const ball = diamondPlay("ball_pitch");
   expect(actorAt(ball, "C", ball.finish + .24, "L").clip).not.toBe("catch_frame");
 });
+
+it.each(['L','R'] as const)('keeps the selected corner across the catcher set and called strike for a %s hitter', side => {
+  const play = diamondPlay('called_pitch');
+  const middle = { ...play, pitchTarget:'attack_zone' as const };
+  const corner = { ...play, pitchTarget:'paint_corners' as const };
+  for (const t of [0, play.legs[0].end, play.finish + .24]) {
+    const shift = actorAt(corner,'C',t,side).pos.x - actorAt(middle,'C',t,side).pos.x;
+    expect(shift).toBeCloseTo(targetOffset('paint_corners', side).x);
+  }
+});

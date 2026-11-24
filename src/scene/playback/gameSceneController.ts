@@ -24,6 +24,7 @@ import {
 } from '../ballpark/stadiumUpgrades';
 import {
   computeShakeOffset,
+  fitFieldOfView,
   dampCameraPose,
   getCameraPresetPose,
   type CameraPose,
@@ -81,6 +82,9 @@ export class GameSceneController {
 
   private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
+  private targetRing = new THREE.Mesh(new THREE.RingGeometry(.19, .23, 40),
+    new THREE.MeshBasicMaterial({ color: 0xffdc66, transparent: true, depthTest: false, depthWrite: false }));
+  private pitcherRitual: CharacterAnimClip = 'pitch_gather';
   private batterRitual: CharacterAnimClip = 'bat_stance';
   private bats: EffectiveBatSide = 'R';
   private throws: ThrowsHand = 'R';
@@ -143,6 +147,9 @@ export class GameSceneController {
   constructor(container: HTMLElement) {
     this.container = container;
     this.scene = new THREE.Scene();
+    this.targetRing.visible = false;
+    this.targetRing.renderOrder = 5;
+    this.scene.add(this.targetRing);
     this.welcome=new WalkoffTeammates(this.scene);
     this.scene.background = new THREE.Color(0x63caff);
     this.scene.fog = new THREE.Fog(0x88dbff, 48, 115);
@@ -255,14 +262,16 @@ export class GameSceneController {
     const battingTeam = toTeamColors(battingClub);
     this.battingPlayers = battingSide.playersById;
     this.battingColors = battingTeam;
-    this.ballpark.setPlateTarget(false);
+    this.targetRing.visible = false;
 
     const pitcher = fieldingSide.playersById[(choreo && event?.pitcherId) || fieldingSide.activePitcherId];
     const batterSlot = battingSide.lineup[battingSide.lineupIndex % battingSide.lineup.length];
     const batter = (choreo && event?.batterId && battingSide.playersById[event.batterId]) || battingSide.playersById[batterSlot.playerId];
     const effectiveBat = resolveEffectiveBatSide(batter.bats, pitcher.throws);
 
-    this.batterRitual = batter.traits.seed % 3 === 0 || batter.personality === 'superstitious' ? 'helmet_tip' : 'bat_stance';
+    this.batterRitual = batter.personality === 'superstitious' || batter.traits.seed % 3 === 0
+      ? 'helmet_tip' : batter.traits.seed % 3 === 1 ? 'bat_contact_set' : 'bat_power_set';
+    this.pitcherRitual = pitcher.personality === 'showboat' || pitcher.traits.seed % 3 === 0 ? 'pitch_salute' : 'pitch_gather';
     this.bats = effectiveBat;
     this.throws = pitcher.throws;
     this.batterRig.updateAppearance({
@@ -282,6 +291,7 @@ export class GameSceneController {
       const rig = this.defenders.get(coord.pos);
       if (!rig) continue;
       rig.root.position.set(coord.x, coord.y, coord.z);
+      rig.root.scale.y = 1;
       rig.logicalYaw = coord.yaw;
       const defender: Player =
         coord.pos === 'P'
@@ -337,6 +347,7 @@ export class GameSceneController {
     }
     const play = choreo?.play ?? choreo?.close ?? choreo?.outfield ?? (choreo?.infield ? diamondPlay(choreo.infield, choreo.highlightFielderPos) : undefined);
     if (play && choreo) {
+      if (play.pitchTarget && !play.close?.steal) this.defenders.get('C')!.root.scale.y = 1 + targetOffset(play.pitchTarget, this.bats).y;
       if (play.outfield && (play.scorerBase || play.runnerToThird) && play.ending?.kind !== 'walkoff') {
         const candidates = battingClub.roster.filter(p => p.id !== batter.id && !bases.includes(p.id));
         const buddy = candidates.find(p => p.personality === 'showboat' || p.personality === 'prankster') ?? candidates[0];
@@ -388,6 +399,13 @@ export class GameSceneController {
     if (event?.outcome === 'home_run') {
       this.trauma = 1;
     }
+  }
+
+  public finishReplay() {
+    if (!this.replay) return;
+    const { play, rate } = this.replay;
+    const duration = play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0);
+    this.replay.start = this.elapsedSec - duration / rate;
   }
 
   private drawPitch(pitch: NonNullable<GameSceneController['pitch']>) {
@@ -496,7 +514,8 @@ export class GameSceneController {
       lookAt: {x:mound.x,y:mound.y+1.08,z:mound.z}, fov: 32,
     } : preview ? previewShot(preview,this.bats)
       : getCameraPresetPose(activePreset, this.elapsedSec, 0, this.throws, this.bats);
-    if (this.camera.fov !== targetPose.fov) { this.camera.fov = targetPose.fov; this.camera.updateProjectionMatrix(); }
+    const fov = fitFieldOfView(targetPose.fov, this.camera.aspect);
+    if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     this.cameraPose = (preview || this.entrance) ? targetPose : dampCameraPose(this.cameraPose, targetPose, dt, 6);
     this.trauma = Math.max(0, this.trauma - dt * 1.4);
     const shake = computeShakeOffset(this.steadyCamera ? 0 : this.trauma, this.elapsedSec);
@@ -512,7 +531,7 @@ export class GameSceneController {
       this.cameraPose.lookAt.z,
     );
 
-    this.ballpark.setPlateTarget(Boolean(this.preview && !swing && !this.entrance && !this.pitch && this.elapsedSec-this.previewStart < 1.65));
+    this.targetRing.visible = Boolean(this.preview && !swing && !this.entrance && !this.pitch);
     for (const [pos, rig] of this.defenders.entries()) {
       if (this.pitch && (pos === 'P' || pos === 'C')) continue;
       const clip =
@@ -525,11 +544,14 @@ export class GameSceneController {
         const home = DIAMOND_DEFENDER_COORDS.find(coord => coord.pos === 'C')!;
         const offset = targetOffset(this.preview ?? 'attack_zone', this.bats);
         rig.root.position.x = THREE.MathUtils.damp(rig.root.position.x, home.x+offset.x, 14, dt);
-        rig.updatePose(this.preview && !swing ? 'catch_target' : clip,this.elapsedSec,undefined,this.camera.position);
         // Keep both cleats planted as the catcher sets a high or low target.
         rig.root.scale.y = THREE.MathUtils.damp(rig.root.scale.y, 1+offset.y, 14, dt);
+        if (this.targetRing.visible) {
+          this.targetRing.position.copy(rig.contactAt('catch_target', this.elapsedSec, rig.root.position, this.camera.position));
+          this.targetRing.quaternion.copy(this.camera.quaternion);
+        } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
       } else if (pos === 'P' && this.entrance?.role === 'pitcher') {
-        rig.updatePose('pitch_gather', entranceTime, undefined, this.camera.position);
+        rig.updatePose(this.pitcherRitual, entranceTime, undefined, this.camera.position);
       } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
     }
     if (this.pitch) this.drawPitch(this.pitch);
@@ -552,6 +574,8 @@ export class GameSceneController {
   public dispose(): void {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
+    this.targetRing.geometry.dispose();
+    this.targetRing.material.dispose();
     this.vfx.dispose();
     if (this.stadiumOverlay) this.stadiumOverlay.dispose();
     this.ballpark.dispose();

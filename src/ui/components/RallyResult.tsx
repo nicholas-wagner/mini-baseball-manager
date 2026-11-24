@@ -72,12 +72,14 @@ export function RallyResult({ event, before, gameOver, nextLabel, detail, onOpen
       <h3>{player.name}</h3>
       <p>{verdict} {runs > 0 && (runs === 1 ? 'One run scores. ' : runs + ' runs score. ')}{baseText}</p>
     </div>
-    {detail && <details className="rally-detail"><summary>Scoring detail</summary><p>{detail}</p></details>}
+    <div className="rally-review">
+      <button className="atbat-tip" onClick={onReplay}>Watch again</button>
+      {detail && <details className="rally-detail"><summary>Scoring detail</summary><p>{detail}</p></details>}
+    </div>
     {onOpenPack && <aside className="rally-gift">
       <span>Opening Day foil pack</span><button onClick={onOpenPack}>Open foil pack</button>
     </aside>}
     <footer>
-      <button className="atbat-tip" onClick={onReplay}>Watch again</button>
       <button className="atbat-go" onClick={onContinue}>{nextLabel}</button>
     </footer>
   </section>;

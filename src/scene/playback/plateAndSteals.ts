@@ -2,7 +2,8 @@ import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { getCameraPresetPose, type CameraPose, type Vec3 } from '../camera/cameraRig';
 import { CLIP_DURATIONS, type CharacterAnimClip } from '../characters/animationState';
-import { BASE_PATH_VERTICES as bags, batterBox, headingToward } from './diamondLayout';
+import { targetOffset } from './firstAtBatPresentation';
+import { BASE_PATH_VERTICES as bags, CATCHER_HOME, batterBox, headingToward } from './diamondLayout';
 import type { Actor, DiamondPlay, Leg } from './diamondPlay';
 import { runBases } from './outfieldPlay';
 
@@ -99,6 +100,13 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
     return pose('runner_slide', time-slideAt, mix(slideStart,stop,1-(1-u)**1.45),yaw);
   }
   const catcher = { x: sign * (close.kind === 'ball_four' || close.kind === 'ball_pitch' ? .68 : play.legs[0].pitch?.pitchType === 'slider' ? -.28 : close.kind.startsWith('called') ? .30 : 0), y: .04, z: 1.02 };
+  if (play.pitchTarget && !close.steal) {
+    const target = targetOffset(play.pitchTarget, bats);
+    const misses = close.kind === 'ball_four' || close.kind === 'ball_pitch';
+    const reach = misses ? .58 * fraction(time, play.legs[0].start, plate) : 0;
+    catcher.x = CATCHER_HOME.x + target.x + sign * reach;
+    catcher.z = CATCHER_HOME.z;
+  }
   if (actor === 'C' && (!close.steal || play.pickup !== 'C' || since < .3)) {
     if ((close.kind === 'called_pitch' || close.kind === 'called_third') && since >= .06 && since < .39)
       return pose('catch_frame', since-.06, catcher, Math.PI);

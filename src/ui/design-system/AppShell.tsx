@@ -9,6 +9,7 @@ export interface NavItem {
 }
 
 interface AppShellProps {
+  liveGame?: boolean;
   clubName: string;
   leagueLabel: string;
   navItems: readonly NavItem[];
@@ -22,6 +23,7 @@ interface AppShellProps {
 }
 
 export function AppShell({
+  liveGame = false,
   clubName,
   leagueLabel,
   navItems,
@@ -44,7 +46,7 @@ export function AppShell({
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-halftone flex flex-col md:flex-row">
+    <div data-live-game={liveGame || undefined} className="career-shell min-h-screen bg-halftone flex flex-col md:flex-row">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:flex-col md:w-60 shrink-0 bg-[#1B4332] text-[#FBF4E4] border-r-[3px] border-[#181B2C] p-4 gap-4">
         <div className="bg-[#122D21] border-2 border-[#0B1E16] rounded-2xl p-3">

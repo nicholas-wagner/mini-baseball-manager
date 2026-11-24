@@ -1,7 +1,7 @@
 import type { playReadout } from './playReadout';
 import { BASE_PATH_VERTICES } from './diamondLayout';
 import { railReaction, welcomePose } from './teamReactions';
-import type { CameraPose } from '../camera/cameraRig';
+import { fitFieldOfView, type CameraPose } from '../camera/cameraRig';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import type { PerspectiveCamera } from 'three';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
@@ -19,7 +19,8 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   const shot = fixedShot ?? diamondCamera(play, t, side, throws);
   camera.position.copy(shot.position);
   camera.lookAt(shot.lookAt.x, shot.lookAt.y, shot.lookAt.z);
-  if (camera.fov !== shot.fov) { camera.fov = shot.fov; camera.updateProjectionMatrix(); }
+  const fov = fitFieldOfView(shot.fov, camera.aspect);
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
 
   // Bring the pocket across the leg on the same side of the bag in either handedness.
   function stateAt(actor: Actor, at: number) {

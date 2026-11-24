@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { DesignLabScreen } from './DesignLabScreen';
 
 vi.mock('../components/BallparkCanvas', () => ({ BallparkCanvas: () => null }));
+
+// Let Vitest receive its worker messages between the synchronous card-shelf renders.
+afterEach(() => new Promise<void>(resolve => setTimeout(resolve, 0)));
 
 it('replaces the rolled preview at the start of the shelf and keeps every illustration', () => {
   render(<DesignLabScreen />);

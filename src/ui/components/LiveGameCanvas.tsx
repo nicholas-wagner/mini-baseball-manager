@@ -32,6 +32,7 @@ interface LiveGameCanvasProps {
   overlay?: ReactNode;
   entrance?: ReactNode;
   guided?: boolean;
+  playFinished?: boolean;
   entranceCue?: PlayerEntranceCue | null;
   onEntranceEnd?: () => void;
 }
@@ -49,6 +50,7 @@ export function LiveGameCanvas({
   overlay = null,
   entrance,
   guided = false,
+  playFinished = false,
   entranceCue = null, onEntranceEnd,
 }: LiveGameCanvasProps) {
   const reducedMotion = useUserPreferencesStore(s => s.reducedMotion);
@@ -94,6 +96,10 @@ export function LiveGameCanvas({
   }, [awayClub, homeClub, session, choreo, lastEvent]);
 
   useEffect(() => {
+    if (playFinished) controllerRef.current?.finishReplay();
+  }, [playFinished, awayClub, homeClub, session, choreo, lastEvent]);
+
+  useEffect(() => {
     if (controllerRef.current) controllerRef.current.setEntrance(entranceCue, onEntranceEnd);
     else if (entranceCue) {
       const timer = window.setTimeout(() => onEntranceEnd?.(), 1600);
@@ -102,7 +108,7 @@ export function LiveGameCanvas({
   }, [entranceCue, onEntranceEnd]);
 
   return (
-    <div className={`relative w-full ${guided ? 'h-[250px] sm:h-[350px] lg:h-[388px]' : 'h-[204px] sm:h-[320px] lg:h-[370px]'} rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] overflow-hidden bg-[#63CAFF]`}>
+    <div className={`live-field relative w-full ${guided ? 'h-[250px] sm:h-[350px] lg:h-[388px]' : 'h-[204px] sm:h-[320px] lg:h-[370px]'} rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] overflow-hidden bg-[#63CAFF]`}>
       <div ref={containerRef} className="w-full h-full" data-testid="live-game-3d-canvas" />
 
       {celebrateConfetti ? (

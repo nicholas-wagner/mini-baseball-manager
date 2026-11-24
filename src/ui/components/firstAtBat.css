@@ -17,34 +17,6 @@
   align-items: center;
   gap: 10px;
 }
-.atbat-action-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  align-items: stretch;
-}
-.atbat-action-row .atbat-go {
-  flex: 1.25;
-  margin-top: 0;
-}
-.atbat-power {
-  flex: 1;
-  min-height: 44px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 2px solid #192735;
-  background: linear-gradient(110deg, #433272, #744069);
-  color: #ffe4a3;
-  font-weight: 900;
-  font-size: 12px;
-  line-height: 1.15;
-  box-shadow: 2px 2px #192735;
-  cursor: pointer;
-}
-.atbat-power.is-armed {
-  background: #ff4d6d;
-  color: #ffffff;
-}
 .atbat-guide header span {
   font: 800 11px monospace;
   text-transform: uppercase;
@@ -102,7 +74,7 @@
 .rally-result h3 { margin: 1px 0; }
 .rally-result p { font-size: 14px; }
 .rally-result footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
-.rally-result footer button:first-child { flex: none; }
+.rally-review { grid-column:1/-1; display:flex; align-items:start; gap:20px; }
 .rally-result .atbat-go { margin: 0; }
 .guided-line, .guided-teams, .guided-team, .guided-count, .rally-gift { display: flex; align-items: center; }
 .guided-line { width: 100%; min-height: 44px; gap: 10px; justify-content: space-between; text-align: left; }
@@ -120,3 +92,90 @@
 .rally-detail {grid-column:1 / -1;color:#254332;font-weight:700}
 .rally-detail summary {cursor:pointer;min-height:44px;align-content:center}
 .rally-detail p {padding:0 0 .5rem 1rem}
+
+.live-score-row { display:flex; align-items:start; gap:6px; }
+.live-score-row > [role=region] { flex:1; min-width:0; }
+.dugout-launch, .dugout-link {
+  background:#fff3bf; border:2px solid #192735; border-radius:10px; color:#193d37;
+  padding:0 12px; min-height:48px; font-weight:850; cursor:pointer;
+}
+.dugout-launch { align-self:stretch; box-shadow:2px 2px #192735; }
+.dugout-link { display:flex; align-items:center; justify-content:center; gap:6px; }
+.club-menu-dialog { margin:auto; padding:0 6px 6px 0; width:min(92vw,380px); max-height:calc(100dvh - 32px); border:0; background:transparent; }
+.club-menu-dialog > div { margin:0; }
+.club-menu-dialog::backdrop { background:#181b2cbf; }
+.matchup-clue { background:#20473d; color:#fff4d5; display:flex; align-items:center; justify-content:space-between; padding:0 10px; gap:8px; border-radius:0 0 8px 8px; font-size:14px; font-weight:750; }
+.matchup-clue button,.atbat-options summary { min-height:48px; display:flex; align-items:center; font-weight:800; text-decoration:underline; cursor:pointer; }
+.matchup-clue button { padding:0 7px; }
+.matchup-scouting { padding:10px 12px; background:#fff8e7; border:2px solid #20473d; border-radius:8px; font-size:14px; }
+.matchup-scouting h3 { font-weight:850; margin-top:5px; }
+.guided-matchup .matchup-scout-line,.guided-matchup .matchup-endurance-wrap,.guided-matchup .matchup-sparkle-badges,.guided-matchup .matchup-memory-line { display:none; }
+.atbat-options { position:relative; }
+.atbat-options summary { font-size:12px; min-width:48px; justify-content:center; }
+.atbat-options > div { position:absolute; right:0; bottom:100%; z-index:5; border:2px solid #193d37; border-radius:10px; padding:4px 8px; background:#fff7e4; width:190px; box-shadow:2px 2px #192735; }
+.atbat-options > div button { width:100%; text-align:left; min-height:48px; }
+.atbat-guide .atbat-go { min-height:50px; }
+.atbat-choices button { min-height:48px; }
+.atbat-go { box-shadow:2px 2px #192735; }
+
+@media (max-width:767px), (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
+  [data-live-game] > aside, [data-live-game] > nav, [data-live-game] > div > header { display:none; }
+  [data-live-game] main { padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); }
+  .live-score-row { top:env(safe-area-inset-top); }
+  .guided-game { display:flex; flex-direction:column; min-height:calc(100dvh - max(6px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom))); }
+  .guided-game > .live-score-row { margin:0 0 6px; }
+  .guided-game > .max-w-3xl { flex:1; display:flex; flex-direction:column; width:100%; }
+  .guided-game > .max-w-3xl > div:first-child { flex:1; display:flex; flex-direction:column; }
+  .guided-game .live-field-controls { flex:1; display:flex; flex-direction:column; gap:6px; }
+  .guided-game .live-field-controls > * { margin:0; }
+  .guided-game .live-field { flex:1 0 140px; min-height:140px; height:auto; }
+  .guided-matchup { position:relative; }
+  .guided-matchup .matchup-prints button { min-height:48px; padding:3px 6px; }
+  .guided-matchup .matchup-prints strong { white-space:normal; }
+  .guided-matchup .matchup-clue { min-height:48px; }
+  .guided-matchup .matchup-scouting { position:absolute; z-index:21; bottom:48px; width:100%; box-shadow:2px 2px #192735; }
+  .guided-game .atbat-guide { padding:4px 10px 10px; }
+  .guided-game .rally-result footer { flex-direction:column; gap:0; align-items:stretch; }
+
+  .live-game:not(.guided-game) [data-testid=live-action-bar] { display:flex; flex-direction:column; gap:8px; }
+  .live-game:not(.guided-game) [data-testid=live-control-grid] { order:-1; }
+  .opening-feature .opening-art { width:min(44vw,25svh,200px); }
+}
+@media (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
+  .live-game .live-field-controls { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(265px,1fr); gap:6px 10px; align-content:start; align-items:start; }
+  .live-game .live-field-controls > * { grid-column:2; margin:0; min-width:0; }
+  .live-game .live-field-controls > .live-field { grid-column:1; grid-row:1 / span 8; position:sticky; top:72px; height:calc(100dvh - 85px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  .guided-game .live-field-controls { grid-template-rows:auto 1fr; }
+  .guided-game .live-field-controls > .live-field { grid-row:1 / span 2; align-self:stretch; position:relative; top:0; height:auto; }
+  .guided-game .live-field-controls > .atbat-guide { align-self:end; }
+  .guided-game .live-score-row > [role=region] { padding-block:0; }
+  .guided-game .guided-line { min-height:48px; }
+  .guided-game .matchup-prints small { letter-spacing:.03em; }
+  .guided-game .matchup-prints img { width:27px; height:32px; }
+  .guided-game .matchup-wrap { display:flex; align-items:stretch; }
+  .guided-game .matchup-prints { flex:1; min-width:0; }
+  .guided-game .matchup-clue { border-radius:6px; padding:0; }
+  .guided-game .matchup-clue span { display:none; }
+  .guided-game .matchup-scouting { bottom:auto; top:100%; }
+  .guided-game .rally-result footer { flex-direction:row; gap:8px; }
+
+}
+
+@media (max-width:767px), (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
+  .dugout-launch { align-self:center; font-size:14px; padding-inline:10px; }
+  .guided-teams { display:grid; gap:1px; }
+  .guided-team { font-size:13px; gap:3px; }
+  .guided-team span { white-space:nowrap; }
+  .guided-team b { font-size:16px; }
+  .guided-line { gap:3px; }
+  .guided-game .live-field { overflow:hidden; }
+  .live-field canvas { position:absolute; inset:0; display:block; }
+}
+@media (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
+  .guided-game > .max-w-3xl { max-width:none; }
+  .guided-game .guided-teams { display:flex; gap:10px; }
+  .guided-game .live-field-controls { min-height:0; }
+}
+@media (min-width:768px) and (min-height:541px) {
+  .guided-game .live-field { height:clamp(215px,40dvh,388px); }
+}

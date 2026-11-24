@@ -30,7 +30,8 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   await again.click();
   await expect(recap).toHaveCount(0);
   await expect(page.getByTestId('live-game-3d-canvas')).toBeVisible();
-  await page.getByRole('button', { name: /^roster$/i }).locator('visible=true').first().click();
+  await page.getByRole('button', { name: 'Dugout', exact:true }).click();
+  await page.getByRole('dialog', { name: 'Dugout', exact:true }).getByRole('button', {name:'Roster', exact:true}).click();
   await page.getByTestId('roster-view-cards-btn').click();
   await page.getByRole('button', { name: 'Print gallery' }).click();
   const gallery = page.getByRole('region', { name: 'Roster print gallery' });
@@ -98,4 +99,41 @@ test('a pitching opener keeps the named pitcher through a first strikeout', asyn
   }
   await expect(result.getByRole('heading')).toHaveText('Jasper Hunter');
   await expect(result).toContainText('Jasper strikes out Ariel.');
+});
+
+test('the first pitch, field and handoff share a phone screen and survive visiting the dugout', async ({page, isMobile}) => {
+  test.slow();
+  const size = isMobile ? {width:360,height:640} : {width:844,height:390};
+  await page.setViewportSize(size);
+  await page.addInitScript(() => {
+    const random = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = array => array instanceof Uint32Array && array.length === 1
+      ? (array.fill(2089), array) : random(array);
+  });
+  await page.goto('/');
+  const start = page.getByRole('button',{name:'Bat with Marcus'});
+  await expect(start).toBeInViewport({ratio:1});
+  await start.click();
+  const swing = page.getByRole('button',{name:'Swing',exact:true});
+  const field = page.getByTestId('live-game-3d-canvas');
+  await expect(swing).toBeInViewport({ratio:1});
+  await expect(field).toBeInViewport({ratio:1});
+  await expect(page.getByRole('navigation',{name:'Mobile Navigation'})).toBeHidden();
+  const box = (await swing.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(48);
+  if (!isMobile) expect((await field.boundingBox())!.x + (await field.boundingBox())!.width).toBeLessThan(box.x);
+  await page.getByRole('button',{name:'Power',exact:true}).click();
+  await swing.click();
+  const next = page.getByRole('button',{name:'Next batter'});
+  await expect(next).toBeVisible({timeout:20000});
+  await expect(next).toBeInViewport({ratio:1});
+  expect(Math.abs((await next.boundingBox())!.y - box.y)).toBeLessThan(12);
+  await next.click();
+  await page.getByRole('button',{name:'Dugout',exact:true}).click();
+  await page.getByRole('dialog',{name:'Dugout'}).getByRole('button',{name:'Roster',exact:true}).click();
+  await expect(page.getByTestId('roster-view-cards-btn')).toBeVisible();
+  await page.getByRole('button',{name:'Play Ball',exact:true}).locator('visible=true').first().click();
+  await expect(page.getByRole('group',{name:'Matchup cards'})).toContainText('Ethan Torres');
+  await expect(page.getByRole('button',{name:'Toggle line score'})).toContainText('1 out');
+  await expect(swing).toBeInViewport({ratio:1});
 });
