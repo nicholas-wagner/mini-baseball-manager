@@ -50,6 +50,7 @@ export interface DiamondPlay {
   duration: number;
   unassisted: boolean;
   buntAttempt?: boolean;
+  buntAdvances?: (1 | 2 | 3)[];
   holdForceCall?: boolean;
   reliefStrikeout?: boolean;
   runnerToThird?: 1 | 2;
@@ -76,12 +77,12 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
   const marked: Actor | undefined =
     highlight === 'SS' || highlight === '3B' || highlight === '2B' || highlight === '1B'
       ? highlight
-      : pop && highlight === 'C'
+      : (pop || bunt) && highlight === 'C'
         ? 'C'
-        : pop && (highlight === 'SP' || highlight === 'RP')
+        : (pop || bunt) && (highlight === 'SP' || highlight === 'RP')
           ? 'P'
           : undefined;
-  const pickup: Actor = pivot ? 'SS' : bunt ? '3B' : kind === 'cover_first' ? '1B' : marked ?? (pop ? '2B' : 'SS');
+  const pickup: Actor = pivot ? 'SS' : bunt ? marked ?? '3B' : kind === 'cover_first' ? '1B' : marked ?? (pop ? '2B' : 'SS');
   const unassisted = kind === 'ground_out' && pickup === '1B';
   const pickupAt = liner ? plate+.66 : pop ? 3.86 : bunt ? 2.64 : 2.85;
   const receiveAt = pivot ? 3.86 : 4.28;
@@ -90,11 +91,11 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
     from: 'BAT', to: pickup, start: plate, end: pickupAt, kind: pop ? 'pop' : liner ? 'flight' : 'ground', apex: liner ? 1.48 : undefined,
   }];
   if (!pop && !liner && !error && !unassisted) legs.push({
-    from: pickup, to: kind === 'cover_first' ? 'P' : pivot ? '2B' : '1B', start: pickupAt + 0.38, end: receiveAt, kind: 'throw',
+    from: pickup, to: kind === 'cover_first' || (bunt && pickup === '1B') ? 'P' : pivot ? '2B' : '1B', start: pickupAt + 0.38, end: receiveAt, kind: 'throw',
   });
   if (pivot) legs.push({ from: '2B', to: '1B', start: receiveAt + 0.32, end: finish, kind: 'throw' });
   const fieldAt = bunt
-    ? { x: -4.25, y: 0.04, z: -4.9 }
+    ? { x: event?.ballFlight?.landingX ?? -4.25, y: .04, z: event?.ballFlight?.landingZ ?? -4.9 }
     : pop && pickup === 'C'
       ? { x: -0.65, y: 0.04, z: -2.1 }
       : pop && pickup === 'P'
@@ -152,10 +153,20 @@ export function heldRunnerLead(play: DiamondPlay, base: number, time: number) {
   return between(BASE_PATH_VERTICES[base], BASE_PATH_VERTICES[base+1], lead);
 }
 
+export function buntRunnerPose(play: DiamondPlay, from: number, time: number) {
+  const contact = play.legs[0].end;
+  const start = heldRunnerLead(play, from, Math.min(time, contact));
+  if (time < contact) {
+    return { pos: start, yaw: headingToward(start, BASE_PATH_VERTICES[0]), clip: 'runner_lead' as const, local: time };
+  }
+  return runBases(start, from, from + 1, time, contact, play.leadArrival);
+}
+
 function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: EffectiveBatSide) {
   const plate = play.legs[0].end;
   let pos = starts[actor];
   const leadBase = play.scorerBase ?? play.runnerToThird;
+  if (actor === 'RUN' && play.buntAdvances && play.scorerBase) return buntRunnerPose(play, play.scorerBase, time);
   if (actor === 'RUN' && leadBase && !play.close?.steal) {
     const go = (play.outfield?.caught ? play.pickupAt : plate) + .10;
     return runBases(BASE_PATH_VERTICES[leadBase],leadBase,play.scorerBase ? 4 : 3,time,go,play.leadArrival);
@@ -168,6 +179,17 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
       pos = between(pos,target,progress(time,plate+.18,relay.start));
       return {pos,yaw:headingToward(pos,play.fieldAt),clip:time < relay.end-.25 ? 'field_ready' as const : 'catch_receive' as const,local:.22};
     }
+  }
+  if ((actor === 'P' || actor === 'C') && play.pickup === actor &&
+      (play.kind === 'bunt_out' || play.kind === 'bunt_single') && time > plate + .06) {
+    const throwLeg = play.legs[2];
+    const charge = progress(time, plate + .06, play.pickupAt - .22);
+    const throwing = time >= throwLeg.start - .16;
+    return { pos: between(pos, play.fieldAt, charge),
+      yaw: charge < 1 ? headingToward(pos, play.fieldAt) : headingToward(play.fieldAt, first),
+      clip: charge < 1 ? 'field_run' as const : !throwing ? 'field_scoop' as const :
+        actor === 'C' ? 'catch_throw' as const : 'field_throw' as const,
+      local: throwing ? Math.min(.64, time - throwLeg.start + .24) : Math.max(0, time - play.pickupAt + .24) };
   }
   if (actor === 'C') {
     if (play.pickup === 'C') {
@@ -281,7 +303,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
   } else {
     const isPickup = actor === play.pickup;
     const stop = isPickup ? play.fieldAt : actor === '1B' ? { ...first, x: first.x + .16, z: first.z - .44 }
-      : actor === '2B' ? { ...second, x: second.x - .34, z: second.z - .28 } : pos;
+      : actor === '2B' && !play.buntAdvances ? { ...second, x: second.x - .34, z: second.z - .28 } : pos;
     const arrive = isPickup ? play.pickupAt - 0.18 : play.receiveAt - 0.24;
     const u = progress(time, plate + 0.05, arrive);
     pos = between(pos, stop, u);
@@ -336,6 +358,10 @@ export function actorAt(play: DiamondPlay, actor: Actor, time: number, bats: Eff
   return reactionPose(play,actor,time,base,bats) ?? base;
 }
 
+export function buntFollowBase(play: DiamondPlay, time: number) {
+  return time > play.batterArrival ? play.buntAdvances?.at(-1) : undefined;
+}
+
 export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSide, throws: ThrowsHand = 'R'): CameraPose {
   const reaction = reactionCamera(play,t,bats);
   if (reaction) return reaction;
@@ -349,6 +375,9 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
     position: { x: bats === 'R' ? -2.25 : 2.25, y: 2.7, z: 4.8 },
     lookAt: { x: 0, y: 1.14, z: -2.75 }, fov: 39,
   };
+  if (play.buntAdvances && t < play.finish - .36) {
+    return { position: {x: 8, y: 11, z: 6}, lookAt: {x: 2, y: .5, z: -10.5}, fov: 44 };
+  }
   const leg = play.legs.find(part => t < part.end) ?? play.legs[play.legs.length - 1];
   if (play.outfield) {
     const a = leg.startPoint ?? actorAt(play,leg.from,leg.start,bats).pos;
@@ -375,6 +404,11 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
       x: point.x + 1.9, y: lookAt.y + (play.kind === 'home_run' ? 6 : atWall ? 4.2 : 3.0 - zoom),
       z: point.z + (atWall ? 10.4 : 9.5 - 4 * zoom),
     } };
+  }
+  const advancingRunner = buntFollowBase(play, t);
+  if (advancingRunner) {
+    const runner = buntRunnerPose(play, advancingRunner, t).pos;
+    return { position: { x: runner.x + 3.4, y: 3.1, z: runner.z + 5.7 }, lookAt: { ...runner, y: .80 }, fov: 40 };
   }
   if (forceAtFirst(play) && t >= play.finish-.36) {
     const runner = actorAt(play,'BAT',t,bats).pos;

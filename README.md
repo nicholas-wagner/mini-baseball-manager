@@ -28,6 +28,8 @@ Marcus’s groundout leaves two runners aboard for Ethan. **Watch again** replay
 
 A pitching change names the incoming reliever on the field. The catcher gives them the ball and returns to the plate. In a paused game you can call the next pitch directly from the diamond. [See the handoff](./docs/screenshots/bullpen-handoff.webp) · [See the next pitch on a phone](./docs/screenshots/bullpen-ready.webp).
 
+On a sacrifice bunt, watch the batter run through first and the baserunner stop on second. [Watch the play](./docs/screenshots/sacrifice-bunt-replay.webp) · [See the runner on second on a phone](./docs/screenshots/sacrifice-bunt-second.webp).
+
 <details>
 <summary>Watch a third strike, a force at first and a runner rounding third</summary>
 
@@ -93,9 +95,9 @@ Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.g
 
 This repository is structured so both **human contributors** and **AI coding agents** can immediately understand the architecture, invariants, and exact next TDD ticket:
 
-- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and six Game Day follow-ups through TASK-079.
+- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-082.
 - **[docs/SIMULATION_MATH.md](./docs/SIMULATION_MATH.md)** — Full pitch-by-pitch seeded dice-roll formulas, all 15 attribute effects, National/Capstone powers, Weather, Shifts, Mind Games & Nemesis math.
-- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-079**.
+- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-082**.
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Canonical TypeScript interfaces, `PlayEvent` stream contracts, and 3D ballpark coordinates.
 - **[docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)** — Exact 90s color tokens, typography, touch targets, and chibi scale units.
 - **[AGENTS.md](./AGENTS.md)** — AI Agent onboarding guide, hard architectural invariants, and Definition of Done.

@@ -8,7 +8,7 @@ import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types
 import type { PaintedPlayerRig } from '../characters/paintedPlayer';
 import { BALL_TRAJECTORY_PRESETS } from '../vfx/ballTrajectory';
 import type { BallparkVfxSystem } from '../vfx/vfxSystem';
-import { actorAt, diamondCamera, forceAtFirst, sampleLeg, type Actor, type DiamondPlay } from './diamondPlay';
+import { actorAt, buntFollowBase, diamondCamera, forceAtFirst, sampleLeg, type Actor, type DiamondPlay } from './diamondPlay';
 
 export type DiamondCast = Record<Actor, PaintedPlayerRig>;
 const actors: Actor[] = ['C', 'P', 'BAT', 'SS', '2B', '1B', '3B', 'LF', 'CF', 'RF', 'RUN'];
@@ -86,7 +86,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     }
     if (leg.end === play.finish || (play.kind === 'double_play' && leg.to === '2B')) {
       const call = play.kind === 'bunt_single' ? 'SAFE!' : play.kind === 'fielding_error' ? 'ERROR!' : leg.end !== play.finish ? 'ONE!' : play.kind === 'double_play' ? 'TURN TWO!' : play.kind === 'pop_up' && play.buntAttempt ? 'POP-UP OUT!' : 'OUT!';
-      if (!play.holdForceCall || leg.end !== play.finish) vfx.spawnComicCallout(call, at, '#167457', true);
+      if (leg.end !== play.finish || (!play.holdForceCall && !play.buntAdvances)) vfx.spawnComicCallout(call, at, '#167457', true);
     }
   }
 
@@ -124,7 +124,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     }
   }
   const ump = vfx.umpire;
-  ump.sprite.visible=Boolean(((play.close?.steal && t>play.pickupAt+.62) || (force && t>play.finish-.30)) && (!play.ending || t<play.ending.start));
+  ump.sprite.visible=Boolean(((play.close?.steal && t>play.pickupAt+.62) || (force && t>play.finish-.30 && (fixedShot || !buntFollowBase(play, t)))) && (!play.ending || t<play.ending.start));
   if (ump.sprite.visible) {
     const bag=force ? BASE_PATH_VERTICES[1] : play.fieldAt;
     const dx=shot.position.x-bag.x,dz=shot.position.z-bag.z;

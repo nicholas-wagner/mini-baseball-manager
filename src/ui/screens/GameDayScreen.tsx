@@ -1,3 +1,4 @@
+import { describeBuntAdvance } from '../../scene/playback/sacrificeBunt';
 import { FORCE_HOLD_SECONDS } from '../../scene/playback/firstAtBatPresentation';
 import { forceAtFirst } from '../../scene/playback/diamondPlay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -2152,6 +2153,8 @@ export function GameDayScreen({
     pitchingChange || (playbackEvent.batterId && playbackEvent.batterId !== currentBatter.id) ||
     (playbackEvent.pitcherId && playbackEvent.pitcherId !== currentPitcher.id)
   );
+  const buntAdvance = lastChoreo?.play?.buntAdvances;
+  const buntCall = buntAdvance && `Out at first · ${describeBuntAdvance(buntAdvance)}`;
   const readout = pendingDecision || showNextMatchup ? null : playReadout(playbackEvent);
   const liveCallout = pendingDecision || showNextMatchup ? null : buildComicPopArtBanner(playbackEvent, liveSession);
   const replayable = Boolean(!pitchingChange && lastChoreo?.play && !playing && watchMode === 'paused' &&
@@ -2360,7 +2363,7 @@ export function GameDayScreen({
                   <ClubMascotBuddy mascot={humanClub.mascot} primaryColor={humanClub.colors.primary}
                     secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm"
                     mood={pendingDecision ? 'watching' : 'peeking'} />
-                  {!pendingDecision && playing && <span className="plate-verdict" role="status">Out at first</span>}
+                  {!pendingDecision && playing && <span className="plate-verdict" role="status">{buntCall ?? 'Out at first'}</span>}
                   </div>
                 ) : handoff && !playing ? null : liveCallout ? (
                   <div
@@ -2393,8 +2396,8 @@ export function GameDayScreen({
                   {playbackEvent?.outcome === 'foul' && <span className="foul-peek" aria-hidden="true"><ClubMascotBuddy mascot={humanClub.mascot}
                     primaryColor={humanClub.colors.primary} secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm" /></span>}
                   <span className="plate-verdict">
-                    {readout.label}
-                    {playbackEvent?.pitchThrown
+                    {buntCall ?? readout.label}
+                    {!buntCall && playbackEvent?.pitchThrown
                       ? ` · ${playbackEvent.pitchThrown.mph} mph ${PITCH_TYPE_SHORT_LABELS[playbackEvent.pitchThrown.pitchType]}`
                       : ''}
                   </span>

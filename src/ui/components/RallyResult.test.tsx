@@ -26,6 +26,9 @@ it('gives a defensive out to the recorded fielder or strikeout pitcher and names
   expect(screen.getByText(new RegExp(batter.name.split(' ')[0] + ' is out at first'))).toBeVisible();
   view.rerender(<RallyResult {...props} event={{...event, outcome:'strikeout',fieldingHighlight:undefined}} />);
   expect(screen.getByRole('heading')).toHaveTextContent(pitcher.name);
+  view.rerender(<RallyResult {...props} before={{...before,bases:['runner',null,null]}}
+    event={{...event,outcome:'bunt_out',basesAfter:[null,'runner',null]}} />);
+  expect(screen.getByRole('region', {name:'Play result'})).toHaveTextContent(/sacrifice bunt.*out at first.*runner to second/i);
 });
 
 it('lets the selected mascot cover its eyes and peek on the official call', async () => {

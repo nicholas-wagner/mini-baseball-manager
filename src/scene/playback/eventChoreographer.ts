@@ -1,3 +1,4 @@
+import { sacrificeAdvances } from './sacrificeBunt';
 import { finishPlay } from './teamReactions';
 import { closeKindFor, stealFrom } from './plateAndSteals';
 import { BASE_PATH_VERTICES, CATCHER_HOME, OUTFIELD_STARTS, PITCHING_RUBBER } from './diamondLayout';
@@ -291,6 +292,12 @@ export function choreographPlayEvent(
       (event.seq % 2 === 0 || (event.ballFlight && event.ballFlight.landingX < 8));
     const timed = close ?? outfield ?? (infield ? diamondPlay(cover?'cover_first':infield, event.fieldingHighlight?.fielderPos,event) : undefined);
     if (timed) {
+      const advances = sacrificeAdvances(event, basesBefore, context.runsScored);
+      if (advances) {
+        timed.buntAdvances = advances;
+        timed.leadArrival = timed.finish + .8;
+        timed.duration = timed.leadArrival + .75;
+      }
       const scoringPlay = Boolean(outfield && (!outfield.outfield?.caught || kind==='sac_fly')) || context.walkoff;
       const crossed = ([3,2,1] as const).filter(base=>{
         const id = basesBefore?.[base-1];

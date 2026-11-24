@@ -1,3 +1,4 @@
+import { describeBuntAdvance, sacrificeAdvances } from '../../scene/playback/sacrificeBunt';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { getBattingSide, getFieldingSide, getCurrentBatter, getCurrentPitcher, type GameSessionState } from '../../engine/simulation/gameState';
 import { playReadout } from '../../scene/playback/playReadout';
@@ -60,6 +61,11 @@ export function RallyResult({ event, before, gameOver, nextLabel, detail, onOpen
     baseText = held && bases.length === 2 ? 'Both runners hold.' : who + verb + bases.join(' and ') + '.';
   }
   const runs = event.homeScore + event.awayScore - before.home.score - before.away.score;
+  const buntAdvances = sacrificeAdvances(event, before.bases, runs);
+  if (buntAdvances) {
+    verdict = `${first} lays down a sacrifice bunt and is out at first.`;
+    if (!gameOver && runs === 0) baseText = describeBuntAdvance(buntAdvances) + '.';
+  }
   return <section className="atbat-guide rally-result" aria-label="Play result">
     <PlayerPrint player={player} />
     <div aria-live="polite">

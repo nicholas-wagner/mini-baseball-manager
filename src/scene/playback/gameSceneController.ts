@@ -5,7 +5,7 @@ import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import { batterBox, headingToward } from './diamondLayout';
 import { createDelivery, sampleDeliveryFlight, type ShowcaseDelivery } from '../vfx/showcaseDelivery';
 import { runBases } from './outfieldPlay';
-import { diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
+import { buntRunnerPose, diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import * as THREE from 'three';
@@ -303,7 +303,7 @@ export class GameSceneController {
       rig.preparePlayback();
     }
 
-    const bases = (choreo?.outfield || choreo?.close || choreo?.infield === 'bunt_single' || choreo?.infield === 'fielding_error') && choreo.basesBefore ? choreo.basesBefore : session.bases;
+    const bases = (choreo?.outfield || choreo?.close || choreo?.infield === 'bunt_out' || choreo?.infield === 'bunt_single' || choreo?.infield === 'fielding_error') && choreo.basesBefore ? choreo.basesBefore : session.bases;
     bases.forEach((baseId, idx) => {
       const runnerId = idx === 0 && choreo?.infield === 'double_play' ? choreo.leadRunnerId : baseId;
       const rig = this.runnerRigs[idx];
@@ -455,7 +455,8 @@ export class GameSceneController {
         this.vfx, this.throws, fixedShot, this.welcome.rigs, this.replay.readout);
       this.runnerRigs.forEach((runner, i) => {
         if (!runner.root.visible || ((play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
-        const destination = runnerDestinations?.[i];
+        const advancing = play.buntAdvances?.some(from => from === i + 1);
+        const destination = advancing ? i + 2 : runnerDestinations?.[i];
         if (destination === undefined) {
           if (forceAtFirst(play)) runner.root.position.copy(heldRunnerLead(play, i+1, t));
           runner.updatePose('runner_lead', t, undefined, this.camera.position);
@@ -463,8 +464,8 @@ export class GameSceneController {
         }
         const go = play.close?.steal ? .52 : play.kind === 'ball_four' ? play.pickupAt+.60
           : (play.outfield?.caught ? play.pickupAt : play.legs[0].end) + .12;
-        const arrival = play.kind === 'ball_four' ? play.batterArrival : play.close?.steal ? play.leadArrival : go + (destination - i - 1) * 1.30;
-        const state = runBases(BASE_PATH_VERTICES[i + 1], i + 1, destination, t, go, arrival);
+        const arrival = advancing ? play.leadArrival : play.kind === 'ball_four' ? play.batterArrival : play.close?.steal ? play.leadArrival : go + (destination - i - 1) * 1.30;
+        const state = advancing ? buntRunnerPose(play, i + 1, t) : runBases(BASE_PATH_VERTICES[i + 1], i + 1, destination, t, go, arrival);
         runner.root.position.copy(state.pos);
         runner.logicalYaw = state.yaw;
         runner.updatePose(state.clip, state.local, undefined, this.camera.position);
