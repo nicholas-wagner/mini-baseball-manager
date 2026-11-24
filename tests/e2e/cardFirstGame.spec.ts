@@ -149,7 +149,11 @@ test('a compact phone keeps the chosen call, primary action and field together a
   });
   await page.setViewportSize({width:360,height:640});
   await page.goto('/');
-  await page.getByRole('button', {name:'Change club'}).click();
+  const customize = page.getByRole('button', {name:'Change club'});
+  await expect(customize).toBeInViewport({ratio:1});
+  const target = (await customize.boundingBox())!;
+  expect(Math.min(target.width, target.height)).toBeGreaterThanOrEqual(44);
+  await customize.tap();
   const useClub = page.getByRole('button', {name:'Use this club'});
   await expect(useClub).toBeInViewport({ratio:1});
   await useClub.click();

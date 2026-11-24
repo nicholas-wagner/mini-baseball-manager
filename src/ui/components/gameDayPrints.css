@@ -505,7 +505,7 @@ button.gallery-tile {
   .opening-cover { margin: 4px auto; }
   .opening-club { padding: 8px 12px; gap: 8px; }
   .opening-club small { font-size: 11.5px; }
-  .opening-club .opening-customize-pill { min-height: 40px; padding: 4px 10px; font-size: 12px; }
+  .opening-club .opening-customize-pill { padding: 4px 10px; }
   .opening-feature { grid-template-columns: 1fr; gap: 12px; padding: 14px 18px 16px;
     background: repeating-linear-gradient(110deg,transparent 0 32px,#ffffff06 32px 58px), linear-gradient(173deg,#24614f 0 45%,#e1b355 45% 46%,#fff4d9 46%); }
   .opening-feature .opening-art { width: min(44vw, 178px); justify-self: center; }
