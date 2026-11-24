@@ -37,6 +37,21 @@ it('marks the actual batter destination even when a single advances on a throw',
     label: 'Fly out',
     lamp: 'outs',
   });
+  expect(playReadout({ ...event, outcome: 'fly_out', battedBallType: 'pop_up' })).toMatchObject({
+    label: 'Pop-up out',
+    lamp: 'outs',
+  });
+  expect(
+    playReadout({
+      ...event,
+      outcome: 'fly_out',
+      battedBallType: 'pop_up',
+      ballFlight: { style: 'ninja_bunt', landingX: -1.5, landingZ: -1.8, apexY: 6.4, durationSec: 1.35 },
+    }),
+  ).toMatchObject({
+    label: 'Bunt pop-up',
+    lamp: 'outs',
+  });
   expect(playReadout({ ...event, outcome: undefined, type: 'pitching_change' })).toBeNull();
 });
 

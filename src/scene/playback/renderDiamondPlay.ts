@@ -85,7 +85,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       continue;
     }
     if (leg.end === play.finish || (play.kind === 'double_play' && leg.to === '2B')) {
-      const call = play.kind === 'bunt_single' ? 'SAFE!' : play.kind === 'fielding_error' ? 'ERROR!' : leg.end !== play.finish ? 'ONE!' : play.kind === 'double_play' ? 'TURN TWO!' : 'OUT!';
+      const call = play.kind === 'bunt_single' ? 'SAFE!' : play.kind === 'fielding_error' ? 'ERROR!' : leg.end !== play.finish ? 'ONE!' : play.kind === 'double_play' ? 'TURN TWO!' : play.kind === 'pop_up' && play.buntAttempt ? 'POP-UP OUT!' : 'OUT!';
       if (!play.holdForceCall || leg.end !== play.finish) vfx.spawnComicCallout(call, at, '#167457', true);
     }
   }

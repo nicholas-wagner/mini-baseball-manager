@@ -1,5 +1,6 @@
 import { FORCE_HOLD_SECONDS } from './firstAtBatPresentation';
 import type { AtBatOutcome, PlayEvent } from '../../engine/models/playEvent';
+import { isBuntEvent } from './diamondPlay';
 import type { ChoreographedStep } from './eventChoreographer';
 
 const labels: Record<AtBatOutcome, string> = {
@@ -31,11 +32,17 @@ export function playReadout(event?: PlayEvent | null) {
   const strike = outcome === 'called_strike' || outcome === 'swinging_strike';
   const count = strike ? event.strikes : event.balls;
   const words = ['', ' one', ' two', ' three', ' four'];
+  const baseLabel =
+    outcome === 'fly_out' && event.battedBallType === 'pop_up'
+      ? isBuntEvent(event)
+        ? 'Bunt pop-up'
+        : 'Pop-up out'
+      : labels[outcome!];
   const label = steal
     ? outsAfter > outsBefore
       ? 'Caught stealing'
       : 'Stolen base'
-    : labels[outcome!] + (strike || outcome === 'ball' ? (words[count] ?? '') : '');
+    : baseLabel + (strike || outcome === 'ball' ? (words[count] ?? '') : '');
   const lamp = strike
     ? 'strikes'
     : outcome === 'ball'

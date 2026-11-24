@@ -125,3 +125,23 @@ it('tracks the lead runner on a failed double steal, even at the end of a half i
   expect(play.pickup).toBe('3B');
   expect(play.receiveAt).toBeLessThan(play.leadArrival);
 });
+
+it('choreographs a bunt pop-up as a bat_bunt pop-up caught by the catcher or pitcher', () => {
+  const step = choreographPlayEvent(
+    buildEvent({
+      type: 'ball_in_play',
+      outcome: 'fly_out',
+      battedBallType: 'pop_up',
+      outsAfter: 1,
+      ballFlight: { style: 'ninja_bunt', landingX: -1.5, landingZ: -1.8, apexY: 6.4, durationSec: 1.35 },
+      fieldingHighlight: { fielderId: 'c-1', fielderPos: 'C', anim: 'field_run' },
+    }),
+    1,
+  );
+  expect(step.infield).toBe('pop_up');
+  expect(step.outfield).toBeUndefined();
+  expect(step.batterClip).toBe('bat_bunt');
+  expect(step.play?.buntAttempt).toBe(true);
+  expect(step.play?.pickup).toBe('C');
+  expect(step.play?.legs[1].kind).toBe('pop');
+});

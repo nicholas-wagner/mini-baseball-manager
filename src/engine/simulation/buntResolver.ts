@@ -64,15 +64,17 @@ export interface BuntPitchResolution {
   mathBreakdown: PlayMathBreakdown;
 }
 
-const PITCH_BUNT_DIFFICULTY: Readonly<Record<PitchType, number>> = {
-  four_seam: 0.45,
-  two_seam: 0.0,
-  cutter: 0.35,
-  slider: 0.55,
-  curveball: 0.5,
-  changeup: -0.2,
-  splitter: 0.6,
-  knuckleball: 0.75,
+const PITCH_BUNT_PROFILE: Readonly<
+  Record<PitchType, { whiff: number; popUp: number; foul: number }>
+> = {
+  four_seam: { whiff: 0.004, popUp: 0.016, foul: 0.018 },
+  two_seam: { whiff: 0.0, popUp: 0.0, foul: 0.0 },
+  cutter: { whiff: 0.005, popUp: 0.012, foul: 0.014 },
+  slider: { whiff: 0.012, popUp: 0.01, foul: 0.02 },
+  curveball: { whiff: 0.01, popUp: 0.014, foul: 0.018 },
+  changeup: { whiff: -0.004, popUp: -0.009, foul: -0.012 },
+  splitter: { whiff: 0.014, popUp: 0.008, foul: 0.018 },
+  knuckleball: { whiff: 0.018, popUp: 0.02, foul: 0.028 },
 };
 
 const SHIFT_BUNT_SINGLE_DELTA: Readonly<Record<DefensiveShiftId, number>> = {
@@ -101,31 +103,58 @@ function gradeBuntSkill(rating: number): BuntOddsBreakdown['buntGrade'] {
   return 'D';
 }
 
-function computePitchBuntPressure(
-  pitchType: PitchType,
-  pitchQuality: number,
-  pitchTarget: PitchTargetIntent,
-): { qualityDiff: number; highHeatRisk: number } {
-  const qualityDiff =
-    (pitchQuality - 60) / 30 + PITCH_BUNT_DIFFICULTY[pitchType] * 0.45;
-  const highHeatRisk = pitchTarget === 'high_heat' ? 0.035 : 0;
-  return { qualityDiff, highHeatRisk };
+function computePitchBuntPressure(input: BuntOddsInput): {
+  whiffPressure: number;
+  popUpPressure: number;
+  foulPressure: number;
+} {
+  const pitchProfile = PITCH_BUNT_PROFILE[input.pitchType];
+  const veloDelta = (input.pitcher.ratings.velocity - 60) / 40;
+  const moveDelta = (input.pitcher.ratings.movement - 60) / 40;
+  const ctrlDelta = (input.pitcher.ratings.control - 60) / 40;
+  const liveQualityDelta = (input.pitchQuality - 60) / 40;
+  const highHeat = input.pitchTarget === 'high_heat' ? 1 : 0;
+
+  return {
+    whiffPressure:
+      pitchProfile.whiff +
+      veloDelta * 0.006 +
+      moveDelta * 0.008 +
+      liveQualityDelta * 0.007 +
+      highHeat * 0.006,
+    popUpPressure:
+      pitchProfile.popUp +
+      veloDelta * 0.014 +
+      moveDelta * 0.009 +
+      ctrlDelta * 0.006 +
+      liveQualityDelta * 0.011 +
+      highHeat * 0.018,
+    foulPressure:
+      pitchProfile.foul +
+      veloDelta * 0.018 +
+      moveDelta * 0.016 +
+      ctrlDelta * 0.008 +
+      liveQualityDelta * 0.018 +
+      highHeat * 0.012,
+  };
 }
 
-/** Computes realistic bunt outcome percentages driven by bunt skill, pitch quality, infield shift, fielding, and speed. */
+/** Computes realistic bunt outcome percentages driven by batter skills, pitch type, pitcher attributes, infield shift, fielding, and speed. */
 export function evaluateBuntOdds(input: BuntOddsInput): BuntOddsBreakdown {
   const effBunt = clampNumber(input.batter.ratings.bunt + input.extraBuntBonus, 15, 99);
   const buntDelta = effBunt - 60;
-  const { qualityDiff, highHeatRisk } = computePitchBuntPressure(
-    input.pitchType,
-    input.pitchQuality,
-    input.pitchTarget,
-  );
+  const eyeDelta = input.batter.ratings.eye - 60;
+  const contactDelta = input.batter.ratings.contact - 60;
+  const { whiffPressure, popUpPressure, foulPressure } = computePitchBuntPressure(input);
 
-  // Neutral baseline: 5% whiff, 20% foul, 15% infield pop-up, 60% in play
-  const whiffProb = clampNumber(0.05 - buntDelta * 0.0012 + qualityDiff * 0.028 + highHeatRisk * 0.6, 0.01, 0.18);
-  const foulProb = clampNumber(0.20 - buntDelta * 0.0022 + qualityDiff * 0.042, 0.08, 0.35);
-  const popUpProb = clampNumber(0.15 - buntDelta * 0.0020 + qualityDiff * 0.036 + highHeatRisk, 0.04, 0.30);
+  const batterWhiffEdge = buntDelta * 0.00055 + eyeDelta * 0.00025;
+  const batterPopUpEdge = buntDelta * 0.00105 + contactDelta * 0.00045;
+  const batterFoulEdge = buntDelta * 0.002 + contactDelta * 0.0006;
+
+  // Neutral baseline: 2% whiff, 20% foul, 5% infield pop-up, 73% in play
+  const whiffProb = clampNumber(0.02 - batterWhiffEdge + whiffPressure, 0.005, 0.1);
+  const foulProb = clampNumber(0.2 - batterFoulEdge + foulPressure, 0.08, 0.34);
+  const popUpProb = clampNumber(0.05 - batterPopUpEdge + popUpPressure, 0.01, 0.16);
 
   const whiffPct = Math.round(whiffProb * 100);
   const foulPct = Math.round(foulProb * 100);

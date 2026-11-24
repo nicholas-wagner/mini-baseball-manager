@@ -30,6 +30,13 @@ export function selectDiamondPlay(outcome?: AtBatOutcome, contact?: BattedBallTy
   if (outcome === 'double_play' || outcome === 'ground_out' || outcome === 'bunt_out') return outcome;
 }
 
+export function isBuntEvent(event?: PlayEvent): boolean {
+  if (!event) return false;
+  if (event.outcome === 'bunt_single' || event.outcome === 'bunt_out') return true;
+  if (event.ballFlight?.style === 'ninja_bunt') return true;
+  return Boolean(event.mathBreakdown?.activeModifiers?.some((tag) => /\bbunt\b/i.test(tag)));
+}
+
 export interface DiamondPlay {
   kind: DiamondPlayKind;
   legs: Leg[];
@@ -42,6 +49,7 @@ export interface DiamondPlay {
   leadArrival: number;
   duration: number;
   unassisted: boolean;
+  buntAttempt?: boolean;
   holdForceCall?: boolean;
   reliefStrikeout?: boolean;
   runnerToThird?: 1 | 2;
@@ -57,7 +65,8 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
   if (kind === 'bullpen') return bullpenPlay();
   const plate = release + (pitchInfo ? pitchSeconds(pitchInfo.mph) : .56);
   const pitch: Leg = {from:'P', to:'BAT', start:release, end:plate, kind:'pitch', pitch:pitchInfo};
-  if (isCloseKind(kind)) return buildClosePlay(kind, pitch, stealBase);
+  const buntAttempt = kind === 'bunt_out' || kind === 'bunt_single' || isBuntEvent(event);
+  if (isCloseKind(kind)) return buildClosePlay(kind, pitch, stealBase, buntAttempt);
   if (isOutfieldKind(kind)) return buildOutfieldPlay(kind, pitch, event);
   const pop = kind === 'pop_up';
   const bunt = kind === 'bunt_out' || kind === 'bunt_single';
@@ -87,16 +96,18 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
   const fieldAt = bunt
     ? { x: -4.25, y: 0.04, z: -4.9 }
     : pop && pickup === 'C'
-      ? { x: 0.45, y: 0.04, z: -1.6 }
+      ? { x: -0.65, y: 0.04, z: -2.1 }
       : pop && pickup === 'P'
-        ? { x: 0.35, y: 0.24, z: -8.1 }
+        ? { x: -0.45, y: 0.1, z: -7.2 }
         : { x: starts[pickup].x * (pickup === 'SS' && !pop ? 1.39 : .82), y: .04, z: starts[pickup].z + 3.9 };
   if (error) {
     const loose = { x:fieldAt.x+.95, y:.14, z:fieldAt.z+.8 };
     legs.push({ from:pickup,to:pickup,start:pickupAt,end:pickupAt+.44,kind:'bounce',endPoint:loose },
       { from:pickup,to:pickup,start:pickupAt+.44,end:finish,kind:'ground',startPoint:loose });
   }
-  return { kind, legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted, duration: finish + (error ? 1.75 : 1.05),
+  return { kind, legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
+    buntAttempt: buntAttempt || undefined,
+    duration: finish + (error ? 1.75 : 1.05),
     batterArrival: kind === 'bunt_single' ? finish-.34 : finish + 0.37, leadArrival: receiveAt + 0.28 };
 }
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
@@ -158,7 +169,27 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
       return {pos,yaw:headingToward(pos,play.fieldAt),clip:time < relay.end-.25 ? 'field_ready' as const : 'catch_receive' as const,local:.22};
     }
   }
-  if (actor === 'C') return { pos, yaw: Math.PI, clip: 'field_ready' as const, local: time };
+  if (actor === 'C') {
+    if (play.pickup === 'C') {
+      const startAt = plate + 0.06;
+      const arrive = play.pickupAt - 0.34;
+      const receive = play.legs.find((leg) => leg.to === 'C');
+      if (receive && time >= receive.end - 0.32) {
+        return { pos: play.fieldAt, yaw: Math.PI, clip: 'field_pop' as const, local: Math.max(0, time - receive.end + 0.32) };
+      }
+      const u = progress(time, startAt, arrive);
+      if (u > 0) {
+        return {
+          pos: between(pos, play.fieldAt, u),
+          yaw: u < 1 ? headingToward(pos, play.fieldAt) : Math.PI,
+          clip: u < 1 ? 'field_run' as const : 'field_pop' as const,
+          local: Math.max(0, time - startAt),
+        };
+      }
+      return { pos, yaw: Math.PI, clip: 'catch_target' as const, local: time };
+    }
+    return { pos, yaw: Math.PI, clip: 'field_ready' as const, local: time };
+  }
   let clip: CharacterAnimClip = 'field_ready';
   let local = time;
   let yaw = actor === '1B' && play.pickup !== '1B' ? -2.1 : 0;
@@ -169,6 +200,29 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     return runBases(BASE_PATH_VERTICES[3],3,4,time,play.pickupAt+.08,play.leadArrival);
   }
   if (actor === 'P') {
+    if (play.pickup === 'P') {
+      const startAt = Math.max(CLIP_DURATIONS.pitch_windup, plate + 0.06);
+      const arrive = play.pickupAt - 0.34;
+      const receive = play.legs.find((leg) => leg.to === 'P');
+      if (time < startAt) {
+        return {
+          pos,
+          yaw: 0,
+          clip: time < CLIP_DURATIONS.pitch_windup ? 'pitch_windup' as const : 'field_ready' as const,
+          local: time,
+        };
+      }
+      if (receive && time >= receive.end - 0.32) {
+        return { pos: play.fieldAt, yaw: 0, clip: 'field_pop' as const, local: Math.max(0, time - receive.end + 0.32) };
+      }
+      const u = progress(time, startAt, arrive);
+      return {
+        pos: between(pos, play.fieldAt, u),
+        yaw: u < 1 ? headingToward(pos, play.fieldAt) : 0,
+        clip: u < 1 ? 'field_run' as const : 'field_pop' as const,
+        local: Math.max(0, time - startAt),
+      };
+    }
     if (play.pickup === '1B' && time > plate+.12) {
       const bag = {...first,x:first.x-.27,z:first.z-.18};
       const u = progress(time,plate+.12,play.receiveAt-.16);
@@ -184,7 +238,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     const arrival = lead ? play.leadArrival : play.batterArrival;
     const go = plate + (lead ? 0.04 : 0.20);
     if (!lead && time < go) {
-      const swing: CharacterAnimClip = (play.kind === 'bunt_out' || play.kind === 'bunt_single') ? 'bat_bunt' : play.kind === 'home_run' ? 'bat_bomb' : 'bat_swing';
+      const swing: CharacterAnimClip = (play.kind === 'bunt_out' || play.kind === 'bunt_single' || play.buntAttempt) ? 'bat_bunt' : play.kind === 'home_run' ? 'bat_bomb' : 'bat_swing';
       local = time - plate + CLIP_DURATIONS[swing] * 0.45;
       clip = local < 0 ? 'bat_stance' : swing;
       pos = start;

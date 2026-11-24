@@ -3,7 +3,7 @@ import { closeKindFor, stealFrom } from './plateAndSteals';
 import { BASE_PATH_VERTICES, CATCHER_HOME, OUTFIELD_STARTS, PITCHING_RUBBER } from './diamondLayout';
 export { BASE_PATH_VERTICES } from './diamondLayout';
 import { selectOutfieldKind } from './outfieldPlay';
-import { diamondPlay, type DiamondPlay, selectDiamondPlay, type DiamondPlayKind } from './diamondPlay';
+import { diamondPlay, isBuntEvent, type DiamondPlay, selectDiamondPlay, type DiamondPlayKind } from './diamondPlay';
 import type { FieldPosition } from '../../engine/handedness/types';
 import type { AtBatOutcome, PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { BallVfxStyle } from '../../engine/vfx/types';
@@ -283,6 +283,7 @@ export function choreographPlayEvent(
 
   if (event.outcome && OUTCOME_PRESETS[event.outcome]) {
     const preset = OUTCOME_PRESETS[event.outcome];
+    const isBunt = isBuntEvent(event);
     const infield = selectDiamondPlay(event.outcome, event.battedBallType, event.fieldingHighlight?.fielderPos);
     const kind = selectOutfieldKind(event);
     const outfield = kind ? diamondPlay(kind, undefined, event) : undefined;
@@ -308,7 +309,15 @@ export function choreographPlayEvent(
         ? 'over_shoulder_batter'
         : preset.cameraPreset,
       pitcherClip: close ? 'pitch_windup' : preset.pitcherClip,
-      batterClip: close ? close.kind === 'swinging_third' || close.kind === 'foul_back' ? 'bat_swing' : 'bat_stance' : preset.batterClip,
+      batterClip: close
+        ? close.kind === 'swinging_third' || close.kind === 'foul_back' || close.kind === 'missed_pitch'
+          ? isBunt
+            ? 'bat_bunt'
+            : 'bat_swing'
+          : 'bat_stance'
+        : isBunt
+          ? 'bat_bunt'
+          : preset.batterClip,
       fielderClip: event.fieldingHighlight?.anim ?? preset.fielderClip,
       highlightFielderPos: event.fieldingHighlight?.fielderPos,
       ballStyle: event.ballFlight?.style ?? preset.ballStyle,

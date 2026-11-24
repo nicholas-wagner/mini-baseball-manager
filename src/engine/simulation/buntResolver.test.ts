@@ -18,8 +18,8 @@ function makeTestPlayer(
 }
 
 describe('TASK-081 — Realistic Bunt Engine (Whiff / Foul / Pop-Up / Speed / Fielding / Shift / Pitch Quality)', () => {
-  it('centers baseline bunt probabilities around ~5% whiff, ~20% foul, ~15% pop-up and ~60% in-play for a neutral 60-rated matchup', () => {
-    const batter = makeTestPlayer(10, 'CF', { bunt: 60, speed: 60 });
+  it('centers baseline bunt probabilities at 2% whiff, 20% foul, 5% pop-up and 73% in-play for a neutral 60-rated matchup', () => {
+    const batter = makeTestPlayer(10, 'CF', { bunt: 60, contact: 60, eye: 60, speed: 60 });
     const pitcher = makeTestPlayer(20, 'SP', { velocity: 60, movement: 60, control: 60, fielding: 60 });
     const charger = makeTestPlayer(30, '3B', { fielding: 60, range: 60, arm: 60 });
 
@@ -37,15 +37,54 @@ describe('TASK-081 — Realistic Bunt Engine (Whiff / Foul / Pop-Up / Speed / Fi
       hasRunners: true,
     });
 
-    expect(odds.whiffPct).toBeGreaterThanOrEqual(4);
-    expect(odds.whiffPct).toBeLessThanOrEqual(6);
-    expect(odds.foulPct).toBeGreaterThanOrEqual(18);
-    expect(odds.foulPct).toBeLessThanOrEqual(22);
-    expect(odds.popUpPct).toBeGreaterThanOrEqual(13);
-    expect(odds.popUpPct).toBeLessThanOrEqual(17);
-    expect(odds.inPlayPct).toBeGreaterThanOrEqual(56);
-    expect(odds.inPlayPct).toBeLessThanOrEqual(64);
+    expect(odds.whiffPct).toBe(2);
+    expect(odds.foulPct).toBe(20);
+    expect(odds.popUpPct).toBe(5);
+    expect(odds.inPlayPct).toBe(73);
     expect(odds.whiffPct + odds.foulPct + odds.popUpPct + odds.inPlayPct).toBe(100);
+  });
+
+  it('independently scales bunt whiff and pop-up rates by batter attributes, pitch type, and pitcher attributes', () => {
+    const avgBatter = makeTestPlayer(41, 'CF', { bunt: 60, contact: 60, eye: 60, speed: 60 });
+    const slickBatter = makeTestPlayer(42, 'CF', { bunt: 90, contact: 88, eye: 85, speed: 60 });
+    const poorBatter = makeTestPlayer(43, '1B', { bunt: 28, contact: 38, eye: 38, speed: 60 });
+    const avgPitcher = makeTestPlayer(44, 'SP', { velocity: 60, movement: 60, control: 60 });
+    const acePitcher = makeTestPlayer(45, 'SP', { velocity: 95, movement: 94, control: 90 });
+    const softPitcher = makeTestPlayer(46, 'SP', { velocity: 35, movement: 36, control: 40 });
+    const charger = makeTestPlayer(47, '3B', { fielding: 60, range: 60, arm: 60 });
+    const baseInput = {
+      batter: avgBatter,
+      pitcher: avgPitcher,
+      pitchType: 'two_seam' as const,
+      pitchQuality: 60,
+      pitchTarget: 'attack_zone' as const,
+      defenseShift: 'standard' as const,
+      charger,
+      firstBaseBonus: 0,
+      extraBuntBonus: 0,
+      outs: 0,
+      hasRunners: false,
+    };
+
+    // 1. Individual player (batter) attributes
+    const slickOdds = evaluateBuntOdds({ ...baseInput, batter: slickBatter });
+    const poorOdds = evaluateBuntOdds({ ...baseInput, batter: poorBatter });
+    expect(poorOdds.whiffPct).toBeGreaterThan(slickOdds.whiffPct);
+    expect(poorOdds.popUpPct).toBeGreaterThan(slickOdds.popUpPct);
+
+    // 2. Pitch type
+    const changeupOdds = evaluateBuntOdds({ ...baseInput, pitchType: 'changeup' });
+    const fourSeamOdds = evaluateBuntOdds({ ...baseInput, pitchType: 'four_seam' });
+    const knuckleOdds = evaluateBuntOdds({ ...baseInput, pitchType: 'knuckleball' });
+    expect(fourSeamOdds.popUpPct).toBeGreaterThan(changeupOdds.popUpPct);
+    expect(knuckleOdds.whiffPct).toBeGreaterThan(changeupOdds.whiffPct);
+    expect(knuckleOdds.popUpPct).toBeGreaterThan(changeupOdds.popUpPct);
+
+    // 3. Pitcher attributes (even with identical pitchQuality & pitchType)
+    const softPitcherOdds = evaluateBuntOdds({ ...baseInput, pitcher: softPitcher });
+    const acePitcherOdds = evaluateBuntOdds({ ...baseInput, pitcher: acePitcher });
+    expect(acePitcherOdds.whiffPct).toBeGreaterThan(softPitcherOdds.whiffPct);
+    expect(acePitcherOdds.popUpPct).toBeGreaterThan(softPitcherOdds.popUpPct);
   });
 
   it('scales bunt hit, whiff, foul, and pop-up odds by infield alignment, defender fielding/arm, batter speed, bunt skill, and pitch quality', () => {
@@ -126,7 +165,7 @@ describe('TASK-081 — Realistic Bunt Engine (Whiff / Foul / Pop-Up / Speed / Fi
     const charger = makeTestPlayer(35, '3B', { fielding: 62, range: 60, arm: 64 });
 
     const counts = { whiff: 0, foul: 0, pop: 0, popByPitcherOrCatcher: 0, single: 0, out: 0 };
-    for (let i = 0; i < 400; i += 1) {
+    for (let i = 0; i < 1000; i += 1) {
       const res = resolveBuntPitch({
         rng: createSeededRng(5000 + i),
         batter,
@@ -157,13 +196,15 @@ describe('TASK-081 — Realistic Bunt Engine (Whiff / Foul / Pop-Up / Speed / Fi
       else if (res.outcome === 'bunt_out') counts.out += 1;
     }
 
-    expect(counts.whiff).toBeGreaterThan(5);
-    expect(counts.foul).toBeGreaterThan(30);
-    expect(counts.pop).toBeGreaterThan(20);
+    expect(counts.whiff).toBeGreaterThan(8);
+    expect(counts.whiff).toBeLessThan(65);
+    expect(counts.foul).toBeGreaterThan(120);
+    expect(counts.pop).toBeGreaterThan(30);
+    expect(counts.pop).toBeLessThan(120);
     // Pitcher or catcher catches the vast majority (>= 85%) of popped-up bunts
     expect(counts.popByPitcherOrCatcher / counts.pop).toBeGreaterThanOrEqual(0.85);
-    expect(counts.single).toBeGreaterThan(20);
-    expect(counts.out).toBeGreaterThan(50);
+    expect(counts.single).toBeGreaterThan(100);
+    expect(counts.out).toBeGreaterThan(250);
 
     // 2-strike bunt foul MUST trigger automatic strikeout!
     let sawTwoStrikeBuntK = false;

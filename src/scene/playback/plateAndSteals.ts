@@ -39,7 +39,7 @@ const fraction = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
 function mix(a: Vec3, b: Vec3, u: number): Vec3 {
   return { x: a.x + (b.x-a.x)*u, y: a.y + (b.y-a.y)*u, z: a.z + (b.z-a.z)*u };
 }
-export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1): DiamondPlay {
+export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1, buntAttempt = false): DiamondPlay {
   const steal = kind === 'steal_safe' || kind === 'steal_out';
   const fieldAt = bags[fromBase + 1];
   const pickup = steal ? (['2B', '3B', 'C'] as const)[fromBase - 1] : 'C';
@@ -57,7 +57,7 @@ export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1):
   const batterArrival = plate + 2.85;
   const duration = kind === 'ball_four' ? batterArrival + .45 : steal ? tagAt + 1.38 : returns ? plate+1.94 : plate+1.45;
   return { kind, close: { kind, fromBase, steal, decisionAt: finish }, legs, pickup, fieldAt, pickupAt: plate,
-    receiveAt, finish, leadArrival, batterArrival, duration, unassisted: false };
+    receiveAt, finish, leadArrival, batterArrival, duration, unassisted: false, buntAttempt: buntAttempt || undefined };
 }
 export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor, time: number, bats: EffectiveBatSide, start: Vec3): Pose {
   const plate = play.legs[0].end;
@@ -69,9 +69,10 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
   if (actor === 'P') return time < CLIP_DURATIONS.pitch_windup ? pose('pitch_windup') : pose('field_ready');
   if (actor === 'BAT') {
     const swing = close.kind === 'foul_back' || close.kind === 'swinging_third' || close.kind === 'missed_pitch';
-    const swingTime = since + CLIP_DURATIONS.bat_swing * .48 + (play.legs[0].pitch?.pitchType === 'changeup' ? .19 : 0);
-    if (swing && swingTime >= 0 && swingTime < CLIP_DURATIONS.bat_swing)
-      return pose('bat_swing', swingTime, box.position, box.yaw);
+    const swingClip: CharacterAnimClip = play.buntAttempt ? 'bat_bunt' : 'bat_swing';
+    const swingTime = since + CLIP_DURATIONS[swingClip] * .48 + (!play.buntAttempt && play.legs[0].pitch?.pitchType === 'changeup' ? .19 : 0);
+    if (swing && swingTime >= 0 && swingTime < CLIP_DURATIONS[swingClip])
+      return pose(swingClip, swingTime, box.position, box.yaw);
     if (close.kind === 'ball_four' && since >= .48) {
       const stride = runBases(box.position, 0, 1, time, plate+.48, play.batterArrival);
       stride.local *= .73;
