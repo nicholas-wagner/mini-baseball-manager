@@ -80,10 +80,11 @@ export function buildOutfieldPlay(kind: OutfieldKind, pitch: Leg, event?: PlayEv
   if (!caught && !homer) {
     legs.push({ kind: 'bounce', from: pickup, to: pickup, start: landAt, end: pickupAt, startPoint: landing });
   }
-  const relay = !homer && (!caught || kind === 'sac_fly');
+  const tagOutDp = caught && event?.outsAfter !== undefined && event?.outsBefore !== undefined && event.outsAfter - event.outsBefore >= 2;
+  const relay = !homer && (!caught || kind === 'sac_fly' || tagOutDp);
   const receiveAt = relay ? pickupAt + 1.32 : pickupAt;
   if (relay) legs.push({
-    kind: 'throw', from: pickup, to: pickup === 'RF' ? '2B' : 'SS',
+    kind: 'throw', from: pickup, to: tagOutDp ? 'C' : pickup === 'RF' ? '2B' : 'SS',
     start: pickupAt + .48, end: receiveAt
   });
   const go = pitch.end + .20;
@@ -95,8 +96,8 @@ export function buildOutfieldPlay(kind: OutfieldKind, pitch: Leg, event?: PlayEv
     kind, pickup, fieldAt, legs, pickupAt, receiveAt, batterArrival, leadArrival,
     finish, duration: finish + .72, unassisted: false,
     outfield: {
-      bags: preset.bags, catchClip, call: event?.specialPowerTriggered?.calloutText ?? preset.call,
-      callColor: event?.specialPowerTriggered?.vfxColor ?? (caught ? '#167457' : '#E7A516'), caught, wall
+      bags: preset.bags, catchClip, call: event?.specialPowerTriggered?.calloutText ?? (tagOutDp ? 'OUT AT HOME!' : preset.call),
+      callColor: event?.specialPowerTriggered?.vfxColor ?? (tagOutDp ? '#C1394C' : caught ? '#167457' : '#E7A516'), caught, wall
     }
   };
 }

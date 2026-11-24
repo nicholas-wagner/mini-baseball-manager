@@ -66,6 +66,7 @@ import {
   type StealPlayType,
 } from './baserunning';
 import { resolveBuntPitch } from './buntResolver';
+import { resolveAirOutWithTagUp } from './sacFlyResolver';
 import {
   evaluateArcadeTimingEffect,
   evaluateBatterGuessEffect,
@@ -100,7 +101,15 @@ export interface PitchResolution {
   totalBases?: 1 | 2 | 3 | 4;
   outsAdded: number;
   runnerId?: string;
-  advanceOnOut?: 'sac_fly' | 'double_play' | 'sac_bunt' | 'none';
+  advanceOnOut?:
+    | 'sac_fly'
+    | 'sac_fly_out_home'
+    | 'tag_up_2b'
+    | 'tag_up_out_3b'
+    | 'double_play'
+    | 'sac_bunt'
+    | 'bunt_fc_lead_out'
+    | 'none';
   stealSuccess?: boolean;
   stealResolution?: StealPlayResolution;
   commentary: string;
@@ -425,17 +434,45 @@ function buildSimpleOut(
   };
 }
 
+function lookupBaseRunner(ctx: PitchResolverContext, baseIndex: 0 | 1 | 2): Player | null {
+  const runnerId = ctx.bases[baseIndex];
+  return runnerId ? (ctx.battingPlayersById?.[runnerId] ?? null) : null;
+}
+
+function maybeResolveTagUpOut(
+  ctx: PitchResolverContext,
+  battedBallType: BattedBallType,
+  powers: PowerBundle,
+): PitchResolution | null {
+  const ofSpot = ctx.rng.pick(OUTFIELD_SPOTS);
+  const outfielder = ctx.outfielders?.[ofSpot.pos as 'LF' | 'CF' | 'RF'] ?? ctx.defender;
+  const effectiveArm =
+    outfielder.ratings.arm +
+    powers.defenderHeritage.defenderArmDelta +
+    powers.defenderCaps.defenderArmDelta +
+    powers.defenderRelics.arm;
+  return resolveAirOutWithTagUp({
+    rng: ctx.rng,
+    batter: ctx.batter,
+    outs: ctx.outs,
+    bases: ctx.bases,
+    battedBallType,
+    outfieldSpot: ofSpot,
+    outfielder,
+    effectiveArm,
+    catcher: ctx.catcher,
+    thirdBaseRunner: lookupBaseRunner(ctx, 2),
+    secondBaseRunner: lookupBaseRunner(ctx, 1),
+  });
+}
+
 function resolveOutOrError(
-  rng: SeededRng,
-  batter: Player,
-  outs: number,
-  bases: BaseState,
-  defender: Player,
-  defenderPos: Exclude<FieldPosition, 'SP' | 'RP'>,
+  ctx: PitchResolverContext,
   luckErrorMultiplier: number,
   battedBallType: BattedBallType,
   powers: PowerBundle,
 ): PitchResolution {
+  const { rng, batter, outs, bases, defender, defenderPos } = ctx;
   const posEval = evaluatePositionAssignment(defender, defenderPos);
   const effectiveFielding =
     defender.ratings.fielding +
@@ -487,29 +524,7 @@ function resolveOutOrError(
     };
   }
 
-  const effectiveArm =
-    defender.ratings.arm +
-    powers.defenderHeritage.defenderArmDelta +
-    powers.defenderCaps.defenderArmDelta +
-    powers.defenderRelics.arm;
-  const armSuppress = (effectiveArm - 65) * 0.0025;
-  const sacChance = battedBallType === 'fly_ball' ? clampProb(0.34 - armSuppress, 0.1, 0.48) : 0.08;
-  if (outs < 2 && bases[2] !== null && rng.chance(sacChance)) {
-    const ofSpot = rng.pick(OUTFIELD_SPOTS);
-    return {
-      kind: 'plate_complete',
-      outcome: 'sac_fly',
-      outsAdded: 1,
-      advanceOnOut: 'sac_fly',
-      battedBallType: 'fly_ball',
-      commentary: `Deep fly ball — caught, and the runner tags from third on a sac fly!`,
-      soundCue: 'glove_pop',
-      ballFlight: { style: 'line_drive', landingX: ofSpot.x, landingZ: ofSpot.z, apexY: 11.5, durationSec: 1.4 },
-      fieldingHighlight: { fielderId: defender.id, fielderPos: ofSpot.pos, anim: 'field_run' },
-    };
-  }
-
-  return buildSimpleOut(rng, batter, defender, battedBallType);
+  return maybeResolveTagUpOut(ctx, battedBallType, powers) ?? buildSimpleOut(rng, batter, defender, battedBallType);
 }
 
 export interface PitchResolverContext {
@@ -519,6 +534,7 @@ export interface PitchResolverContext {
   catcher: Player;
   defender: Player;
   defenderPos: Exclude<FieldPosition, 'SP' | 'RP'>;
+  outfielders?: Readonly<Record<'LF' | 'CF' | 'RF', Player>>;
   firstBaseRunner: Player | null;
   balls: number;
   strikes: number;
@@ -800,12 +816,7 @@ function resolveContactResult(
     return hit;
   }
   return resolveOutOrError(
-    ctx.rng,
-    ctx.batter,
-    ctx.outs,
-    ctx.bases,
-    ctx.defender,
-    ctx.defenderPos,
+    ctx,
     defenderLuckErrMult,
     battedBallType,
     powers,
@@ -1270,6 +1281,8 @@ function resolveBuntCall(
     fullPowers.batterCaps.buntBonus +
     fullPowers.batterRelics.bunt +
     (fullPowers.batterSurge?.buntBonus ?? 0);
+  const thirdBaseRunner = lookupBaseRunner(ctx, 2);
+  const leadRunner = thirdBaseRunner ?? lookupBaseRunner(ctx, 1) ?? lookupBaseRunner(ctx, 0);
   return attachPitchTelemetry(
     decorateActivePowerOutcome(
       resolveBuntPitch({
@@ -1277,6 +1290,8 @@ function resolveBuntCall(
         batter: ctx.batter,
         pitcher: ctx.pitcher,
         catcher: ctx.catcher,
+        leadRunner,
+        thirdBaseRunner,
         pitchType,
         pitchSpeedMph: adjustedMatchup.mph,
         pitchQuality,

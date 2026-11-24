@@ -52,6 +52,17 @@ it('marks the actual batter destination even when a single advances on a throw',
     label: 'Bunt pop-up',
     lamp: 'outs',
   });
+  expect(
+    playReadout({
+      ...event,
+      outcome: 'fly_out',
+      outsBefore: 0,
+      outsAfter: 2,
+    }),
+  ).toMatchObject({
+    label: 'Thrown out tagging',
+    lamp: 'outs',
+  });
   expect(playReadout({ ...event, outcome: undefined, type: 'pitching_change' })).toBeNull();
 });
 

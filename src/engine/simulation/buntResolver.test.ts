@@ -3,7 +3,11 @@ import { createPlayer } from '../gm/rosterFactory';
 import { generateSixTierWorld } from '../league/seasonEngine';
 import { createSeededRng } from '../rng/seededRng';
 import { createGameSession, stepPitch } from './baseballEngine';
-import { evaluateBuntOdds, resolveBuntPitch } from './buntResolver';
+import {
+  evaluateBuntOdds,
+  formatBuntPreviewSummary,
+  resolveBuntPitch,
+} from './buntResolver';
 
 function makeTestPlayer(
   seed: number,
@@ -203,7 +207,7 @@ describe('TASK-081 — Realistic Bunt Engine (Whiff / Foul / Pop-Up / Speed / Fi
     expect(counts.pop).toBeLessThan(120);
     // Pitcher or catcher catches the vast majority (>= 85%) of popped-up bunts
     expect(counts.popByPitcherOrCatcher / counts.pop).toBeGreaterThanOrEqual(0.85);
-    expect(counts.single).toBeGreaterThan(100);
+    expect(counts.single).toBeGreaterThan(60);
     expect(counts.out).toBeGreaterThan(250);
 
     // 2-strike bunt foul MUST trigger automatic strikeout!
@@ -262,5 +266,152 @@ describe('TASK-081 — Realistic Bunt Engine (Whiff / Foul / Pop-Up / Speed / Fi
       }
     }
     expect(sawSacAdvance).toBe(true);
+  });
+
+  it('makes bunting for a hit hard unless fast (and much harder with infield in), while sacrifice advancing a runner is far more achievable', () => {
+    const slowBatter = makeTestPlayer(51, '1B', { bunt: 55, contact: 60, eye: 60, speed: 38 });
+    const avgBatter = makeTestPlayer(52, 'CF', { bunt: 60, contact: 60, eye: 60, speed: 60 });
+    const fastBatter = makeTestPlayer(53, 'CF', { bunt: 82, contact: 72, eye: 70, speed: 92 });
+    const avgRunner = makeTestPlayer(54, 'CF', { speed: 62 });
+    const pitcher = makeTestPlayer(55, 'SP', { velocity: 60, movement: 60, control: 60 });
+    const charger = makeTestPlayer(56, '3B', { fielding: 62, range: 62, arm: 62 });
+
+    const base = {
+      pitcher,
+      pitchType: 'two_seam' as const,
+      pitchQuality: 60,
+      pitchTarget: 'attack_zone' as const,
+      charger,
+      leadRunner: avgRunner,
+      firstBaseBonus: 0,
+      extraBuntBonus: 0,
+      outs: 0,
+      hasRunners: true,
+    };
+
+    const slowStd = evaluateBuntOdds({ ...base, batter: slowBatter, defenseShift: 'standard' });
+    const avgStd = evaluateBuntOdds({ ...base, batter: avgBatter, defenseShift: 'standard' });
+    const avgIn = evaluateBuntOdds({ ...base, batter: avgBatter, defenseShift: 'infield_in' });
+    const fastStd = evaluateBuntOdds({ ...base, batter: fastBatter, defenseShift: 'standard' });
+    const fastIn = evaluateBuntOdds({ ...base, batter: fastBatter, defenseShift: 'infield_in' });
+
+    // Bunting for a hit is very hard for slow/average runners, viable for fast runners
+    expect(slowStd.buntSinglePct).toBeLessThanOrEqual(4);
+    expect(avgStd.buntSinglePct).toBeLessThanOrEqual(11);
+    expect(fastStd.buntSinglePct).toBeGreaterThanOrEqual(26);
+
+    // Much harder to beat out a bunt hit with the infield drawn in!
+    expect(avgIn.buntSinglePct).toBeLessThanOrEqual(Math.ceil(avgStd.buntSinglePct * 0.55));
+    expect(fastIn.buntSinglePct).toBeLessThanOrEqual(Math.ceil(fastStd.buntSinglePct * 0.55));
+
+    // Sacrificing a runner to the next base is MUCH easier than bunting for a hit!
+    expect(avgStd.sacAdvancePct).toBeGreaterThanOrEqual(avgStd.buntSinglePct * 4);
+    expect(formatBuntPreviewSummary(avgStd)).toMatch(/Sac/i);
+  });
+
+  it('makes squeezing a runner home from 3B difficult without a fast runner coming home, and cuts down slow runners at the plate', () => {
+    const avgBatter = makeTestPlayer(61, 'CF', { bunt: 64, contact: 60, eye: 60, speed: 60 });
+    const slowThird = makeTestPlayer(62, '1B', { speed: 35 });
+    const avgThird = makeTestPlayer(63, '3B', { speed: 60 });
+    const fastThird = makeTestPlayer(64, 'CF', { speed: 92 });
+    const pitcher = makeTestPlayer(65, 'SP', { velocity: 60, movement: 60, control: 60 });
+    const charger = makeTestPlayer(66, '3B', { fielding: 64, range: 64, arm: 64 });
+    const catcher = createPlayer(createSeededRng(67), { position: 'C', tier: 'aa' });
+
+    const base = {
+      batter: avgBatter,
+      pitcher,
+      catcher,
+      pitchType: 'two_seam' as const,
+      pitchQuality: 60,
+      pitchTarget: 'attack_zone' as const,
+      charger,
+      firstBaseBonus: 0,
+      extraBuntBonus: 0,
+      outs: 0,
+      hasRunners: true,
+    };
+
+    const slowSqStd = evaluateBuntOdds({
+      ...base,
+      defenseShift: 'standard',
+      leadRunner: slowThird,
+      thirdBaseRunner: slowThird,
+    });
+    const avgSqStd = evaluateBuntOdds({
+      ...base,
+      defenseShift: 'standard',
+      leadRunner: avgThird,
+      thirdBaseRunner: avgThird,
+    });
+    const avgSqIn = evaluateBuntOdds({
+      ...base,
+      defenseShift: 'infield_in',
+      leadRunner: avgThird,
+      thirdBaseRunner: avgThird,
+    });
+    const fastSqStd = evaluateBuntOdds({
+      ...base,
+      defenseShift: 'standard',
+      leadRunner: fastThird,
+      thirdBaseRunner: fastThird,
+    });
+
+    // Squeeze home is tough without speed, even harder with infield in, and strong with a fast 3B runner
+    expect(slowSqStd.squeezeScorePct).toBeLessThanOrEqual(20);
+    expect(avgSqStd.squeezeScorePct).toBeLessThanOrEqual(36);
+    expect(avgSqIn.squeezeScorePct).toBeLessThan(avgSqStd.squeezeScorePct);
+    expect(fastSqStd.squeezeScorePct).toBeGreaterThanOrEqual(slowSqStd.squeezeScorePct * 2.5);
+    expect(formatBuntPreviewSummary(avgSqIn)).toMatch(/Squeeze/i);
+
+    // Live stepPitch squeeze trials: fast runner on 3B scores far more often than slow runner, and failed squeezes cut the runner down at home!
+    const world = generateSixTierWorld(2099, {
+      city: 'Sandlot',
+      clubName: 'Comets',
+      mascot: 'Rocket Dog',
+      monogram: 'SC',
+      primaryColor: '#E63946',
+      secondaryColor: '#1D3557',
+      accentColor: '#FFD166',
+    });
+    const [away, home] = world.leagues.rookie;
+    const thirdId = away.lineup[2].playerId;
+
+    const runSqueezeTrials = (runnerSpeed: number) => {
+      let scored = 0;
+      let cutDownAtHome = 0;
+      for (let i = 0; i < 160; i += 1) {
+        const baseSession = createGameSession(away, home, 8200 + i);
+        const modPlayers = {
+          ...baseSession.away.playersById,
+          [thirdId]: {
+            ...baseSession.away.playersById[thirdId],
+            ratings: { ...baseSession.away.playersById[thirdId].ratings, speed: runnerSpeed },
+          },
+        };
+        const squeezeSpot = {
+          ...baseSession,
+          outs: 0,
+          bases: [null, null, thirdId] as [string | null, string | null, string | null],
+          away: { ...baseSession.away, playersById: modPlayers },
+        };
+        const res = stepPitch(squeezeSpot, 'bunt', { defensiveShift: 'standard' });
+        if (res.nextSession.away.score > 0) {
+          scored += 1;
+        } else if (
+          res.nextSession.outs === 1 &&
+          res.nextSession.bases[2] === null &&
+          res.nextSession.bases[0] !== null
+        ) {
+          cutDownAtHome += 1;
+        }
+      }
+      return { scored, cutDownAtHome };
+    };
+
+    const slowTrials = runSqueezeTrials(34);
+    const fastTrials = runSqueezeTrials(94);
+    expect(slowTrials.cutDownAtHome).toBeGreaterThan(slowTrials.scored);
+    expect(fastTrials.scored).toBeGreaterThan(slowTrials.scored * 2);
   });
 });

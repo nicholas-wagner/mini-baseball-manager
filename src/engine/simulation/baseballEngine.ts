@@ -6,7 +6,6 @@ import {
   PITCHER_ROLE_SHORT_LABELS,
   type GameLengthInnings,
   type GamePressureLevel,
-  type PitchType,
   type PlayerSeasonStats,
 } from '../models/player';
 import { createSeededRng } from '../rng/seededRng';
@@ -43,27 +42,17 @@ import {
   type PitcherBoxLine,
   type TeamGameSide,
 } from './gameState';
+import {
+  chooseAiBattingCall,
+  chooseAiDefensiveShift,
+  chooseAiPitchTarget,
+  isOffensiveTacticalCall,
+  type StepPitchOptions,
+} from './aiManager';
 import { shouldAiAttemptSteal } from './baserunning';
-import type { NemesisMatchupEvaluation } from '../league/nemesisTracker';
-import type {
-  ArcadeTimingInput,
-  BatterPitchGuess,
-  PitchTargetIntent,
-} from './pitchMindGames';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
-import type { WeatherSimulationImpact } from './weather';
-import type { DefensiveShiftId } from './winProbability';
 
-export interface StepPitchOptions {
-  requestedPitchType?: PitchType;
-  requestedPowerId?: string;
-  defensiveShift?: DefensiveShiftId;
-  weatherImpact?: WeatherSimulationImpact;
-  pitchTarget?: PitchTargetIntent;
-  batterGuess?: BatterPitchGuess;
-  nemesisBonus?: NemesisMatchupEvaluation;
-  arcadeTiming?: ArcadeTimingInput;
-}
+export type { StepPitchOptions } from './aiManager';
 
 export function createGameSession(
   awayClub: Club,
@@ -365,6 +354,23 @@ function applyFieldingErrorOutcome(
   recordRunsScored(state, batting, pitcherLine, batterLine, errAdvance.runsScoredIds, false);
 }
 
+function applyBuntFieldersChoiceLeadOut(state: GameSessionState, batterId: string): void {
+  const [b1, b2, b3] = state.bases;
+  if (b3) {
+    state.bases = [batterId, b1, b2];
+    return;
+  }
+  if (b2 && b1) {
+    state.bases = [batterId, b1, null];
+    return;
+  }
+  if (b1) {
+    state.bases = [batterId, null, null];
+    return;
+  }
+  state.bases = [null, b2, null];
+}
+
 function applySacrificeBuntAdvance(
   state: GameSessionState,
   batting: TeamGameSide,
@@ -379,6 +385,63 @@ function applySacrificeBuntAdvance(
   }
   if (runsScoredIds.length > 0) {
     recordRunsScored(state, batting, pitcherLine, batterLine, runsScoredIds, true);
+  }
+}
+
+function applyTagUpBaseMovement(
+  state: GameSessionState,
+  res: PitchResolution,
+  batting: TeamGameSide,
+  batterLine: BatterBoxLine,
+  pitcherLine: PitcherBoxLine,
+): boolean {
+  if (res.advanceOnOut === 'sac_fly' && state.bases[2]) {
+    const scoringId = state.bases[2];
+    state.bases = [state.bases[0], state.bases[1], null];
+    batterLine.atBats = Math.max(0, batterLine.atBats - 1);
+    batterLine.sacFlies += 1;
+    recordRunsScored(state, batting, pitcherLine, batterLine, [scoringId], true);
+    return true;
+  }
+  if (res.advanceOnOut === 'sac_fly_out_home') {
+    state.bases = [state.bases[0], state.bases[1], null];
+    return true;
+  }
+  if (res.advanceOnOut === 'tag_up_2b' && state.bases[1] && !state.bases[2]) {
+    state.bases = [state.bases[0], null, state.bases[1]];
+    return true;
+  }
+  if (res.advanceOnOut === 'tag_up_out_3b') {
+    state.bases = [state.bases[0], null, state.bases[2]];
+    return true;
+  }
+  return false;
+}
+
+function applyOutRunnerMovement(
+  state: GameSessionState,
+  res: PitchResolution,
+  batterId: string,
+  batting: TeamGameSide,
+  batterLine: BatterBoxLine,
+  pitcherLine: PitcherBoxLine,
+): void {
+  if (res.outcome === 'strikeout') {
+    batterLine.strikeouts += 1;
+    pitcherLine.strikeouts += 1;
+    return;
+  }
+  if (res.advanceOnOut === 'double_play') {
+    state.bases = [null, state.bases[1], state.bases[2]];
+    return;
+  }
+  if (applyTagUpBaseMovement(state, res, batting, batterLine, pitcherLine)) return;
+  if (res.advanceOnOut === 'sac_bunt') {
+    applySacrificeBuntAdvance(state, batting, batterLine, pitcherLine);
+    return;
+  }
+  if (res.advanceOnOut === 'bunt_fc_lead_out') {
+    applyBuntFieldersChoiceLeadOut(state, batterId);
   }
 }
 
@@ -421,20 +484,7 @@ function applyRunnerMovementForPlateOutcome(
 
   state.outs += res.outsAdded;
   pitcherLine.outsRecorded += res.outsAdded;
-  if (res.outcome === 'strikeout') {
-    batterLine.strikeouts += 1;
-    pitcherLine.strikeouts += 1;
-  } else if (res.advanceOnOut === 'double_play') {
-    state.bases = [null, state.bases[1], state.bases[2]];
-  } else if (res.advanceOnOut === 'sac_fly' && state.bases[2]) {
-    const scoringId = state.bases[2];
-    state.bases = [state.bases[0], state.bases[1], null];
-    batterLine.atBats -= 1;
-    batterLine.sacFlies += 1;
-    recordRunsScored(state, batting, pitcherLine, batterLine, [scoringId], true);
-  } else if (res.advanceOnOut === 'sac_bunt') {
-    applySacrificeBuntAdvance(state, batting, batterLine, pitcherLine);
-  }
+  applyOutRunnerMovement(state, res, batterId, batting, batterLine, pitcherLine);
 }
 
 function applyPostPlateHypeAndCooldowns(
@@ -814,11 +864,28 @@ const STEAL_TACTICAL_CALLS: ReadonlySet<TacticalCall> = new Set([
   'steal_home',
 ]);
 
-function resolveEffectiveCall(
+function resolveOwnedEffectiveCall(
   rng: ReturnType<typeof createSeededRng>,
   state: GameSessionState,
   requested: TacticalCall,
 ): TacticalCall {
+  const batting = getBattingSide(state);
+  if (batting.isHuman) {
+    return isOffensiveTacticalCall(requested) ? requested : 'normal';
+  }
+  if (requested === 'intentional_walk' || requested === 'pitchout') return requested;
+  return chooseAiBattingCall(rng, state);
+}
+
+function resolveEffectiveCall(
+  rng: ReturnType<typeof createSeededRng>,
+  state: GameSessionState,
+  requested: TacticalCall,
+  enforceSideOwnership: boolean,
+): TacticalCall {
+  if (enforceSideOwnership && state.away.isHuman !== state.home.isHuman) {
+    return resolveOwnedEffectiveCall(rng, state, requested);
+  }
   const batting = getBattingSide(state);
   if (requested !== 'normal' || batting.isHuman) return requested;
   const fielding = getFieldingSide(state);
@@ -837,9 +904,39 @@ function resolveEffectiveCall(
   return aiSteal === 'steal_2b' ? 'steal' : aiSteal;
 }
 
-function resolveStealDefenseCall(call: TacticalCall): 'normal' | 'hold_runner' | 'pitchout' {
+function resolveStealDefenseCall(
+  call: TacticalCall,
+  explicit?: 'normal' | 'hold_runner' | 'pitchout',
+): 'normal' | 'hold_runner' | 'pitchout' {
+  if (explicit) return explicit;
   if (call === 'pitchout' || call === 'hold_runner') return call;
   return 'normal';
+}
+
+function sanitizeStepOptionsForSide(
+  rng: ReturnType<typeof createSeededRng>,
+  state: GameSessionState,
+  options: StepPitchOptions,
+): StepPitchOptions {
+  if (!options.enforceSideOwnership || state.away.isHuman === state.home.isHuman) {
+    return options;
+  }
+  const batting = getBattingSide(state);
+  if (batting.isHuman) {
+    return {
+      ...options,
+      requestedPitchType: undefined,
+      defensiveShift: options.defensiveShift ?? chooseAiDefensiveShift(state),
+      pitchTarget: options.pitchTarget ?? chooseAiPitchTarget(rng, state),
+      stealDefenseCall: 'normal',
+      arcadeTiming: options.arcadeTiming?.actor === 'batter' ? options.arcadeTiming : undefined,
+    };
+  }
+  return {
+    ...options,
+    batterGuess: 'none',
+    arcadeTiming: options.arcadeTiming?.actor === 'pitcher' ? options.arcadeTiming : undefined,
+  };
 }
 
 function recordPitchFatigueIfThrown(
@@ -887,7 +984,8 @@ export function stepPitch(
   const batting = getBattingSide(next);
   const firstBaseRunner = next.bases[0] ? batting.playersById[next.bases[0]] : null;
 
-  const effectiveCall = resolveEffectiveCall(rng, next, tacticalCall);
+  const effectiveCall = resolveEffectiveCall(rng, next, tacticalCall, Boolean(options.enforceSideOwnership));
+  const safeOpts = sanitizeStepOptionsForSide(rng, next, options);
   const leverage = getCurrentLeverage(next).leverageIndex;
   const pitchingLead = fielding.score - batting.score;
   recordPitchFatigueIfThrown(next, effectiveCall, pitcher, fielding, leverage);
@@ -901,6 +999,11 @@ export function stepPitch(
     catcher: getDefenderAtPosition(fielding, 'C'),
     defender: getDefenderAtPosition(fielding, defenderPos),
     defenderPos,
+    outfielders: {
+      LF: getDefenderAtPosition(fielding, 'LF'),
+      CF: getDefenderAtPosition(fielding, 'CF'),
+      RF: getDefenderAtPosition(fielding, 'RF'),
+    },
     firstBaseRunner,
     balls: next.balls,
     strikes: next.strikes,
@@ -916,8 +1019,8 @@ export function stepPitch(
     leverageIndex: leverage,
     tacticalCall: effectiveCall,
     atBatPitchHistory: next.atBatPitchHistory,
-    requestedPitchType: options.requestedPitchType,
-    requestedPowerId: options.requestedPowerId,
+    requestedPitchType: safeOpts.requestedPitchType,
+    requestedPowerId: safeOpts.requestedPowerId,
     battingCoEdSynergy: batting.coEdSynergy,
     fieldingCoEdSynergy: fielding.coEdSynergy,
     battingStaffBonuses: batting.staffBonuses,
@@ -925,17 +1028,17 @@ export function stepPitch(
     battingChemistryBonuses: batting.chemistryBonuses,
     fieldingChemistryBonuses: fielding.chemistryBonuses,
     ballparkId: next.ballparkId,
-    defensiveShift: options.defensiveShift,
-    weatherImpact: options.weatherImpact,
-    pitchTarget: options.pitchTarget,
-    batterGuess: options.batterGuess,
-    nemesisBonus: options.nemesisBonus,
-    arcadeTiming: options.arcadeTiming,
+    defensiveShift: safeOpts.defensiveShift,
+    weatherImpact: safeOpts.weatherImpact,
+    pitchTarget: safeOpts.pitchTarget,
+    batterGuess: safeOpts.batterGuess,
+    nemesisBonus: safeOpts.nemesisBonus,
+    arcadeTiming: safeOpts.arcadeTiming,
     battingGameplan: batting.activeGameplan,
     fieldingGameplan: fielding.activeGameplan,
     battingPlayersById: batting.playersById,
     catcherPopTimeBonus: fielding.catcherPopTimeBonus,
-    stealDefenseCall: resolveStealDefenseCall(tacticalCall),
+    stealDefenseCall: resolveStealDefenseCall(tacticalCall, safeOpts.stealDefenseCall),
   });
 
   events.push(dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
@@ -986,6 +1089,7 @@ export function stepAtBat(
 export function stepHalfInning(
   session: GameSessionState,
   tacticalCall: TacticalCall = 'normal',
+  options?: StepPitchOptions,
 ): { nextSession: GameSessionState; events: PlayEvent[] } {
   if (session.status === 'completed') {
     return { nextSession: session, events: [] };
@@ -994,11 +1098,15 @@ export function stepHalfInning(
   const startInning = session.inning;
   const events: PlayEvent[] = [];
   let current = session;
+  let activeCall: TacticalCall = tacticalCall;
 
   for (let i = 0; i < 60 && current.status === 'in_progress'; i += 1) {
-    const step = stepAtBat(current, tacticalCall);
+    const step = stepAtBat(current, activeCall, options);
     current = step.nextSession;
     events.push(...step.events);
+    if (activeCall === 'bunt' || STEAL_TACTICAL_CALLS.has(activeCall)) {
+      activeCall = 'normal';
+    }
     if (current.half !== startHalf || current.inning !== startInning) break;
   }
   return { nextSession: current, events };

@@ -84,3 +84,12 @@ it('lets the batter keep running until the fly is actually caught', () => {
   expect(caught.pos.x).toBeGreaterThan(before.pos.x);
   expect(actorAt(play, 'BAT', play.duration, 'R').pos).toEqual(caught.pos);
 });
+
+it('throws home from the outfield when a runner tagging up is doubled off', () => {
+  const play = choreographPlayEvent(
+    { ...fly, outcome: 'fly_out', outsBefore: 0, outsAfter: 2, fieldingHighlight: { fielderId: 'rf', fielderPos: 'RF', anim: 'field_run' } },
+    1,
+  ).outfield!;
+  expect(play.legs.at(-1)).toMatchObject({ kind: 'throw', from: 'RF', to: 'C' });
+  expect(play.outfield?.call).toBe('OUT AT HOME!');
+});

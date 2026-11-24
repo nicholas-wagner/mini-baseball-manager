@@ -33,11 +33,13 @@ export function playReadout(event?: PlayEvent | null) {
   const count = strike ? event.strikes : event.balls;
   const words = ['', ' one', ' two', ' three', ' four'];
   const baseLabel =
-    outcome === 'fly_out' && event.battedBallType === 'pop_up'
-      ? isBuntEvent(event)
-        ? 'Bunt pop-up'
-        : 'Pop-up out'
-      : labels[outcome!];
+    outcome === 'fly_out' && outsAfter - outsBefore >= 2
+      ? 'Thrown out tagging'
+      : outcome === 'fly_out' && event.battedBallType === 'pop_up'
+        ? isBuntEvent(event)
+          ? 'Bunt pop-up'
+          : 'Pop-up out'
+        : labels[outcome!];
   const label = steal
     ? outsAfter > outsBefore
       ? 'Caught stealing'

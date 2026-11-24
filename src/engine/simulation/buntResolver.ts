@@ -21,6 +21,9 @@ export interface BuntOddsInput {
   pitchTarget: PitchTargetIntent;
   defenseShift: DefensiveShiftId;
   charger: Pick<Player, 'id' | 'name' | 'position' | 'ratings'>;
+  catcher?: Pick<Player, 'id' | 'name' | 'position' | 'ratings'>;
+  leadRunner?: Pick<Player, 'id' | 'name' | 'ratings'> | null;
+  thirdBaseRunner?: Pick<Player, 'id' | 'name' | 'ratings'> | null;
   firstBaseBonus: number;
   extraBuntBonus: number;
   outs: number;
@@ -34,7 +37,10 @@ export interface BuntOddsBreakdown {
   inPlayPct: number;
   buntSinglePct: number;
   sacAdvancePct: number;
+  squeezeScorePct: number;
   inPlaySingleProb: number;
+  inPlaySacProb: number;
+  inPlaySqueezeProb: number;
   buntRating: number;
   buntGrade: 'S' | 'A' | 'B' | 'C' | 'D';
   shiftLabel: string;
@@ -54,7 +60,7 @@ export interface BuntPitchResolution {
   outcome: AtBatOutcome;
   totalBases?: 1;
   outsAdded: number;
-  advanceOnOut?: 'sac_bunt' | 'none';
+  advanceOnOut?: 'sac_bunt' | 'bunt_fc_lead_out' | 'none';
   commentary: string;
   soundCue: PlaySoundCue;
   pitchThrown: NonNullable<PlayEvent['pitchThrown']>;
@@ -77,11 +83,25 @@ const PITCH_BUNT_PROFILE: Readonly<
   knuckleball: { whiff: 0.018, popUp: 0.02, foul: 0.028 },
 };
 
-const SHIFT_BUNT_SINGLE_DELTA: Readonly<Record<DefensiveShiftId, number>> = {
+const SHIFT_BUNT_SINGLE_MULT: Readonly<Record<DefensiveShiftId, number>> = {
+  standard: 1.0,
+  infield_in: 0.42,
+  no_doubles: 1.32,
+  bunt_defense: 0.25,
+};
+
+const SHIFT_SAC_PENALTY: Readonly<Record<DefensiveShiftId, number>> = {
   standard: 0,
   infield_in: -0.1,
+  no_doubles: 0.05,
+  bunt_defense: -0.18,
+};
+
+const SHIFT_SQUEEZE_DELTA: Readonly<Record<DefensiveShiftId, number>> = {
+  standard: 0,
+  infield_in: -0.22,
   no_doubles: 0.1,
-  bunt_defense: -0.22,
+  bunt_defense: -0.28,
 };
 
 const SHIFT_SHORT_LABELS: Readonly<Record<DefensiveShiftId, string>> = {
@@ -139,7 +159,65 @@ function computePitchBuntPressure(input: BuntOddsInput): {
   };
 }
 
-/** Computes realistic bunt outcome percentages driven by batter skills, pitch type, pitcher attributes, infield shift, fielding, and speed. */
+function computeInPlayBuntSuccessProbs(
+  input: BuntOddsInput,
+  buntDelta: number,
+): { inPlaySingleProb: number; inPlaySacProb: number; inPlaySqueezeProb: number } {
+  const defenderComposite =
+    (input.charger.ratings.fielding +
+      input.charger.ratings.range +
+      input.charger.ratings.arm) /
+    3;
+  const speedDelta = input.batter.ratings.speed - 60;
+  const fastBurst = Math.max(0, input.batter.ratings.speed - 65) * 0.006;
+  const rawSingle = clampNumber(
+    0.11 +
+      speedDelta * 0.0045 +
+      fastBurst +
+      buntDelta * 0.0032 +
+      input.firstBaseBonus * 0.022 -
+      (defenderComposite - 60) * 0.0042,
+    0.02,
+    0.64,
+  );
+  const inPlaySingleProb = clampNumber(
+    rawSingle * SHIFT_BUNT_SINGLE_MULT[input.defenseShift],
+    0.01,
+    0.66,
+  );
+
+  const leadSpeed = input.leadRunner?.ratings.speed ?? 60;
+  const inPlaySacProb = clampNumber(
+    0.84 +
+      buntDelta * 0.004 +
+      (leadSpeed - 60) * 0.003 +
+      SHIFT_SAC_PENALTY[input.defenseShift] -
+      (defenderComposite - 60) * 0.0035,
+    0.42,
+    0.96,
+  );
+
+  const thirdSpeed = input.thirdBaseRunner?.ratings.speed ?? 60;
+  const catcherGlove = input.catcher
+    ? (input.catcher.ratings.fielding + input.catcher.ratings.arm) * 0.5
+    : 60;
+  const squeezeDefense = defenderComposite * 0.7 + catcherGlove * 0.3;
+  const fastSqueezeBurst = Math.max(0, thirdSpeed - 70) * 0.0065;
+  const inPlaySqueezeProb = clampNumber(
+    0.34 +
+      (thirdSpeed - 60) * 0.0085 +
+      fastSqueezeBurst +
+      buntDelta * 0.0038 +
+      SHIFT_SQUEEZE_DELTA[input.defenseShift] -
+      (squeezeDefense - 60) * 0.0048,
+    0.08,
+    0.86,
+  );
+
+  return { inPlaySingleProb, inPlaySacProb, inPlaySqueezeProb };
+}
+
+/** Computes realistic bunt outcome percentages driven by batter skills, pitch type, pitcher attributes, infield shift, fielding, and runner speed. */
 export function evaluateBuntOdds(input: BuntOddsInput): BuntOddsBreakdown {
   const effBunt = clampNumber(input.batter.ratings.bunt + input.extraBuntBonus, 15, 99);
   const buntDelta = effBunt - 60;
@@ -161,27 +239,21 @@ export function evaluateBuntOdds(input: BuntOddsInput): BuntOddsBreakdown {
   const popUpPct = Math.round(popUpProb * 100);
   const inPlayPct = Math.max(15, 100 - whiffPct - foulPct - popUpPct);
 
-  const defenderComposite =
-    (input.charger.ratings.fielding +
-      input.charger.ratings.range +
-      input.charger.ratings.arm) /
-    3;
-  const inPlaySingleProb = clampNumber(
-    0.26 +
-      (input.batter.ratings.speed - 60) * 0.0062 +
-      buntDelta * 0.004 +
-      input.firstBaseBonus * 0.025 +
-      SHIFT_BUNT_SINGLE_DELTA[input.defenseShift] -
-      (defenderComposite - 60) * 0.0055,
-    0.05,
-    0.72,
+  const { inPlaySingleProb, inPlaySacProb, inPlaySqueezeProb } = computeInPlayBuntSuccessProbs(
+    input,
+    buntDelta,
   );
 
   const buntSinglePct = Math.round((inPlayPct / 100) * inPlaySingleProb * 100);
-  const sacAdvancePct =
-    input.hasRunners && input.outs < 2
-      ? Math.max(0, inPlayPct - buntSinglePct)
-      : 0;
+  const inPlayOutPct = Math.max(0, inPlayPct - buntSinglePct);
+  const hasThird = Boolean(input.thirdBaseRunner) && input.outs < 2;
+  const hasSacOpp = input.hasRunners && input.outs < 2;
+  const squeezeScorePct = hasThird
+    ? Math.min(inPlayPct, buntSinglePct + Math.round(inPlayOutPct * inPlaySqueezeProb))
+    : 0;
+  const sacAdvancePct = hasSacOpp
+    ? Math.round(inPlayOutPct * (hasThird ? inPlaySqueezeProb : inPlaySacProb))
+    : 0;
 
   return {
     whiffPct,
@@ -190,7 +262,10 @@ export function evaluateBuntOdds(input: BuntOddsInput): BuntOddsBreakdown {
     inPlayPct,
     buntSinglePct,
     sacAdvancePct,
+    squeezeScorePct,
     inPlaySingleProb,
+    inPlaySacProb,
+    inPlaySqueezeProb,
     buntRating: Math.round(effBunt),
     buntGrade: gradeBuntSkill(effBunt),
     shiftLabel: SHIFT_SHORT_LABELS[input.defenseShift],
@@ -199,8 +274,13 @@ export function evaluateBuntOdds(input: BuntOddsInput): BuntOddsBreakdown {
 
 /** Plain-English 1-line bunt preview shown in LiveActionBar when Bunt is selected. */
 export function formatBuntPreviewSummary(odds: BuntOddsBreakdown): string {
-  const sacBit = odds.sacAdvancePct > 0 ? ` • ${odds.sacAdvancePct}% Sac` : '';
-  return `Bunt (${odds.buntGrade} ${odds.buntRating}): ${odds.buntSinglePct}% Hit${sacBit} • ${odds.popUpPct}% Pop • ${odds.foulPct}% Foul • ${odds.whiffPct}% Whiff (${odds.shiftLabel})`;
+  const runnerBit =
+    odds.squeezeScorePct > 0
+      ? ` • ${odds.squeezeScorePct}% Squeeze Home`
+      : odds.sacAdvancePct > 0
+        ? ` • ${odds.sacAdvancePct}% Sac Advance`
+        : '';
+  return `Bunt (${odds.buntGrade} ${odds.buntRating}): ${odds.buntSinglePct}% Hit${runnerBit} • ${odds.popUpPct}% Pop • ${odds.foulPct}% Foul • ${odds.whiffPct}% Whiff (${odds.shiftLabel})`;
 }
 
 function buildBuntMath(
@@ -314,25 +394,43 @@ function buildBuntPopOutcome(
   };
 }
 
-function describeBuntInPlay(
-  isSingle: boolean,
-  canSacrifice: boolean,
+function resolveBuntOutAdvance(
   input: BuntPitchInput,
+  odds: BuntOddsBreakdown,
   pitchLabel: string,
-): { commentary: string; modifierTag: string } {
-  if (isSingle) {
+): { advanceOnOut: 'sac_bunt' | 'bunt_fc_lead_out' | 'none'; commentary: string; modifierTag: string } {
+  if (input.thirdBaseRunner && input.outs < 2) {
+    const squeezedHome = input.rng.next() < odds.inPlaySqueezeProb;
+    if (squeezedHome) {
+      return {
+        advanceOnOut: 'sac_bunt',
+        commentary: `SQUEEZE PLAY! ${input.batter.name} deadens the ${pitchLabel} and ${input.thirdBaseRunner.name} slides home safely!`,
+        modifierTag: 'Squeeze Play RBI!',
+      };
+    }
     return {
-      commentary: `${input.batter.name} drops a gorgeous bunt off the ${pitchLabel} and beats ${input.charger.name}'s throw!`,
-      modifierTag: 'Bunt Single!',
+      advanceOnOut: 'bunt_fc_lead_out',
+      commentary: `${input.charger.name} charges the bunt and fires HOME — ${input.thirdBaseRunner.name} is gunned down at the plate!`,
+      modifierTag: 'Squeeze Out at Home',
     };
   }
-  if (canSacrifice) {
+  if (input.hasRunners && input.outs < 2) {
+    const advanced = input.rng.next() < odds.inPlaySacProb;
+    if (advanced) {
+      return {
+        advanceOnOut: 'sac_bunt',
+        commentary: `${input.batter.name} lays down a crisp sacrifice bunt — thrown out by ${input.charger.name} as runners advance!`,
+        modifierTag: 'Sacrifice Bunt',
+      };
+    }
     return {
-      commentary: `${input.batter.name} lays down a crisp sacrifice bunt — thrown out by ${input.charger.name} as runners advance!`,
-      modifierTag: 'Sacrifice Bunt',
+      advanceOnOut: 'bunt_fc_lead_out',
+      commentary: `${input.charger.name} charges hard on the bunt and fires ahead to cut down the lead runner!`,
+      modifierTag: 'Lead Runner Out (FC)',
     };
   }
   return {
+    advanceOnOut: 'none',
     commentary: `${input.batter.name} squares to bunt and ${input.charger.name} (${input.charger.position}) fires to first for the out.`,
     modifierTag: 'Charging Throw-Out',
   };
@@ -345,18 +443,23 @@ function buildBuntInPlayOutcome(
 ): BuntPitchResolution {
   const singleRoll = input.rng.next();
   const isSingle = singleRoll < odds.inPlaySingleProb;
-  const canSacrifice = !isSingle && input.hasRunners && input.outs < 2;
   const pitchLabel = PITCH_TYPE_SHORT_LABELS[input.pitchType];
-  const { commentary, modifierTag } = describeBuntInPlay(isSingle, canSacrifice, input, pitchLabel);
+  const outInfo = isSingle
+    ? {
+        advanceOnOut: 'none' as const,
+        commentary: `${input.batter.name} drops a gorgeous bunt off the ${pitchLabel} and beats ${input.charger.name}'s throw!`,
+        modifierTag: 'Bunt Single!',
+      }
+    : resolveBuntOutAdvance(input, odds, pitchLabel);
 
   return {
     kind: 'plate_complete',
     outcome: isSingle ? 'bunt_single' : 'bunt_out',
     totalBases: isSingle ? 1 : undefined,
     outsAdded: isSingle ? 0 : 1,
-    advanceOnOut: canSacrifice ? 'sac_bunt' : 'none',
+    advanceOnOut: outInfo.advanceOnOut,
     battedBallType: 'ground_ball',
-    commentary,
+    commentary: outInfo.commentary,
     soundCue: 'bunt_tap',
     pitchThrown,
     ballFlight: {
@@ -371,7 +474,7 @@ function buildBuntInPlayOutcome(
       fielderPos: input.charger.position,
       anim: isSingle ? 'field_run' : 'field_dive',
     },
-    mathBreakdown: buildBuntMath(odds, input, singleRoll, modifierTag),
+    mathBreakdown: buildBuntMath(odds, input, singleRoll, outInfo.modifierTag),
   };
 }
 

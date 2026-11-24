@@ -87,4 +87,40 @@ describe('TASK-081 — Bunt UI, Visible Pitcher Fatigue, Manager Pitch Sign & Ti
     expect(majorsList).toHaveTextContent(/grand cathedral anthem/i);
     expect(majorsList).toHaveTextContent(/9th-inning turbo/i);
   });
+
+  it('does not force the PC team to keep bunting after the human selected Bunt before the inning flipped', () => {
+    render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
+    fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+
+    // Ensure we are on a human-batting half first
+    if (!screen.queryByTestId('arcade-bunt-btn')) {
+      fireEvent.click(screen.getByTestId('fast-sim-toggle'));
+      fireEvent.click(screen.getByRole('button', { name: /sim half-inn/i }));
+    }
+
+    // Human selects Bunt, then the half-inning flips to PC batting
+    const buntBtn = screen.getByTestId('arcade-bunt-btn');
+    fireEvent.click(buntBtn);
+    expect(buntBtn).toHaveAttribute('aria-pressed', 'true');
+
+    if (!screen.queryByRole('button', { name: /sim half-inn/i })) {
+      fireEvent.click(screen.getByTestId('fast-sim-toggle'));
+    }
+    fireEvent.click(screen.getByRole('button', { name: /sim half-inn/i }));
+
+    // Now human is pitching (PC is batting) — throw 6 pitches and confirm PC is NOT forced into bunting
+    expect(screen.getByTestId('arcade-pitch-sign-bar')).toBeInTheDocument();
+    let buntMentions = 0;
+    for (let i = 0; i < 6; i += 1) {
+      const nextBtn = screen.queryByRole('button', { name: /next pitch/i });
+      if (!nextBtn || nextBtn.hasAttribute('disabled') || !screen.queryByTestId('arcade-pitch-sign-bar')) {
+        break;
+      }
+      fireEvent.click(nextBtn);
+      const ticker = screen.queryByTestId('live-action-bar')?.textContent ?? '';
+      if (/bunt|squares/i.test(ticker)) buntMentions += 1;
+    }
+    expect(buntMentions).toBeLessThanOrEqual(1);
+  });
 });

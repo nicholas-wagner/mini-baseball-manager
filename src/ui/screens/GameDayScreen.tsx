@@ -39,6 +39,11 @@ import {
   selectClubSpotlightTrio,
 } from '../../engine/gm/openingDayHook';
 import { getEligibleStealPlays } from '../../engine/simulation/baserunning';
+import {
+  chooseAiDefensiveShift,
+  isOffensiveTacticalCall,
+  resolveIsolatedStepInputs,
+} from '../../engine/simulation/aiManager';
 import { evaluateBuntOdds, formatBuntPreviewSummary } from '../../engine/simulation/buntResolver';
 import { getBattingSide, getDefenderAtPosition, getFieldingSide } from '../../engine/simulation/gameState';
 import { getNextAvailableStoryChapter } from '../../engine/story/storyEngine';
@@ -571,6 +576,20 @@ export function GameDayScreen({
       setEntranceCue(null);
       setPrePlaySession(liveSession);
       setLiveSession(nextSession);
+      if (liveSession) {
+        const halfChanged =
+          nextSession.half !== liveSession.half || nextSession.inning !== liveSession.inning;
+        const prevBatting = getBattingSide(liveSession);
+        const nextBatting = getBattingSide(nextSession);
+        const batterChanged = !halfChanged && nextBatting.lineupIndex !== prevBatting.lineupIndex;
+        if (halfChanged) {
+          setTacticalCall('normal');
+          setBatterGuess('none');
+          setArmedPowerId(null);
+        } else if (batterChanged) {
+          setTacticalCall((prev) => (prev === 'bunt' ? 'normal' : prev));
+        }
+      }
       setWinProbHistory((prev) => [...prev.slice(-23), estimateHomeWinProbability(nextSession)]);
       if (warmingRelieverIds.length > 0) {
         setWarmupCounts((prev) => tickBullpenWarmups(prev, warmingRelieverIds));
@@ -625,8 +644,8 @@ export function GameDayScreen({
     [finalizeSessionIfComplete, speed, watchMode, warmingRelieverIds, liveSession, recordNemesisEvents, guiding, showMore],
   );
 
-  const resolvePitchCallOption = useCallback(
-    (session: GameSessionState) => {
+  const resolveLiveStepInputs = useCallback(
+    (session: GameSessionState, callOverride?: TacticalCall, timingGrade?: ArcadeTimingGrade) => {
       const batterNow = getCurrentBatter(session);
       const pitcherNow = getCurrentPitcher(session);
       const nemesisBonus =
@@ -637,53 +656,46 @@ export function GameDayScreen({
           batterNow.name,
           pitcherNow.name,
         ) ?? undefined;
-      const humanIsBattingNow = (session.half === 'BOT') === session.home.isHuman;
-      const humanIsPitchingNow = !humanIsBattingNow;
-      const opts: {
-        requestedPitchType?: PitchType;
-        requestedPowerId?: string;
-        defensiveShift?: DefensiveShiftId;
-        weatherImpact?: ReturnType<typeof evaluateWeatherSimulationImpact>;
-        pitchTarget?: PitchTargetIntent;
-        batterGuess?: BatterPitchGuess;
-        nemesisBonus?: typeof nemesisBonus;
-      } = {
-        defensiveShift,
-        weatherImpact: gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : undefined,
-        pitchTarget: humanIsPitchingNow ? pitchTarget : undefined,
-        batterGuess: humanIsBattingNow ? batterGuess : 'none',
-        nemesisBonus,
-      };
-      if (armedPowerId) {
-        opts.requestedPowerId = armedPowerId;
-      }
-      if (humanIsPitchingNow && selectedPitchType) {
-        const ownsPitch = pitcherNow.pitchArsenal?.repertoire.some(
-          (slot) => slot.pitchType === selectedPitchType,
-        );
-        if (ownsPitch) opts.requestedPitchType = selectedPitchType;
-      }
-      return opts;
+      const aiRng = createSeededRng(
+        (session.rngSeed ^ Math.imul(session.stepCounter + 1, 0x9e3779b1)) >>> 0,
+      );
+      return resolveIsolatedStepInputs(
+        session,
+        {
+          tacticalCall: callOverride ?? tacticalCall,
+          pitchTarget,
+          selectedPitchType,
+          defensiveShift,
+          batterGuess,
+          armedPowerId,
+          arcadeTimingGrade: timingGrade,
+        },
+        aiRng,
+        {
+          weatherImpact: gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : undefined,
+          nemesisBonus,
+        },
+      );
     },
-    [armedPowerId, batterGuess, defensiveShift, gameWeather, nemesisHistory, pitchTarget, selectedPitchType],
+    [
+      armedPowerId,
+      batterGuess,
+      defensiveShift,
+      gameWeather,
+      nemesisHistory,
+      pitchTarget,
+      selectedPitchType,
+      tacticalCall,
+    ],
   );
 
   const handleNextPitch = useCallback((call = tacticalCall, timingGrade?: ArcadeTimingGrade) => {
     if (!liveSession || liveSession.status === 'completed') return;
-    const humanBattingNow = (liveSession.half === 'BOT') === liveSession.home.isHuman;
-    const baseOpts = resolvePitchCallOption(liveSession);
+    const isolated = resolveLiveStepInputs(liveSession, call, timingGrade);
     const { nextSession, events } = stepPitch(
       liveSession,
-      call,
-      timingGrade
-        ? {
-            ...baseOpts,
-            arcadeTiming: {
-              actor: humanBattingNow ? 'batter' : 'pitcher',
-              grade: timingGrade,
-            },
-          }
-        : baseOpts,
+      isolated.tacticalCall,
+      isolated.options,
     );
     setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId);
@@ -698,14 +710,15 @@ export function GameDayScreen({
     ) {
       setTacticalCall('normal');
     }
-  }, [activeOpponentId, applyStepResult, liveSession, resolvePitchCallOption, tacticalCall]);
+  }, [activeOpponentId, applyStepResult, liveSession, resolveLiveStepInputs, tacticalCall]);
 
   const handleSimAtBat = () => {
     if (!liveSession || liveSession.status === 'completed') return;
+    const isolated = resolveLiveStepInputs(liveSession, tacticalCall);
     const { nextSession, events } = stepAtBat(
       liveSession,
-      tacticalCall,
-      resolvePitchCallOption(liveSession),
+      isolated.tacticalCall,
+      isolated.options,
     );
     setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId);
@@ -713,7 +726,13 @@ export function GameDayScreen({
 
   const handleSimHalfInning = () => {
     if (!liveSession || liveSession.status === 'completed') return;
-    const { nextSession, events } = stepHalfInning(liveSession, tacticalCall);
+    const battingIsHuman = (liveSession.half === 'BOT') === liveSession.home.isHuman;
+    const safeCall: TacticalCall =
+      battingIsHuman && isOffensiveTacticalCall(tacticalCall) && tacticalCall !== 'bunt'
+        ? tacticalCall
+        : 'normal';
+    const { nextSession, events } = stepHalfInning(liveSession, safeCall);
+    setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId);
   };
 
@@ -2077,19 +2096,29 @@ export function GameDayScreen({
   });
   const liveBattingSide = getBattingSide(liveSession);
   const liveFieldingSide = getFieldingSide(liveSession);
+  const thirdBaseRunnerNow = liveSession.bases[2]
+    ? (liveBattingSide.playersById[liveSession.bases[2]] ?? null)
+    : null;
+  const leadRunnerIdNow = liveSession.bases[2] ?? liveSession.bases[1] ?? liveSession.bases[0];
+  const leadRunnerNow = leadRunnerIdNow
+    ? (liveBattingSide.playersById[leadRunnerIdNow] ?? null)
+    : null;
   const buntPreviewLine = humanIsBatting
     ? formatBuntPreviewSummary(
         evaluateBuntOdds({
           batter: currentBatter,
           pitcher: currentPitcher,
+          catcher: getDefenderAtPosition(liveFieldingSide, 'C'),
+          leadRunner: leadRunnerNow,
+          thirdBaseRunner: thirdBaseRunnerNow,
           pitchType: currentPitcher.pitchArsenal?.favoritePitch ?? 'four_seam',
           pitchQuality: Math.round(
             (currentPitcher.ratings.velocity + currentPitcher.ratings.movement) * 0.5 +
               enduranceFx.mphDrop +
               enduranceFx.breakDrop,
           ),
-          pitchTarget,
-          defenseShift: defensiveShift,
+          pitchTarget: 'attack_zone',
+          defenseShift: chooseAiDefensiveShift(liveSession),
           charger: getDefenderAtPosition(liveFieldingSide, '3B') ?? currentPitcher,
           firstBaseBonus: platoon.firstBaseStepBonus,
           extraBuntBonus: 0,
