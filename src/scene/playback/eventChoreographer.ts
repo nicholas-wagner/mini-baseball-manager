@@ -1,4 +1,4 @@
-import { sacrificeAdvances } from './sacrificeBunt';
+import { sacrificeAdvances } from '../../engine/simulation/sacrificeAdvances';
 import { finishPlay } from './teamReactions';
 import { closeKindFor, stealFrom } from './plateAndSteals';
 import { BASE_PATH_VERTICES, CATCHER_HOME, OUTFIELD_STARTS, PITCHING_RUBBER } from './diamondLayout';

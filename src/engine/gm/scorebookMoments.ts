@@ -1,3 +1,4 @@
+import { sacrificeAdvances } from "../simulation/sacrificeAdvances";
 import type { AtBatOutcome, PlayEvent } from "../models/playEvent";
 
 export interface ScorebookMoment {
@@ -32,7 +33,14 @@ const homers = [
   "Grand slam",
 ];
 
-function battingPlay(e: PlayEvent, runs: number): Highlight | undefined {
+function isRecordedSacrifice(e: PlayEvent, previous: PlayEvent | undefined, runs: number) {
+  if (previous?.seq !== e.seq - 1 || previous.half !== e.half || previous.inning !== e.inning) return false;
+  return Boolean(sacrificeAdvances(e, previous.basesAfter, runs));
+}
+
+function battingPlay(e: PlayEvent, runs: number, previous?: PlayEvent): Highlight | undefined {
+  if (isRecordedSacrifice(e, previous, runs))
+    return { actor: e.batterId, caption: "Sacrifice bunt", priority: runs ? 8 : 5 };
   if (e.outcome === "home_run")
     return {
       actor: e.batterId,
@@ -98,40 +106,60 @@ function scoreForClub(event: PlayEvent, humanHome: boolean, runs: number) {
     : scoreLine(event.awayScore, event.homeScore, runs);
 }
 
-/** Select distinct contributors using only credited plays in this game's log. */
-export function selectScorebookMoments(
-  events: readonly PlayEvent[],
-  players: Readonly<Record<string, { name: string }>>,
+type ScorebookPlayers = Readonly<Record<string, { name: string }>>;
+
+function creditedMoment(
+  event: PlayEvent,
+  previous: PlayEvent | undefined,
+  players: ScorebookPlayers,
   humanHome: boolean,
   opponent: string,
   gameId: string,
+) {
+  const runs = runsSince(event, previous);
+  const batting = (event.half === "BOT") === humanHome;
+  const play = batting ? battingPlay(event, runs, previous) : defensivePlay(event);
+  if (!play?.actor || !players[play.actor]) return;
+  const situation = scoreForClub(event, humanHome, batting ? runs : 0);
+  const rank =
+    play.priority + (situation.startsWith("Took the lead") ? 4 : 0);
+  const moment = {
+    id: gameId + "/" + event.seq,
+    playerId: play.actor,
+    playerName: players[play.actor].name,
+    caption: play.caption,
+    opponent,
+    situation,
+    inning: event.inning,
+    half: event.half,
+  };
+  return { moment, rank };
+}
+
+/** Select distinct contributors using only credited plays in this game's log. */
+export function selectScorebookMoments(
+  events: readonly PlayEvent[],
+  players: ScorebookPlayers,
+  humanHome: boolean,
+  opponent: string,
+  gameId: string,
+  guidedEvents?: ReadonlySet<number>,
 ): ScorebookMoment[] {
   const ranked = new Map<string, { moment: ScorebookMoment; rank: number }>();
-  events.forEach((event, i) => {
-    const runs = runsSince(event, events[i - 1]);
-    const batting = (event.half === "BOT") === humanHome;
-    const play = batting ? battingPlay(event, runs) : defensivePlay(event);
-    if (!play?.actor || !players[play.actor]) return;
-    const situation = scoreForClub(event, humanHome, batting ? runs : 0);
-    const rank =
-      play.priority + (situation.startsWith("Took the lead") ? 4 : 0);
-    if ((ranked.get(play.actor)?.rank ?? -1) > rank) return;
-    ranked.set(play.actor, {
-      rank,
-      moment: {
-        id: gameId + "/" + event.seq,
-        playerId: play.actor,
-        playerName: players[play.actor].name,
-        caption: play.caption,
-        opponent,
-        situation,
-        inning: event.inning,
-        half: event.half,
-      },
-    });
-  });
-  return [...ranked.values()]
+  let openingPrint: ScorebookMoment | undefined;
+  for (const [i, event] of events.entries()) {
+    const credit = creditedMoment(event, events[i - 1], players, humanHome, opponent, gameId);
+    if (!credit) continue;
+    const { moment, rank } = credit;
+    if (!openingPrint && guidedEvents?.has(event.seq)) openingPrint = moment;
+    if ((ranked.get(moment.playerId)?.rank ?? -1) <= rank) {
+      ranked.set(moment.playerId, credit);
+    }
+  }
+  const highlights = [...ranked.values()]
     .sort((a, b) => b.rank - a.rank)
-    .slice(0, 3)
-    .map((item) => item.moment);
+    .map(item => item.moment);
+  if (!openingPrint) return highlights.slice(0, 3);
+  const otherPlayers = highlights.filter(moment => moment.playerId !== openingPrint.playerId);
+  return [openingPrint, ...otherPlayers.slice(0, 2)];
 }

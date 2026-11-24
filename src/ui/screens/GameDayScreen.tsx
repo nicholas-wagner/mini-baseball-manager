@@ -1,4 +1,5 @@
 import { describeBuntAdvance } from '../../scene/playback/sacrificeBunt';
+import { RunnerCue } from '../components/RunnerCue';
 import { FORCE_HOLD_SECONDS } from '../../scene/playback/firstAtBatPresentation';
 import { forceAtFirst } from '../../scene/playback/diamondPlay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -272,6 +273,7 @@ export function GameDayScreen({
   const [liveSession, setLiveSession] = useState<GameSessionState | null>(null);
   const [activeOpponentId, setActiveOpponentId] = useState<string>('');
   const gameLog = useRef<PlayEvent[]>([]);
+  const guidedPitchEvents = useRef(new Set<number>());
   const [entranceCue, setEntranceCue] = useState<PlayerEntranceCue | null>(null);
   const finishEntrance = useCallback(() => setEntranceCue(null), []);
   const [guidedHalf, setGuidedHalf] = useState<string | null>(null);
@@ -437,7 +439,7 @@ export function GameDayScreen({
         boxScore: finalState.boxScore,
         playerStatDeltas: buildPlayerStatDeltas(finalState.boxScore),
       };
-      const summary = commitCompletedGame(opponentId, result, isHumanHome);
+      const summary = commitCompletedGame(opponentId, result, isHumanHome, guidedPitchEvents.current);
       if (pendingLivePlayoff && pendingLivePlayoff.opponentClubId === opponentId) {
         recordLivePlayoffResult(result.winnerClubId, result.awayScore, result.homeScore);
       }
@@ -489,6 +491,7 @@ export function GameDayScreen({
     setArgueUsed(false);
     setManagerEjected(false);
     setLastChoreo(null);
+    guidedPitchEvents.current.clear();
     gameLog.current = [];
     setTacticalCall('normal');
     setEntranceCue(null);
@@ -529,6 +532,7 @@ export function GameDayScreen({
     const clutch = openingMoment ?? buildScheduledMoment();
     if (!clutch) return;
     setActiveOpponentId(opp.id);
+    guidedPitchEvents.current.clear();
     gameLog.current = [...clutch.gameEvents];
     const openingBatting = (clutch.session.half === 'BOT') === clutch.session.home.isHuman;
     setEntranceCue(guided ? {role: openingBatting ? 'batter' : 'pitcher'} : null);
@@ -581,6 +585,7 @@ export function GameDayScreen({
   const applyStepResult = useCallback(
     (nextSession: GameSessionState, emitted: PlayEvent[], oppId: string, calledTarget?: PitchTargetIntent) => {
       gameLog.current.push(...emitted);
+      setClutchRecap(null);
       setEntranceCue(null);
       setPrePlaySession(liveSession);
       setLiveSession(nextSession);
@@ -706,6 +711,9 @@ export function GameDayScreen({
       isolated.tacticalCall,
       isolated.options,
     );
+    if (guiding && !showMore) {
+      for (const event of events) guidedPitchEvents.current.add(event.seq);
+    }
     setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId, isolated.options.pitchTarget);
     if (
@@ -719,7 +727,7 @@ export function GameDayScreen({
     ) {
       setTacticalCall('normal');
     }
-  }, [activeOpponentId, applyStepResult, liveSession, resolveLiveStepInputs, tacticalCall]);
+  }, [activeOpponentId, applyStepResult, guiding, liveSession, resolveLiveStepInputs, showMore, tacticalCall]);
 
   const handleSimAtBat = () => {
     if (!liveSession || liveSession.status === 'completed') return;
@@ -2315,6 +2323,7 @@ export function GameDayScreen({
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
+  const advancedFrom = handoff && !playing ? lastChoreo?.play?.buntAdvances?.at(-1) : undefined;
   const offerOpeningPack = eventInGuide && !playing && (changedSides || liveSession.status === 'completed') &&
     unopenedPacks.some(pack => pack.id === 'pack-opening-day');
   const openBetweenInningsPack = () => {
@@ -2379,7 +2388,7 @@ export function GameDayScreen({
               guided={Boolean(guiding && !showMore)}
               onEntranceEnd={finishEntrance}
               entranceCue={guiding && !showMore ? entranceCue : null}
-              preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' ? 'power' : 'contact') : pitchTarget) : null}
+              preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' || tacticalCall === 'bunt' ? tacticalCall : 'contact') : pitchTarget) : null}
               awayClub={liveAwayClub}
               homeClub={liveHomeClub}
               session={!pitchingChange && prePlaySession && lastChoreo && !showNextMatchup ? prePlaySession : liveSession}
@@ -2396,7 +2405,11 @@ export function GameDayScreen({
                 : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}
               celebrateConfetti={celebrateScore && !(handoff && !playing)}
               overlay={
-                pitchingChange && liveSession.status === 'in_progress' ? (
+                guiding && !showMore && advancedFrom && prePlaySession ? (
+                  <RunnerCue session={prePlaySession} advancedFrom={advancedFrom} />
+                ) : guiding && !showMore && guidedBatting && !playing && !lastChoreo && shown.bases.some(Boolean) ? (
+                  <RunnerCue session={shown} />
+                ) : pitchingChange && liveSession.status === 'in_progress' ? (
                   <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border-2 border-[#172C29] bg-[#FFF7E4] px-3 py-1.5 text-sm font-bold text-[#172C29] shadow-sm">
                     <span role="status">{bullpenMessage}</span>
                     {(!playing || nextDefensivePitcher) && watchMode === 'paused' && (
@@ -2456,6 +2469,7 @@ export function GameDayScreen({
               const scoutLine = buildMatchupScoutLine(picturedBatter, picturedPitcher, shown);
               return (
                 <MatchupPrints guided={guiding && !showMore}
+                  nextBatterName={handoff && !playing && !stole && !changedSides && liveSession.status === 'in_progress' ? currentBatter.name : undefined}
                   memories={humanClub.keepsakes}
                   batter={picturedBatter}
                   pitcher={picturedPitcher}

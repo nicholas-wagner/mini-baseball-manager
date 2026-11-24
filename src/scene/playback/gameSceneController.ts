@@ -1,4 +1,4 @@
-import { FORCE_HOLD_SECONDS, forceReplayTime, previewShot, rehearsalPose, targetOffset, type AtBatPreview, type PlayerEntranceCue } from './firstAtBatPresentation';
+import { FORCE_HOLD_SECONDS, forceReplayTime, isSwingPreview, previewShot, rehearsalPose, targetOffset, type AtBatPreview, type PlayerEntranceCue } from './firstAtBatPresentation';
 import { playReadout } from './playReadout';
 import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
@@ -493,7 +493,7 @@ export class GameSceneController {
       this.ballpark.update(dt, 0.57);
       return;
     }
-    const swing = this.preview === 'contact' || this.preview === 'power' ? this.preview : null;
+    const swing = isSwingPreview(this.preview) ? this.preview : null;
     const activePreset = this.cameraOverride ?? this.cameraPreset;
     const preview = this.cameraOverride ? null : this.preview;
     // Loading a texture or compiling the first frame can take longer than the entrance.

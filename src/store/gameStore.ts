@@ -225,7 +225,7 @@ export interface GameStoreState {
   respecPlayerSkillTree: (playerId: string) => { refundedSp: number; reason?: string };
   signFreeAgent: (playerId: string) => { signed: boolean; reason?: string };
   releasePlayer: (playerId: string) => { released: boolean; reason?: string };
-  commitCompletedGame: (opponentClubId: string, result: GameSessionResult, isHomeGame: boolean) => PostGameSummary | null;
+  commitCompletedGame: (opponentClubId: string, result: GameSessionResult, isHomeGame: boolean, guidedEvents?: ReadonlySet<number>) => PostGameSummary | null;
   playInstantExhibition: (opponentClubId: string, gameSeed?: number) => PostGameSummary | null;
   saveCareerToSlot: (slotId: SaveSlotId) => Promise<void>;
   loadCareerFromSlot: (slotId: SaveSlotId) => Promise<boolean>;
@@ -1105,7 +1105,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       return { released: true };
     },
 
-    commitCompletedGame: (opponentClubId, result, isHomeGame) => {
+    commitCompletedGame: (opponentClubId, result, isHomeGame, guidedEvents) => {
       const state = get();
       const { manager, leagues } = state;
       const humanClub = get().getHumanClub();
@@ -1206,7 +1206,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const side = isHomeGame ? result.finalState.home : result.finalState.away;
       const gameId = [state.seasonNumber,humanClub.id,opponentClub.id,humanClub.wins + humanClub.losses,result.finalState.rngSeed].join('/');
       const summary: PostGameSummary = {
-        moments: selectScorebookMoments(result.events, side.playersById, isHomeGame, opponentClub.name, gameId),
+        moments: selectScorebookMoments(result.events, side.playersById, isHomeGame, opponentClub.name, gameId, guidedEvents),
         opponentClubId: opponentClub.id,
         opponentName: `${opponentClub.city} ${opponentClub.name}`,
         isHomeGame,

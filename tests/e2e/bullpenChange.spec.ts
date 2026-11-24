@@ -11,6 +11,8 @@ test('a new pitcher takes the field and can deliver the next pitch from the diam
   await page.getByRole('button', { name: /^Pitch with/ }).click();
   await expect(page.getByRole('region', { name: 'First at-bat' })).toBeVisible();
   await page.getByRole('button', { name: 'More controls' }).click();
+  const tactics = page.getByRole('button', { name:'Tactics', exact:true });
+  if (await tactics.isVisible()) await tactics.click();
   await page.getByTestId('arcade-bullpen-toggle').click();
   const bringIn = page.getByTestId('arcade-bullpen-bring-in').first();
   const name = (await bringIn.innerText()).match(/Bring In (.+?) \(/)![1];

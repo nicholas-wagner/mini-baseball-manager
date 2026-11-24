@@ -313,61 +313,64 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
         subtitle={`Record ${humanClub.wins}-${humanClub.losses} • Roster ${humanClub.roster.length}/${MAX_ACTIVE_ROSTER_SIZE} • Payroll $${clubPayroll.toLocaleString()}/$${salaryCap.toLocaleString()} • Cash $${humanClub.economy.cash.toLocaleString()} • Hype ${humanClub.economy.teamHype}/100`}
         headerBg={humanClub.colors.secondary}
         badge={
-          <div className="flex flex-wrap gap-2">
-            <ComicButton
-              size="sm"
-              variant={lineupOptimized ? 'turf' : 'gold'}
-              data-testid="roster-auto-optimize-btn"
-              data-confirmed={lineupOptimized ? 'true' : undefined}
-              icon={<Sparkles className="w-4 h-4" />}
-              onClick={() => {
-                const beforeLineup = humanClub.lineup;
-                autoOptimizeHumanLineup();
-                const afterLineup =
-                  useGameStore.getState().getHumanClub()?.lineup ?? beforeLineup;
-                const diff = summarizeLineupChange(
-                  beforeLineup,
-                  afterLineup,
-                  'for best OVR & defense',
-                );
-                setLineupOptimized(true);
-                setRosterMessage(`✓ ${diff.message}`);
-                soundEngine.play('level_up');
-              }}
-            >
-              {lineupOptimized ? '✓ Lineup Optimized!' : 'Auto-Optimize Lineup'}
-            </ComicButton>
-            {onOpenUniforms ? (
+          <details className="roster-tools">
+            <summary>Club tools</summary>
+            <div className="flex flex-wrap gap-2">
               <ComicButton
                 size="sm"
-                variant="cream"
-                data-testid="roster-open-uniforms-btn"
-                icon={<Palette className="w-4 h-4" />}
+                variant={lineupOptimized ? 'turf' : 'gold'}
+                data-testid="roster-auto-optimize-btn"
+                data-confirmed={lineupOptimized ? 'true' : undefined}
+                icon={<Sparkles className="w-4 h-4" />}
                 onClick={() => {
-                  soundEngine.play('ui_pop');
-                  onOpenUniforms();
+                  const beforeLineup = humanClub.lineup;
+                  autoOptimizeHumanLineup();
+                  const afterLineup =
+                    useGameStore.getState().getHumanClub()?.lineup ?? beforeLineup;
+                  const diff = summarizeLineupChange(
+                    beforeLineup,
+                    afterLineup,
+                    'for best OVR & defense',
+                  );
+                  setLineupOptimized(true);
+                  setRosterMessage(`✓ ${diff.message}`);
+                  soundEngine.play('level_up');
                 }}
               >
-                Uniforms
+                {lineupOptimized ? '✓ Lineup Optimized!' : 'Auto-Optimize Lineup'}
               </ComicButton>
-            ) : null}
-            <ComicButton
-              size="sm"
-              variant="sky"
-              icon={<Save className="w-4 h-4" />}
-              onClick={() => setSaveModalOpen(true)}
-            >
-              Save / Load
-            </ComicButton>
-            <ComicButton
-              size="sm"
-              variant="turf"
-              icon={<Gamepad2 className="w-4 h-4" />}
-              onClick={onPlayBall}
-            >
-              Play Ball!
-            </ComicButton>
-          </div>
+              {onOpenUniforms ? (
+                <ComicButton
+                  size="sm"
+                  variant="cream"
+                  data-testid="roster-open-uniforms-btn"
+                  icon={<Palette className="w-4 h-4" />}
+                  onClick={() => {
+                    soundEngine.play('ui_pop');
+                    onOpenUniforms();
+                  }}
+                >
+                  Uniforms
+                </ComicButton>
+              ) : null}
+              <ComicButton
+                size="sm"
+                variant="sky"
+                icon={<Save className="w-4 h-4" />}
+                onClick={() => setSaveModalOpen(true)}
+              >
+                Save / Load
+              </ComicButton>
+              <ComicButton
+                size="sm"
+                variant="turf"
+                icon={<Gamepad2 className="w-4 h-4" />}
+                onClick={onPlayBall}
+              >
+                Play Ball!
+              </ComicButton>
+            </div>
+          </details>
         }
       >
         {rosterMessage ? (
@@ -454,39 +457,33 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
 
         {rosterView === 'cards' ? (
           <div data-testid="roster-card-binder" className="space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {(
-                [
-                  { id: 'all', label: `All (${humanClub.roster.length})` },
-                  { id: 'favorites', label: `⭐ Favorites (${favoritePlayerIds.length})` },
-                  { id: 'lineup', label: 'Lineup (9)' },
-                  { id: 'pitchers', label: 'Pitchers' },
-                  { id: 'bench', label: 'Bench' },
-                ] as const
-              ).map((tab) => (
-                <ComicButton
-                  key={tab.id}
-                  size="sm"
-                  variant={cardFilter === tab.id ? 'sky' : 'cream'}
-                  active={cardFilter === tab.id}
-                  onClick={() => {
-                    setCardFilter(tab.id);
-                    soundEngine.play('ui_pop');
-                  }}
-                >
-                  {tab.label}
-                </ComicButton>
-              ))}
-              <button
-                type="button"
-                className="ml-auto min-h-11 px-3 text-sm font-bold underline cursor-pointer"
-                aria-pressed={printGallery}
-                onClick={() => setPrintGallery((v) => !v)}
-              >
-                {printGallery ? 'Stat cards' : 'Print gallery'}
-              </button>
-            </div>
-
+            <details className="binder-filters">
+              <summary>Filter · {cardFilter === 'all' ? 'All players' : cardFilter.charAt(0).toUpperCase() + cardFilter.slice(1)}</summary>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { id: 'all', label: `All (${humanClub.roster.length})` },
+                    { id: 'favorites', label: `⭐ Favorites (${favoritePlayerIds.length})` },
+                    { id: 'lineup', label: 'Lineup (9)' },
+                    { id: 'pitchers', label: 'Pitchers' },
+                    { id: 'bench', label: 'Bench' },
+                  ] as const
+                ).map((tab) => (
+                  <ComicButton
+                    key={tab.id}
+                    size="sm"
+                    variant={cardFilter === tab.id ? 'sky' : 'cream'}
+                    active={cardFilter === tab.id}
+                    onClick={() => {
+                      setCardFilter(tab.id);
+                      soundEngine.play('ui_pop');
+                    }}
+                  >
+                    {tab.label}
+                  </ComicButton>
+                ))}
+              </div>
+            </details>
             {printGallery ? (
               <RosterPrintGallery club={humanClub.name} players={filteredBinderEntries.map((e) => e.player)} />
             ) : filteredBinderEntries.length === 0 ? (
@@ -543,7 +540,13 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                         onClick={() => openCardModalFor(player.id)}
                         className="w-full text-left flex-1 flex flex-col cursor-pointer group"
                       >
-                        <div className="px-2 pt-2 pb-1 flex items-center gap-1 pr-11">
+                        <div className="binder-name flex items-center gap-1 min-w-0">
+                          <FlagBadge nationalityId={player.nationalityId} size="sm" />
+                          <span className="font-display text-xs text-[#181B2C] break-words">
+                            {player.name}
+                          </span>
+                        </div>
+                        <div className="px-2 pt-2 pb-1 flex flex-wrap items-center gap-1">
                           <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[10px]">
                             {player.position}
                           </span>
@@ -565,12 +568,6 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                           </div>
                         </div>
                         <div className="px-2 py-2 space-y-0.5">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <FlagBadge nationalityId={player.nationalityId} size="sm" />
-                            <span className="font-display text-xs text-[#181B2C] truncate">
-                              {player.name}
-                            </span>
-                          </div>
                           <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-[#4A5068]">
                             <span className="truncate">{roleTag}</span>
                             <span className="text-[#1D3557] font-extrabold shrink-0">Flip →</span>
@@ -629,7 +626,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                           testId="roster-lineup-portrait"
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="font-display text-xs sm:text-sm text-[#181B2C] leading-tight truncate">
+                          <div className="font-display text-xs sm:text-sm text-[#181B2C] leading-tight break-words">
                             {isFavPlayer ? '⭐ ' : ''}
                             {player.name}
                           </div>

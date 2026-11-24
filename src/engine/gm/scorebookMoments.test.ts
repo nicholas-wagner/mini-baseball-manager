@@ -114,3 +114,11 @@ describe("signed scorebook moments", () => {
     ).toMatchObject({ playerId: "arm", caption: "Inning-ending strikeout" });
   });
 });
+
+it('keeps a sacrifice that moved a runner and skips a force on the lead runner', () => {
+  const before: PlayEvent = {...play, basesAfter:[null,'runner',null]};
+  const out: PlayEvent = {...play, seq:11, outcome:'bunt_out', batterId:'bat', outsAfter:1, basesAfter:[null,null,'runner']};
+  expect(select([before,out])[0]).toMatchObject({playerId:'bat',caption:'Sacrifice bunt'});
+  expect(select([before,{...out,basesAfter:['bat',null,null]}])).toEqual([]);
+  expect(select([out])).toEqual([]);
+});

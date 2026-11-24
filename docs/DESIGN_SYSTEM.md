@@ -73,7 +73,7 @@
 
 ### Opening Day rally
 
-Keep the result with the player who made the play until the manager advances. The result panel pairs their illustration with the official call and a short description of the runners. Give **Next batter** the gold primary button and **Watch again** a secondary action. Keep the two swing choices or three pitch targets in the same spot through the half-inning.
+Keep the result with the player who made the play until the manager advances. The result panel pairs their illustration with the official call and a short description of the runners. Give **Next batter** the gold primary button and **Watch again** a secondary action. Keep the swing choices or pitch targets in the same spot through the half-inning.
 
 For a force at first, let the manager see the mitt, the bag, the batter running through and the umpire in the same shot. A held runner takes a secondary lead. On a gap hit the camera can leave the retrieved ball to follow a runner into third or home. Use the runner’s actual base and destination for the cut.
 
@@ -82,3 +82,6 @@ In the guided half, put the manager’s club first on the compact scoreboard. Sh
 The first screen offers the actual featured player and the stakes, with the club and mascot alongside **Change club**. Use one short scouting clue on portrait phones. Matchup opens the full scouting detail, and Options opens timing and special powers. Choosing **Contact** or **Power** holds the corresponding grip and stance until **Swing**. At first base, hold the umpire’s signal with the runner still short of the bag. The mascot peeks and the glove pop marks the catch. Use the result card to explain the runners and credit a defensive out to the recorded fielder or strikeout pitcher.
 
 Run the first-use playtest with a younger newcomer, a teen who enjoys characters, and a longtime baseball fan. Give each person a muted 360×640 phone, open the first card, and say “Play one at-bat.” Record the time to their first deliberate swing or pitch, any scrolling or requests for help, and whether they choose the next batter on their own. Aim for a first call within 15 seconds. After the play, ask “What happened?” and “Which player do you remember?” Ask the fan where they would look for the matchup details, and ask a returning player to find their saved print.
+
+
+During the first-use playtest, include a sacrifice with runners aboard. Ask the player to point to the runner they hope to move before the pitch. Afterward, record which batter was out, which runner advanced, and whether the player taps **Next batter** unprompted. Test the same sequence in portrait and after rotation. For the character-focused player, record whether they recognize the runner or keep a print after a loss. For the baseball fan, record whether they can find scoring detail or change tactics and return to the field. Record device, viewport, first-call time, scrolls, and each person's own words. Leave unobserved results blank.

@@ -23,6 +23,7 @@ import { getNextAvailableStoryChapter } from './engine/story/storyEngine';
 import { useCareerStoryStore } from './store/careerSlots';
 import { useFoilPackStore } from './store/foilPackStore';
 import { useGameStore } from './store/gameStore';
+import { SaveSlotsModal } from './ui/components/SaveSlotsModal';
 import { CareerSlotsModal } from './ui/components/CareerSlotsModal';
 import { DugoutGuideModal } from './ui/components/DugoutGuideModal';
 import { FoilPackModal } from './ui/components/FoilPackModal';
@@ -86,6 +87,7 @@ export function App() {
   const [bgmEnabled, setBgmEnabled] = useState(() => bgmEngine.getState().enabled);
   const [guideOpen, setGuideOpen] = useState(false);
   const [storyOpen, setStoryOpen] = useState(false);
+  const [saveLoadOpen, setSaveLoadOpen] = useState(false);
   const [slotsOpen, setSlotsOpen] = useState(false);
   const [jukeboxOpen, setJukeboxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -495,6 +497,7 @@ export function App() {
         onJumpToTab={(tab) => setActiveTab(tab)}
       />
       <StoryChapterModal open={storyOpen} onClose={() => setStoryOpen(false)} />
+      {saveLoadOpen && <SaveSlotsModal open onClose={() => setSaveLoadOpen(false)} />}
       <CareerSlotsModal
         open={slotsOpen}
         onClose={() => setSlotsOpen(false)}
@@ -583,6 +586,8 @@ export function App() {
                 <ScrollText className="w-4 h-4 shrink-0" />
                 <span>Story &amp; Origins{hasUnreadChapter ? ' ★ NEW!' : ''}</span>
               </button>
+              {humanClub && <button type="button" className="w-full comic-btn bg-[#E0FBFC] text-left min-h-12 px-3"
+                onClick={() => { setMobileMenuOpen(false); setSaveLoadOpen(true); }}>Save / Load</button>}
               <button
                 type="button"
                 aria-label="Open 4 Career Save Slots"

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { FastForward, Play, RefreshCw, Shield, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
 import { PITCH_CALL_GUIDE, SWING_CALL_GUIDE } from '../../engine/gm/openingDayHook';
@@ -163,6 +163,8 @@ export function LiveActionBar({
   onInspectPlayers,
 }: LiveActionBarProps) {
   const [bullpenOpen, setBullpenOpen] = useState(false);
+  const [tacticsOpen, setTacticsOpen] = useState(false);
+  const tacticsId = useId();
   const [fastSimOpen, setFastSimOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
   const cuePalette =
@@ -197,6 +199,8 @@ export function LiveActionBar({
     : (SIMPLE_PITCH_CALLS.find((opt) => opt.id === pitchTarget)?.tradeoff ??
       SIMPLE_PITCH_CALLS[0].tradeoff);
 
+  const battingAction = tacticalCall.includes('steal') ? 'Send runners' : tacticalCall === 'bunt' ? 'Lay down bunt' : 'Swing';
+  const pitchAction = isBatting ? battingAction : 'Throw Pitch';
   const enduranceFillClass =
     pitcherEnduranceTier === 'gassed'
       ? 'bg-[#FF4D6D]'
@@ -417,289 +421,279 @@ export function LiveActionBar({
         </div>
       </div>
 
-      {/* Optional Interactive Arcade Sweet-Spot Timing Bar */}
-      {arcadeTimingEnabled && !gameCompleted ? (
-        <ArcadeTimingMeter
-          isBatting={isBatting}
-          disabled={gameCompleted}
-          actionLabel={isBatting ? 'Swing!' : 'Throw Pitch!'}
-          powerArmed={powerArmed}
-          onLockTiming={(grade) => onNextPitch(grade)}
-        />
-      ) : null}
-
-      {/* Row 2: Balanced 2-Row Mobile Controller Grid (Never an orphan button on row 3!) */}
+      {/* Keep the committed call beside the tactics disclosure on a phone. */}
       <div data-testid="live-control-grid" className="space-y-1.5">
-        <div
-          className={
-            onToggleSmartWatch && onCycleSpeed
-              ? 'grid grid-cols-[minmax(0,1.22fr)_minmax(0,1.15fr)_auto] gap-1.5'
-              : 'flex flex-wrap items-center gap-1.5'
-          }
-        >
-          <ComicButton
+        <div className="live-primary-row">
+          {arcadeTimingEnabled && !gameCompleted ? (
+            <ArcadeTimingMeter isBatting={isBatting} disabled={gameCompleted} actionLabel={pitchAction + '!'}
+              powerArmed={powerArmed} onLockTiming={onNextPitch} />
+          ) : <ComicButton
             size="sm"
             variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'gold'}
             disabled={gameCompleted}
             icon={<Play className="w-3.5 h-3.5" />}
-            aria-label={cue.primaryButtonLabel}
+            aria-label={gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)'}
             onClick={() => onNextPitch()}
             className="w-full px-2.5 text-xs whitespace-nowrap"
           >
-            {isBatting ? 'Next Pitch' : 'Throw Pitch'}
-          </ComicButton>
+            {gameCompleted ? cue.primaryButtonLabel : pitchAction}
+          </ComicButton>}
 
-          {onToggleSmartWatch ? (
-            <ComicButton
-              size="sm"
-              variant={watchMode === 'smart' ? 'coral' : 'turf'}
-              data-testid="smart-watch-toggle"
-              disabled={gameCompleted}
-              onClick={onToggleSmartWatch}
-              className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
-            >
-              {watchMode === 'smart' ? '⏸️ Smart ON' : '✨ Smart Watch'}
-            </ComicButton>
-          ) : null}
-
-          {onCycleSpeed ? (
-            <ComicButton
-              size="sm"
-              variant={speed > 1 ? 'gold' : 'cream'}
-              data-testid="arcade-speed-toggle"
-              disabled={gameCompleted}
-              onClick={onCycleSpeed}
-              className="px-2.5 text-[11px] sm:text-xs whitespace-nowrap"
-            >
-              ⏩ {speed}x
-            </ComicButton>
-          ) : null}
+          <button type="button" className="tactics-toggle" aria-expanded={tacticsOpen} aria-controls={tacticsId}
+            onClick={() => setTacticsOpen(!tacticsOpen)}>Tactics</button>
         </div>
+        <div id={tacticsId} className="tactics-panel" data-open={tacticsOpen}>
+          <div className="tactics-buttons">
+            {onToggleSmartWatch ? (
+              <ComicButton
+                size="sm"
+                variant={watchMode === 'smart' ? 'coral' : 'turf'}
+                data-testid="smart-watch-toggle"
+                disabled={gameCompleted}
+                onClick={onToggleSmartWatch}
+                className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
+              >
+                {watchMode === 'smart' ? '⏸️ Smart ON' : '✨ Smart Watch'}
+              </ComicButton>
+            ) : null}
 
-        <div className="flex flex-nowrap sm:flex-wrap items-center gap-1 overflow-x-auto pb-0.5">
-          <ComicButton
-            size="sm"
-            variant={fastSimOpen || watchMode === 'live' ? 'gold' : 'cream'}
-            data-testid="fast-sim-toggle"
-            disabled={gameCompleted}
-            icon={<FastForward className="w-3.5 h-3.5" />}
-            onClick={() => {
-              setFastSimOpen((open) => !open);
-              setBullpenOpen(false);
-              setShiftOpen(false);
-            }}
-            className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
-          >
-            {watchMode === 'live' ? 'Auto ▾' : 'Sim ▾'}
-          </ComicButton>
+            {onCycleSpeed ? (
+              <ComicButton
+                size="sm"
+                variant={speed > 1 ? 'gold' : 'cream'}
+                data-testid="arcade-speed-toggle"
+                disabled={gameCompleted}
+                onClick={onCycleSpeed}
+                className="px-2.5 text-[11px] sm:text-xs whitespace-nowrap"
+              >
+                ⏩ {speed}x
+              </ComicButton>
+            ) : null}
 
-          {hasBullpenPicker ? (
             <ComicButton
               size="sm"
-              variant={bullpenOpen ? 'coral' : 'sky'}
-              data-testid="arcade-bullpen-toggle"
+              variant={fastSimOpen || watchMode === 'live' ? 'gold' : 'cream'}
+              data-testid="fast-sim-toggle"
               disabled={gameCompleted}
-              icon={<RefreshCw className="w-3.5 h-3.5" />}
+              icon={<FastForward className="w-3.5 h-3.5" />}
               onClick={() => {
-                setBullpenOpen((open) => !open);
-                setFastSimOpen(false);
+                setFastSimOpen((open) => !open);
+                setBullpenOpen(false);
                 setShiftOpen(false);
               }}
               className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
             >
-              Pen ({bullpenOptions.length})
+              {watchMode === 'live' ? 'Auto ▾' : 'Sim ▾'}
             </ComicButton>
-          ) : null}
 
-          {hasShiftPicker ? (
-            <ComicButton
-              size="sm"
-              variant={shiftOpen || defensiveShift !== 'standard' ? 'gold' : 'cream'}
-              data-testid="arcade-shift-toggle"
-              disabled={gameCompleted}
-              icon={<Shield className="w-3.5 h-3.5" />}
-              onClick={() => {
-                setShiftOpen((open) => !open);
-                setBullpenOpen(false);
-                setFastSimOpen(false);
-              }}
-              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
-            >
-              {defensiveShift === 'standard' ? 'Shift ▾' : `${activeShiftShort} ▾`}
-            </ComicButton>
-          ) : null}
-
-          {onToggleArcadeTiming ? (
-            <ComicButton
-              size="sm"
-              variant={arcadeTimingEnabled ? 'gold' : 'cream'}
-              data-testid="arcade-timing-toggle"
-              disabled={gameCompleted}
-              onClick={onToggleArcadeTiming}
-              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
-            >
-              {arcadeTimingEnabled ? '🎯 ON' : '🎯 Timing'}
-            </ComicButton>
-          ) : null}
-
-          <ComicButton
-            size="sm"
-            variant={controlMode === 'advanced' ? 'violet' : 'cream'}
-            data-testid="control-mode-toggle"
-            icon={<Sliders className="w-3.5 h-3.5" />}
-            onClick={onToggleControlMode}
-            className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
-          >
-            {controlMode === 'simple' ? 'Pro' : 'Simple'}
-          </ComicButton>
-        </div>
-      </div>
-
-      {shiftOpen && onSelectDefensiveShift ? (
-        <div
-          data-testid="arcade-shift-drawer"
-          className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-1.5"
-        >
-          <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-[#1D3557]">
-            <span>🛡️ Defensive Alignment — 1-Tap Shift</span>
-            <button
-              type="button"
-              onClick={() => setShiftOpen(false)}
-              className="underline cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {DEFENSIVE_SHIFTS.map((shift) => {
-              const active = defensiveShift === shift.id;
-              return (
-                <button
-                  key={shift.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => {
-                    onSelectDefensiveShift(shift.id);
-                    setShiftOpen(false);
-                  }}
-                  className={`p-1.5 min-h-[44px] rounded-lg border-2 border-[#181B2C] text-left cursor-pointer transition ${
-                    active
-                      ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
-                      : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
-                  }`}
-                >
-                  <div className="font-display text-[11px] leading-tight">{shift.label}</div>
-                  <div className="text-[9.5px] font-bold text-[#4A5068] leading-tight mt-0.5">
-                    {shift.description}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Compact Fast Sim Popover Drawer (Auto Play 3D, At-Bat, Half-Inn, Clutch, Sim to End) */}
-      {fastSimOpen ? (
-        <div
-          data-testid="fast-sim-drawer"
-          className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] flex flex-wrap items-center gap-1.5"
-        >
-          <ComicButton
-            size="sm"
-            variant={watchMode === 'live' ? 'coral' : 'sky'}
-            disabled={gameCompleted}
-            onClick={() => {
-              onToggleWatchMode();
-              setFastSimOpen(false);
-            }}
-          >
-            {watchMode === 'live' ? 'Pause Auto' : 'Auto Play 3D'}
-          </ComicButton>
-          <ComicButton
-            size="sm"
-            variant="cream"
-            disabled={gameCompleted}
-            icon={<SkipForward className="w-3.5 h-3.5" />}
-            onClick={() => {
-              onSimAtBat();
-              setFastSimOpen(false);
-            }}
-          >
-            Sim At-Bat
-          </ComicButton>
-          <ComicButton
-            size="sm"
-            variant="cream"
-            disabled={gameCompleted}
-            icon={<FastForward className="w-3.5 h-3.5" />}
-            onClick={() => {
-              onSimHalfInning();
-              setFastSimOpen(false);
-            }}
-          >
-            Sim Half-Inn
-          </ComicButton>
-          <ComicButton
-            size="sm"
-            variant="violet"
-            disabled={gameCompleted}
-            icon={<Zap className="w-3.5 h-3.5" />}
-            onClick={() => {
-              onClutchSim();
-              setFastSimOpen(false);
-            }}
-          >
-            Clutch Sim
-          </ComicButton>
-          <ComicButton
-            size="sm"
-            variant="gold"
-            disabled={gameCompleted}
-            icon={<FastForward className="w-3.5 h-3.5" />}
-            onClick={() => {
-              onSimToEnd();
-              setFastSimOpen(false);
-            }}
-          >
-            Sim to End
-          </ComicButton>
-        </div>
-      ) : null}
-
-      {bullpenOpen && bullpenOptions.length > 0 && onSelectBullpenReliever ? (
-        <div
-          data-testid="arcade-bullpen-drawer"
-          className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
-        >
-          <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-[#1D3557]">
-            <span>📞 Quick Bullpen Call — Tap a Fresh Arm to Enter</span>
-            <button
-              type="button"
-              onClick={() => setBullpenOpen(false)}
-              className="underline cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {bullpenOptions.map((rel) => (
+            {hasBullpenPicker ? (
               <ComicButton
-                key={rel.id}
                 size="sm"
-                variant="cream"
-                data-testid="arcade-bullpen-bring-in"
+                variant={bullpenOpen ? 'coral' : 'sky'}
+                data-testid="arcade-bullpen-toggle"
+                disabled={gameCompleted}
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
                 onClick={() => {
-                  onSelectBullpenReliever(rel.id);
+                  setBullpenOpen((open) => !open);
+                  setFastSimOpen(false);
+                  setShiftOpen(false);
+                }}
+                className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+              >
+                Pen ({bullpenOptions.length})
+              </ComicButton>
+            ) : null}
+
+            {hasShiftPicker ? (
+              <ComicButton
+                size="sm"
+                variant={shiftOpen || defensiveShift !== 'standard' ? 'gold' : 'cream'}
+                data-testid="arcade-shift-toggle"
+                disabled={gameCompleted}
+                icon={<Shield className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  setShiftOpen((open) => !open);
                   setBullpenOpen(false);
+                  setFastSimOpen(false);
+                }}
+                className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+              >
+                {defensiveShift === 'standard' ? 'Shift ▾' : `${activeShiftShort} ▾`}
+              </ComicButton>
+            ) : null}
+
+            {onToggleArcadeTiming ? (
+              <ComicButton
+                size="sm"
+                variant={arcadeTimingEnabled ? 'gold' : 'cream'}
+                data-testid="arcade-timing-toggle"
+                disabled={gameCompleted}
+                onClick={onToggleArcadeTiming}
+                className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+              >
+                {arcadeTimingEnabled ? '🎯 ON' : '🎯 Timing'}
+              </ComicButton>
+            ) : null}
+
+            <ComicButton
+              size="sm"
+              variant={controlMode === 'advanced' ? 'violet' : 'cream'}
+              data-testid="control-mode-toggle"
+              icon={<Sliders className="w-3.5 h-3.5" />}
+              onClick={onToggleControlMode}
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+            >
+              {controlMode === 'simple' ? 'Pro' : 'Simple'}
+            </ComicButton>
+          </div>
+
+          {shiftOpen && onSelectDefensiveShift ? (
+            <div
+              data-testid="arcade-shift-drawer"
+              className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-1.5"
+            >
+              <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-[#1D3557]">
+                <span>🛡️ Defensive Alignment — 1-Tap Shift</span>
+                <button
+                  type="button"
+                  onClick={() => setShiftOpen(false)}
+                  className="underline cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {DEFENSIVE_SHIFTS.map((shift) => {
+                  const active = defensiveShift === shift.id;
+                  return (
+                    <button
+                      key={shift.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => {
+                        onSelectDefensiveShift(shift.id);
+                        setShiftOpen(false);
+                      }}
+                      className={`p-1.5 min-h-[44px] rounded-lg border-2 border-[#181B2C] text-left cursor-pointer transition ${
+                        active
+                          ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
+                          : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
+                      }`}
+                    >
+                      <div className="font-display text-[11px] leading-tight">{shift.label}</div>
+                      <div className="text-[9.5px] font-bold text-[#4A5068] leading-tight mt-0.5">
+                        {shift.description}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Compact Fast Sim Popover Drawer (Auto Play 3D, At-Bat, Half-Inn, Clutch, Sim to End) */}
+          {fastSimOpen ? (
+            <div
+              data-testid="fast-sim-drawer"
+              className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] flex flex-wrap items-center gap-1.5"
+            >
+              <ComicButton
+                size="sm"
+                variant={watchMode === 'live' ? 'coral' : 'sky'}
+                disabled={gameCompleted}
+                onClick={() => {
+                  onToggleWatchMode();
+                  setFastSimOpen(false);
                 }}
               >
-                Bring In {rel.name} ({rel.throws}HP{rel.roleLabel ? ` • ${rel.roleLabel}` : ''})
+                {watchMode === 'live' ? 'Pause Auto' : 'Auto Play 3D'}
               </ComicButton>
-            ))}
-          </div>
+              <ComicButton
+                size="sm"
+                variant="cream"
+                disabled={gameCompleted}
+                icon={<SkipForward className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  onSimAtBat();
+                  setFastSimOpen(false);
+                }}
+              >
+                Sim At-Bat
+              </ComicButton>
+              <ComicButton
+                size="sm"
+                variant="cream"
+                disabled={gameCompleted}
+                icon={<FastForward className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  onSimHalfInning();
+                  setFastSimOpen(false);
+                }}
+              >
+                Sim Half-Inn
+              </ComicButton>
+              <ComicButton
+                size="sm"
+                variant="violet"
+                disabled={gameCompleted}
+                icon={<Zap className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  onClutchSim();
+                  setFastSimOpen(false);
+                }}
+              >
+                Clutch Sim
+              </ComicButton>
+              <ComicButton
+                size="sm"
+                variant="gold"
+                disabled={gameCompleted}
+                icon={<FastForward className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  onSimToEnd();
+                  setFastSimOpen(false);
+                }}
+              >
+                Sim to End
+              </ComicButton>
+            </div>
+          ) : null}
+
+          {bullpenOpen && bullpenOptions.length > 0 && onSelectBullpenReliever ? (
+            <div
+              data-testid="arcade-bullpen-drawer"
+              className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
+            >
+              <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-[#1D3557]">
+                <span>📞 Quick Bullpen Call — Tap a Fresh Arm to Enter</span>
+                <button
+                  type="button"
+                  onClick={() => setBullpenOpen(false)}
+                  className="underline cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {bullpenOptions.map((rel) => (
+                  <ComicButton
+                    key={rel.id}
+                    size="sm"
+                    variant="cream"
+                    data-testid="arcade-bullpen-bring-in"
+                    onClick={() => {
+                      onSelectBullpenReliever(rel.id);
+                      setBullpenOpen(false);
+                    }}
+                  >
+                    Bring In {rel.name} ({rel.throws}HP{rel.roleLabel ? ` • ${rel.roleLabel}` : ''})
+                  </ComicButton>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
 
       {/* Compact Last-Play Readout directly under the controller so it stays visible above the fold on mobile! */}
       <div
@@ -719,7 +713,7 @@ export function LiveActionBar({
             </>
           ) : (
             <span className="text-[#4A5068]">
-              Eyes on the 3D diamond — press {isBatting ? 'Next Pitch' : 'Throw Pitch'} to start!
+              Eyes on the 3D diamond — press {pitchAction} to start!
             </span>
           )}
         </div>

@@ -79,3 +79,9 @@ describe('a sacrifice bunt with the putout at first', () => {
     ]) expect(choreographPlayEvent(event, 1, ['runner',null,null]).play!.buntAdvances).toBeUndefined();
   });
 });
+
+it('lets the safe runner tip their helmet to the dugout after reaching second', () => {
+  const play = choreographPlayEvent(out, 1, ['runner', null, null]).play!;
+  const salute = buntRunnerPose(play, 1, play.leadArrival + .4);
+  expect(salute).toMatchObject({clip:'helmet_tip', pos:bags[2]});
+});

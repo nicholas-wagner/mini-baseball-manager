@@ -223,7 +223,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
         subtitle="Jump onto the 3D Sandlot diamond in 5 seconds • Collect 90s manga cards & chase the Mini Majors!"
         headerBg="#1B4332"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="club-customizer space-y-4">
           {/* 1. Above-the-Fold 5-Second Toy Box Hero (Quick Club + Cute Mascot + Fanned Manga Cards + BIG PLAY BUTTON!) */}
           <div className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_270px] gap-4 items-center">
             <div className="space-y-3">
@@ -299,7 +299,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                   size="lg"
                   variant="turf"
                   icon={<Play className="w-4 h-4" />}
-                  className="flex-1 sm:flex-none whitespace-nowrap"
+                  className="club-confirm flex-1 sm:flex-none whitespace-nowrap"
                 >
                   Use this club
                 </ComicButton>

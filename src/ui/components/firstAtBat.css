@@ -192,3 +192,57 @@
 @media (min-width:768px) and (min-height:541px) {
   .guided-game .live-field { height:clamp(215px,40dvh,388px); }
 }
+
+.runner-cue { display:flex; align-items:center; gap:4px; background:#173e37f2; color:#fff7dd; padding:2px 8px 2px 3px; border-radius:8px; }
+.runner-cue span { font:750 13px/1.2 var(--font-body); }
+.runner-cue small { display:block; color:#ffda72; font-size:11px; }
+
+.live-primary-row { display:flex; align-items:center; gap:8px; }
+.tactics-buttons { display:grid; grid-template-columns:repeat(auto-fit,minmax(76px,1fr)); gap:6px; }
+.tactics-panel > :not(:first-child) { margin-top:8px; }
+.tactics-toggle, .roster-tools summary {
+  min-height:48px; padding:0 12px; border:2px solid #192735; border-radius:10px;
+  background:#fff2bf; color:#193d37; font-weight:850; cursor:pointer;
+}
+.tactics-toggle { display:none; }
+.roster-tools summary { align-content:center; }
+.roster-tools[open] > div { padding-block:8px; }
+.binder-name { min-height:50px; padding:6px 48px 2px 8px; }
+[data-testid=binder-star-btn] { width:44px; height:44px; }
+@media (max-width:767px), (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
+  .tactics-toggle { display:block; }
+  .tactics-panel[data-open=false] { display:none; }
+  .tactics-panel { padding:8px; border:2px solid #193d37; border-radius:10px; background:#fffdf5; }
+  .tactics-buttons { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .tactics-buttons button, .live-primary-row button, [data-testid=arcade-call-bar] button,
+  [data-testid=arcade-pitch-sign-bar] button { min-height:48px; min-width:48px; }
+  .live-game [data-testid=arcade-call-bar] { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .live-game [data-testid=arcade-call-bar] button { white-space:normal; }
+  .live-game [data-testid=live-calls-block] > div { display:grid; grid-template-columns:minmax(0,1fr); }
+  .live-game [data-testid=arcade-pitch-sign-bar] { display:flex; flex-wrap:wrap; overflow:visible; }
+  .live-game [data-testid=arcade-hype-bar] { width:100%; }
+  .club-customizer { padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+  .club-customizer .club-confirm {
+    position:fixed; z-index:35; left:max(14px,env(safe-area-inset-left)); right:max(14px,env(safe-area-inset-right));
+    bottom:max(10px,env(safe-area-inset-bottom)); min-height:50px;
+  }
+  .club-customizer > button[type=submit] { display:none; }
+}
+@media (orientation:landscape) and (max-height:540px) and (max-width:1024px) {
+  .live-game:not(.guided-game) { --live-score-height:64px; }
+  .live-game:not(.guided-game) .live-score-row { height:var(--live-score-height); align-items:center; }
+  .live-game:not(.guided-game) .live-score-row [data-testid^=scoreboard-] { line-height:1.12; }
+  .live-game:not(.guided-game) .live-field-controls { grid-template-columns:minmax(0,1.4fr) minmax(285px,1fr); }
+  .live-game [data-testid=arcade-call-bar] > span { display:none; }
+  .live-game:not(.guided-game) .live-field-controls > .live-field {
+    top:calc(var(--live-score-height) + env(safe-area-inset-top));
+    height:calc(100dvh - var(--live-score-height) - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  .live-game:not(.guided-game) [data-testid=live-action-bar] { grid-row:1; }
+  .live-game:not(.guided-game) .live-score-row > [role=region] { padding-block:2px; }
+  .live-game:not(.guided-game) .live-field-controls > * { min-width:0; }
+}
+
+.binder-filters summary { min-height:44px; align-content:center; width:fit-content; padding:0 9px; font-weight:800; cursor:pointer; }
+.binder-filters[open] summary { margin-bottom:4px; }
+.live-primary-row > [data-testid=arcade-timing-meter] { min-width:0; flex:1; }

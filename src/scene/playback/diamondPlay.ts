@@ -161,6 +161,11 @@ export function buntRunnerPose(play: DiamondPlay, from: number, time: number) {
   if (time < contact) {
     return { pos: start, yaw: headingToward(start, BASE_PATH_VERTICES[0]), clip: 'runner_lead' as const, local: time };
   }
+  const arrival = time - play.leadArrival;
+  if (from < 3 && arrival >= .26 && arrival < .74) {
+    const bag = BASE_PATH_VERTICES[from + 1];
+    return { pos: bag, yaw: headingToward(bag, BASE_PATH_VERTICES[0]), clip: 'helmet_tip' as const, local: arrival + .15 };
+  }
   return runBases(start, from, from + 1, time, contact, play.leadArrival);
 }
 

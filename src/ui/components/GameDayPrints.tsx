@@ -154,6 +154,7 @@ export function BatterEntrance({ player, pitching = false, guided = false }: { p
 
 export function MatchupPrints({
   guided = false,
+  nextBatterName,
   batter,
   pitcher,
   memories = [],
@@ -172,6 +173,7 @@ export function MatchupPrints({
   onInspect,
 }: {
   guided?: boolean;
+  nextBatterName?: string;
   batter: Player;
   pitcher: Player;
   memories?: readonly ScorebookMoment[];
@@ -197,7 +199,7 @@ export function MatchupPrints({
   const entries = [
     {
       player: batter,
-      role: 'At bat',
+      role: nextBatterName ? 'Last at bat' : 'At bat',
       scoutLine: batterScoutLine,
       sparkle: evaluateMatchupCardSparkle({
         player: batter,
@@ -285,7 +287,7 @@ export function MatchupPrints({
       })}
     </div>
     {guided && <>
-      <div className="matchup-clue"><span>{clue}</span><button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>Matchup</button></div>
+      <div className="matchup-clue"><span>{nextBatterName ? 'Up next · ' + nextBatterName : clue}</span><button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>Matchup</button></div>
       {expanded && <section aria-label="Matchup scouting" className="matchup-scouting">
         <h3>{batter.name}</h3>
         <p>{batter.bats === 'S' ? 'Switch hitter' : batter.bats === 'L' ? 'Bats left' : 'Bats right'} · Contact {batter.ratings.contact} · Power {batter.ratings.power} · Speed {batter.ratings.speed}</p>

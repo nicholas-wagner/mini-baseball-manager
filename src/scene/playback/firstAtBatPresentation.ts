@@ -9,10 +9,14 @@ export interface PlayerEntranceCue {
   outgoingId?: string;
 }
 
-export type AtBatPreview = PitchTargetIntent | "contact" | "power";
+type SwingPreview = "contact" | "power" | "bunt";
+export type AtBatPreview = PitchTargetIntent | SwingPreview;
+export function isSwingPreview(intent: AtBatPreview | null): intent is SwingPreview {
+  return intent === 'contact' || intent === 'power' || intent === 'bunt';
+}
 export function previewShot(intent: AtBatPreview, side: EffectiveBatSide) {
   const sign = side === "R" ? 1 : -1;
-  if (intent === "power" || intent === "contact") {
+  if (isSwingPreview(intent)) {
     return {
       position: { x: sign * 1.75, y: 1.75, z: -3.8 },
       lookAt: { x: -sign * 0.78, y: 0.99, z: 0.12 },
@@ -39,11 +43,12 @@ export function targetOffset(target: AtBatPreview, side: EffectiveBatSide) {
   }
 }
 export function rehearsalPose(
-  intent: "contact" | "power",
+  intent: SwingPreview,
   elapsed: number,
   still: boolean,
 ): { clip: CharacterAnimClip; time: number } {
-  return { clip: intent === "contact" ? "bat_contact_set" : "bat_power_set",
+  const clips = { contact: "bat_contact_set", power: "bat_power_set", bunt: "bat_bunt" } as const;
+  return { clip: clips[intent],
     time: still ? 0.32 : Math.min(0.32, elapsed) };
 }
 

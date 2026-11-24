@@ -1,4 +1,5 @@
-import { describeBuntAdvance, sacrificeAdvances } from '../../scene/playback/sacrificeBunt';
+import { sacrificeAdvances } from '../../engine/simulation/sacrificeAdvances';
+import { describeBuntAdvance } from '../../scene/playback/sacrificeBunt';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { getBattingSide, getFieldingSide, getCurrentBatter, getCurrentPitcher, type GameSessionState } from '../../engine/simulation/gameState';
 import { playReadout } from '../../scene/playback/playReadout';

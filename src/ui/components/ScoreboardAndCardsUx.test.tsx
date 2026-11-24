@@ -106,9 +106,10 @@ describe('Mobile Roster Baseball Cards, Live R/H/E Scoreboard & In-Game Player C
     fireEvent.click(screen.getByTestId('roster-view-cards-btn'));
     expect(screen.getByTestId('roster-card-binder')).toBeInTheDocument();
     expect(screen.getAllByTestId('roster-binder-card-slot').length).toBe(18);
-    fireEvent.click(screen.getByRole('button', {name:'Print gallery'}));
+    fireEvent.click(screen.getByTestId('roster-view-gallery-btn'));
     const gallery = screen.getByRole('region', {name:'Roster print gallery'});
     expect(gallery.querySelectorAll('img')).toHaveLength(18);
+    fireEvent.click(screen.getByText(/Filter ·/));
     fireEvent.click(screen.getByRole('button', {name:'Pitchers'}));
     expect(gallery.querySelectorAll('img').length).toBeLessThan(18);
     expect(gallery.querySelectorAll('img').length).toBeGreaterThan(0);

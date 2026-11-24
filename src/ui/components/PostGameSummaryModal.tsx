@@ -89,10 +89,11 @@ export function PostGameSummaryModal({
             </span>
           }
         >
+          <ScorebookPrint moments={summary.moments ?? []} kept={humanClub.keepsakes} onKeep={keepMoment} />
           <div className="mb-3 space-y-2 border-b-2 border-[#d6bea0] pb-3">
-            <h3 className="font-display text-base sm:text-lg leading-tight text-[#173f3a]">
+            {(isHumanMvp || !summary.moments?.length) && <h3 className="font-display text-base sm:text-lg leading-tight text-[#173f3a]">
               {story}
-            </h3>
+            </h3>}
             <div className="flex flex-wrap items-center gap-2">
               {unopenedPackCount > 0 && onOpenFoilPacks ? (
                 <ComicButton
@@ -112,13 +113,13 @@ export function PostGameSummaryModal({
               ) : null}
             </div>
           </div>
-          <ScorebookPrint moments={summary.moments ?? []} kept={humanClub.keepsakes} onKeep={keepMoment} />
           <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
-            <div className="mx-auto w-full max-w-[260px]">
+            <div className={isHumanMvp || !summary.moments?.length ? "mx-auto w-full max-w-[260px]" : "mx-auto w-full max-w-[195px]"}>
               <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[#9E1B32]">
                 <Trophy className="w-4 h-4 text-[#FFC300]" />{' '}
                 {isHumanMvp ? 'Game MVP Spotlight' : 'Rival MVP Spotlight'}
               </div>
+              {!isHumanMvp && Boolean(summary.moments?.length) && <p className="mb-2 text-center text-sm font-bold">{story}</p>}
               <FlipBaseballCard
                 player={mvpCardPlayer}
                 team={{

@@ -64,6 +64,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await expect(page.getByTestId('first-pitch-tip')).toBeVisible();
   await expect(page.getByTestId('arcade-call-bar')).toBeVisible();
   await expect(page.getByTestId('arcade-hype-bar')).toBeVisible();
+  const tactics = page.getByRole('button', { name:'Tactics', exact:true });
+  if (await tactics.isVisible()) await tactics.click();
   await expect(page.getByTestId('arcade-speed-toggle')).toBeVisible();
   await expect(page.getByTestId('camera-angle-switcher')).toBeVisible();
   await expect(page.getByTestId('smart-watch-toggle')).toBeVisible();

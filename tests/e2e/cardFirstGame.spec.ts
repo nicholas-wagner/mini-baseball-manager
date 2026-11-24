@@ -18,6 +18,8 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   await expect(matchup.getByRole('button', { name: 'Inspect ' + name + ' card' })).toBeVisible();
   const guide = page.getByRole('region',{name:'First at-bat'});
   await guide.getByRole('button',{name:'More controls'}).click();
+  const tactics = page.getByRole('button', { name:'Tactics', exact:true });
+  if (await tactics.isVisible()) await tactics.click();
   await page.getByTestId('fast-sim-toggle').click();
   await page.getByRole('button', { name: /sim to end/i }).click();
   const recap = page.getByRole('dialog', { name: /post-game box score/i });
@@ -33,7 +35,7 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   await page.getByRole('button', { name: 'Dugout', exact:true }).click();
   await page.getByRole('dialog', { name: 'Dugout', exact:true }).getByRole('button', {name:'Roster', exact:true}).click();
   await page.getByTestId('roster-view-cards-btn').click();
-  await page.getByRole('button', { name: 'Print gallery' }).click();
+  await page.getByTestId('roster-view-gallery-btn').click();
   const gallery = page.getByRole('region', { name: 'Roster print gallery' });
   await gallery.getByRole('button').first().click();
   const enlarged = page.locator('dialog:modal');
@@ -136,4 +138,48 @@ test('the first pitch, field and handoff share a phone screen and survive visiti
   await expect(page.getByRole('group',{name:'Matchup cards'})).toContainText('Ethan Torres');
   await expect(page.getByRole('button',{name:'Toggle line score'})).toContainText('1 out');
   await expect(swing).toBeInViewport({ratio:1});
+});
+
+test('a compact phone keeps the chosen call, primary action and field together after rotation', async ({page, isMobile}) => {
+  test.skip(!isMobile, 'Compact phone layout');
+  test.slow();
+  await page.addInitScript(() => {
+    const random = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = a => a instanceof Uint32Array && a.length === 1 ? (a.fill(1994), a) : random(a);
+  });
+  await page.setViewportSize({width:360,height:640});
+  await page.goto('/');
+  await page.getByRole('button', {name:'Change club'}).click();
+  const useClub = page.getByRole('button', {name:'Use this club'});
+  await expect(useClub).toBeInViewport({ratio:1});
+  await useClub.click();
+  await page.getByRole('button',{name:'Pitch with Jasper'}).click();
+  await page.getByRole('button',{name:'More controls'}).click();
+  for (const size of [{width:360,height:640},{width:390,height:844},{width:844,height:390}]) {
+    await page.setViewportSize(size);
+    await expect(page.getByTestId('live-game-3d-canvas')).toBeInViewport({ratio:1});
+    await expect(page.getByRole('button',{name:/throw pitch \(next pitch\)/i})).toBeInViewport({ratio:1});
+    await expect(page.getByTestId('arcade-call-bar').getByRole('button',{pressed:true})).toBeInViewport({ratio:1});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(size.width);
+  }
+  await expect(page.getByTestId('arcade-speed-toggle')).toBeHidden();
+  const tactics = page.getByRole('button',{name:'Tactics'});
+  await tactics.click();
+  await expect(page.getByTestId('arcade-speed-toggle')).toBeVisible();
+  await tactics.click();
+  await page.setViewportSize({width:360,height:740});
+  for (const sign of await page.getByTestId('arcade-pitch-sign-bar').getByRole('button').all()) {
+    const rect = (await sign.boundingBox())!;
+    expect(Math.min(rect.width,rect.height)).toBeGreaterThanOrEqual(48);
+  }
+  await page.getByRole('button',{name:'Dugout',exact:true}).click();
+  await page.getByRole('dialog',{name:'Dugout'}).getByRole('button',{name:'Roster'}).click();
+  await page.setViewportSize({width:360,height:640});
+  await page.getByTestId('roster-view-cards-btn').click();
+  const firstName = page.getByTestId('binder-card-open-btn').first().locator('.binder-name');
+  await expect(firstName).toBeInViewport({ratio:1});
+  expect(await firstName.evaluate(el => {
+    const r = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));
+  })).toBe(true);
 });

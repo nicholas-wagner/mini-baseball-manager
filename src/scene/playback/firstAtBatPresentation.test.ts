@@ -129,3 +129,9 @@ it.each(['L','R'] as const)('keeps the selected corner across the catcher set an
     expect(shift).toBeCloseTo(targetOffset('paint_corners', side).x);
   }
 });
+
+it('holds the square-to-bunt cel from either side before the pitch', () => {
+  expect(rehearsalPose('bunt', 2, false)).toMatchObject({clip:'bat_bunt'});
+  expect(rehearsalPose('bunt', 0, true)).toEqual(rehearsalPose('bunt', 2, false));
+  for (const hand of ['L','R'] as const) expect(previewShot('bunt', hand)).toEqual(previewShot('contact', hand));
+});
