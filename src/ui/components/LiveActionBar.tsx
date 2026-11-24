@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import { FastForward, Play, RefreshCw, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
-import { PITCH_TYPE_SHORT_LABELS, type FormState } from '../../engine/models/player';
+import { PITCH_CALL_GUIDE, SWING_CALL_GUIDE } from '../../engine/gm/openingDayHook';
+import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
+import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
-import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
+import type {
+  ArcadeTimingGrade,
+  PitchTargetIntent,
+} from '../../engine/simulation/pitchMindGames';
 import type { GameDayControlMode } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
+import { ArcadeTimingMeter } from './ArcadeTimingMeter';
 import { CoachPopsAvatar } from './CoachPopsAvatar';
 
 export interface ArcadeBullpenOption {
@@ -14,6 +20,14 @@ export interface ArcadeBullpenOption {
   name: string;
   throws: string;
   roleLabel: string;
+}
+
+export interface PitcherSignOption {
+  pitchType: PitchType;
+  label: string;
+  mastery: number;
+  isFavorite: boolean;
+  isWeak: boolean;
 }
 
 interface LiveActionBarProps {
@@ -26,6 +40,14 @@ interface LiveActionBarProps {
   clutchRecap?: string | null;
   firstPitchTip?: string | null;
   bullpenOptions?: readonly ArcadeBullpenOption[];
+  buntPreviewLine?: string | null;
+  pitcherArsenal?: readonly PitcherSignOption[];
+  selectedPitchType?: PitchType | null;
+  onSelectPitchType?: (pitchType: PitchType | null) => void;
+  pitcherEndurance?: number;
+  pitcherEnduranceTier?: PitcherEnduranceTier;
+  pitcherStamina?: number;
+  pitcherFatigueDropTag?: string | null;
   latestEvent: PlayEvent | null;
   controlMode: GameDayControlMode;
   watchMode: 'live' | 'smart' | 'clutch' | 'paused';
@@ -41,9 +63,11 @@ interface LiveActionBarProps {
   onArmReadyPower?: () => void;
   speed?: 1 | 2 | 4;
   onCycleSpeed?: () => void;
+  arcadeTimingEnabled?: boolean;
+  onToggleArcadeTiming?: () => void;
   quickStealOption?: { label: string; runnerName: string; successPct: number; call: TacticalCall } | null;
   isBatterFavorite?: boolean;
-  onNextPitch: () => void;
+  onNextPitch: (timingGrade?: ArcadeTimingGrade) => void;
   onToggleWatchMode: () => void;
   onToggleSmartWatch?: () => void;
   onSimAtBat: () => void;
@@ -60,17 +84,14 @@ interface LiveActionBarProps {
   onInspectPlayers?: () => void;
 }
 
-const SIMPLE_BAT_APPROACHES: readonly { id: TacticalCall; label: string; hint: string }[] = [
-  { id: 'contact', label: '🎯 Contact', hint: 'Put it in play' },
-  { id: 'normal', label: '⚾ Normal', hint: 'Balanced swing' },
-  { id: 'power', label: '💥 Swing Big!', hint: 'Hunt home runs' },
-];
+const SIMPLE_BAT_APPROACHES = SWING_CALL_GUIDE;
 
-const SIMPLE_PITCH_CALLS: readonly { id: PitchTargetIntent; label: string; hint: string }[] = [
-  { id: 'high_heat', label: '🔥 Heat', hint: 'Fastball power' },
-  { id: 'bury_offspeed', label: '🌀 Trick', hint: 'Fool them' },
-  { id: 'paint_corners', label: '🎯 Corner', hint: 'Pinpoint edge' },
-];
+const SIMPLE_PITCH_CALLS = [
+  PITCH_CALL_GUIDE[3], // 🔥 Heat
+  PITCH_CALL_GUIDE[0], // 🎯 Over Plate
+  PITCH_CALL_GUIDE[1], // 🎨 Corner
+  PITCH_CALL_GUIDE[2], // 🌀 Low Chase
+] as const;
 
 function formEmoji(form: FormState): string {
   if (form === 'blazing' || form === 'hot') return ' 🔥';
@@ -88,6 +109,14 @@ export function LiveActionBar({
   clutchRecap,
   firstPitchTip = null,
   bullpenOptions = [],
+  buntPreviewLine = null,
+  pitcherArsenal = [],
+  selectedPitchType = null,
+  onSelectPitchType,
+  pitcherEndurance,
+  pitcherEnduranceTier = 'fresh',
+  pitcherStamina,
+  pitcherFatigueDropTag = null,
   latestEvent,
   controlMode,
   watchMode,
@@ -103,6 +132,8 @@ export function LiveActionBar({
   onArmReadyPower,
   speed = 1,
   onCycleSpeed,
+  arcadeTimingEnabled = false,
+  onToggleArcadeTiming,
   quickStealOption = null,
   isBatterFavorite = false,
   onNextPitch,
@@ -142,125 +173,229 @@ export function LiveActionBar({
   const hypeReadoutLabel = isHypeReady ? 'READY! 100%' : `${hypePct}%`;
   const hasBullpenPicker = bullpenOptions.length > 0 && Boolean(onSelectBullpenReliever);
 
+  const activeTradeoff = isBatting
+    ? tacticalCall === 'bunt' && buntPreviewLine
+      ? buntPreviewLine
+      : (SIMPLE_BAT_APPROACHES.find((opt) => opt.id === tacticalCall)?.tradeoff ??
+        SIMPLE_BAT_APPROACHES[1].tradeoff)
+    : (SIMPLE_PITCH_CALLS.find((opt) => opt.id === pitchTarget)?.tradeoff ??
+      SIMPLE_PITCH_CALLS[0].tradeoff);
+
+  const enduranceFillClass =
+    pitcherEnduranceTier === 'gassed'
+      ? 'bg-[#FF4D6D]'
+      : pitcherEnduranceTier === 'fatigued'
+        ? 'bg-[#FB923C]'
+        : pitcherEnduranceTier === 'tiring'
+          ? 'bg-[#FFCC49]'
+          : pitcherEnduranceTier === 'solid'
+            ? 'bg-[#2EC4B6]'
+            : 'bg-[#2FB356]';
+
   return (
     <div
       data-testid="live-action-bar"
-      className="rounded-2xl border-[3px] border-[#181B2C] bg-[#FFFDF7] shadow-[4px_4px_0_#181B2C] p-2 sm:p-3 space-y-1.5 sm:space-y-2"
+      className="rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] p-2.5 sm:p-3 space-y-2"
     >
-      {/* Row 1: Interactive 3-Call Arcade Choice (Batting & Pitching!) + High-Contrast Hype Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        {controlMode === 'simple' ? (
+      {/* Row 1: Unified Arcade Call Bar + 5-Word Trade-Off Hint + High-Contrast Hype Bar */}
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
+          {controlMode === 'simple' ? (
+            <div className="space-y-1 flex-1 min-w-[210px]">
+              <div
+                data-testid="arcade-call-bar"
+                className="flex flex-wrap items-center gap-1"
+              >
+                <span className="font-display text-[10px] uppercase text-[#193D37] mr-0.5">
+                  {isBatting ? 'Swing:' : 'Pitch:'}
+                </span>
+                {isBatting
+                  ? SIMPLE_BAT_APPROACHES.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        title={opt.tradeoff}
+                        aria-pressed={tacticalCall === opt.id}
+                        disabled={gameCompleted}
+                        onClick={() => onSelectTacticalCall(opt.id)}
+                        className={`px-2 py-1 min-h-11 rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer ${
+                          tacticalCall === opt.id
+                            ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
+                            : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                        }`}
+                      >
+                        {opt.shortLabel}
+                      </button>
+                    ))
+                  : SIMPLE_PITCH_CALLS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        title={opt.tradeoff}
+                        aria-pressed={pitchTarget === opt.id}
+                        disabled={gameCompleted}
+                        onClick={() => onSelectPitchTarget?.(opt.id)}
+                        className={`px-2 py-1 min-h-11 rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer ${
+                          pitchTarget === opt.id
+                            ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
+                            : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                        }`}
+                      >
+                        {opt.shortLabel}
+                      </button>
+                    ))}
+                {isBatting ? (
+                  <button
+                    type="button"
+                    data-testid="arcade-bunt-btn"
+                    title={buntPreviewLine ?? 'Lay down a sacrifice or drag bunt for a hit'}
+                    aria-pressed={tacticalCall === 'bunt'}
+                    disabled={gameCompleted}
+                    onClick={() =>
+                      onSelectTacticalCall(tacticalCall === 'bunt' ? 'normal' : 'bunt')
+                    }
+                    className={`px-2 py-1 min-h-11 rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer ${
+                      tacticalCall === 'bunt'
+                        ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
+                        : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                    }`}
+                  >
+                    🏏 Bunt
+                  </button>
+                ) : null}
+                {isBatting && quickStealOption ? (
+                  <button
+                    type="button"
+                    data-testid="arcade-steal-btn"
+                    aria-pressed={tacticalCall === quickStealOption.call}
+                    disabled={gameCompleted}
+                    onClick={() =>
+                      onSelectTacticalCall(
+                        tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
+                      )
+                    }
+                    className={`px-2 py-1 min-h-11 rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                      tacticalCall === quickStealOption.call
+                        ? 'bg-[#FFCC49] text-[#152F2E] shadow-[2px_2px_0_#192735]'
+                        : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFCC49]'
+                    }`}
+                  >
+                    💨 {quickStealOption.label} ({quickStealOption.successPct}%)
+                  </button>
+                ) : null}
+              </div>
+              {!isBatting && pitcherArsenal.length > 0 && onSelectPitchType ? (
+                <div
+                  data-testid="arcade-pitch-sign-bar"
+                  className="flex flex-wrap items-center gap-1 pt-0.5"
+                >
+                  <span className="font-display text-[9.5px] uppercase text-[#193D37]/80 mr-0.5">
+                    Sign:
+                  </span>
+                  <button
+                    type="button"
+                    aria-pressed={selectedPitchType === null}
+                    disabled={gameCompleted}
+                    onClick={() => onSelectPitchType(null)}
+                    className={`px-2 py-0.5 min-h-[30px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] cursor-pointer transition ${
+                      selectedPitchType === null
+                        ? 'bg-[#193D37] text-[#FFD166]'
+                        : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                    }`}
+                  >
+                    Auto
+                  </button>
+                  {pitcherArsenal.map((slot) => {
+                    const active = selectedPitchType === slot.pitchType;
+                    return (
+                      <button
+                        key={slot.pitchType}
+                        type="button"
+                        aria-pressed={active}
+                        disabled={gameCompleted}
+                        onClick={() => onSelectPitchType(active ? null : slot.pitchType)}
+                        className={`px-2 py-0.5 min-h-[30px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] cursor-pointer transition ${
+                          active
+                            ? 'bg-[#FFCC49] text-[#152F2E] shadow-[1px_1px_0_#192735]'
+                            : slot.isWeak
+                              ? 'bg-[#FFE5EC] text-[#9D0208] hover:bg-[#FFF3BF]'
+                              : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                        }`}
+                      >
+                        {slot.isFavorite ? '★ ' : slot.isWeak ? '⚠ ' : ''}
+                        {slot.label} {slot.mastery}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <div
+                data-testid="arcade-tradeoff-hint"
+                className="text-[11px] font-bold text-[#193D37]/85"
+              >
+                {activeTradeoff}
+              </div>
+            </div>
+          ) : null}
+
+          {/* High-Contrast ⚡ Special Power Hype Meter */}
           <div
-            data-testid="arcade-call-bar"
-            className="flex flex-wrap items-center gap-1"
+            data-testid="arcade-hype-bar"
+            className={`flex items-center justify-between gap-2 w-full sm:w-auto sm:ml-auto px-2.5 py-1.5 rounded-xl border-2 border-[#192735] ${
+              readyPowerLabel && onArmReadyPower ? 'bg-[#FFF3BF]' : 'bg-[#FFFDF8]'
+            }`}
           >
-            <span className="font-display text-[10px] uppercase text-[#1D3557] mr-0.5">
-              {isBatting ? 'Swing:' : 'Pitch:'}
-            </span>
-            {isBatting
-              ? SIMPLE_BAT_APPROACHES.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    title={opt.hint}
-                    aria-pressed={tacticalCall === opt.id}
-                    disabled={gameCompleted}
-                    onClick={() => onSelectTacticalCall(opt.id)}
-                    className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
-                      tacticalCall === opt.id
-                        ? 'bg-[#FF4D6D] text-white shadow-[2px_2px_0_#181B2C]'
-                        : 'bg-[#FBF4E4] text-[#181B2C] hover:bg-[#FFF3BF]'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))
-              : SIMPLE_PITCH_CALLS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    title={opt.hint}
-                    aria-pressed={pitchTarget === opt.id}
-                    disabled={gameCompleted}
-                    onClick={() => onSelectPitchTarget?.(opt.id)}
-                    className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
-                      pitchTarget === opt.id
-                        ? 'bg-[#1D3557] text-[#FFD166] shadow-[2px_2px_0_#181B2C]'
-                        : 'bg-[#E0FBFC] text-[#1D3557] hover:bg-[#FFF3BF]'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-            {isBatting && quickStealOption ? (
-              <button
-                type="button"
-                data-testid="arcade-steal-btn"
-                aria-pressed={tacticalCall === quickStealOption.call}
-                disabled={gameCompleted}
-                onClick={() =>
-                  onSelectTacticalCall(
-                    tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
-                  )
-                }
-                className={`px-2 py-1 min-h-11 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] cursor-pointer transition ${
-                  tacticalCall === quickStealOption.call
-                    ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
-                    : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFC300]'
+            <div className="flex items-center gap-2 flex-1 sm:flex-none sm:min-w-[136px]">
+              <span className="text-[10px] font-extrabold uppercase text-[#193D37] shrink-0">
+                ⚡ Hype
+              </span>
+              <div className="h-2.5 flex-1 min-w-[54px] rounded-full border border-[#192735] bg-white overflow-hidden">
+                <div
+                  className={`h-full transition-all ${
+                    isHypeReady ? 'bg-[#E63946]' : 'bg-[#FFCC49]'
+                  }`}
+                  style={{ width: `${hypePct}%` }}
+                />
+              </div>
+              <span
+                className={`font-mono-tabular text-[10px] uppercase shrink-0 ${
+                  isHypeReady ? 'text-[#9D0208] font-black' : 'text-[#193D37] font-extrabold'
                 }`}
               >
-                💨 {quickStealOption.label} ({quickStealOption.successPct}%)
+                {hypeReadoutLabel}
+              </span>
+            </div>
+            {readyPowerLabel && onArmReadyPower ? (
+              <button
+                type="button"
+                data-testid="arcade-unleash-power-btn"
+                disabled={gameCompleted}
+                onClick={onArmReadyPower}
+                className={`px-2.5 py-1 min-h-[34px] rounded-lg border-2 border-[#192735] font-display text-[10px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#192735] shrink-0 transition ${
+                  powerArmed
+                    ? 'bg-[#FF4D6D] text-white'
+                    : 'bg-[#FFCC49] text-[#152F2E] ring-2 ring-[#193D37] hover:bg-[#FFD86B]'
+                }`}
+              >
+                {powerArmed ? '🔥 ARMED!' : `⚡ ${readyPowerLabel}`}
               </button>
             ) : null}
           </div>
-        ) : null}
-
-        {/* High-Contrast ⚡ Special Power Hype Meter (Sleek full-width strip on phones, inline right on desktop!) */}
-        <div
-          data-testid="arcade-hype-bar"
-          className={`flex items-center justify-between gap-2 w-full sm:w-auto sm:ml-auto px-2 py-1 rounded-xl border-2 border-[#181B2C] ${
-            readyPowerLabel && onArmReadyPower ? 'bg-[#FFF8DC]' : 'bg-[#F5EEFF]'
-          }`}
-        >
-          <div className="flex items-center gap-2 flex-1 sm:flex-none sm:min-w-[140px]">
-            <span className="text-[10px] font-extrabold uppercase text-[#181B2C] shrink-0">
-              ⚡ Hype
-            </span>
-            <div className="h-2.5 flex-1 min-w-[54px] rounded-full border border-[#181B2C] bg-white overflow-hidden">
-              <div
-                className={`h-full transition-all ${
-                  isHypeReady ? 'bg-[#FF4D6D]' : 'bg-[#FFC300]'
-                }`}
-                style={{ width: `${hypePct}%` }}
-              />
-            </div>
-            <span
-              className={`font-mono-tabular text-[10px] uppercase shrink-0 ${
-                isHypeReady ? 'text-[#B51748] font-black' : 'text-[#4C1D95] font-extrabold'
-              }`}
-            >
-              {hypeReadoutLabel}
-            </span>
-          </div>
-          {readyPowerLabel && onArmReadyPower ? (
-            <button
-              type="button"
-              data-testid="arcade-unleash-power-btn"
-              disabled={gameCompleted}
-              onClick={onArmReadyPower}
-              className={`px-2.5 py-1 min-h-[34px] rounded-lg border-2 border-[#181B2C] font-display text-[10px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#181B2C] shrink-0 transition ${
-                powerArmed
-                  ? 'bg-[#FF4D6D] text-white'
-                  : 'bg-[#FFC300] text-[#181B2C] ring-2 ring-[#FF4D6D] hover:bg-[#FFD166]'
-              }`}
-            >
-              {powerArmed ? '🔥 ARMED!' : `⚡ ${readyPowerLabel}`}
-            </button>
-          ) : null}
         </div>
       </div>
 
-      {/* Row 2: Compact 2-Row Mobile Controller Grid (Zero orphan rows — always in thumb zone!) */}
+      {/* Optional Interactive Arcade Sweet-Spot Timing Bar */}
+      {arcadeTimingEnabled && !gameCompleted ? (
+        <ArcadeTimingMeter
+          isBatting={isBatting}
+          disabled={gameCompleted}
+          actionLabel={isBatting ? 'Swing!' : 'Throw Pitch!'}
+          powerArmed={powerArmed}
+          onLockTiming={(grade) => onNextPitch(grade)}
+        />
+      ) : null}
+
+      {/* Row 2: Balanced 2-Row Mobile Controller Grid (Never an orphan button on row 3!) */}
       <div data-testid="live-control-grid" className="space-y-1.5">
         <div
           className={
@@ -271,11 +406,11 @@ export function LiveActionBar({
         >
           <ComicButton
             size="sm"
-            variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'turf'}
+            variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'gold'}
             disabled={gameCompleted}
             icon={<Play className="w-3.5 h-3.5" />}
             aria-label={cue.primaryButtonLabel}
-            onClick={onNextPitch}
+            onClick={() => onNextPitch()}
             className="w-full px-2.5 text-xs whitespace-nowrap"
           >
             {isBatting ? 'Next Pitch' : 'Throw Pitch'}
@@ -284,7 +419,7 @@ export function LiveActionBar({
           {onToggleSmartWatch ? (
             <ComicButton
               size="sm"
-              variant={watchMode === 'smart' ? 'coral' : 'violet'}
+              variant={watchMode === 'smart' ? 'coral' : 'turf'}
               data-testid="smart-watch-toggle"
               disabled={gameCompleted}
               onClick={onToggleSmartWatch}
@@ -309,7 +444,13 @@ export function LiveActionBar({
         </div>
 
         <div
-          className={`grid gap-1.5 ${hasBullpenPicker ? 'grid-cols-3' : 'grid-cols-2'}`}
+          className={`grid gap-1.5 ${
+            hasBullpenPicker && onToggleArcadeTiming
+              ? 'grid-cols-2 sm:grid-cols-4'
+              : hasBullpenPicker || onToggleArcadeTiming
+                ? 'grid-cols-3'
+                : 'grid-cols-2'
+          }`}
         >
           <ComicButton
             size="sm"
@@ -340,6 +481,19 @@ export function LiveActionBar({
               className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
             >
               📞 Bullpen ({bullpenOptions.length})
+            </ComicButton>
+          ) : null}
+
+          {onToggleArcadeTiming ? (
+            <ComicButton
+              size="sm"
+              variant={arcadeTimingEnabled ? 'gold' : 'cream'}
+              data-testid="arcade-timing-toggle"
+              disabled={gameCompleted}
+              onClick={onToggleArcadeTiming}
+              className="w-full px-2 text-[11px] sm:text-xs whitespace-nowrap"
+            >
+              {arcadeTimingEnabled ? '🎯 Timing ON' : '🎯 Timing'}
             </ComicButton>
           ) : null}
 
@@ -479,14 +633,51 @@ export function LiveActionBar({
         </div>
         {latestEvent?.pitchThrown ? (
           <span
-            data-testid="last-pitch-radar-pill"
-            className="px-2 py-0.5 rounded-lg bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[10px] font-extrabold shrink-0"
+            data-testid="live-pitch-radar-pill"
+            className="px-2 py-0.5 rounded-lg bg-[#193D37] text-[#FFCC49] border border-[#192735] font-mono-tabular text-[10px] font-extrabold shrink-0"
           >
-            {latestEvent.pitchThrown.mph} mph {PITCH_TYPE_SHORT_LABELS[latestEvent.pitchThrown.pitchType]}
+            ⚾ {latestEvent.pitchThrown.mph} mph {PITCH_TYPE_SHORT_LABELS[latestEvent.pitchThrown.pitchType]}
             {latestEvent.pitchThrown.isFavoritePitch ? ' ★' : ''}
           </span>
         ) : null}
       </div>
+
+      {/* Visible Live Pitcher Stamina / Fatigue Bar (shows pitch count, endurance %, stamina & live effectiveness drop) */}
+      {typeof pitcherEndurance === 'number' ? (
+        <div
+          data-testid="live-pitcher-fatigue-strip"
+          className="px-2.5 py-1.5 rounded-xl border border-[#192735]/30 bg-[#FFFDF8] flex flex-wrap items-center justify-between gap-2 text-[10px] font-extrabold text-[#193D37]"
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-[160px]">
+            <span className="uppercase shrink-0">
+              💪 {pitcherName ? `${pitcherName.split(' ')[0]} Arm` : 'Pitcher Arm'}
+            </span>
+            <div className="h-2 flex-1 min-w-[64px] rounded-full border border-[#192735] bg-[#EFE6D2] overflow-hidden">
+              <div
+                className={`h-full transition-all ${enduranceFillClass}`}
+                style={{ width: `${Math.max(4, Math.min(100, pitcherEndurance))}%` }}
+              />
+            </div>
+            <span className="font-mono-tabular shrink-0">
+              {pitcherEndurance}% ({pitcherEnduranceTier.toUpperCase()})
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 font-mono-tabular shrink-0">
+            {typeof pitcherStamina === 'number' ? (
+              <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#192735]/25 text-[#1D3557]">
+                STA {pitcherStamina}
+              </span>
+            ) : null}
+            {pitcherFatigueDropTag ? (
+              <span className="px-1.5 py-0.5 rounded bg-[#FFE5EC] border border-[#9D0208]/40 text-[#9D0208]">
+                {pitcherFatigueDropTag}
+              </span>
+            ) : (
+              <span className="text-[#1B4332]">Full Stuff &amp; Control</span>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Row 3: Coach Pops' Contextual Turn & Action Cue + First-Pitch Welcome Tip + 1-Tap Card Inspection */}
       <div

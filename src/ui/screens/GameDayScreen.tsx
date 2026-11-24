@@ -6,6 +6,7 @@ import {
   CloudRain,
   Flame,
   Gift,
+  Palette,
   Play,
   RefreshCw,
   Sliders,
@@ -31,10 +32,13 @@ import {
 import { evaluatePreGameLineupCheck, summarizeLineupChange } from '../../engine/gm/seriesRecap';
 import {
   buildFirstPitchCoachTip,
+  buildMatchupScoutLine,
   evaluateWelcomeChecklist,
+  selectBetweenGameSpotlight,
   selectClubSpotlightTrio,
 } from '../../engine/gm/openingDayHook';
 import { getEligibleStealPlays } from '../../engine/simulation/baserunning';
+import { evaluateBuntOdds, formatBuntPreviewSummary } from '../../engine/simulation/buntResolver';
 import { getBattingSide, getDefenderAtPosition, getFieldingSide } from '../../engine/simulation/gameState';
 import { getNextAvailableStoryChapter } from '../../engine/story/storyEngine';
 import { useCareerStoryStore } from '../../store/careerSlots';
@@ -114,6 +118,7 @@ import {
 import {
   BATTER_GUESS_OPTIONS,
   PITCH_TARGET_OPTIONS,
+  type ArcadeTimingGrade,
   type BatterPitchGuess,
   type PitchTargetIntent,
 } from '../../engine/simulation/pitchMindGames';
@@ -192,6 +197,7 @@ interface GameDayScreenProps {
   onJumpToTab?: (tab: 'roster' | 'skills' | 'league' | 'economy') => void;
   onOpenStory?: () => void;
   onOpenRelics?: () => void;
+  onOpenUniforms?: () => void;
 }
 
 export function GameDayScreen({
@@ -199,6 +205,7 @@ export function GameDayScreen({
   onJumpToTab,
   onOpenStory,
   onOpenRelics,
+  onOpenUniforms,
 }: GameDayScreenProps = {}) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
@@ -238,6 +245,7 @@ export function GameDayScreen({
   const [derbyOpen, setDerbyOpen] = useState(false);
   const [trophyOpen, setTrophyOpen] = useState(false);
   const [openingSeasonExpanded, setOpeningSeasonExpanded] = useState(false);
+  const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
 
   const opponents = humanClub
     ? leagues[humanClub.leagueTier].filter((c) => c.id !== humanClub.id)
@@ -323,6 +331,8 @@ export function GameDayScreen({
   const wakeLockEnabled = useUserPreferencesStore((s) => s.wakeLockEnabled);
   const setControlMode = useUserPreferencesStore((s) => s.setGameDayControlMode);
   const toggleControlMode = useUserPreferencesStore((s) => s.toggleGameDayControlMode);
+  const arcadeTimingEnabled = useUserPreferencesStore((s) => s.arcadeTimingEnabled);
+  const toggleArcadeTiming = useUserPreferencesStore((s) => s.toggleArcadeTiming);
   const pendingLivePlayoff = usePostseasonStore((s) => s.pendingLiveGame);
   const recordLivePlayoffResult = usePostseasonStore((s) => s.recordLivePlayoffResult);
   const nemesisHistory = useNemesisStore((s) => s.history);
@@ -337,7 +347,7 @@ export function GameDayScreen({
   const scheduledIsHome = pendingLivePlayoff ? true : (nextScheduled?.isHome ?? true);
   const activeOpponent = opponents.find((c) => c.id === activeOpponentId) ?? scheduledOpponent;
 
-  const buildScheduledMoment = useCallback(() => {
+  const buildScheduledMoment = useCallback((isOpeningHero = false) => {
     if (!humanClub || !scheduledOpponent) return null;
     return createClutchMomentSession({
       awayClub: scheduledIsHome ? scheduledOpponent : humanClub,
@@ -347,10 +357,11 @@ export function GameDayScreen({
       awayGameplan: scheduledIsHome ? 'balanced' : activeGameplan,
       homeGameplan: scheduledIsHome ? activeGameplan : 'balanced',
       pressureLevel: pendingLivePlayoff?.pressureLevel ?? 'regular',
+      chargeOpeningPower: isOpeningHero,
     });
   }, [humanClub, scheduledOpponent, scheduledIsHome, worldSeed, gameLength, activeGameplan, pendingLivePlayoff]);
   const openingMoment = useMemo(() => !liveSession && humanClub && humanClub.wins + humanClub.losses === 0
-    ? openingRequest ?? buildScheduledMoment() : null, [openingRequest, buildScheduledMoment, liveSession, humanClub]);
+    ? openingRequest ?? buildScheduledMoment(true) : null, [openingRequest, buildScheduledMoment, liveSession, humanClub]);
 
   const rivalryPreview = useMemo(() => {
     if (!humanClub || !activeOpponent) return null;
@@ -656,12 +667,22 @@ export function GameDayScreen({
     [armedPowerId, batterGuess, defensiveShift, gameWeather, nemesisHistory, pitchTarget, selectedPitchType],
   );
 
-  const handleNextPitch = useCallback((call = tacticalCall) => {
+  const handleNextPitch = useCallback((call = tacticalCall, timingGrade?: ArcadeTimingGrade) => {
     if (!liveSession || liveSession.status === 'completed') return;
+    const humanBattingNow = (liveSession.half === 'BOT') === liveSession.home.isHuman;
+    const baseOpts = resolvePitchCallOption(liveSession);
     const { nextSession, events } = stepPitch(
       liveSession,
       call,
-      resolvePitchCallOption(liveSession),
+      timingGrade
+        ? {
+            ...baseOpts,
+            arcadeTiming: {
+              actor: humanBattingNow ? 'batter' : 'pitcher',
+              grade: timingGrade,
+            },
+          }
+        : baseOpts,
     );
     setArmedPowerId(null);
     applyStepResult(nextSession, events, activeOpponentId);
@@ -975,6 +996,59 @@ export function GameDayScreen({
     const openingOpponentLabel = scheduledOpponent
       ? `${scheduledIsHome ? 'vs' : '@'} ${scheduledOpponent.city} ${scheduledOpponent.name}`
       : undefined;
+    const totalUnspentSp =
+      humanClub.roster.reduce((sum, p) => sum + p.skillPoints, 0) + (manager?.skillPoints ?? 0);
+    const betweenGameSpotlight = !isOpeningDay
+      ? selectBetweenGameSpotlight({
+          canClaimStarterReward: welcomeChecklist.canClaimReward,
+          unopenedPackCount: unopenedPacks.length,
+          hasUnreadStoryBeat: Boolean(nextStoryBeat && onOpenStory),
+          storyBeatTitle: nextStoryBeat?.title,
+          hasGmDilemma: Boolean(activeGmInboxEvent),
+          gmDilemmaHeadline: activeGmInboxEvent?.title,
+          totalUnspentSp,
+          hasSeriesRecap: Boolean(lastSeriesRecap),
+          seriesRecapHeadline: lastSeriesRecap?.headline,
+        })
+      : null;
+
+    const handleSpotlightAction = (id: NonNullable<typeof betweenGameSpotlight>['primary'] extends infer T ? T extends { id: infer K } ? K : never : never) => {
+      if (id === 'starter_reward') {
+        const res = claimWelcomeChecklistReward();
+        if (res.claimed) {
+          awardFoilPack('sandlot_foil', 'Sandlot Starter Goals Complete!');
+          soundEngine.play('trophy_fanfare');
+          setGmQuickFeedback(`🎉 Starter Goals complete! +$${res.cashBonus.toLocaleString()} Cash + 🎁 Foil Pack!`);
+        }
+        return;
+      }
+      if (id === 'foil_pack') {
+        setFoilModalOpen(true);
+        soundEngine.play('ui_pop');
+        return;
+      }
+      if (id === 'story_chapter' && onOpenStory) {
+        soundEngine.play('ui_pop');
+        onOpenStory();
+        return;
+      }
+      if (id === 'skill_points' && onJumpToTab) {
+        soundEngine.play('ui_pop');
+        onJumpToTab('skills');
+        return;
+      }
+      if (id === 'derby_invite') {
+        setDerbyOpen(true);
+        soundEngine.play('organ_charge');
+        return;
+      }
+      if (id === 'series_recap' && typeof document !== 'undefined') {
+        document.querySelector('[data-testid="series-recap-card"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (id === 'gm_dilemma' && typeof document !== 'undefined') {
+        document.querySelector('[data-testid="manager-clipboard-banner"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      soundEngine.play('ui_pop');
+    };
 
     return (
       <div className="space-y-4">
@@ -986,24 +1060,34 @@ export function GameDayScreen({
             onInspect={(player) => setPreGameScoutPlayerId(player.id)}
           />
         )}
-        {unopenedPacks.length > 0 && !isOpeningDay ? (
-          <div className="p-3 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-r from-[#7209B7] via-[#F72585] to-[#FFC300] text-white flex flex-wrap items-center justify-between gap-2 shadow-[4px_4px_0_#181B2C]">
-            <div className="flex items-center gap-2 font-display text-xs sm:text-sm drop-shadow-[1px_1px_0_#181B2C]">
-              <Gift className="w-4 h-4 text-[#FFD166] shrink-0" />
-              <span>
-                You have {unopenedPacks.length} unopened 1994 Foil Booster Pack{unopenedPacks.length === 1 ? '' : 's'}!
-              </span>
+        {betweenGameSpotlight?.primary ? (
+          <div
+            data-testid="between-game-spotlight"
+            className="p-3 rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] flex flex-wrap items-center justify-between gap-2.5"
+          >
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#83601F]">
+                <span>{betweenGameSpotlight.primary.eyebrow}</span>
+                {betweenGameSpotlight.secondaryCount > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#192735]/30 text-[#1D3557]">
+                    +{betweenGameSpotlight.secondaryCount} more below
+                  </span>
+                ) : null}
+              </div>
+              <div className="font-display text-sm text-[#193D37] leading-snug">
+                {betweenGameSpotlight.primary.title}
+              </div>
+              <div className="text-[11px] font-bold text-[#4A5068]">
+                {betweenGameSpotlight.primary.detail}
+              </div>
             </div>
             <ComicButton
               size="sm"
-              variant="gold"
+              variant={betweenGameSpotlight.primary.tone}
               icon={<Sparkles className="w-3.5 h-3.5" />}
-              onClick={() => {
-                setFoilModalOpen(true);
-                soundEngine.play('ui_pop');
-              }}
+              onClick={() => handleSpotlightAction(betweenGameSpotlight.primary!.id)}
             >
-              Rip Foil Pack!
+              {betweenGameSpotlight.primary.ctaLabel}
             </ComicButton>
           </div>
         ) : null}
@@ -1451,57 +1535,64 @@ export function GameDayScreen({
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-2.5">
-                {!pendingLivePlayoff && !nextScheduled && onJumpToTab ? (
+              {/* Calm 1-Hero Play CTA + Tidy Secondary Modes */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {!pendingLivePlayoff && !nextScheduled && onJumpToTab ? (
+                    <ComicButton
+                      variant="gold"
+                      size="lg"
+                      icon={<Trophy className="w-4 h-4" />}
+                      onClick={() => {
+                        soundEngine.play('level_up');
+                        onJumpToTab('league');
+                      }}
+                    >
+                      Enter League Playoffs
+                    </ComicButton>
+                  ) : null}
+                  <ComicButton
+                    variant="turf"
+                    size="lg"
+                    icon={<Play className="w-4 h-4" />}
+                    onClick={() => handleStartLiveGame(false)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    Start Live 3D Game
+                  </ComicButton>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <ComicButton
+                    variant="violet"
+                    size="sm"
+                    data-testid="start-smart-watch-btn"
+                    icon={<Sparkles className="w-3.5 h-3.5" />}
+                    onClick={() => handleStartLiveGame('smart')}
+                  >
+                    ✨ Smart Watch 3D
+                  </ComicButton>
+                  <ComicButton
+                    variant="coral"
+                    size="sm"
+                    data-testid="start-clutch-moment-btn"
+                    icon={<Flame className="w-3.5 h-3.5" />}
+                    onClick={() => handleStartClutchMoment()}
+                  >
+                    Play Clutch Moment
+                  </ComicButton>
                   <ComicButton
                     variant="gold"
-                    size="lg"
-                    icon={<Trophy className="w-4 h-4" />}
-                    onClick={() => {
-                      soundEngine.play('level_up');
-                      onJumpToTab('league');
-                    }}
+                    size="sm"
+                    icon={<Zap className="w-3.5 h-3.5" />}
+                    onClick={handleInstantSimPreGame}
                   >
-                    Enter League Playoffs
+                    Instant Sim Game
                   </ComicButton>
-                ) : null}
-                <ComicButton
-                  variant="turf"
-                  size="lg"
-                  icon={<Play className="w-4 h-4" />}
-                  onClick={() => handleStartLiveGame(false)}
-                >
-                  Start Live 3D Game
-                </ComicButton>
-                <ComicButton
-                  variant="violet"
-                  size="lg"
-                  data-testid="start-smart-watch-btn"
-                  icon={<Sparkles className="w-4 h-4" />}
-                  onClick={() => handleStartLiveGame('smart')}
-                >
-                  ✨ Smart Watch 3D
-                </ComicButton>
-                <ComicButton
-                  variant="coral"
-                  size="lg"
-                  data-testid="start-clutch-moment-btn"
-                  icon={<Flame className="w-4 h-4" />}
-                  onClick={() => handleStartClutchMoment()}
-                >
-                  Play Clutch Moment
-                </ComicButton>
-                <ComicButton
-                  variant="gold"
-                  size="lg"
-                  icon={<Zap className="w-4 h-4" />}
-                  onClick={handleInstantSimPreGame}
-                >
-                  Instant Sim Game
-                </ComicButton>
+                </div>
               </div>
 
-              {/* Fun Side Activities: 30-Second Playable HR Derby & Trophy Sticker Album */}
+              {/* Fun Side Toys: 30s HR Derby, Uniform Studio & Trophy Sticker Album */}
               <div className="flex flex-wrap items-center gap-2">
                 <ComicButton
                   size="sm"
@@ -1515,6 +1606,20 @@ export function GameDayScreen({
                 >
                   💥 30s HR Derby
                 </ComicButton>
+                {onOpenUniforms ? (
+                  <ComicButton
+                    size="sm"
+                    variant="sky"
+                    data-testid="open-uniform-studio-btn"
+                    icon={<Palette className="w-3.5 h-3.5" />}
+                    onClick={() => {
+                      soundEngine.play('ui_pop');
+                      onOpenUniforms();
+                    }}
+                  >
+                    🎨 Uniform Studio
+                  </ComicButton>
+                ) : null}
                 <ComicButton
                   size="sm"
                   variant="gold"
@@ -1529,47 +1634,83 @@ export function GameDayScreen({
                 </ComicButton>
               </div>
 
-              {/* Compact Settings Bar: Game Length + Play Style */}
-              <div className="p-2.5 rounded-xl border-2 border-[#181B2C]/25 bg-[#FBF4E4] flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-extrabold uppercase text-[#181B2C]">
-                    Length:
+              {/* Compact Collapsible Game Length & Play Style Strip */}
+              <div className="p-2 rounded-xl border-2 border-[#181B2C]/25 bg-[#FBF4E4] space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] font-extrabold text-[#181B2C] flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-[#1B4332]" />
+                    <span>
+                      {gameLength} Innings • {controlMode === 'simple' ? 'Arcade Mode' : 'Pro Manager'}
+                      {arcadeTimingEnabled ? ' • 🎯 Timing ON' : ''}
+                    </span>
                   </span>
-                  {GAME_LENGTH_OPTIONS.map((opt) => (
-                    <ComicButton
-                      key={opt.innings}
-                      size="sm"
-                      variant={gameLength === opt.innings ? 'gold' : 'cream'}
-                      active={gameLength === opt.innings}
-                      onClick={() => setGameLength(opt.innings)}
-                    >
-                      {opt.label}
-                    </ComicButton>
-                  ))}
+                  <button
+                    type="button"
+                    data-testid="game-settings-toggle"
+                    aria-expanded={gameSettingsOpen}
+                    onClick={() => {
+                      setGameSettingsOpen((v) => !v);
+                      soundEngine.play('ui_pop');
+                    }}
+                    className="px-2.5 py-1 min-h-[36px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                  >
+                    {gameSettingsOpen ? 'Done ▴' : 'Length & Style ▾'}
+                  </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-extrabold uppercase text-[#181B2C] flex items-center gap-1">
-                    <Sliders className="w-3.5 h-3.5" />
-                    Style:
-                  </span>
-                  <ComicButton
-                    size="sm"
-                    variant={controlMode === 'simple' ? 'turf' : 'cream'}
-                    active={controlMode === 'simple'}
-                    onClick={() => setControlMode('simple')}
-                  >
-                    🎮 Arcade Mode (Simple)
-                  </ComicButton>
-                  <ComicButton
-                    size="sm"
-                    variant={controlMode === 'advanced' ? 'violet' : 'cream'}
-                    active={controlMode === 'advanced'}
-                    onClick={() => setControlMode('advanced')}
-                  >
-                    🧠 Pro Manager (All Controls)
-                  </ComicButton>
-                </div>
+                {gameSettingsOpen ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-dashed border-[#181B2C]/20">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-extrabold uppercase text-[#181B2C]">
+                        Length:
+                      </span>
+                      {GAME_LENGTH_OPTIONS.map((opt) => (
+                        <ComicButton
+                          key={opt.innings}
+                          size="sm"
+                          variant={gameLength === opt.innings ? 'gold' : 'cream'}
+                          active={gameLength === opt.innings}
+                          onClick={() => setGameLength(opt.innings)}
+                        >
+                          {opt.label}
+                        </ComicButton>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-extrabold uppercase text-[#181B2C]">
+                        Style:
+                      </span>
+                      <ComicButton
+                        size="sm"
+                        variant={controlMode === 'simple' ? 'turf' : 'cream'}
+                        active={controlMode === 'simple'}
+                        onClick={() => setControlMode('simple')}
+                      >
+                        🎮 Arcade Mode (Simple)
+                      </ComicButton>
+                      <ComicButton
+                        size="sm"
+                        variant={controlMode === 'advanced' ? 'violet' : 'cream'}
+                        active={controlMode === 'advanced'}
+                        onClick={() => setControlMode('advanced')}
+                      >
+                        🧠 Pro Manager (All Controls)
+                      </ComicButton>
+                      <ComicButton
+                        size="sm"
+                        variant={arcadeTimingEnabled ? 'gold' : 'cream'}
+                        active={arcadeTimingEnabled}
+                        onClick={() => {
+                          toggleArcadeTiming();
+                          soundEngine.play('ui_pop');
+                        }}
+                      >
+                        {arcadeTimingEnabled ? '🎯 Timing Bar ON' : '🎯 Timing Bar OFF'}
+                      </ComicButton>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               {/* Predetermined 7-Series Home & Away Season Schedule Strip (Horizontal Scroll on Phones!) */}
@@ -1676,7 +1817,8 @@ export function GameDayScreen({
                 ))}
               </div>
             </div>
-            {welcomeChecklist.canClaimReward ? (
+            {welcomeChecklist.canClaimReward &&
+            betweenGameSpotlight?.primary?.id !== 'starter_reward' ? (
               <ComicButton
                 size="sm"
                 variant="gold"
@@ -1692,6 +1834,10 @@ export function GameDayScreen({
               >
                 🎁 Claim Starter Reward!
               </ComicButton>
+            ) : welcomeChecklist.canClaimReward ? (
+              <span className="px-2 py-1 rounded-lg border border-[#181B2C]/30 bg-[#FFF3BF] text-[10px] font-extrabold text-[#181B2C]">
+                ✨ Ready to claim above ↑
+              </span>
             ) : !welcomeChecklist.steps[2].done && onJumpToTab ? (
               <ComicButton
                 size="sm"
@@ -1707,8 +1853,8 @@ export function GameDayScreen({
           </div>
         ) : null}
 
-        {/* Gentle Story & Origins Comic Adventure Nudge */}
-        {nextStoryBeat && onOpenStory ? (
+        {/* Gentle Story & Origins Comic Adventure Nudge (avoid duplicating when Spotlight already leads with it) */}
+        {nextStoryBeat && onOpenStory && betweenGameSpotlight?.primary?.id !== 'story_chapter' ? (
           <div
             data-testid="story-chapter-nudge"
             className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#F5EEFF] flex flex-wrap items-center justify-between gap-2 shadow-[3px_3px_0_#181B2C]"
@@ -1889,6 +2035,19 @@ export function GameDayScreen({
     pitcherEndurance,
     currentPitcher.pitchArsenal?.favoritePitch ?? 'four_seam',
   );
+  const pitcherFatigueParts: string[] = [];
+  if (enduranceFx.mphDrop < 0) pitcherFatigueParts.push(`${enduranceFx.mphDrop} mph`);
+  if (enduranceFx.controlDrop < 0) pitcherFatigueParts.push(`${enduranceFx.controlDrop} CTL`);
+  if (enduranceFx.breakDrop < 0) pitcherFatigueParts.push(`${enduranceFx.breakDrop} BRK`);
+  const pitcherFatigueDropTag =
+    pitcherFatigueParts.length > 0 ? pitcherFatigueParts.join(' · ') : null;
+  const livePitcherSignOptions = (currentPitcher.pitchArsenal?.repertoire ?? []).map((slot) => ({
+    pitchType: slot.pitchType,
+    label: PITCH_TYPE_SHORT_LABELS[slot.pitchType],
+    mastery: slot.mastery,
+    isFavorite: slot.pitchType === currentPitcher.pitchArsenal?.favoritePitch,
+    isWeak: slot.pitchType === currentPitcher.pitchArsenal?.weakestPitch,
+  }));
   const batterSpecial = canTriggerSpecialAbility(
     liveSession.abilityCooldowns,
     battingSideKey,
@@ -1917,6 +2076,27 @@ export function GameDayScreen({
   });
   const liveBattingSide = getBattingSide(liveSession);
   const liveFieldingSide = getFieldingSide(liveSession);
+  const buntPreviewLine = humanIsBatting
+    ? formatBuntPreviewSummary(
+        evaluateBuntOdds({
+          batter: currentBatter,
+          pitcher: currentPitcher,
+          pitchType: currentPitcher.pitchArsenal?.favoritePitch ?? 'four_seam',
+          pitchQuality: Math.round(
+            (currentPitcher.ratings.velocity + currentPitcher.ratings.movement) * 0.5 +
+              enduranceFx.mphDrop +
+              enduranceFx.breakDrop,
+          ),
+          pitchTarget,
+          defenseShift: defensiveShift,
+          charger: getDefenderAtPosition(liveFieldingSide, '3B') ?? currentPitcher,
+          firstBaseBonus: platoon.firstBaseStepBonus,
+          extraBuntBonus: 0,
+          outs: liveSession.outs,
+          hasRunners: liveSession.bases.some(Boolean),
+        }),
+      )
+    : null;
   const quickStealCandidates = humanIsBatting
     ? getEligibleStealPlays(
         liveSession.bases,
@@ -2134,7 +2314,13 @@ export function GameDayScreen({
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
+      <div
+        className={
+          guiding && !showMore
+            ? 'max-w-3xl mx-auto space-y-2'
+            : 'grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start'
+        }
+      >
         <div className="space-y-3">
           {/* Unified 3D Ballpark + Directly Attached Live Action Bar (always visible together!) */}
           <div className="space-y-2">
@@ -2206,35 +2392,50 @@ export function GameDayScreen({
                 ) : readout ? <div key={playbackEvent?.seq} className="flex items-center gap-1" role="status">
                   {playbackEvent?.outcome === 'foul' && <span className="foul-peek" aria-hidden="true"><ClubMascotBuddy mascot={humanClub.mascot}
                     primaryColor={humanClub.colors.primary} secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm" /></span>}
-                  <span className="plate-verdict">{readout.label}</span>
+                  <span className="plate-verdict">
+                    {readout.label}
+                    {playbackEvent?.pitchThrown
+                      ? ` · ${playbackEvent.pitchThrown.mph} mph ${PITCH_TYPE_SHORT_LABELS[playbackEvent.pitchThrown.pitchType]}`
+                      : ''}
+                  </span>
                 </div> : null
               }
             />
-            <MatchupPrints
-              memories={humanClub.keepsakes}
-              batter={picturedBatter}
-              pitcher={picturedPitcher}
-              batterFavorite={favoritePlayerIds.includes(picturedBatter.id)}
-              pitcherFavorite={favoritePlayerIds.includes(picturedPitcher.id)}
-              batterPowerReady={
-                humanIsBatting &&
-                Boolean(readyPowerOption) &&
-                picturedBatter.id === currentBatter.id
-              }
-              pitcherPowerReady={
-                !humanIsBatting &&
-                Boolean(readyPowerOption) &&
-                picturedPitcher.id === currentPitcher.id
-              }
-              batterPowerArmed={
-                humanIsBatting && Boolean(armedPowerId) && picturedBatter.id === currentBatter.id
-              }
-              pitcherPowerArmed={
-                !humanIsBatting && Boolean(armedPowerId) && picturedPitcher.id === currentPitcher.id
-              }
-              latestEvent={pendingDecision || showNextMatchup || (handoff && !playing) || lastChoreo?.play?.holdForceCall ? null : playbackEvent}
-              onInspect={openGamePlayerCard}
-            />
+            {(() => {
+              const scoutLine = buildMatchupScoutLine(picturedBatter, picturedPitcher, shown);
+              return (
+                <MatchupPrints
+                  memories={humanClub.keepsakes}
+                  batter={picturedBatter}
+                  pitcher={picturedPitcher}
+                  batterScoutLine={scoutLine.batterLine}
+                  pitcherScoutLine={scoutLine.pitcherLine}
+                  pitcherEndurance={pitcherEndurance}
+                  pitcherEnduranceTier={enduranceFx.tier}
+                  pitcherFatigueDropTag={pitcherFatigueDropTag}
+                  batterFavorite={favoritePlayerIds.includes(picturedBatter.id)}
+                  pitcherFavorite={favoritePlayerIds.includes(picturedPitcher.id)}
+                  batterPowerReady={
+                    humanIsBatting &&
+                    Boolean(readyPowerOption) &&
+                    picturedBatter.id === currentBatter.id
+                  }
+                  pitcherPowerReady={
+                    !humanIsBatting &&
+                    Boolean(readyPowerOption) &&
+                    picturedPitcher.id === currentPitcher.id
+                  }
+                  batterPowerArmed={
+                    humanIsBatting && Boolean(armedPowerId) && picturedBatter.id === currentBatter.id
+                  }
+                  pitcherPowerArmed={
+                    !humanIsBatting && Boolean(armedPowerId) && picturedPitcher.id === currentPitcher.id
+                  }
+                  latestEvent={pendingDecision || showNextMatchup || (handoff && !playing) || lastChoreo?.play?.holdForceCall ? null : playbackEvent}
+                  onInspect={openGamePlayerCard}
+                />
+              );
+            })()}
 
             {handoff && !playing && playbackEvent && prePlaySession && lastChoreo ?
               <RallyResult detail={scoringDetail(playbackEvent, lastChoreo.play)} gameOver={liveSession.status === 'completed'} before={prePlaySession} event={playbackEvent}
@@ -2248,10 +2449,27 @@ export function GameDayScreen({
                   setPlaybackEvent(null);
                   if (delayedSummary) { setModalSummary(delayedSummary.summary); setDelayedSummary(null); }
                 }} /> : guiding && <FirstAtBat session={shown} batting={guidedBatting} target={pitchTarget} call={tacticalCall}
-              locked={playing} expanded={showMore} powerArmed={Boolean(armedPowerId)} cue={liveCue} onExpand={()=>setShowMore(v=>!v)}
+              locked={playing} expanded={showMore} powerArmed={Boolean(armedPowerId)}
+              readyPowerName={readyPowerOption?.name ?? null}
+              arcadeTimingEnabled={arcadeTimingEnabled}
+              onToggleArcadeTiming={() => {
+                toggleArcadeTiming();
+                soundEngine.play('ui_pop');
+              }}
+              onArmPower={
+                readyPowerOption
+                  ? () => {
+                      setArmedPowerId((prev) =>
+                        prev === readyPowerOption.id ? null : readyPowerOption.id,
+                      );
+                      soundEngine.play('clutch_stinger');
+                    }
+                  : undefined
+              }
+              cue={liveCue} onExpand={()=>setShowMore(v=>!v)}
               onTarget={target=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setPitchTarget(target);}}
               onSwing={call=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setTacticalCall(call);}}
-              onPitch={handleNextPitch} onSuggested={()=>{
+              onPitch={(grade) => handleNextPitch(tacticalCall, grade)} onSuggested={()=>{
                 const action = liveCue.suggestedAction;
                 if (action?.type === 'steal' && action.tacticalCall) handleNextPitch(action.tacticalCall);
                 else if (action) handleSuggestedAction(action);
@@ -2272,6 +2490,17 @@ export function GameDayScreen({
               clutchRecap={clutchRecap}
               firstPitchTip={firstPitchTip}
               bullpenOptions={humanIsBatting ? [] : arcadeBullpenOptions}
+              buntPreviewLine={buntPreviewLine}
+              pitcherArsenal={humanIsBatting ? [] : livePitcherSignOptions}
+              selectedPitchType={selectedPitchType}
+              onSelectPitchType={(pt) => {
+                setSelectedPitchType(pt);
+                soundEngine.play('ui_pop');
+              }}
+              pitcherEndurance={pitcherEndurance}
+              pitcherEnduranceTier={enduranceFx.tier}
+              pitcherStamina={currentPitcher.ratings.stamina}
+              pitcherFatigueDropTag={pitcherFatigueDropTag}
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
               watchMode={watchMode}
@@ -2289,6 +2518,11 @@ export function GameDayScreen({
                 setSpeed((s) => (s === 1 ? 2 : s === 2 ? 4 : 1));
                 soundEngine.play('ui_pop');
               }}
+              arcadeTimingEnabled={arcadeTimingEnabled}
+              onToggleArcadeTiming={() => {
+                toggleArcadeTiming();
+                soundEngine.play('ui_pop');
+              }}
               quickStealOption={bestQuickSteal}
               isBatterFavorite={favoritePlayerIds.includes(currentBatter.id)}
               onArmReadyPower={
@@ -2301,9 +2535,9 @@ export function GameDayScreen({
                     }
                   : undefined
               }
-              onNextPitch={() => {
+              onNextPitch={(grade) => {
                 setSmartPauseReason(null);
-                handleNextPitch();
+                handleNextPitch(tacticalCall, grade);
               }}
               onToggleWatchMode={() => {
                 setSmartPauseReason(null);
@@ -2351,10 +2585,13 @@ export function GameDayScreen({
             ) : null}
           </div>
 
-          {/* Dynamic Weather, Park Factors & 1-Tap Live Box Score Strip */}
-          {(() => {
+          {/* Quiet Guided Mode: keep Weather, Rivalry & Broadcast HUD hidden until More Controls or full game */}
+          {(!guiding || showMore) ? (() => {
             const park = getBallparkPreset(liveSession.ballparkId);
             const weatherImpact = gameWeather ? evaluateWeatherSimulationImpact(gameWeather) : null;
+            const hasParkTilt =
+              park.factors.hrFactor !== 1 ||
+              Boolean(weatherImpact && weatherImpact.hrCarryMultiplier !== 1);
             return (
               <div className="space-y-2">
                 <div
@@ -2371,12 +2608,20 @@ export function GameDayScreen({
                     <span className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[10px] text-[#1D3557]">
                       {weatherImpact ? weatherImpact.hudLabel : 'Clear Ballpark Skies'}
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[10px]">
-                      Park HR {park.factors.hrFactor.toFixed(2)}x
-                      {weatherImpact && weatherImpact.hrCarryMultiplier !== 1
-                        ? ` • Wind Carry ${weatherImpact.hrCarryMultiplier.toFixed(2)}x`
-                        : ''}
-                    </span>
+                    {hasParkTilt ? (
+                      <span
+                        data-testid="park-factor-pill"
+                        className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[10px]"
+                      >
+                        {park.factors.hrFactor !== 1 ? `Park HR ${park.factors.hrFactor.toFixed(2)}x` : ''}
+                        {park.factors.hrFactor !== 1 && weatherImpact && weatherImpact.hrCarryMultiplier !== 1
+                          ? ' • '
+                          : ''}
+                        {weatherImpact && weatherImpact.hrCarryMultiplier !== 1
+                          ? `Wind Carry ${weatherImpact.hrCarryMultiplier.toFixed(2)}x`
+                          : ''}
+                      </span>
+                    ) : null}
                   </div>
                   <ComicButton
                     size="sm"
@@ -2413,24 +2658,26 @@ export function GameDayScreen({
                 ) : null}
               </div>
             );
-          })()}
+          })() : null}
 
-          <BroadcastHud
-            session={liveSession}
-            winProbHistory={winProbHistory}
-            defensiveShift={defensiveShift}
-            onSelectShift={(shift) => {
-              setDefensiveShift(shift);
-              soundEngine.play('ui_pop');
-            }}
-            activeTacticalCall={tacticalCall}
-            onSelectStealCall={(call) => {
-              setTacticalCall((prev) => (prev === call ? 'normal' : call));
-              soundEngine.play('ui_pop');
-            }}
-            lastEvent={recentEvents[0] ?? null}
-            atBatEvents={atBatEvents}
-          />
+          {(!guiding || showMore) ? (
+            <BroadcastHud
+              session={liveSession}
+              winProbHistory={winProbHistory}
+              defensiveShift={defensiveShift}
+              onSelectShift={(shift) => {
+                setDefensiveShift(shift);
+                soundEngine.play('ui_pop');
+              }}
+              activeTacticalCall={tacticalCall}
+              onSelectStealCall={(call) => {
+                setTacticalCall((prev) => (prev === call ? 'normal' : call));
+                soundEngine.play('ui_pop');
+              }}
+              lastEvent={recentEvents[0] ?? null}
+              atBatEvents={atBatEvents}
+            />
+          ) : null}
 
           {controlMode === 'advanced' ? (
             <ComicCard
@@ -2753,6 +3000,7 @@ export function GameDayScreen({
           ) : null}
         </div>
 
+        {(!guiding || showMore) ? (
         <div className="space-y-3">
           <ComicCard
             title="PLAY-BY-PLAY TICKER"
@@ -3026,6 +3274,7 @@ export function GameDayScreen({
             </>
           ) : null}
         </div>
+        ) : null}
       </div>
 
       <LiveBoxScoreModal

@@ -203,7 +203,7 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
     expect(album.favoriteCount).toBe(2);
   });
 
-  it('starts fresh rosters at 0 SP so Day-1 Spark yields exactly 2 player SP (+1 Manager = 3 total) and hides Ballpark badge before Game 1', () => {
+  it('starts fresh rosters at 0 SP so Day-1 Spark yields exactly 2 player SP (+1 Manager = 3 total) and quiets Skills & Clubhouse badges before Game 1', () => {
     const club = makeClub(1994);
     expect(club.roster.every((p) => p.skillPoints === 0)).toBe(true);
 
@@ -218,8 +218,9 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
       currentSeriesIndex: 0,
       unopenedPackCount: 1,
     });
-    expect(preGameInbox.tabBadges.skills).toBe('⚡ 3');
+    expect(preGameInbox.tabBadges.skills).toBeUndefined();
     expect(preGameInbox.tabBadges.economy).toBeUndefined();
+    expect(preGameInbox.playerSpTotal + preGameInbox.managerSpTotal).toBe(3);
 
     const postGameInbox = buildManagerActionInbox({
       club: { ...sparked, wins: 1, economy: { ...sparked.economy, cash: 25_000 } },
@@ -227,6 +228,7 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
       currentSeriesIndex: 0,
       unopenedPackCount: 1,
     });
+    expect(postGameInbox.tabBadges.skills).toBe('⚡ 3');
     expect(postGameInbox.tabBadges.economy).toBe('⬆');
   });
 

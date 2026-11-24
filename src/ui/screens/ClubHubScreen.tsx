@@ -161,8 +161,8 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
   return (
     <div className="space-y-4">
       <ComicCard
-        title={`${club.city.toUpperCase()} ${club.name.toUpperCase()} — CLUBHOUSE & BALLPARK HQ`}
-        subtitle={`Cash $${club.economy.cash.toLocaleString()} • Home: ${activePark.name} • Staff ${activeStaff.length}/${staffSlotCap}`}
+        title={`${club.city.toUpperCase()} ${club.name.toUpperCase()} — CLUBHOUSE HQ`}
+        subtitle={`Uniforms, Relics, Ballpark, Trades & Gazette • Cash $${club.economy.cash.toLocaleString()} • Home: ${activePark.name} • Staff ${activeStaff.length}/${staffSlotCap}`}
         headerBg="#1B4332"
         badge={
           <div

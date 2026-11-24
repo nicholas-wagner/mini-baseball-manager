@@ -117,6 +117,18 @@ const OUTCOME_POP_ART_TABLE: Readonly<
   },
 };
 
+/** Estimates a juicy retro arcade home-run distance in feet from 3D landing coordinates. */
+export function estimateHomeRunDistanceFt(event: PlayEvent): number {
+  const flight = event.ballFlight;
+  if (flight) {
+    const radial = Math.hypot(flight.landingX, flight.landingZ);
+    const scaled = Math.round(240 + radial * 3.7 + (flight.apexY ?? 12) * 0.9);
+    return Math.max(365, Math.min(460, scaled));
+  }
+  const mphSeed = event.pitchThrown?.mph ?? 90;
+  return 378 + ((event.seq * 13 + mphSeed) % 58);
+}
+
 function buildStealBanner(event: PlayEvent): ComicPopArtBanner {
   const caught = event.outsAfter > event.outsBefore;
   return {
@@ -189,6 +201,26 @@ function detectInGameMilestoneBanner(
   return detectBatterMilestone(event, session) ?? detectPitcherMilestone(event, session);
 }
 
+function buildOutcomePopArt(event: PlayEvent): ComicPopArtBanner | null {
+  const preset = event.outcome ? OUTCOME_POP_ART_TABLE[event.outcome] : undefined;
+  if (!preset) return null;
+  if (event.outcome === 'home_run') {
+    return {
+      ...preset,
+      title: `💥 ${estimateHomeRunDistanceFt(event)} FT MOONSHOT!!`,
+      subtitle: event.commentary,
+    };
+  }
+  if (event.outcome === 'strikeout' && event.pitchThrown?.mph) {
+    return {
+      ...preset,
+      title: `⚡ ${event.pitchThrown.mph} MPH — STRIKE THREE!`,
+      subtitle: event.commentary,
+    };
+  }
+  return { ...preset, subtitle: event.commentary };
+}
+
 /** Builds punchy 90s Saturday-morning cartoon pop-art callouts + Coach Pops dugout quips. */
 export function buildComicPopArtBanner(
   event: PlayEvent | null,
@@ -220,6 +252,5 @@ export function buildComicPopArtBanner(
   if (event.type === 'stolen_base_attempt') {
     return buildStealBanner(event);
   }
-  const preset = event.outcome ? OUTCOME_POP_ART_TABLE[event.outcome] : undefined;
-  return preset ? { ...preset, subtitle: event.commentary } : null;
+  return buildOutcomePopArt(event);
 }

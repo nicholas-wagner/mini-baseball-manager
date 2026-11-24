@@ -1,21 +1,36 @@
 import { useEffect, useState } from 'react';
-import { Disc3, MapPin, Music, Volume2, VolumeX, X } from 'lucide-react';
-import { BGM_TRACKS, bgmEngine } from '../../audio/bgmEngine';
+import { Disc3, Lock, MapPin, Music, Volume2, VolumeX, X } from 'lucide-react';
+import {
+  BGM_TRACKS,
+  bgmEngine,
+  getBgmTracksForTier,
+  LEAGUE_TIER_MUSIC_LABELS,
+} from '../../audio/bgmEngine';
+import type { LeagueTierId } from '../../engine/models/club';
 import { ComicButton } from '../design-system/ComicButton';
 
 interface MusicJukeboxModalProps {
   open: boolean;
+  leagueTier?: LeagueTierId;
   onClose: () => void;
 }
 
-export function MusicJukeboxModal({ open, onClose }: MusicJukeboxModalProps) {
+const ORDERED_TIERS: readonly LeagueTierId[] = ['rookie', 'low_a', 'high_a', 'aa', 'aaa', 'majors'];
+
+export function MusicJukeboxModal({ open, leagueTier, onClose }: MusicJukeboxModalProps) {
   const [bgmState, setBgmState] = useState(() => bgmEngine.getState());
 
   useEffect(() => bgmEngine.subscribe(setBgmState), []);
 
   if (!open) return null;
 
-  const activeTrack = BGM_TRACKS.find((t) => t.id === bgmState.trackId) ?? BGM_TRACKS[0];
+  const activeTier: LeagueTierId = leagueTier ?? bgmState.currentLeagueTier;
+  const availableTracks = getBgmTracksForTier(activeTier);
+  const lockedTiers = ORDERED_TIERS.filter((t) => t !== activeTier);
+  const activeTrack =
+    availableTracks.find((t) => t.id === bgmState.trackId) ??
+    BGM_TRACKS.find((t) => t.id === bgmState.trackId) ??
+    availableTracks[0];
 
   return (
     <div
@@ -40,7 +55,7 @@ export function MusicJukeboxModal({ open, onClose }: MusicJukeboxModalProps) {
                 90s ARCADE STADIUM JUKEBOX
               </div>
               <div className="text-[11px] font-bold text-[#FFD166] truncate">
-                Unique environmental music for every ballpark — gentle volume &amp; mutable anytime
+                {LEAGUE_TIER_MUSIC_LABELS[activeTier]} Soundtrack — climb leagues to unlock higher-tier anthems!
               </div>
             </div>
           </div>
@@ -61,7 +76,7 @@ export function MusicJukeboxModal({ open, onClose }: MusicJukeboxModalProps) {
                 {bgmState.enabled ? `♪ ${activeTrack.title}` : '♪ Background Music Muted'}
               </div>
               <div className="text-[11px] font-bold text-[#4A5068]">
-                🏟️ {activeTrack.stadiumLabel} • {activeTrack.vibe} ({activeTrack.bpm} BPM)
+                🏟️ {LEAGUE_TIER_MUSIC_LABELS[activeTier]} • {activeTrack.vibe} ({activeTrack.bpm} BPM)
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -72,7 +87,7 @@ export function MusicJukeboxModal({ open, onClose }: MusicJukeboxModalProps) {
                 icon={<MapPin className="w-3.5 h-3.5" />}
                 onClick={() => bgmEngine.setAutoMatchStadium(!bgmState.autoMatchStadium)}
               >
-                {bgmState.autoMatchStadium ? 'Auto: Match Stadium' : 'Manual Pin'}
+                {bgmState.autoMatchStadium ? 'Auto: Match Park' : 'Manual Pin'}
               </ComicButton>
               <ComicButton
                 size="sm"
@@ -107,39 +122,77 @@ export function MusicJukeboxModal({ open, onClose }: MusicJukeboxModalProps) {
             />
           </label>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {BGM_TRACKS.map((track) => {
-              const selected = bgmState.trackId === track.id;
-              return (
-                <button
-                  key={track.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => {
-                    if (!bgmState.enabled) bgmEngine.setEnabled(true);
-                    bgmEngine.selectTrack(track.id);
-                  }}
-                  className={`min-h-[52px] p-2.5 rounded-xl border-2 border-[#181B2C] text-left transition-all cursor-pointer ${
-                    selected
-                      ? 'bg-[#FFC300] text-[#181B2C] shadow-[3px_3px_0_#181B2C]'
-                      : 'bg-white text-[#181B2C] hover:bg-[#FFFDF7]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-display text-xs flex items-center gap-1">
-                      <Music className="w-3.5 h-3.5 shrink-0" />
-                      {track.title}
-                    </span>
-                    <span className="text-[10px] font-mono-tabular font-extrabold text-[#4A5068]">
-                      {track.bpm} BPM
-                    </span>
-                  </div>
-                  <div className="text-[10px] font-extrabold text-[#1B4332] mt-0.5">
-                    🏟️ {track.stadiumLabel} — {track.vibe}
-                  </div>
-                </button>
-              );
-            })}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#1B4332]">
+              🎵 {LEAGUE_TIER_MUSIC_LABELS[activeTier]} Tracks ({availableTracks.length} Options)
+            </div>
+            <div data-testid="jukebox-tier-tracks" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {availableTracks.map((track) => {
+                const selected = bgmState.trackId === track.id;
+                return (
+                  <button
+                    key={track.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      bgmEngine.syncLeagueTier(activeTier);
+                      if (!bgmState.enabled) bgmEngine.setEnabled(true);
+                      bgmEngine.selectTrack(track.id);
+                    }}
+                    className={`min-h-[52px] p-2.5 rounded-xl border-2 border-[#181B2C] text-left transition-all cursor-pointer ${
+                      selected
+                        ? 'bg-[#FFC300] text-[#181B2C] shadow-[3px_3px_0_#181B2C]'
+                        : 'bg-white text-[#181B2C] hover:bg-[#FFFDF7]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-display text-xs flex items-center gap-1">
+                        <Music className="w-3.5 h-3.5 shrink-0" />
+                        {track.title}
+                      </span>
+                      <span className="text-[10px] font-mono-tabular font-extrabold text-[#4A5068]">
+                        {track.bpm} BPM
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-extrabold text-[#1B4332] mt-0.5">
+                      🏟️ {track.stadiumLabel} — {track.vibe}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div
+            data-testid="jukebox-locked-tiers"
+            className="pt-2 border-t-2 border-dashed border-[#181B2C]/20 space-y-2"
+          >
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4A5068] flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5" />
+              Other League Soundtracks (Available When Playing at That Level)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {lockedTiers.flatMap((tier) =>
+                getBgmTracksForTier(tier).map((track) => (
+                  <button
+                    key={track.id}
+                    type="button"
+                    disabled
+                    className="p-2 rounded-xl border-2 border-[#181B2C]/30 bg-[#EFE6D2] text-[#4A5068] text-left opacity-75 cursor-not-allowed"
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="font-display text-[11px] flex items-center gap-1 truncate">
+                        <Lock className="w-3 h-3 shrink-0" />
+                        {track.title}
+                      </span>
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-white/70 border border-[#181B2C]/25 shrink-0">
+                        {LEAGUE_TIER_MUSIC_LABELS[tier]}
+                      </span>
+                    </div>
+                  </button>
+                )),
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -21,6 +21,7 @@ describe('App — Production Hidden Design Lab with 5x "d" Secret Toggle', () =>
 
     // 2. Typing "d" 5 times inside a text input must NOT reveal Design Lab
     fireEvent.click(screen.getByRole("button", { name: "Change club" }));
+    fireEvent.click(screen.getByTestId('creator-customize-toggle'));
     const inputs = screen.getAllByRole('textbox');
     for (let i = 0; i < 5; i += 1) {
       fireEvent.keyDown(inputs[0], { key: 'd' });

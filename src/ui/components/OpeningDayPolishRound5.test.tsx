@@ -30,14 +30,21 @@ describe('Opening Day Polish Round 5 (Clean Badges, Unified Opening Story, 2-Row
     });
   });
 
-  it('shows ⚡ 3 (not 21) and suppresses Ballpark ⬆ & Menu dot before Game 1 on App', () => {
+  it('quiets noisy Skill Tree, Clubhouse & Menu badges before Game 1 and reveals them after Game 1', () => {
     useFoilPackStore.getState().awardPack('sandlot_foil', 'Opening Day Gift!');
-    render(<App />);
+    const { unmount } = render(<App />);
 
-    expect(screen.getAllByText('⚡ 3').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('⚡ 3')).not.toBeInTheDocument();
     expect(screen.queryByText('⚡ 21')).not.toBeInTheDocument();
     expect(screen.queryByText('⬆')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mobile-menu-badge-dot')).not.toBeInTheDocument();
+    unmount();
+
+    const club = useGameStore.getState().getHumanClub()!;
+    const rival = useGameStore.getState().leagues[club.leagueTier].find((c) => c.id !== club.id)!;
+    useGameStore.getState().playInstantExhibition(rival.id, 1994);
+    render(<App />);
+    expect(screen.getAllByText('⚡ 3').length).toBeGreaterThanOrEqual(1);
   });
 
   it('fans 3 real manga player cards in the ClubCreatorScreen hero beside the mascot', () => {

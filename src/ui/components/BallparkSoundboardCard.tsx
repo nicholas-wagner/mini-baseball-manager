@@ -90,7 +90,7 @@ export function BallparkSoundboardCard() {
                   aria-pressed={selected}
                   onClick={() => {
                     if (!bgmState.enabled) bgmEngine.setEnabled(true);
-                    bgmEngine.selectTrack(track.id);
+                    bgmEngine.selectTrack(track.id, { bypassTierGate: true });
                   }}
                   className={`min-h-[48px] px-2.5 py-2 rounded-xl border-2 border-[#181B2C] text-left transition-all cursor-pointer ${
                     selected

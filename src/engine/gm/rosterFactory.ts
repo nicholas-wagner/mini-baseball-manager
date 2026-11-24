@@ -128,18 +128,62 @@ const PERSONALITIES: readonly PersonalityArchetype[] = [
   'rival_hunter',
 ];
 
-const NICKNAMES = [
-  'Sandlot Kid',
-  'Turbo Cleats',
-  'Laser Arm',
-  'Bubblegum Bam',
-  'Ghost Heater',
+export const PITCHER_NICKNAMES = [
   'Corner Painter',
-  'Dust Cloud',
-  'Moonshot',
-  'Iron Glove',
-  'Rally Cap',
+  'Ghost Heater',
+  'Slider Wizard',
+  'Curveball Kid',
+  'Ice Mound',
+  'Strikeout Star',
+  'High Heat',
+  'Paint Brush',
+  'Wiffle Ace',
+  'Sandlot Ace',
 ] as const;
+
+export const SLUGGER_NICKNAMES = [
+  'Moonshot',
+  'Boomstick',
+  'Sweet Swing',
+  'Clutch Bat',
+  'Bubblegum Bam',
+  'Line Drive',
+  'Rally Cap',
+  'Sandlot Kid',
+  'Gap Crusher',
+  'Tape Measure',
+] as const;
+
+export const SPEED_DEFENSE_NICKNAMES = [
+  'Turbo Cleats',
+  'Dust Cloud',
+  'Iron Glove',
+  'Laser Arm',
+  'Flash Step',
+  'Gold Mitt',
+  'Sparkplug',
+  'Quick Hands',
+  'Base Thief',
+  'Web Gem',
+] as const;
+
+export function pickNicknameForRole(
+  rng: SeededRng,
+  position: FieldPosition,
+  ratings: Pick<PlayerRatings, 'speed' | 'fielding' | 'power'>,
+): string {
+  if (isPitcherPosition(position)) {
+    return rng.pick(PITCHER_NICKNAMES);
+  }
+  const prefersSpeedOrGlove =
+    ratings.speed >= 62 ||
+    ratings.fielding >= 64 ||
+    ((position === 'SS' || position === '2B' || position === 'CF' || position === 'C') &&
+      ratings.power < 62);
+  return prefersSpeedOrGlove
+    ? rng.pick(SPEED_DEFENSE_NICKNAMES)
+    : rng.pick(SLUGGER_NICKNAMES);
+}
 
 const BIOS = [
   'Always arrives early with a pocket full of sunflower seeds and extra pine tar.',
@@ -317,7 +361,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   return {
     id: playerId(rng, options),
     name: birthplace.name,
-    nickname: rng.pick(NICKNAMES),
+    nickname: pickNicknameForRole(rng, options.position, ratings),
     age,
     position: options.position,
     secondaryPositions: eligibility.secondaryPositions,

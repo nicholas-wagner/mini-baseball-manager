@@ -1,19 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { BALLPARK_CATALOG } from '../engine/ballparks/stadiumCatalog';
+import type { LeagueTierId } from '../engine/models/club';
 import {
   BGM_TRACKS,
+  getBgmTracksForTier,
   getTrackForBallpark,
+  isTrackAllowedForTier,
   RetroBgmEngine,
   type BgmTrackId,
 } from './bgmEngine';
 
-describe('RetroBgmEngine — Unique Per-Stadium 90s Arcade Jukebox (10 Mutable Tracks)', () => {
-  it('provides a unique 90s arcade background track for every one of the 10 ballparks with full multi-voice patterns', () => {
-    expect(BGM_TRACKS).toHaveLength(10);
-    const ids = new Set<BgmTrackId>(BGM_TRACKS.map((t) => t.id));
-    expect(ids.size).toBe(10);
+const ALL_TIERS: readonly LeagueTierId[] = ['rookie', 'low_a', 'high_a', 'aa', 'aaa', 'majors'];
 
-    // Every single ballpark maps to a distinct stadium-specific track
+describe('RetroBgmEngine — League-Tier-Gated 90s Arcade Jukebox (12 Mutable Tracks Across All 6 Tiers)', () => {
+  it('provides at least 2 selectable 90s tracks per league tier and covers every ballpark with full multi-voice patterns', () => {
+    expect(BGM_TRACKS).toHaveLength(12);
+    const ids = new Set<BgmTrackId>(BGM_TRACKS.map((t) => t.id));
+    expect(ids.size).toBe(12);
+
+    // Every league tier (Rookie -> Majors) has 2 dedicated selectable tracks
+    for (const tier of ALL_TIERS) {
+      const tierTracks = getBgmTracksForTier(tier);
+      expect(tierTracks.length).toBeGreaterThanOrEqual(2);
+      for (const t of tierTracks) {
+        expect(t.leagueTier).toBe(tier);
+        expect(isTrackAllowedForTier(t.id, tier)).toBe(true);
+      }
+    }
+
+    // Every single ballpark still maps to a stadium-specific track
     const mappedTrackIds = new Set<BgmTrackId>();
     for (const park of BALLPARK_CATALOG) {
       const track = getTrackForBallpark(park.id);
@@ -33,35 +48,33 @@ describe('RetroBgmEngine — Unique Per-Stadium 90s Arcade Jukebox (10 Mutable T
     }
   });
 
-  it('auto-switches music per stadium when autoMatchStadium is ON, and respects manual track lock, mute & gentle volume', () => {
+  it('restricts track selection to the active league tier and switches music cleanly on promotion', () => {
     const bgm = new RetroBgmEngine({ persist: false });
-    const initial = bgm.getState();
+    bgm.syncLeagueTier('rookie');
 
-    expect(initial.enabled).toBe(true);
-    expect(initial.autoMatchStadium).toBe(true);
-    expect(initial.volume).toBeGreaterThan(0);
-    expect(initial.volume).toBeLessThanOrEqual(0.35);
-    expect(initial.trackId).toBe('sandlot_sunshine');
+    expect(bgm.getState().currentLeagueTier).toBe('rookie');
+    expect(bgm.getState().trackId).toBe('sandlot_sunshine');
 
-    // Traveling to Sakura Garden or Neon Metro Dome automatically updates the environmental soundtrack
-    bgm.syncStadium('sakura_garden');
-    expect(bgm.getState().trackId).toBe('sakura_pentatonic_march');
-
-    bgm.syncStadium('neon_metro_dome');
-    expect(bgm.getState().trackId).toBe('ninth_inning_turbo');
-
-    // Manually choosing a track pins it (disables autoMatchStadium until user re-enables)
-    bgm.selectTrack('dugout_funk');
-    expect(bgm.getState().trackId).toBe('dugout_funk');
+    // Rookie club can pick the second Rookie track
+    bgm.selectTrack('twilight_bleachers');
+    expect(bgm.getState().trackId).toBe('twilight_bleachers');
     expect(bgm.getState().autoMatchStadium).toBe(false);
 
-    // Stadium changes do not override a manually pinned track
-    bgm.syncStadium('bayfront_cove');
-    expect(bgm.getState().trackId).toBe('dugout_funk');
+    // Rookie club CANNOT select Major League music!
+    bgm.selectTrack('cathedral_championship');
+    expect(bgm.getState().trackId).toBe('twilight_bleachers');
 
-    // Re-enabling Auto-Match immediately syncs to the current stadium
-    bgm.setAutoMatchStadium(true);
-    expect(bgm.getState().trackId).toBe('bayfront_surf_94');
+    // Promoting to Mini Major League automatically moves into Major League tracks and unlocks both Majors options
+    bgm.syncLeagueTier('majors');
+    expect(isTrackAllowedForTier(bgm.getState().trackId, 'majors')).toBe(true);
+    bgm.selectTrack('cathedral_championship');
+    expect(bgm.getState().trackId).toBe('cathedral_championship');
+    bgm.selectTrack('ninth_inning_turbo');
+    expect(bgm.getState().trackId).toBe('ninth_inning_turbo');
+
+    // Major League club cannot pick Rookie tracks either
+    bgm.selectTrack('sandlot_sunshine');
+    expect(bgm.getState().trackId).toBe('ninth_inning_turbo');
 
     // Independent Music mute toggle + volume clamping + master mute
     expect(bgm.toggleEnabled()).toBe(false);

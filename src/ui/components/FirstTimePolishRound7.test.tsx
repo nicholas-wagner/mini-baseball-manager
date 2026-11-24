@@ -26,7 +26,7 @@ describe('First-Time Hook Polish Round 7 (Clean Screen 0, Compact Sidebar & Quie
     // Uninitialized club tabs and Foil Pack gift CTA must stay hidden until a club is founded
     expect(screen.queryByRole('button', { name: /^roster$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^league$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^ballpark$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^(ballpark|clubhouse)$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /open 1994 foil packs/i })).not.toBeInTheDocument();
     // Returning players can still open 4 Save Slots from Screen 0
     expect(screen.getAllByRole('button', { name: /open 4 career save slots/i }).length).toBeGreaterThanOrEqual(1);

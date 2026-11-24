@@ -1,9 +1,88 @@
 import { useState } from 'react';
 import { Gift, Sparkles, X } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
-import { FOIL_PACK_TIER_LABELS, type FoilCardKind } from '../../engine/events/foilPacks';
+import {
+  FOIL_PACK_TIER_LABELS,
+  type FoilCardKind,
+  type FoilPackCard,
+} from '../../engine/events/foilPacks';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { ComicButton } from '../design-system/ComicButton';
+
+function FoilCardArtwork({ card }: { card: FoilPackCard }) {
+  const lower = card.title.toLowerCase();
+  const isBat = lower.includes('bat') || lower.includes('grip') || lower.includes('tape') || lower.includes('pine');
+  const isMitt = lower.includes('mitt') || lower.includes('glove') || lower.includes('leather');
+  const isShades = lower.includes('shade') || lower.includes('visor') || lower.includes('goggle');
+  const isCleats = lower.includes('cleat') || lower.includes('spike') || lower.includes('stirrup');
+  const bg =
+    card.rarity === 'legendary'
+      ? '#FFE08A'
+      : card.rarity === 'rare'
+        ? '#D8F3DC'
+        : '#FFF3D6';
+
+  return (
+    <div
+      data-testid="foil-card-artwork"
+      className="w-full h-20 rounded-lg border-2 border-[#181B2C] flex items-center justify-center overflow-hidden"
+      style={{ backgroundColor: bg }}
+    >
+      <svg viewBox="0 0 96 64" className="w-24 h-16" aria-hidden="true">
+        <circle cx="48" cy="32" r="24" fill="#FFFFFF" fillOpacity="0.65" stroke="#181B2C" strokeWidth="1.8" strokeDasharray="3 3" />
+        {card.kind === 'cash_windfall' ? (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <rect x="24" y="18" width="48" height="28" rx="6" fill="#2FB356" />
+            <circle cx="48" cy="32" r="9" fill="#FFCC49" />
+            <text x="48" y="36" textAnchor="middle" fontSize="12" fontWeight="900" fill="#181B2C" stroke="none">$</text>
+          </g>
+        ) : card.kind === 'training_xp' ? (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <polygon points="48,10 55,25 71,27 59,38 62,54 48,46 34,54 37,38 25,27 41,25" fill="#FFCC49" />
+            <circle cx="48" cy="33" r="6" fill="#FFFDF7" />
+          </g>
+        ) : card.kind === 'hype_ticket' ? (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <path d="M20 20 H76 V28 A4 4 0 0 0 76 36 V44 H20 V36 A4 4 0 0 0 20 28 Z" fill="#FF4D6D" />
+            <text x="48" y="36" textAnchor="middle" fontSize="10" fontWeight="900" fill="#FFFDF7" stroke="none">VIP FAN</text>
+          </g>
+        ) : isBat ? (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <path d="M24 46 L64 14 Q70 10 73 15 Q75 19 69 24 L29 50 Z" fill="#F4A261" />
+            <circle cx="64" cy="44" r="8" fill="#FFFDF7" />
+            <path d="M60 39 Q64 44 60 49 M68 39 Q64 44 68 49" fill="none" stroke="#E63946" strokeWidth="1.4" />
+          </g>
+        ) : isMitt ? (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <path d="M32 48 C24 38 26 18 42 16 C56 14 70 24 66 40 C62 50 42 54 32 48 Z" fill="#C67D3B" />
+            <circle cx="48" cy="34" r="7" fill="#FFFDF7" />
+          </g>
+        ) : isShades ? (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <rect x="20" y="24" width="24" height="16" rx="5" fill="#1D3557" />
+            <rect x="52" y="24" width="24" height="16" rx="5" fill="#1D3557" />
+            <line x1="44" y1="30" x2="52" y2="30" />
+            <line x1="24" y1="28" x2="34" y2="36" stroke="#00E5FF" strokeWidth="2" />
+            <line x1="56" y1="28" x2="66" y2="36" stroke="#00E5FF" strokeWidth="2" />
+          </g>
+        ) : isCleats ? (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <path d="M24 42 L32 22 H46 L52 32 H70 C74 32 76 38 72 42 Z" fill="#E63946" />
+            <line x1="30" y1="44" x2="30" y2="48" />
+            <line x1="46" y1="44" x2="46" y2="48" />
+            <line x1="64" y1="44" x2="64" y2="48" />
+          </g>
+        ) : (
+          <g stroke="#181B2C" strokeWidth="2.2">
+            <circle cx="48" cy="32" r="15" fill="#FFFDF7" />
+            <path d="M39 22 Q45 32 39 42 M57 22 Q51 32 57 42" fill="none" stroke="#E63946" strokeWidth="2" />
+            <polygon points="72,14 74,19 79,20 74,22 72,27 70,22 65,20 70,19" fill="#FFCC49" strokeWidth="1.2" />
+          </g>
+        )}
+      </svg>
+    </div>
+  );
+}
 
 interface FoilPackModalProps {
   open: boolean;
@@ -75,14 +154,14 @@ export function FoilPackModal({
         data-testid="foil-pack-modal"
         className="w-full max-w-2xl min-w-0 max-h-[90dvh] flex flex-col rounded-2xl border-[3px] border-[#181B2C] bg-[#FBF4E4] shadow-[6px_6px_0_#181B2C] overflow-hidden"
       >
-        <div className="px-3 sm:px-4 py-3 bg-gradient-to-r from-[#7209B7] via-[#B5179E] to-[#F72585] text-white border-b-[3px] border-[#181B2C] flex items-center justify-between gap-2 shrink-0">
+        <div className="px-3 sm:px-4 py-3 bg-[#173D37] text-[#FFF7E4] border-b-[3px] border-[#181B2C] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Gift className="w-5 h-5 text-[#FFD166] shrink-0" />
+            <Gift className="w-5 h-5 text-[#FFCC49] shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="font-display text-sm sm:text-base tracking-wide truncate">
                 1994 FOIL CARD SHOP &amp; BOOSTER PACKS
               </div>
-              <div className="text-[11px] font-bold text-[#FFD166] truncate">
+              <div className="text-[11px] font-bold text-[#FFDC90] truncate">
                 Unopened: {unopenedPacks.length} • Packs Ripped: {openedCount} • Win games &amp; playoffs to earn more!
               </div>
             </div>
@@ -174,7 +253,7 @@ export function FoilPackModal({
                     <div
                       key={card.slot}
                       data-testid="foil-pack-card"
-                      className={`p-3 rounded-xl border-2 shadow-[3px_3px_0_#181B2C] space-y-1.5 ${RARITY_STYLES[card.rarity]}`}
+                      className={`p-3 rounded-xl border-2 shadow-[3px_3px_0_#181B2C] space-y-2 ${RARITY_STYLES[card.rarity]}`}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[9px] uppercase">
@@ -184,6 +263,7 @@ export function FoilPackModal({
                           {CARD_KIND_ICONS[card.kind]}
                         </span>
                       </div>
+                      <FoilCardArtwork card={card} />
                       <div className="font-display text-xs text-[#181B2C] leading-snug">
                         {card.title}
                       </div>

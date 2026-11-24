@@ -64,7 +64,14 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
   const liner = kind === 'infield_liner';
   const error = kind === 'fielding_error';
   const pivot = kind === 'double_play';
-  const marked = highlight === 'SS' || highlight === '3B' || highlight === '2B' || highlight === '1B' ? highlight : undefined;
+  const marked: Actor | undefined =
+    highlight === 'SS' || highlight === '3B' || highlight === '2B' || highlight === '1B'
+      ? highlight
+      : pop && highlight === 'C'
+        ? 'C'
+        : pop && (highlight === 'SP' || highlight === 'RP')
+          ? 'P'
+          : undefined;
   const pickup: Actor = pivot ? 'SS' : bunt ? '3B' : kind === 'cover_first' ? '1B' : marked ?? (pop ? '2B' : 'SS');
   const unassisted = kind === 'ground_out' && pickup === '1B';
   const pickupAt = liner ? plate+.66 : pop ? 3.86 : bunt ? 2.64 : 2.85;
@@ -77,8 +84,13 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
     from: pickup, to: kind === 'cover_first' ? 'P' : pivot ? '2B' : '1B', start: pickupAt + 0.38, end: receiveAt, kind: 'throw',
   });
   if (pivot) legs.push({ from: '2B', to: '1B', start: receiveAt + 0.32, end: finish, kind: 'throw' });
-  const fieldAt = bunt ? { x: -4.25, y: 0.04, z: -4.9 }
-    : { x: starts[pickup].x * (pickup === 'SS' && !pop ? 1.39 : .82), y: .04, z: starts[pickup].z + 3.9 };
+  const fieldAt = bunt
+    ? { x: -4.25, y: 0.04, z: -4.9 }
+    : pop && pickup === 'C'
+      ? { x: 0.45, y: 0.04, z: -1.6 }
+      : pop && pickup === 'P'
+        ? { x: 0.35, y: 0.24, z: -8.1 }
+        : { x: starts[pickup].x * (pickup === 'SS' && !pop ? 1.39 : .82), y: .04, z: starts[pickup].z + 3.9 };
   if (error) {
     const loose = { x:fieldAt.x+.95, y:.14, z:fieldAt.z+.8 };
     legs.push({ from:pickup,to:pickup,start:pickupAt,end:pickupAt+.44,kind:'bounce',endPoint:loose },

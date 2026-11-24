@@ -3,6 +3,22 @@ import type { PitchType } from '../models/player';
 export type PitchFamily = 'fastball' | 'offspeed';
 export type BatterPitchGuess = 'none' | PitchFamily;
 export type PitchTargetIntent = 'attack_zone' | 'paint_corners' | 'high_heat' | 'bury_offspeed';
+export type ArcadeTimingGrade = 'perfect' | 'good' | 'late';
+
+export interface ArcadeTimingInput {
+  actor: 'batter' | 'pitcher';
+  grade: ArcadeTimingGrade;
+}
+
+export interface ArcadeTimingEvaluation {
+  contactDelta: number;
+  powerDelta: number;
+  stuffDelta: number;
+  controlDelta: number;
+  mphBonus: number;
+  hitProbBonus: number;
+  label: string | null;
+}
 
 export interface BatterGuessEvaluation {
   status: 'none' | 'locked_in' | 'fooled';
@@ -147,4 +163,92 @@ export function evaluatePitchTargetEffect(
     return { ...base, chaseRateDelta: 0.03, whiffBonus: 0.02 };
   }
   return base;
+}
+
+/** Converts a 0–100 sweet-spot timing cursor into a crisp Perfect / Good / Late grade. */
+export function evaluateArcadeTimingCursor(cursorPos: number): ArcadeTimingGrade {
+  const distance = Math.abs(cursorPos - 50);
+  if (distance <= 11) return 'perfect';
+  if (distance <= 24) return 'good';
+  return 'late';
+}
+
+const ZERO_TIMING: ArcadeTimingEvaluation = {
+  contactDelta: 0,
+  powerDelta: 0,
+  stuffDelta: 0,
+  controlDelta: 0,
+  mphBonus: 0,
+  hitProbBonus: 0,
+  label: null,
+};
+
+const BATTER_TIMING_TABLE: Readonly<Record<ArcadeTimingGrade, ArcadeTimingEvaluation>> = {
+  perfect: {
+    contactDelta: 12,
+    powerDelta: 14,
+    stuffDelta: 0,
+    controlDelta: 0,
+    mphBonus: 0,
+    hitProbBonus: 0.07,
+    label: 'Arcade Timing: PERFECT SWING!',
+  },
+  good: {
+    contactDelta: 4,
+    powerDelta: 4,
+    stuffDelta: 0,
+    controlDelta: 0,
+    mphBonus: 0,
+    hitProbBonus: 0.02,
+    label: 'Arcade Timing: Good Contact',
+  },
+  late: {
+    contactDelta: -6,
+    powerDelta: -4,
+    stuffDelta: 0,
+    controlDelta: 0,
+    mphBonus: 0,
+    hitProbBonus: -0.03,
+    label: 'Arcade Timing: Off-Balance',
+  },
+};
+
+const PITCHER_TIMING_TABLE: Readonly<Record<ArcadeTimingGrade, ArcadeTimingEvaluation>> = {
+  perfect: {
+    contactDelta: 0,
+    powerDelta: 0,
+    stuffDelta: 8,
+    controlDelta: 8,
+    mphBonus: 2,
+    hitProbBonus: 0,
+    label: 'Arcade Timing: PERFECT RELEASE!',
+  },
+  good: {
+    contactDelta: 0,
+    powerDelta: 0,
+    stuffDelta: 3,
+    controlDelta: 3,
+    mphBonus: 0,
+    hitProbBonus: 0,
+    label: 'Arcade Timing: Solid Release',
+  },
+  late: {
+    contactDelta: 0,
+    powerDelta: 0,
+    stuffDelta: -2,
+    controlDelta: -5,
+    mphBonus: -1,
+    hitProbBonus: 0,
+    label: 'Arcade Timing: Missed Spot',
+  },
+};
+
+/** Evaluates optional interactive Arcade Timing bar bonuses for either batter or pitcher. */
+export function evaluateArcadeTimingEffect(
+  input?: ArcadeTimingInput,
+): ArcadeTimingEvaluation {
+  if (!input) return ZERO_TIMING;
+  return input.actor === 'batter'
+    ? BATTER_TIMING_TABLE[input.grade]
+    : PITCHER_TIMING_TABLE[input.grade];
 }

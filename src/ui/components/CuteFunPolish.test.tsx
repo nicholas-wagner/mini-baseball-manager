@@ -65,6 +65,8 @@ describe('Cute, Clean & Balanced Gameplay Polish (Drill Quota, Portraits, 4-Room
     fireEvent.click(screen.getByRole('button', { name: 'Change club' }));
     expect(screen.getByTestId('quick-club-presets')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /harbor otters/i }));
+    expect(screen.getByTestId('creator-club-identity')).toHaveTextContent(/harbor otters/i);
+    fireEvent.click(screen.getByTestId('creator-customize-toggle'));
     expect(screen.getByLabelText(/club city/i)).toHaveValue('Harbor');
     expect(screen.getByLabelText(/club name/i)).toHaveValue('Otters');
   });

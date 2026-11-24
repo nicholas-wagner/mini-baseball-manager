@@ -69,7 +69,7 @@ describe('Mini Baseball Manager — App & Design Lab Integration', () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^(Bat|Pitch) with / }));
-    await user.click(screen.getAllByRole('button', { name: /ballpark/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /clubhouse/i })[0]);
     expect(
       await screen.findByTestId('ballpark-visual-banner', {}, { timeout: 10_000 }),
     ).toBeInTheDocument();

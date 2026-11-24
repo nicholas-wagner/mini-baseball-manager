@@ -8,6 +8,10 @@ import {
   type GamePressureLevel,
   type Player,
 } from '../models/player';
+import {
+  cloneAbilityCooldownState,
+  SPECIAL_ABILITY_HYPE_COST,
+} from '../rpg/abilityCooldowns';
 import { fatigueToEndurance } from '../rpg/pitcherEndurance';
 import { createGameSession, stepPitch } from '../simulation/baseballEngine';
 import {
@@ -32,6 +36,10 @@ export interface ClutchMomentInput {
   awayGameplan?: SeriesGameplanId;
   homeGameplan?: SeriesGameplanId;
   pressureLevel?: GamePressureLevel;
+  /** When true (Opening Day), wait until the human club is batting in a late inning. */
+  preferHumanBattingFirst?: boolean;
+  /** When true (Opening Day), ensure the human side starts with a charged Signature Power. */
+  chargeOpeningPower?: boolean;
 }
 
 export interface ClutchMomentLaunch {
@@ -93,7 +101,16 @@ function describeOccupiedBases(session: GameSessionState): string {
   return labels.length > 0 ? ` • Runners on ${labels.join(' & ')}` : '';
 }
 
-function isClutchJumpStop(session: GameSessionState, targetInning: number): boolean {
+function isHumanBattingNow(session: GameSessionState): boolean {
+  return (session.half === 'BOT') === session.home.isHuman;
+}
+
+function isClutchJumpStop(
+  session: GameSessionState,
+  targetInning: number,
+  preferHumanBattingFirst: boolean,
+): boolean {
+  if (preferHumanBattingFirst && !isHumanBattingNow(session)) return false;
   if (session.inning >= session.regulationInnings) return true;
   if (session.inning < targetInning) return false;
   const diff = Math.abs(session.away.score - session.home.score);
@@ -101,49 +118,94 @@ function isClutchJumpStop(session: GameSessionState, targetInning: number): bool
   return leverageIndex >= 1.3 || diff <= 2;
 }
 
-/** Fast-sims early innings and hands control to the manager at the biggest late-inning spot. */
-export function createClutchMomentSession(input: ClutchMomentInput): ClutchMomentLaunch {
-  const {
-    awayClub,
-    homeClub,
-    seed,
-    regulationInnings,
-    awayGameplan = 'balanced',
-    homeGameplan = 'balanced',
-    pressureLevel = 'regular',
-  } = input;
+function applyOpeningPowerCharge(session: GameSessionState): GameSessionState {
+  const humanSideKey = session.home.isHuman ? 'home' : 'away';
+  const hero = isHumanBattingNow(session)
+    ? getCurrentBatter(session)
+    : getCurrentPitcher(session);
+  const cooldowns = cloneAbilityCooldownState(session.abilityCooldowns);
+  cooldowns.playerUsesById[hero.id] = 0;
+  cooldowns.pitcherCooldownBattersById[hero.id] = 0;
+  cooldowns.pitcherCooldownPitchesById[hero.id] = 0;
+  cooldowns.teamSuperSwingCooldownPas[humanSideKey] = 0;
 
-  let current = createGameSession(
-    awayClub,
-    homeClub,
-    seed,
-    pressureLevel,
-    regulationInnings,
-    awayGameplan,
-    homeGameplan,
-  );
-  let lastPlayable = current;
+  if (session.home.isHuman) {
+    return {
+      ...session,
+      abilityCooldowns: cooldowns,
+      home: {
+        ...session.home,
+        hypeGauge: Math.max(session.home.hypeGauge, SPECIAL_ABILITY_HYPE_COST),
+      },
+    };
+  }
+  return {
+    ...session,
+    abilityCooldowns: cooldowns,
+    away: {
+      ...session.away,
+      hypeGauge: Math.max(session.away.hypeGauge, SPECIAL_ABILITY_HYPE_COST),
+    },
+  };
+}
+
+function advanceToClutchStop(
+  initial: GameSessionState,
+  targetInning: number,
+  preferHumanBattingFirst: boolean,
+): { finalSession: GameSessionState; allEvents: PlayEvent[] } {
+  let current = initial;
+  let lastPlayable = initial;
+  let lastHumanBatting: GameSessionState | null = null;
   const allEvents: PlayEvent[] = [];
-  const targetInning = Math.max(2, regulationInnings - 1);
 
   for (let i = 0; i < 450; i += 1) {
     if (current.status === 'completed') break;
-    if (isClutchJumpStop(current, targetInning)) break;
+    if (isClutchJumpStop(current, targetInning, preferHumanBattingFirst)) break;
     const step = stepPitch(current, 'normal');
     if (step.nextSession.status === 'in_progress') {
       lastPlayable = step.nextSession;
+      if (isHumanBattingNow(step.nextSession)) {
+        lastHumanBatting = step.nextSession;
+      }
     }
     current = step.nextSession;
     allEvents.push(...step.events);
   }
 
-  const finalSession = current.status === 'in_progress' ? current : lastPlayable;
+  const fallback = preferHumanBattingFirst && lastHumanBatting ? lastHumanBatting : lastPlayable;
+  return {
+    finalSession: current.status === 'in_progress' ? current : fallback,
+    allEvents,
+  };
+}
+
+/** Fast-sims early innings and hands control to the manager at the biggest late-inning spot. */
+export function createClutchMomentSession(input: ClutchMomentInput): ClutchMomentLaunch {
+  const initial = createGameSession(
+    input.awayClub,
+    input.homeClub,
+    input.seed,
+    input.pressureLevel ?? 'regular',
+    input.regulationInnings,
+    input.awayGameplan ?? 'balanced',
+    input.homeGameplan ?? 'balanced',
+  );
+  const targetInning = Math.max(2, input.regulationInnings - 1);
+  const stepped = advanceToClutchStop(
+    initial,
+    targetInning,
+    Boolean(input.preferHumanBattingFirst),
+  );
+  const finalSession = input.chargeOpeningPower
+    ? applyOpeningPowerCharge(stepped.finalSession)
+    : stepped.finalSession;
   const scoreText = describeScoreStatus(finalSession);
   const basesText = describeOccupiedBases(finalSession);
   const outsText = `${finalSession.outs} Out${finalSession.outs === 1 ? '' : 's'}`;
   const recapHeadline = `Clutch Jump-In: ${finalSession.half} ${finalSession.inning} (${scoreText} • ${outsText}${basesText}) — Take over!`;
 
-  const gameEvents = allEvents.filter(e => e.seq <= finalSession.eventSeq);
+  const gameEvents = stepped.allEvents.filter((e) => e.seq <= finalSession.eventSeq);
   return {
     session: finalSession,
     gameEvents,

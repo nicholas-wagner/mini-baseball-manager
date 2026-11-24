@@ -142,6 +142,7 @@ function pushInjuryAndSkillItems(
   injuredCount: number,
   playerSpTotal: number,
   managerSpTotal: number,
+  isOpeningDayPreGame: boolean,
 ): void {
   if (injuredCount > 0) {
     tabBadges.roster = `🩺 ${injuredCount}`;
@@ -158,7 +159,9 @@ function pushInjuryAndSkillItems(
 
   const totalSp = playerSpTotal + managerSpTotal;
   if (totalSp > 0) {
-    tabBadges.skills = `⚡ ${totalSp}`;
+    if (!isOpeningDayPreGame) {
+      tabBadges.skills = `⚡ ${totalSp}`;
+    }
     items.push({
       kind: 'skill_points_ready',
       priority: 'reward',
@@ -228,7 +231,15 @@ export function buildManagerActionInbox(input: ManagerActionInboxInput): Manager
   const items: ManagerActionItem[] = [];
   const tabBadges: NavTabBadges = {};
 
-  pushInjuryAndSkillItems(items, tabBadges, injuredCount, playerSpTotal, managerSpTotal);
+  const isOpeningDayPreGame = club.wins + club.losses === 0 && currentSeriesIndex === 0;
+  pushInjuryAndSkillItems(
+    items,
+    tabBadges,
+    injuredCount,
+    playerSpTotal,
+    managerSpTotal,
+    isOpeningDayPreGame,
+  );
   pushClubMilestoneItems(items, tabBadges, club, currentSeriesIndex, unopenedPackCount);
 
   const headline =

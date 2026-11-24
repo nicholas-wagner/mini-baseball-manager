@@ -12,6 +12,7 @@ describe('ClubCreatorScreen — Fair Starting Roster Presets (TASK-064)', () => 
 
     expect(screen.queryByRole('button', { name: /all rookies/i })).toBeNull();
     await user.click(screen.getByRole('button', {name: 'Change club'}));
+    await user.click(screen.getByTestId('creator-customize-toggle'));
     for (const label of [
       'Balanced',
       'All Rookies',

@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import { playerIllustration } from '../../art/portraits/illustratedPlayerPool';
 import pending from '../../art/portraits/illustrations/portrait-pending.svg';
 import { evaluateMatchupCardSparkle } from '../../engine/gm/openingDayHook';
+import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import type { Player } from '../../engine/models/player';
 import type { GameSessionState } from '../../engine/simulation/gameState';
@@ -155,6 +156,11 @@ export function MatchupPrints({
   batter,
   pitcher,
   memories = [],
+  batterScoutLine,
+  pitcherScoutLine,
+  pitcherEndurance,
+  pitcherEnduranceTier,
+  pitcherFatigueDropTag,
   batterFavorite = false,
   pitcherFavorite = false,
   batterPowerReady = false,
@@ -167,6 +173,11 @@ export function MatchupPrints({
   batter: Player;
   pitcher: Player;
   memories?: readonly ScorebookMoment[];
+  batterScoutLine?: string;
+  pitcherScoutLine?: string;
+  pitcherEndurance?: number;
+  pitcherEnduranceTier?: PitcherEnduranceTier;
+  pitcherFatigueDropTag?: string | null;
   batterFavorite?: boolean;
   pitcherFavorite?: boolean;
   batterPowerReady?: boolean;
@@ -180,6 +191,7 @@ export function MatchupPrints({
     {
       player: batter,
       role: 'At bat',
+      scoutLine: batterScoutLine,
       sparkle: evaluateMatchupCardSparkle({
         player: batter,
         role: 'batter',
@@ -192,6 +204,7 @@ export function MatchupPrints({
     {
       player: pitcher,
       role: 'On the mound',
+      scoutLine: pitcherScoutLine,
       sparkle: evaluateMatchupCardSparkle({
         player: pitcher,
         role: 'pitcher',
@@ -204,7 +217,7 @@ export function MatchupPrints({
   ];
   return (
     <div className="matchup-prints" role="group" aria-label="Matchup cards">
-      {entries.map(({ player, role, sparkle }) => {
+      {entries.map(({ player, role, scoutLine, sparkle }) => {
         const memory = memories.find((m) => m.playerId === player.id);
         return (
           <button
@@ -226,6 +239,28 @@ export function MatchupPrints({
                 ) : null}
               </span>
               <strong>{player.name}</strong>
+              {scoutLine ? (
+                <em className="matchup-scout-line" data-testid="matchup-scout-line">
+                  {scoutLine}
+                </em>
+              ) : null}
+              {role === 'On the mound' && typeof pitcherEndurance === 'number' ? (
+                <span
+                  className="matchup-endurance-wrap"
+                  data-testid="pitcher-endurance-meter"
+                  aria-label={`Pitcher endurance ${pitcherEndurance}%`}
+                >
+                  <span className="matchup-endurance-track">
+                    <span
+                      className={`matchup-endurance-fill tier-${pitcherEnduranceTier ?? 'fresh'}`}
+                      style={{ width: `${Math.max(4, Math.min(100, pitcherEndurance))}%` }}
+                    />
+                  </span>
+                  {pitcherFatigueDropTag ? (
+                    <em className="matchup-fatigue-drop">{pitcherFatigueDropTag}</em>
+                  ) : null}
+                </span>
+              ) : null}
               {sparkle.badges.length > 0 ? (
                 <span className="matchup-sparkle-badges">
                   {sparkle.badges.map((badge) => (

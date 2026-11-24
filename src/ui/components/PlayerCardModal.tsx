@@ -191,113 +191,11 @@ export function PlayerCardModal({
               </div>
 
               <div className="space-y-2.5 min-w-0">
-                {liveStatLine ? (
-                  <div
-                    data-testid="card-modal-live-statline"
-                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]"
-                  >
-                    📊 Today&apos;s Line: {liveStatLine}
-                  </div>
-                ) : null}
-
-                <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
-                  {isPitcherPosition(player.position) && player.pitchArsenal ? (
-                    <>
-                      <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
-                        <span>Pitch Arsenal ({player.pitchArsenal.repertoire.length})</span>
-                        <span className="text-[#1B4332]">
-                          ★ {PITCH_TYPE_SHORT_LABELS[player.pitchArsenal.favoritePitch]}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {player.pitchArsenal.repertoire.map((slot) => {
-                          const isFav = slot.pitchType === player.pitchArsenal!.favoritePitch;
-                          const isWeak = slot.pitchType === player.pitchArsenal!.weakestPitch;
-                          return (
-                            <span
-                              key={slot.pitchType}
-                              className={`px-1.5 py-0.5 rounded border border-[#181B2C] text-[10px] font-extrabold ${
-                                isFav
-                                  ? 'bg-[#FFC300] text-[#181B2C]'
-                                  : isWeak
-                                    ? 'bg-[#FFE5EC] text-[#9D0208]'
-                                    : 'bg-white text-[#181B2C]'
-                              }`}
-                            >
-                              {isFav ? '★ ' : ''}
-                              {PITCH_TYPE_SHORT_LABELS[slot.pitchType]} {slot.mastery}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-[11px] font-extrabold uppercase text-[#181B2C]">
-                        Batter Pitch Scouting
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
-                        <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
-                          Crushes: {PITCH_TYPE_SHORT_LABELS[player.batterPitchProfile.favoritePitch]}
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
-                          Weak vs: {PITCH_TYPE_SHORT_LABELS[player.batterPitchProfile.weakPitch]}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                  <div className="flex flex-wrap gap-1 pt-1 border-t border-[#181B2C]/15 text-[10px] font-extrabold">
-                    <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]">
-                      {PRESSURE_PROFILE_LABELS[player.pressureProfile]}
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-[#F6EEFF] border border-[#181B2C] text-[#4A148C]">
-                      {COED_TRAIT_LABELS[player.coEdTrait]}
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
-                      {EXPERIENCE_TIER_LABELS[player.careerService.experienceTier]} •{' '}
-                      {player.careerService.seasonsPlayed} Yr
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick Player Switcher List (inspect any player in the game or on your roster!) */}
-                {allEntries.length > 1 && onSelectPlayerId ? (
-                  <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-1.5">
-                    <div className="text-[10px] font-extrabold uppercase text-[#181B2C]">
-                      {isLiveGameMode ? 'Tap Any Player in This Game' : 'Jump To Teammate'}
-                    </div>
-                    <div className="flex flex-wrap gap-1 max-h-36 overflow-y-auto">
-                      {allEntries.map((item) => {
-                        const active = item.player.id === player.id;
-                        return (
-                          <button
-                            key={item.player.id}
-                            type="button"
-                            data-testid="card-modal-player-chip"
-                            onClick={() => {
-                              soundEngine.play('card_flip');
-                              onSelectPlayerId(item.player.id);
-                            }}
-                            className={`px-2 py-1 rounded-lg border border-[#181B2C] text-[10px] font-extrabold cursor-pointer ${
-                              active
-                                ? 'bg-[#FFC300] text-[#181B2C]'
-                                : 'bg-white text-[#181B2C] hover:bg-[#FFF3BF]'
-                            }`}
-                          >
-                            <span
-                              className="inline-block w-2 h-2 rounded-full mr-1 align-middle border border-[#181B2C]"
-                              style={{ backgroundColor: item.club.colors.primary }}
-                            />
-                            {item.player.position} {item.player.name.split(' ')[0]}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
                 {(onToggleFavorite || onCustomizePlayer) ? (
-                  <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2">
+                  <div
+                    data-testid="card-modal-personalize-bar"
+                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2"
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       {onToggleFavorite ? (
                         <ComicButton
@@ -381,6 +279,114 @@ export function PlayerCardModal({
                         </ComicButton>
                       </div>
                     ) : null}
+                  </div>
+                ) : null}
+
+                {liveStatLine ? (
+                  <div
+                    data-testid="card-modal-live-statline"
+                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-xs font-extrabold text-[#181B2C]"
+                  >
+                    📊 Today&apos;s Line: {liveStatLine}
+                  </div>
+                ) : null}
+
+                <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
+                  {isPitcherPosition(player.position) && player.pitchArsenal ? (
+                    <>
+                      <div className="flex items-center justify-between text-[11px] font-extrabold uppercase text-[#181B2C]">
+                        <span>Pitch Arsenal ({player.pitchArsenal.repertoire.length})</span>
+                        <span className="text-[#1B4332]">
+                          ★ {PITCH_TYPE_SHORT_LABELS[player.pitchArsenal.favoritePitch]}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {player.pitchArsenal.repertoire.map((slot) => {
+                          const isFav = slot.pitchType === player.pitchArsenal!.favoritePitch;
+                          const isWeak = slot.pitchType === player.pitchArsenal!.weakestPitch;
+                          return (
+                            <span
+                              key={slot.pitchType}
+                              className={`px-1.5 py-0.5 rounded border border-[#181B2C] text-[10px] font-extrabold ${
+                                isFav
+                                  ? 'bg-[#FFC300] text-[#181B2C]'
+                                  : isWeak
+                                    ? 'bg-[#FFE5EC] text-[#9D0208]'
+                                    : 'bg-white text-[#181B2C]'
+                              }`}
+                            >
+                              {isFav ? '★ ' : ''}
+                              {PITCH_TYPE_SHORT_LABELS[slot.pitchType]} {slot.mastery}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-[11px] font-extrabold uppercase text-[#181B2C]">
+                        Batter Pitch Scouting
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold">
+                        <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
+                          Crushes: {PITCH_TYPE_SHORT_LABELS[player.batterPitchProfile.favoritePitch]}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-[#FFE5EC] border border-[#181B2C] text-[#9D0208]">
+                          Weak vs: {PITCH_TYPE_SHORT_LABELS[player.batterPitchProfile.weakPitch]}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-[#FFF3BF] border border-[#181B2C] text-[#181B2C]">
+                          Bunt: {player.ratings.bunt}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex flex-wrap gap-1 pt-1 border-t border-[#181B2C]/15 text-[10px] font-extrabold">
+                    <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[#1D3557]">
+                      {PRESSURE_PROFILE_LABELS[player.pressureProfile]}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#F6EEFF] border border-[#181B2C] text-[#4A148C]">
+                      {COED_TRAIT_LABELS[player.coEdTrait]}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
+                      {EXPERIENCE_TIER_LABELS[player.careerService.experienceTier]} •{' '}
+                      {player.careerService.seasonsPlayed} Yr
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Player Switcher List (inspect any player in the game or on your roster!) */}
+                {allEntries.length > 1 && onSelectPlayerId ? (
+                  <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-1.5">
+                    <div className="text-[10px] font-extrabold uppercase text-[#181B2C]">
+                      {isLiveGameMode ? 'Tap Any Player in This Game' : 'Jump To Teammate'}
+                    </div>
+                    <div className="flex flex-wrap gap-1 max-h-36 overflow-y-auto">
+                      {allEntries.map((item) => {
+                        const active = item.player.id === player.id;
+                        return (
+                          <button
+                            key={item.player.id}
+                            type="button"
+                            data-testid="card-modal-player-chip"
+                            onClick={() => {
+                              soundEngine.play('card_flip');
+                              onSelectPlayerId(item.player.id);
+                            }}
+                            className={`px-2 py-1 rounded-lg border border-[#181B2C] text-[10px] font-extrabold cursor-pointer ${
+                              active
+                                ? 'bg-[#FFC300] text-[#181B2C]'
+                                : 'bg-white text-[#181B2C] hover:bg-[#FFF3BF]'
+                            }`}
+                          >
+                            <span
+                              className="inline-block w-2 h-2 rounded-full mr-1 align-middle border border-[#181B2C]"
+                              style={{ backgroundColor: item.club.colors.primary }}
+                            />
+                            {item.player.position} {item.player.name.split(' ')[0]}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : null}
 

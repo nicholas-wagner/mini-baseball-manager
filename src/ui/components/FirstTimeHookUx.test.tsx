@@ -33,9 +33,10 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
 
     // Pick Otter mascot -> updates mascot input & bouncing buddy immediately!
     fireEvent.click(within(screen.getByTestId('mascot-animal-picker')).getByRole('button', { name: /otter/i }));
+    fireEvent.click(screen.getByTestId('creator-customize-toggle'));
     expect(screen.getByRole('textbox', { name: /^mascot$/i })).toHaveValue('Splash Otter');
 
-    // Primary Play Opening Day button appears BEFORE the deeper Starting Roster Build cards!
+    // Primary Use this club button appears BEFORE the deeper Starting Roster Build cards!
     const startBtn = screen.getByRole('button', { name: /use this club/i });
     const rosterBuildHeading = screen.getByText(/starting roster build/i);
     expect(
@@ -74,12 +75,13 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
     // Glowing Hype meter visible directly in Arcade Mode!
     expect(screen.getByTestId('arcade-hype-bar')).toBeInTheDocument();
 
-    // Home team pitches TOP 1 -> interactive 3-button Arcade Pitch Call bar!
+    // Home team pitches TOP 1 -> interactive Arcade Pitch Call bar with unified trade-off hints!
     const callBar = screen.getByTestId('arcade-call-bar');
     expect(callBar).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /🔥 heat/i }));
-    fireEvent.click(screen.getByRole('button', { name: /🌀 trick/i }));
-    fireEvent.click(screen.getByRole('button', { name: /🎯 corner/i }));
+    fireEvent.click(screen.getByRole('button', { name: /🌀 low chase/i }));
+    fireEvent.click(screen.getByRole('button', { name: /🎨 corner/i }));
+    expect(screen.getByTestId('arcade-tradeoff-hint')).toBeInTheDocument();
 
     // Throw pitch #1 -> first-pitch tip gently clears!
     fireEvent.click(screen.getByRole('button', { name: /next pitch/i }));

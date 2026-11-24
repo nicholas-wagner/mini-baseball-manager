@@ -130,8 +130,8 @@ test('Full career flow: Club Creation -> Live 3D Game Day HUD -> Ballpark HQ Der
   await page.getByRole('button', { name: /download 90s card/i }).click();
   await expect(page.getByTestId('cross-train-feedback')).toContainText(/exported 90s baseball card/i);
 
-  // Visit Ballpark HQ -> 4 Clean Rooms (Ballpark & Economy, Uniforms & Gear, Staff & Front Office, Events & Duels)
-  await page.getByRole('button', { name: /^ballpark$/i }).locator('visible=true').first().click();
+  // Visit Clubhouse HQ -> 4 Clean Rooms (Ballpark & Economy, Uniforms & Gear, Staff & Front Office, Events & Duels)
+  await page.getByRole('button', { name: /^clubhouse$/i }).locator('visible=true').first().click();
   await expect(page.getByTestId('hub-room-tabs')).toBeVisible();
   await expect(page.getByText(/neighborhood sandlot/i)).toBeVisible();
 

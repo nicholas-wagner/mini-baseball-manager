@@ -15,10 +15,13 @@ describe('Pitcher Endurance & Pitch-Specific Effectiveness Drop-Off (TASK-061)',
     const lowStaminaRp = { ...sp, position: 'RP' as const, pitcherRole: 'closer' as const, ratings: { ...sp.ratings, stamina: 38 } };
 
     const normalDrainSp = computePitchEnduranceDrain(highStaminaSp, 1.0, 9);
+    const lowStaminaSp = { ...sp, pitcherRole: 'starter' as const, ratings: { ...sp.ratings, stamina: 42 } };
+    const lowStaminaDrainSp = computePitchEnduranceDrain(lowStaminaSp, 1.0, 9);
     const stressDrainSp = computePitchEnduranceDrain(highStaminaSp, 2.3, 9);
     const blitzDrainSp = computePitchEnduranceDrain(highStaminaSp, 1.0, 5);
     const closerDrain = computePitchEnduranceDrain(lowStaminaRp, 1.0, 9);
 
+    expect(lowStaminaDrainSp).toBeGreaterThan(normalDrainSp * 1.45);
     expect(stressDrainSp).toBeGreaterThan(normalDrainSp);
     expect(blitzDrainSp).toBeGreaterThan(normalDrainSp);
     expect(closerDrain).toBeGreaterThan(normalDrainSp);

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Dices, Play, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Dices, Play, Sparkles } from 'lucide-react';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { ILLUSTRATED_PLAYER_POOL } from '../../art/portraits/illustratedPlayerPool';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
 import { soundEngine } from '../../audio/soundEngine';
+import { buildMascotCheerQuip } from '../../engine/gm/openingDayHook';
 import {
   STARTING_ROSTER_PRESETS,
   type StartingRosterPreset,
@@ -12,6 +13,11 @@ import { createSeededRng } from '../../engine/rng/seededRng';
 import { createClutchMomentSession, type ClutchMomentLaunch } from '../../engine/gm/gameDayMoments';
 import { getHumanSeasonSchedule } from '../../engine/league/seasonEngine';
 import type { Player } from '../../engine/models/player';
+import {
+  MANAGER_BACKSTORIES,
+  type ManagerBackstoryId,
+} from '../../engine/story/backstories';
+import { useCareerStoryStore } from '../../store/careerSlots';
 import { PlayerCardModal } from '../components/PlayerCardModal';
 import { OpeningDayPrint } from '../components/GameDayPrints';
 import { newCareerSeed, prepareCareer, useGameStore } from '../../store/gameStore';
@@ -80,6 +86,7 @@ const MASCOT_ANIMAL_OPTIONS = [
 
 export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const startNewCareer = useGameStore((s) => s.startNewCareer);
+  const chooseCareerBackstory = useCareerStoryStore((s) => s.chooseCareerBackstory);
 
   const [city, setCity] = useState('Sandlot');
   const [clubName, setClubName] = useState('Comets');
@@ -87,18 +94,24 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const [mascot, setMascot] = useState('Rocket Dog');
   const [monogram, setMonogram] = useState('SC');
   const [managerName, setManagerName] = useState('Coach Skip');
+  const [backstoryId, setBackstoryId] = useState<ManagerBackstoryId>('sandlot_hero');
   const [startingPreset, setStartingPreset] = useState<StartingRosterPreset>('balanced');
   const [enableInjuries, setEnableInjuries] = useState(true);
   const [enableIllnesses, setEnableIllnesses] = useState(true);
   const [paletteIndex, setPaletteIndex] = useState(0);
   const [seedNonce, setSeedNonce] = useState(newCareerSeed);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   const palette = SAMPLE_TEAM_PALETTES[paletteIndex];
   const previewTraits = createPortraitTraits(seedNonce);
-  const featuredMangaCards = [0, 1, 2].map(
-    (offset) =>
-      ILLUSTRATED_PLAYER_POOL[(paletteIndex * 3 + offset) % ILLUSTRATED_PLAYER_POOL.length],
-  );
+  const femalePool = ILLUSTRATED_PLAYER_POOL.filter((c) => c.traits.playerLook === 'female');
+  const malePool = ILLUSTRATED_PLAYER_POOL.filter((c) => c.traits.playerLook !== 'female');
+  const featuredMangaCards = [
+    malePool[(paletteIndex * 2) % malePool.length] ?? ILLUSTRATED_PLAYER_POOL[0],
+    femalePool[paletteIndex % femalePool.length] ?? ILLUSTRATED_PLAYER_POOL[1],
+    malePool[(paletteIndex * 2 + 1) % malePool.length] ?? ILLUSTRATED_PLAYER_POOL[2],
+  ];
+  const mascotCheer = buildMascotCheerQuip(mascot || 'Rocket Dog', 'cheering', tipCount + paletteIndex);
 
   const handleRandomize = () => {
     const nextSeed = seedNonce + 137;
@@ -130,7 +143,9 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
     const moment = createClutchMomentSession({
       homeClub: series.isHome ? homeClub : series.opponent,
       awayClub: series.isHome ? series.opponent : homeClub,
-      regulationInnings: 5, seed: draft.seed + 1,
+      regulationInnings: 5,
+      seed: draft.seed + 1,
+      chargeOpeningPower: true,
     });
     return { draft, club: homeClub, series, moment };
   }, [editing, city, clubName, mascot, monogram, managerName, startingPreset, palette, enableInjuries, enableIllnesses, seedNonce]);
@@ -139,13 +154,25 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
     const { club, series, moment, draft } = opening;
     return <section className="opening-cover" aria-label="Your club">
       <div className="opening-club">
-        <ClubMascotBuddy mascot={club.mascot} primaryColor={club.colors.primary} secondaryColor={club.colors.secondary}
-          accentColor={club.colors.accent} size="md" />
+        <ClubMascotBuddy
+          mascot={club.mascot}
+          primaryColor={club.colors.primary}
+          secondaryColor={club.colors.secondary}
+          accentColor={club.colors.accent}
+          mood="happy"
+          size="md"
+        />
         <div><strong data-testid="creator-club-identity">{club.city} {club.name}</strong><small>{club.mascot}</small></div>
         <button onClick={() => setEditing(true)}>Change club</button>
       </div>
       <OpeningDayPrint cover session={moment.session} opponentLabel={(series.isHome ? 'vs ' : '@ ') + series.opponent.name}
-        onInspect={setInspected} onStart={() => { startNewCareer(draft); onCreated(moment); }} />
+        onInspect={setInspected} onStart={() => {
+          startNewCareer(draft);
+          if (backstoryId !== 'sandlot_hero') {
+            chooseCareerBackstory(backstoryId);
+          }
+          onCreated(moment);
+        }} />
       <PlayerCardModal open={!!inspected} entry={inspected && {player:inspected, club, roleTag:'Opening Day'}}
         onClose={() => setInspected(null)} />
     </section>;
@@ -238,7 +265,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                   size="lg"
                   variant="turf"
                   icon={<Play className="w-4 h-4" />}
-                  className="flex-1 sm:flex-none"
+                  className="flex-1 sm:flex-none whitespace-nowrap"
                 >
                   Use this club
                 </ComicButton>
@@ -286,6 +313,19 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                     </div>
                   </div>
                 </div>
+                <div className="w-11 h-12 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] p-0.5 shrink-0 hidden sm:block md:hidden">
+                  <PaintedUniformPreview
+                    traits={previewTraits}
+                    team={{
+                      primary: palette.primary,
+                      secondary: palette.secondary,
+                      accent: palette.accent,
+                      monogram: monogram.slice(0, 2) || 'SC',
+                    }}
+                    jerseyNumber={24}
+                    role="pitcher"
+                  />
+                </div>
                 <div className="flex md:hidden items-center gap-1 shrink-0">
                   <span
                     className="w-3 h-3 rounded-full border border-[#181B2C]"
@@ -300,6 +340,13 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                     style={{ backgroundColor: palette.accent }}
                   />
                 </div>
+              </div>
+
+              <div
+                data-testid="creator-mascot-quip"
+                className="px-2.5 py-1 rounded-xl border border-[#181B2C]/30 bg-[#FFF8E7] text-[10px] font-extrabold text-[#1B4332] leading-snug"
+              >
+                💬 {mascotCheer}
               </div>
 
               <div
@@ -354,17 +401,30 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
             </div>
           </div>
 
-          {/* 2. Optional Customization & Strategy Details (Already Ready Above — Tweak Anytime!) */}
-          <div className="p-3.5 rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-1 border-b border-dashed border-[#181B2C]/25 pb-2">
+          {/* 2. Collapsible Optional Customization, Origin & Rules Drawer (Keeps Screen 0 Clean Above the Fold!) */}
+          <div className="rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] overflow-hidden shadow-[3px_3px_0_#181B2C]">
+            <button
+              type="button"
+              data-testid="creator-customize-toggle"
+              aria-expanded={customizeOpen}
+              onClick={() => {
+                setCustomizeOpen((v) => !v);
+                soundEngine.play('ui_pop');
+              }}
+              className="w-full px-3.5 py-3 min-h-[48px] flex flex-wrap items-center justify-between gap-2 text-left hover:bg-[#FFF8E7] transition cursor-pointer"
+            >
               <span className="font-display text-xs uppercase text-[#1D3557] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#F77F00]" />
-                Optional: Customize Club Name, Uniform, Starting Roster &amp; Rules
+                Customize Club Name, Uniform, Manager Origin &amp; Rules
               </span>
-              <span className="text-[10px] font-bold text-[#4A5068]">
-                Defaults are already ready to play above!
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-[11px] font-extrabold text-[#181B2C]">
+                {customizeOpen ? 'Hide' : 'Optional'}
+                {customizeOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </span>
-            </div>
+            </button>
+
+            {customizeOpen ? (
+              <div data-testid="creator-customize-panel" className="p-3.5 pt-2 border-t border-dashed border-[#181B2C]/25 space-y-3">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -528,6 +588,47 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
               </div>
             </div>
 
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
+                  📖 Manager Story Origin (8 Replayable Adventures)
+                </span>
+                <span className="text-[10px] font-bold text-[#7209B7]">
+                  Unlocks a 3-Act Choose-Your-Own-Adventure story!
+                </span>
+              </div>
+              <div
+                data-testid="creator-backstory-picker"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-2"
+              >
+                {MANAGER_BACKSTORIES.map((bg) => {
+                  const selected = backstoryId === bg.id;
+                  return (
+                    <button
+                      key={bg.id}
+                      type="button"
+                      onClick={() => {
+                        setBackstoryId(bg.id);
+                        soundEngine.play('ui_pop');
+                      }}
+                      className={`p-2 rounded-xl border-2 border-[#181B2C] text-left min-h-[54px] cursor-pointer transition ${
+                        selected
+                          ? 'bg-[#FFF3BF] shadow-[2px_2px_0_#181B2C]'
+                          : 'bg-[#FFFDF7] hover:bg-[#FBF4E4]'
+                      }`}
+                    >
+                      <div className="font-display text-[11px] text-[#181B2C] leading-tight">
+                        {bg.badgeIcon} {bg.title}
+                      </div>
+                      <div className="text-[10px] font-bold text-[#4A5068] truncate mt-0.5">
+                        {bg.arcTitle}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2">
               <div className="text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">
                 Career Realism Toggles (Low-Frequency, Fun-First)
@@ -553,6 +654,8 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
                 </label>
               </div>
             </div>
+              </div>
+            ) : null}
           </div>
           <ComicButton type="submit" size="lg" variant="turf">Back to Opening Day</ComicButton>
         </form>

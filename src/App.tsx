@@ -66,7 +66,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { id: 'roster', label: 'Roster', icon: <Users className="w-4 h-4" /> },
   { id: 'league', label: 'League', icon: <Trophy className="w-4 h-4" /> },
   { id: 'skills', label: 'Skill Tree', icon: <GitBranch className="w-4 h-4" /> },
-  { id: 'economy', label: 'Ballpark', icon: <Building2 className="w-4 h-4" /> },
+  { id: 'economy', label: 'Clubhouse', icon: <Building2 className="w-4 h-4" /> },
 ];
 
 export function App() {
@@ -92,7 +92,7 @@ export function App() {
   const [packsOpen, setPacksOpen] = useState(false);
   const [trophyOpen, setTrophyOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [hubInitialSubTab, setHubInitialSubTab] = useState<'stadiums' | 'relics'>('stadiums');
+  const [hubInitialSubTab, setHubInitialSubTab] = useState<'stadiums' | 'relics' | 'uniforms'>('stadiums');
   const humanClub = useGameStore((s) => s.getHumanClub());
   const manager = useGameStore((s) => s.manager);
   const currentSeriesIndex = useGameStore((s) => s.currentSeriesIndex);
@@ -149,10 +149,11 @@ export function App() {
     };
   }, []);
 
-  // Automatically sync stadium environmental soundtrack whenever the active club's home ballpark changes
+  // Automatically sync league-tier soundtrack & ballpark theme whenever club tier or home ballpark changes
   useEffect(() => {
+    bgmEngine.syncLeagueTier(humanClub?.leagueTier ?? 'rookie');
     bgmEngine.syncStadium(humanClub?.stadium.ballparkId ?? 'sandlot_commons');
-  }, [humanClub?.stadium.ballparkId]);
+  }, [humanClub?.leagueTier, humanClub?.stadium.ballparkId]);
 
   // Resume the last active saved career slot automatically on boot
   useEffect(() => {
@@ -187,10 +188,11 @@ export function App() {
   );
 
   const hasMobileBadge = gamesPlayed >= 1 && hasUnreadChapter;
+  const showHeaderPackButton = Boolean(humanClub && unopenedPackCount > 0 && gamesPlayed >= 1);
 
   const mobileUtilityActions = (
     <div className="flex items-center gap-1.5">
-      {humanClub && unopenedPackCount > 0 ? (
+      {showHeaderPackButton ? (
         <button
           type="button"
           onClick={() => {
@@ -229,7 +231,7 @@ export function App() {
 
   const desktopUtilityActions = (
     <div className="space-y-1.5">
-      {humanClub && unopenedPackCount > 0 ? (
+      {showHeaderPackButton ? (
         <button
           type="button"
           onClick={() => {
@@ -303,7 +305,7 @@ export function App() {
           <Disc3 className="w-3.5 h-3.5 shrink-0" />
           <span>Music</span>
         </button>
-        {humanClub && unopenedPackCount === 0 ? (
+        {humanClub && !showHeaderPackButton ? (
           <button
             type="button"
             onClick={() => {
@@ -387,6 +389,11 @@ export function App() {
     setActiveTab('economy');
   };
 
+  const handleOpenUniforms = () => {
+    setHubInitialSubTab('uniforms');
+    setActiveTab('economy');
+  };
+
   const renderMainContent = () => {
     if (activeTab === 'lab' && designLabVisible) {
       return <DesignLabScreen />;
@@ -400,6 +407,7 @@ export function App() {
           }}
           onOpenStory={() => setStoryOpen(true)}
           onOpenRelics={handleOpenRelics}
+          onOpenUniforms={handleOpenUniforms}
         />
       ) : (
         <ClubCreatorScreen onCreated={startOpening} />
@@ -407,7 +415,10 @@ export function App() {
     }
     if (activeTab === 'roster') {
       return humanClub ? (
-        <RosterLineupScreen onPlayBall={() => setActiveTab('gameday')} />
+        <RosterLineupScreen
+          onPlayBall={() => setActiveTab('gameday')}
+          onOpenUniforms={handleOpenUniforms}
+        />
       ) : (
         <ClubCreatorScreen onCreated={startOpening} />
       );
@@ -475,7 +486,11 @@ export function App() {
         onClose={() => setSlotsOpen(false)}
         onStartNewInSlot={() => setActiveTab('gameday')}
       />
-      <MusicJukeboxModal open={jukeboxOpen} onClose={() => setJukeboxOpen(false)} />
+      <MusicJukeboxModal
+        open={jukeboxOpen}
+        leagueTier={humanClub?.leagueTier ?? 'rookie'}
+        onClose={() => setJukeboxOpen(false)}
+      />
       <FoilPackModal
         open={packsOpen}
         onClose={() => setPacksOpen(false)}

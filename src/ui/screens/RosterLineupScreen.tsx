@@ -5,6 +5,7 @@ import {
   FileSearch,
   Flame,
   Gamepad2,
+  Palette,
   Save,
   Snowflake,
   Sparkles,
@@ -66,6 +67,7 @@ import { formStateToCardMood, toBaseballCardPlayer } from '../utils/playerCardAd
 
 interface RosterLineupScreenProps {
   onPlayBall: () => void;
+  onOpenUniforms?: () => void;
 }
 
 const HITTER_CROSS_TRAIN_POSITIONS: readonly FieldPosition[] = [
@@ -98,7 +100,7 @@ function renderFormBadge(formState: FormState) {
   return null;
 }
 
-export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
+export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupScreenProps) {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const freeAgents = useGameStore((s) => s.freeAgents);
   const individualDrillsRemaining = useGameStore((s) => s.individualDrillsRemaining);
@@ -335,6 +337,20 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
             >
               {lineupOptimized ? '✓ Lineup Optimized!' : 'Auto-Optimize Lineup'}
             </ComicButton>
+            {onOpenUniforms ? (
+              <ComicButton
+                size="sm"
+                variant="cream"
+                data-testid="roster-open-uniforms-btn"
+                icon={<Palette className="w-4 h-4" />}
+                onClick={() => {
+                  soundEngine.play('ui_pop');
+                  onOpenUniforms();
+                }}
+              >
+                Uniforms
+              </ComicButton>
+            ) : null}
             <ComicButton
               size="sm"
               variant="sky"
@@ -376,7 +392,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
           </div>
         ) : null}
 
-        {/* Mobile & Desktop Quick Switch: Lineup Management vs Full 90s Roster Baseball Card Binder */}
+        {/* Mobile & Desktop Quick Switch: Lineup vs Stat Card Binder vs Illustrated Print Gallery */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4]">
           <div className="flex flex-wrap gap-2">
             <ComicButton
@@ -386,6 +402,7 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
               active={rosterView === 'lineup'}
               onClick={() => {
                 setRosterView('lineup');
+                setPrintGallery(false);
                 soundEngine.play('ui_pop');
               }}
             >
@@ -394,14 +411,28 @@ export function RosterLineupScreen({ onPlayBall }: RosterLineupScreenProps) {
             <ComicButton
               size="sm"
               data-testid="roster-view-cards-btn"
-              variant={rosterView === 'cards' ? 'coral' : 'cream'}
-              active={rosterView === 'cards'}
+              variant={rosterView === 'cards' && !printGallery ? 'coral' : 'cream'}
+              active={rosterView === 'cards' && !printGallery}
               onClick={() => {
                 setRosterView('cards');
+                setPrintGallery(false);
                 soundEngine.play('card_flip');
               }}
             >
               🃏 Roster Cards ({humanClub.roster.length})
+            </ComicButton>
+            <ComicButton
+              size="sm"
+              data-testid="roster-view-gallery-btn"
+              variant={rosterView === 'cards' && printGallery ? 'turf' : 'cream'}
+              active={rosterView === 'cards' && printGallery}
+              onClick={() => {
+                setRosterView('cards');
+                setPrintGallery(true);
+                soundEngine.play('card_flip');
+              }}
+            >
+              🖼️ Art Gallery
             </ComicButton>
           </div>
           <span className="text-[11px] font-bold text-[#4A5068]">

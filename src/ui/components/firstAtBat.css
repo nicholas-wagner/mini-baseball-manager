@@ -3,13 +3,47 @@
   color: #193d37;
   border: 2px solid #192735;
   border-radius: 12px;
-  padding: 8px 12px 12px;
+  padding: 6px 12px 10px;
   box-shadow: 3px 3px #192735;
 }
 .atbat-guide header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+.atbat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.atbat-action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: stretch;
+}
+.atbat-action-row .atbat-go {
+  flex: 1.25;
+  margin-top: 0;
+}
+.atbat-power {
+  flex: 1;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 2px solid #192735;
+  background: linear-gradient(110deg, #433272, #744069);
+  color: #ffe4a3;
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 1.15;
+  box-shadow: 2px 2px #192735;
+  cursor: pointer;
+}
+.atbat-power.is-armed {
+  background: #ff4d6d;
+  color: #ffffff;
 }
 .atbat-guide header span {
   font: 800 11px monospace;
@@ -29,7 +63,7 @@
   font-family: var(--font-display);
   font-size: clamp(16px, 2vw, 22px);
   line-height: 1.2;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .atbat-choices {
   display: flex;

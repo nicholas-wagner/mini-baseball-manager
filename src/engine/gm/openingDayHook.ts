@@ -1,12 +1,132 @@
 import type { Club } from '../models/club';
-import type { AtBatOutcome, PlayEvent } from '../models/playEvent';
-import { computePlayerOverall, isPitcherPosition, type Player } from '../models/player';
+import type { AtBatOutcome, PlayEvent, TacticalCall } from '../models/playEvent';
+import {
+  computePlayerOverall,
+  isPitcherPosition,
+  PITCH_TYPE_SHORT_LABELS,
+  type Player,
+} from '../models/player';
+import { fatigueToEndurance } from '../rpg/pitcherEndurance';
+import type { GameSessionState } from '../simulation/gameState';
+import type { PitchTargetIntent } from '../simulation/pitchMindGames';
 
 export interface SpotlightStarCard {
   roleId: 'captain' | 'ace' | 'speedster';
   roleBadge: string;
   player: Player;
   tagline: string;
+}
+
+export interface PitchCallGuideOption {
+  id: PitchTargetIntent;
+  label: string;
+  shortLabel: string;
+  actionLabel: string;
+  tradeoff: string;
+}
+
+export interface SwingCallGuideOption {
+  id: TacticalCall;
+  label: string;
+  shortLabel: string;
+  actionLabel: string;
+  tradeoff: string;
+}
+
+export const PITCH_CALL_GUIDE: readonly PitchCallGuideOption[] = [
+  {
+    id: 'attack_zone',
+    label: 'Over the plate',
+    shortLabel: '🎯 Over Plate',
+    actionLabel: 'Pitch over the plate',
+    tradeoff: 'Safe strike. Easier to hit.',
+  },
+  {
+    id: 'paint_corners',
+    label: 'Corner',
+    shortLabel: '🎨 Corner',
+    actionLabel: 'Pitch to the corner',
+    tradeoff: 'More strikeouts. Risk a walk.',
+  },
+  {
+    id: 'bury_offspeed',
+    label: 'Low and away',
+    shortLabel: '🌀 Low Chase',
+    actionLabel: 'Pitch low',
+    tradeoff: 'Chase pitch. Great with 2 strikes.',
+  },
+  {
+    id: 'high_heat',
+    label: 'High heat',
+    shortLabel: '🔥 Heat',
+    actionLabel: 'Throw high heat',
+    tradeoff: 'Extra velocity. Risky if squared.',
+  },
+];
+
+export const SWING_CALL_GUIDE: readonly SwingCallGuideOption[] = [
+  {
+    id: 'contact',
+    label: 'Make contact',
+    shortLabel: '🎯 Contact',
+    actionLabel: 'Swing for contact',
+    tradeoff: 'Easier to connect. Less power.',
+  },
+  {
+    id: 'normal',
+    label: 'Balanced',
+    shortLabel: '⚾ Balanced',
+    actionLabel: 'Swing balanced',
+    tradeoff: 'Steady mix of hits and pop.',
+  },
+  {
+    id: 'power',
+    label: 'Swing big',
+    shortLabel: '💥 Swing Big',
+    actionLabel: 'Swing for power',
+    tradeoff: 'More power. Easier to miss.',
+  },
+];
+
+export interface MatchupScoutLine {
+  batterLine: string;
+  pitcherLine: string;
+}
+
+export interface BetweenGameSpotlightInput {
+  canClaimStarterReward: boolean;
+  unopenedPackCount: number;
+  hasUnreadStoryBeat: boolean;
+  storyBeatTitle?: string;
+  hasGmDilemma: boolean;
+  gmDilemmaHeadline?: string;
+  totalUnspentSp: number;
+  hasSeriesRecap: boolean;
+  seriesRecapHeadline?: string;
+}
+
+export type BetweenGameSpotlightKind =
+  | 'starter_reward'
+  | 'foil_pack'
+  | 'story_chapter'
+  | 'gm_dilemma'
+  | 'skill_points'
+  | 'series_recap'
+  | 'derby_invite';
+
+export interface BetweenGameSpotlightCard {
+  id: BetweenGameSpotlightKind;
+  eyebrow: string;
+  title: string;
+  detail: string;
+  ctaLabel: string;
+  tone: 'gold' | 'violet' | 'turf' | 'coral' | 'sky';
+}
+
+export interface BetweenGameSpotlightSelection {
+  primary: BetweenGameSpotlightCard | null;
+  secondaryCount: number;
+  all: readonly BetweenGameSpotlightCard[];
 }
 
 export interface FirstPitchTipInput {
@@ -31,14 +151,44 @@ function pickCaptainHitter(club: Club, excludeIds: ReadonlySet<string>): Player 
   return [...pool].sort((a, b) => computePlayerOverall(b) - computePlayerOverall(a))[0];
 }
 
-function pickSpeedster(club: Club, excludeIds: ReadonlySet<string>): Player | null {
-  const hitters = club.roster.filter((p) => !isPitcherPosition(p.position) && !excludeIds.has(p.id));
-  const pool = hitters.length > 0 ? hitters : club.roster.filter((p) => !excludeIds.has(p.id));
-  if (pool.length === 0) return null;
+function pickThirdSpotlightPlayer(
+  club: Club,
+  excludeIds: ReadonlySet<string>,
+  needFemaleRepresentation: boolean,
+): Player | null {
+  const remaining = club.roster.filter((p) => !excludeIds.has(p.id));
+  if (remaining.length === 0) return null;
+  if (needFemaleRepresentation) {
+    const femaleHitters = remaining.filter(
+      (p) => p.traits.playerLook === 'female' && !isPitcherPosition(p.position),
+    );
+    const femalePool =
+      femaleHitters.length > 0
+        ? femaleHitters
+        : remaining.filter((p) => p.traits.playerLook === 'female');
+    if (femalePool.length > 0) {
+      return [...femalePool].sort(
+        (a, b) => b.ratings.speed + computePlayerOverall(b) - (a.ratings.speed + computePlayerOverall(a)),
+      )[0];
+    }
+  }
+  const hitters = remaining.filter((p) => !isPitcherPosition(p.position));
+  const pool = hitters.length > 0 ? hitters : remaining;
   return [...pool].sort((a, b) => b.ratings.speed - a.ratings.speed)[0];
 }
 
-/** Picks up to 3 memorable stars (Captain, Staff Ace, Speedster) for an instant Opening Day intro. */
+function buildThirdStarTagline(player: Player): string {
+  const ovr = computePlayerOverall(player);
+  if (player.ratings.speed >= 65) {
+    return `“${player.nickname}” — ${player.ratings.speed} Speed base stealer`;
+  }
+  if (player.ratings.fielding >= 62) {
+    return `“${player.nickname}” — ${player.ratings.fielding} Glove sparkplug`;
+  }
+  return `“${player.nickname}” — Rising club spark (${ovr} OVR)`;
+}
+
+/** Picks up to 3 memorable stars (Captain, Staff Ace, Speedster/Spark) with co-ed representation. */
 export function selectClubSpotlightTrio(club: Club): SpotlightStarCard[] {
   if (club.roster.length === 0) return [];
   const cards: SpotlightStarCard[] = [];
@@ -66,17 +216,190 @@ export function selectClubSpotlightTrio(club: Club): SpotlightStarCard[] {
     });
   }
 
-  const speedster = pickSpeedster(club, usedIds);
-  if (speedster) {
+  const alreadyHasFemale = cards.some((c) => c.player.traits.playerLook === 'female');
+  const thirdStar = pickThirdSpotlightPlayer(club, usedIds, !alreadyHasFemale);
+  if (thirdStar) {
     cards.push({
       roleId: 'speedster',
-      roleBadge: '⚡ SPEEDSTER',
-      player: speedster,
-      tagline: `“${speedster.nickname}” — ${speedster.ratings.speed} Speed base stealer`,
+      roleBadge: thirdStar.ratings.speed >= 65 ? '⚡ SPEEDSTER' : '✨ CLUB SPARK',
+      player: thirdStar,
+      tagline: buildThirdStarTagline(thirdStar),
     });
   }
 
   return cards;
+}
+
+function formatBatterScoutStat(batter: Player): string {
+  const { power, speed, contact } = batter.ratings;
+  if (power >= speed && power >= contact) return `PWR ${power}`;
+  if (speed >= contact) return `SPD ${speed}`;
+  return `CON ${contact}`;
+}
+
+function formatScoutFormTag(formState: Player['formState']): string {
+  if (formState === 'blazing' || formState === 'hot') return ' • Hot 🔥';
+  if (formState === 'cold' || formState === 'frozen') return ' • Cold 🧊';
+  return '';
+}
+
+/** Concise 2-second scouting line for live matchup cards without spreadsheet clutter. */
+export function buildMatchupScoutLine(
+  batter: Player,
+  pitcher: Player,
+  session: GameSessionState,
+): MatchupScoutLine {
+  const batSide = batter.bats === 'S' ? 'SHB' : `${batter.bats}HB`;
+  const pitchingSide = session.half === 'TOP' ? session.home : session.away;
+  const pitBox =
+    session.half === 'TOP'
+      ? session.boxScore.homePitchers[pitcher.id]
+      : session.boxScore.awayPitchers[pitcher.id];
+  const pitches = pitBox?.pitchesThrown ?? 0;
+  const endPct = fatigueToEndurance(pitchingSide.pitcherFatigue);
+  const favPitch = pitcher.pitchArsenal
+    ? ` • ★ ${PITCH_TYPE_SHORT_LABELS[pitcher.pitchArsenal.favoritePitch]}`
+    : '';
+
+  return {
+    batterLine: `${batSide} • ${formatBatterScoutStat(batter)}${formatScoutFormTag(batter.formState)}`,
+    pitcherLine: `${pitcher.throws}HP • ${pitches} P • ${endPct}%${favPitch}`,
+  };
+}
+
+const MASCOT_QUIPS: Readonly<Record<'happy' | 'cheering' | 'rally' | 'determined', readonly string[]>> = {
+  happy: [
+    'Ready for some sandlot magic!',
+    'Sun’s out, gloves on — let’s play!',
+    'High-fives in the dugout!',
+  ],
+  cheering: [
+    'WHOA!! That’s how we do it!!',
+    'Cue the fireworks and peanuts!',
+    'Best club in the whole league!',
+  ],
+  rally: [
+    'Rally caps ON — time to shine!',
+    'Clap it up! Big inning coming!',
+    'Noise meter to the MAX!!',
+  ],
+  determined: [
+    'Shake it off — next one’s ours!',
+    'Deep breath. Paint the corner!',
+    'Comeback story starts right here!',
+  ],
+};
+
+/** Returns a playful Saturday-morning cartoon mascot speech line. */
+export function buildMascotCheerQuip(
+  mascot: string,
+  mood: 'happy' | 'cheering' | 'rally' | 'determined',
+  seedIndex = 0,
+): string {
+  const pool = MASCOT_QUIPS[mood];
+  const picked = pool[Math.abs(seedIndex) % pool.length];
+  return `${mascot.split(' ')[0]}: "${picked}"`;
+}
+
+const DERBY_INVITE_CARD: BetweenGameSpotlightCard = {
+  id: 'derby_invite',
+  eyebrow: '💥 QUICK ARCADE BREAK',
+  title: 'Try a 30-Second Home Run Derby!',
+  detail: 'Test your sweet-spot timing for +$1,200 Cash & a Foil Pack.',
+  ctaLabel: 'Play 30s HR Derby',
+  tone: 'coral',
+};
+
+function collectPrimarySpotlightCards(
+  input: BetweenGameSpotlightInput,
+): BetweenGameSpotlightCard[] {
+  const cards: BetweenGameSpotlightCard[] = [];
+  if (input.canClaimStarterReward) {
+    cards.push({
+      id: 'starter_reward',
+      eyebrow: '🌟 STARTER GOALS COMPLETE',
+      title: 'Claim +$1,000 Cash & Bonus Foil Pack!',
+      detail: 'You finished all 3 Sandlot Starter Goals.',
+      ctaLabel: '🎁 Claim Starter Reward!',
+      tone: 'gold',
+    });
+  }
+  if (input.unopenedPackCount > 0) {
+    const plural = input.unopenedPackCount === 1 ? '' : 's';
+    cards.push({
+      id: 'foil_pack',
+      eyebrow: '🎁 1994 CARD SHOP',
+      title: `${input.unopenedPackCount} Unopened Foil Pack${plural} Ready!`,
+      detail: 'Peel 3 shiny foil cards for vintage relics, XP & cash.',
+      ctaLabel: 'Rip Foil Pack!',
+      tone: 'coral',
+    });
+  }
+  if (input.hasUnreadStoryBeat) {
+    cards.push({
+      id: 'story_chapter',
+      eyebrow: '📖 CLUBHOUSE STORY BEAT',
+      title: input.storyBeatTitle ?? 'New Story Chapter Ready!',
+      detail: 'Make a fun dugout choice to shape your club’s legend.',
+      ctaLabel: 'Read Story Chapter',
+      tone: 'violet',
+    });
+  }
+  return cards;
+}
+
+function collectSecondarySpotlightCards(
+  input: BetweenGameSpotlightInput,
+): BetweenGameSpotlightCard[] {
+  const cards: BetweenGameSpotlightCard[] = [];
+  if (input.hasGmDilemma) {
+    cards.push({
+      id: 'gm_dilemma',
+      eyebrow: '📬 FRONT OFFICE CALL',
+      title: input.gmDilemmaHeadline ?? 'Incoming GM Dilemma',
+      detail: 'Your front office needs a quick call before next pitch.',
+      ctaLabel: 'Review Call',
+      tone: 'sky',
+    });
+  }
+  if (input.totalUnspentSp > 0) {
+    const plural = input.totalUnspentSp === 1 ? '' : 's';
+    cards.push({
+      id: 'skill_points',
+      eyebrow: '⚡ LEVEL-UP POWER',
+      title: `${input.totalUnspentSp} Skill Point${plural} Ready to Spend`,
+      detail: 'Unlock Cultural Heritage powers or Manager Skipper tricks.',
+      ctaLabel: 'Spend Skill Points',
+      tone: 'violet',
+    });
+  }
+  if (input.hasSeriesRecap) {
+    cards.push({
+      id: 'series_recap',
+      eyebrow: '📰 SANDLOT SPORTS EXTRA',
+      title: input.seriesRecapHeadline ?? 'Series Final Recap Ready',
+      detail: 'Check your 3-game scores, standings climb & Series MVP.',
+      ctaLabel: 'Read Series Recap',
+      tone: 'turf',
+    });
+  }
+  return cards;
+}
+
+/** Selects 1 calm prioritized Between-Game Spotlight card to prevent post-game dashboard overload. */
+export function selectBetweenGameSpotlight(
+  input: BetweenGameSpotlightInput,
+): BetweenGameSpotlightSelection {
+  const combined = [
+    ...collectPrimarySpotlightCards(input),
+    ...collectSecondarySpotlightCards(input),
+  ];
+  const all = combined.length > 0 ? combined : [DERBY_INVITE_CARD];
+  return {
+    primary: all[0],
+    secondaryCount: Math.max(0, all.length - 1),
+    all,
+  };
 }
 
 /** Friendly 1-line Coach Pops guidance shown before Pitch #1 of a club's Opening Day game. */

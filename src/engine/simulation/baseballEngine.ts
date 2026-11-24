@@ -45,7 +45,11 @@ import {
 } from './gameState';
 import { shouldAiAttemptSteal } from './baserunning';
 import type { NemesisMatchupEvaluation } from '../league/nemesisTracker';
-import type { BatterPitchGuess, PitchTargetIntent } from './pitchMindGames';
+import type {
+  ArcadeTimingInput,
+  BatterPitchGuess,
+  PitchTargetIntent,
+} from './pitchMindGames';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
 import type { WeatherSimulationImpact } from './weather';
 import type { DefensiveShiftId } from './winProbability';
@@ -58,6 +62,7 @@ export interface StepPitchOptions {
   pitchTarget?: PitchTargetIntent;
   batterGuess?: BatterPitchGuess;
   nemesisBonus?: NemesisMatchupEvaluation;
+  arcadeTiming?: ArcadeTimingInput;
 }
 
 export function createGameSession(
@@ -360,6 +365,23 @@ function applyFieldingErrorOutcome(
   recordRunsScored(state, batting, pitcherLine, batterLine, errAdvance.runsScoredIds, false);
 }
 
+function applySacrificeBuntAdvance(
+  state: GameSessionState,
+  batting: TeamGameSide,
+  batterLine: BatterBoxLine,
+  pitcherLine: PitcherBoxLine,
+): void {
+  const [b1, b2, b3] = state.bases;
+  const runsScoredIds = b3 && state.outs < 3 ? [b3] : [];
+  state.bases = [null, b1, b2];
+  if (b1 || b2 || b3) {
+    batterLine.atBats = Math.max(0, batterLine.atBats - 1);
+  }
+  if (runsScoredIds.length > 0) {
+    recordRunsScored(state, batting, pitcherLine, batterLine, runsScoredIds, true);
+  }
+}
+
 function applyRunnerMovementForPlateOutcome(
   state: GameSessionState,
   res: PitchResolution,
@@ -410,6 +432,8 @@ function applyRunnerMovementForPlateOutcome(
     batterLine.atBats -= 1;
     batterLine.sacFlies += 1;
     recordRunsScored(state, batting, pitcherLine, batterLine, [scoringId], true);
+  } else if (res.advanceOnOut === 'sac_bunt') {
+    applySacrificeBuntAdvance(state, batting, batterLine, pitcherLine);
   }
 }
 
@@ -906,6 +930,7 @@ export function stepPitch(
     pitchTarget: options.pitchTarget,
     batterGuess: options.batterGuess,
     nemesisBonus: options.nemesisBonus,
+    arcadeTiming: options.arcadeTiming,
     battingGameplan: batting.activeGameplan,
     fieldingGameplan: fielding.activeGameplan,
     battingPlayersById: batting.playersById,

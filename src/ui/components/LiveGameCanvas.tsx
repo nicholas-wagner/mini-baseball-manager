@@ -102,7 +102,7 @@ export function LiveGameCanvas({
   }, [entranceCue, onEntranceEnd]);
 
   return (
-    <div className={`relative w-full ${guided ? 'h-[250px] sm:h-[355px] lg:h-[410px]' : 'h-[204px] sm:h-[320px] lg:h-[370px]'} rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] overflow-hidden bg-[#63CAFF]`}>
+    <div className={`relative w-full ${guided ? 'h-[250px] sm:h-[350px] lg:h-[388px]' : 'h-[204px] sm:h-[320px] lg:h-[370px]'} rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] overflow-hidden bg-[#63CAFF]`}>
       <div ref={containerRef} className="w-full h-full" data-testid="live-game-3d-canvas" />
 
       {celebrateConfetti ? (

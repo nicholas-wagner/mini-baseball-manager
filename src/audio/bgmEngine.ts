@@ -1,19 +1,32 @@
 import type { BallparkPresetId } from '../engine/ballparks/stadiumCatalog';
+import type { LeagueTierId } from '../engine/models/club';
 
 export type BgmTrackId =
   | 'sandlot_sunshine'
-  | 'dugout_funk'
   | 'twilight_bleachers'
+  | 'dugout_funk'
   | 'harbor_shanty_swing'
   | 'bayfront_surf_94'
   | 'sunbelt_mariachi_groove'
   | 'sakura_pentatonic_march'
+  | 'pinewood_organ_shuffle'
   | 'mesa_skyline_soar'
+  | 'neon_dome_rally'
   | 'ninth_inning_turbo'
   | 'cathedral_championship';
 
+export const LEAGUE_TIER_MUSIC_LABELS: Readonly<Record<LeagueTierId, string>> = {
+  rookie: 'Rookie Sandlot',
+  low_a: 'Low-A Community',
+  high_a: 'High-A Municipal',
+  aa: 'AA Regional',
+  aaa: 'AAA Pro Showcase',
+  majors: 'Mini Major League',
+};
+
 export interface BgmTrackSpec {
   id: BgmTrackId;
+  leagueTier: LeagueTierId;
   ballparkId: BallparkPresetId;
   stadiumLabel: string;
   title: string;
@@ -38,16 +51,18 @@ export interface BgmState {
   masterMuted: boolean;
   playing: boolean;
   autoMatchStadium: boolean;
+  currentLeagueTier: LeagueTierId;
   currentBallparkId: BallparkPresetId;
   trackId: BgmTrackId;
   /** User-facing 0..1 slider (internally scaled gently so BGM stays cozy beneath SFX). */
   volume: number;
 }
 
-/** 10 handcrafted environmental 90s arcade baseball tracks — one unique theme per ballpark! */
+/** 12 handcrafted 90s arcade baseball tracks — 2 selectable themes per League Tier (Rookie -> Majors)! */
 export const BGM_TRACKS: readonly BgmTrackSpec[] = [
   {
     id: 'sandlot_sunshine',
+    leagueTier: 'rookie',
     ballparkId: 'sandlot_commons',
     stadiumLabel: 'Sandlot Commons',
     title: "Sandlot Sunshine '94",
@@ -74,7 +89,36 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
     drumIntensity: 0.72,
   },
   {
+    id: 'twilight_bleachers',
+    leagueTier: 'rookie',
+    ballparkId: 'cornfield_twilight',
+    stadiumLabel: 'Cornfield Twilight Park',
+    title: 'Twilight Bleachers',
+    vibe: 'Golden-hour sandlot breeze (G Major)',
+    bpm: 94,
+    leadWave: 'sine',
+    bassWave: 'sine',
+    chordWave: 'sine',
+    featuredClassic: true,
+    leadNotes: [
+      79, 0, 83, 0, 86, 0, 83, 81,
+      76, 0, 79, 0, 83, 0, 79, 0,
+      72, 0, 76, 0, 79, 81, 83, 0,
+      81, 0, 78, 0, 74, 0, 79, 0,
+    ],
+    bassNotes: [
+      55, 0, 0, 62, 55, 0, 59, 0,
+      52, 0, 0, 59, 52, 0, 55, 0,
+      48, 0, 0, 55, 48, 0, 52, 0,
+      50, 0, 0, 57, 50, 0, 54, 0,
+    ],
+    chordRoots: [67, 67, 64, 64, 60, 60, 62, 62],
+    chordQuality: 'major',
+    drumIntensity: 0.45,
+  },
+  {
     id: 'dugout_funk',
+    leagueTier: 'low_a',
     ballparkId: 'brickyard_classic',
     stadiumLabel: 'Brickyard Classic',
     title: '90s Dugout Funk',
@@ -101,34 +145,8 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
     drumIntensity: 0.84,
   },
   {
-    id: 'twilight_bleachers',
-    ballparkId: 'cornfield_twilight',
-    stadiumLabel: 'Cornfield Twilight Park',
-    title: 'Twilight Bleachers',
-    vibe: 'Golden-hour heartland breeze (G Major)',
-    bpm: 94,
-    leadWave: 'sine',
-    bassWave: 'sine',
-    chordWave: 'sine',
-    featuredClassic: true,
-    leadNotes: [
-      79, 0, 83, 0, 86, 0, 83, 81,
-      76, 0, 79, 0, 83, 0, 79, 0,
-      72, 0, 76, 0, 79, 81, 83, 0,
-      81, 0, 78, 0, 74, 0, 79, 0,
-    ],
-    bassNotes: [
-      55, 0, 0, 62, 55, 0, 59, 0,
-      52, 0, 0, 59, 52, 0, 55, 0,
-      48, 0, 0, 55, 48, 0, 52, 0,
-      50, 0, 0, 57, 50, 0, 54, 0,
-    ],
-    chordRoots: [67, 67, 64, 64, 60, 60, 62, 62],
-    chordQuality: 'major',
-    drumIntensity: 0.45,
-  },
-  {
     id: 'harbor_shanty_swing',
+    leagueTier: 'low_a',
     ballparkId: 'harbor_shipyard',
     stadiumLabel: 'Harbor Shipyard Yard',
     title: 'Harbor Shipyard Swing',
@@ -155,6 +173,7 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
   },
   {
     id: 'bayfront_surf_94',
+    leagueTier: 'high_a',
     ballparkId: 'bayfront_cove',
     stadiumLabel: 'Bayfront Cove Park',
     title: "Bayfront Surf '94",
@@ -181,6 +200,7 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
   },
   {
     id: 'sunbelt_mariachi_groove',
+    leagueTier: 'high_a',
     ballparkId: 'sunbelt_cactus',
     stadiumLabel: 'Sunbelt Cactus Field',
     title: 'Sunbelt Desert Fiesta',
@@ -207,6 +227,7 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
   },
   {
     id: 'sakura_pentatonic_march',
+    leagueTier: 'aa',
     ballparkId: 'sakura_garden',
     stadiumLabel: 'Sakura Garden Stadium',
     title: 'Sakura Brass-Band March',
@@ -232,11 +253,39 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
     drumIntensity: 0.86,
   },
   {
+    id: 'pinewood_organ_shuffle',
+    leagueTier: 'aa',
+    ballparkId: 'sakura_garden',
+    stadiumLabel: 'AA Regional Ballpark',
+    title: 'Pinewood Organ Shuffle',
+    vibe: 'Classic AA ballpark Hammond organ swing (Bb Major)',
+    bpm: 118,
+    leadWave: 'triangle',
+    bassWave: 'triangle',
+    chordWave: 'triangle',
+    leadNotes: [
+      70, 0, 74, 77, 82, 0, 79, 77,
+      75, 0, 79, 82, 79, 0, 74, 0,
+      72, 0, 75, 79, 81, 0, 77, 74,
+      70, 74, 77, 0, 82, 0, 77, 0,
+    ],
+    bassNotes: [
+      46, 0, 53, 0, 46, 50, 53, 0,
+      51, 0, 58, 0, 51, 55, 58, 0,
+      48, 0, 55, 0, 53, 0, 57, 0,
+      46, 0, 53, 0, 46, 0, 53, 0,
+    ],
+    chordRoots: [58, 58, 63, 63, 60, 65, 58, 58],
+    chordQuality: 'major',
+    drumIntensity: 0.78,
+  },
+  {
     id: 'mesa_skyline_soar',
+    leagueTier: 'aaa',
     ballparkId: 'high_altitude_mesa',
     stadiumLabel: 'High-Altitude Mesa Park',
     title: 'Mile-High Orbit Synth',
-    vibe: 'Soaring thin-air 90s synth-pop (Eb Major)',
+    vibe: 'Soaring AAA showcase synth-pop (Eb Major)',
     bpm: 122,
     leadWave: 'triangle',
     bassWave: 'sawtooth',
@@ -258,11 +307,39 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
     drumIntensity: 0.76,
   },
   {
+    id: 'neon_dome_rally',
+    leagueTier: 'aaa',
+    ballparkId: 'high_altitude_mesa',
+    stadiumLabel: 'AAA Showcase Stadium',
+    title: 'Floodlight Showcase Drive',
+    vibe: 'Under-the-lights AAA pennant chase groove (F Minor)',
+    bpm: 126,
+    leadWave: 'square',
+    bassWave: 'sawtooth',
+    chordWave: 'triangle',
+    leadNotes: [
+      77, 0, 80, 84, 87, 0, 84, 80,
+      82, 0, 85, 84, 80, 0, 77, 0,
+      75, 77, 80, 82, 84, 0, 82, 80,
+      79, 0, 84, 87, 84, 0, 77, 0,
+    ],
+    bassNotes: [
+      53, 53, 60, 53, 53, 56, 60, 53,
+      58, 58, 65, 58, 56, 56, 63, 56,
+      51, 51, 58, 51, 55, 55, 62, 55,
+      53, 53, 60, 53, 56, 58, 60, 53,
+    ],
+    chordRoots: [65, 65, 70, 68, 63, 67, 65, 65],
+    chordQuality: 'minor',
+    drumIntensity: 0.86,
+  },
+  {
     id: 'ninth_inning_turbo',
+    leagueTier: 'majors',
     ballparkId: 'neon_metro_dome',
     stadiumLabel: 'Neon Metro Dome',
     title: '9th-Inning Turbo',
-    vibe: 'Electric 90s cyber-dome arcade synth (D Minor)',
+    vibe: 'Electric Mini Major League prime-time synth (D Minor)',
     bpm: 132,
     leadWave: 'square',
     bassWave: 'sawtooth',
@@ -286,6 +363,7 @@ export const BGM_TRACKS: readonly BgmTrackSpec[] = [
   },
   {
     id: 'cathedral_championship',
+    leagueTier: 'majors',
     ballparkId: 'grand_cathedral',
     stadiumLabel: 'Grand Cathedral Colosseum',
     title: 'Grand Cathedral Anthem',
@@ -340,6 +418,28 @@ function isValidTrackId(value: unknown): value is BgmTrackId {
 /** Returns the unique environmental 90s arcade track dedicated to a specific ballpark. */
 export function getTrackForBallpark(ballparkId?: BallparkPresetId): BgmTrackSpec {
   return BGM_TRACKS.find((t) => t.ballparkId === ballparkId) ?? BGM_TRACKS[0];
+}
+
+/** Returns the selectable soundtrack options belonging to a specific league tier. */
+export function getBgmTracksForTier(tier: LeagueTierId): readonly BgmTrackSpec[] {
+  const tierTracks = BGM_TRACKS.filter((t) => t.leagueTier === tier);
+  return tierTracks.length > 0 ? tierTracks : [BGM_TRACKS[0]];
+}
+
+/** Returns true when a track is allowed to be selected at the given league tier. */
+export function isTrackAllowedForTier(trackId: BgmTrackId, tier: LeagueTierId): boolean {
+  const track = BGM_TRACKS.find((t) => t.id === trackId);
+  return Boolean(track && track.leagueTier === tier);
+}
+
+/** Picks the best allowed track for a ballpark while respecting the club's current league tier. */
+export function getTrackForBallparkInTier(
+  tier: LeagueTierId,
+  ballparkId?: BallparkPresetId,
+): BgmTrackSpec {
+  const tierTracks = getBgmTracksForTier(tier);
+  const parkMatch = tierTracks.find((t) => t.ballparkId === ballparkId);
+  return parkMatch ?? tierTracks[0];
 }
 
 function readPersistedPrefs(): Partial<
@@ -404,8 +504,12 @@ export class RetroBgmEngine {
       masterMuted: false,
       playing: false,
       autoMatchStadium: saved.autoMatchStadium ?? true,
+      currentLeagueTier: 'rookie',
       currentBallparkId: 'sandlot_commons',
-      trackId: saved.trackId ?? 'sandlot_sunshine',
+      trackId:
+        saved.trackId && isTrackAllowedForTier(saved.trackId, 'rookie')
+          ? saved.trackId
+          : 'sandlot_sunshine',
       volume: saved.volume ?? DEFAULT_BGM_VOLUME,
     };
   }
@@ -524,7 +628,24 @@ export class RetroBgmEngine {
     }
   }
 
-  /** Updates the active ballpark context; swaps track automatically when Auto-Match Stadium is ON. */
+  /** Updates the active league tier and ensures the playing track belongs to that tier. */
+  syncLeagueTier(tier: LeagueTierId): void {
+    const tierChanged = this.state.currentLeagueTier !== tier;
+    this.state.currentLeagueTier = tier;
+    if (!isTrackAllowedForTier(this.state.trackId, tier)) {
+      const nextTrack = getTrackForBallparkInTier(tier, this.state.currentBallparkId);
+      this.state.trackId = nextTrack.id;
+      this.stepIndex = 0;
+      this.savePrefs();
+      this.emit();
+      return;
+    }
+    if (tierChanged) {
+      this.emit();
+    }
+  }
+
+  /** Updates the active ballpark context; swaps track automatically within the current league tier when Auto-Match is ON. */
   syncStadium(ballparkId?: BallparkPresetId): void {
     const resolved: BallparkPresetId = ballparkId ?? 'sandlot_commons';
     this.state.currentBallparkId = resolved;
@@ -532,7 +653,7 @@ export class RetroBgmEngine {
       this.emit();
       return;
     }
-    const stadiumTrack = getTrackForBallpark(resolved);
+    const stadiumTrack = getTrackForBallparkInTier(this.state.currentLeagueTier, resolved);
     if (this.state.trackId !== stadiumTrack.id) {
       this.state.trackId = stadiumTrack.id;
       this.stepIndex = 0;
@@ -541,11 +662,14 @@ export class RetroBgmEngine {
     this.emit();
   }
 
-  /** Enables or disables Auto-Match Stadium mode; turning it ON immediately syncs to the active venue. */
+  /** Enables or disables Auto-Match Stadium mode; turning it ON immediately syncs within the current league tier. */
   setAutoMatchStadium(autoMatch: boolean): void {
     this.state.autoMatchStadium = autoMatch;
     if (autoMatch) {
-      const stadiumTrack = getTrackForBallpark(this.state.currentBallparkId);
+      const stadiumTrack = getTrackForBallparkInTier(
+        this.state.currentLeagueTier,
+        this.state.currentBallparkId,
+      );
       if (this.state.trackId !== stadiumTrack.id) {
         this.state.trackId = stadiumTrack.id;
         this.stepIndex = 0;
@@ -555,9 +679,12 @@ export class RetroBgmEngine {
     this.emit();
   }
 
-  /** Manually selects and pins a specific arcade track (turns off Auto-Match until re-enabled). */
-  selectTrack(trackId: BgmTrackId): void {
+  /** Manually selects and pins an allowed track within the active league tier (Design Lab can audition all). */
+  selectTrack(trackId: BgmTrackId, options: { bypassTierGate?: boolean } = {}): void {
     if (!isValidTrackId(trackId)) return;
+    if (!options.bypassTierGate && !isTrackAllowedForTier(trackId, this.state.currentLeagueTier)) {
+      return;
+    }
     const changed = this.state.trackId !== trackId;
     this.state.trackId = trackId;
     this.state.autoMatchStadium = false;

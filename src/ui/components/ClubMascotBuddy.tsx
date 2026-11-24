@@ -11,6 +11,7 @@ interface ClubMascotBuddyProps {
   size?: 'sm' | 'md' | 'lg';
   testId?: string;
   tipCap?: boolean;
+  speechBubble?: string;
 }
 
 type MascotSpecies = 'dog' | 'otter' | 'fox' | 'bear' | 'baseball';
@@ -50,6 +51,7 @@ export function ClubMascotBuddy({
   mood = 'happy',
   size = 'md',
   tipCap = false,
+  speechBubble,
   testId = 'club-mascot-buddy',
 }: ClubMascotBuddyProps) {
   const species = detectMascotSpecies(mascot);
@@ -58,7 +60,7 @@ export function ClubMascotBuddy({
   const isCheering = mood === 'cheering';
   const isRally = mood === 'rally';
 
-  return (
+  const avatar = (
     <div
       data-testid={testId}
       title={`${mascot} (${mood})`}
@@ -215,6 +217,20 @@ export function ClubMascotBuddy({
           </g>
         </g>}
       </svg>
+    </div>
+  );
+
+  if (!speechBubble) return avatar;
+
+  return (
+    <div className="inline-flex items-center gap-2 min-w-0">
+      {avatar}
+      <div
+        data-testid={`${testId}-speech`}
+        className="px-2.5 py-1 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] text-[11px] font-extrabold text-[#181B2C] shadow-[2px_2px_0_#181B2C] leading-snug"
+      >
+        💬 {speechBubble}
+      </div>
     </div>
   );
 }

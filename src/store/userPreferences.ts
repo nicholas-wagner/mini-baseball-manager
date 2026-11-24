@@ -12,6 +12,7 @@ export interface UserPreferences {
   enableInjuries: boolean;
   enableIllnesses: boolean;
   gameDayControlMode: GameDayControlMode;
+  arcadeTimingEnabled: boolean;
 }
 
 const PREFS_STORAGE_KEY = 'mbm.user.prefs.v1';
@@ -25,6 +26,7 @@ const DEFAULT_PREFS: UserPreferences = {
   enableInjuries: true,
   enableIllnesses: true,
   gameDayControlMode: 'simple',
+  arcadeTimingEnabled: false,
 };
 
 function readSavedPrefs(): UserPreferences {
@@ -48,6 +50,7 @@ function readSavedPrefs(): UserPreferences {
       enableIllnesses: parsed.enableIllnesses ?? DEFAULT_PREFS.enableIllnesses,
       gameDayControlMode:
         parsed.gameDayControlMode === 'advanced' ? 'advanced' : DEFAULT_PREFS.gameDayControlMode,
+      arcadeTimingEnabled: parsed.arcadeTimingEnabled ?? DEFAULT_PREFS.arcadeTimingEnabled,
     };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -85,6 +88,8 @@ interface UserPreferencesStore extends UserPreferences {
   toggleIllnesses: () => void;
   setGameDayControlMode: (mode: GameDayControlMode) => void;
   toggleGameDayControlMode: () => void;
+  setArcadeTimingEnabled: (enabled: boolean) => void;
+  toggleArcadeTiming: () => void;
   resetDefaults: () => void;
 }
 
@@ -101,6 +106,7 @@ function extractPrefs(state: UserPreferencesStore): UserPreferences {
     enableInjuries: state.enableInjuries,
     enableIllnesses: state.enableIllnesses,
     gameDayControlMode: state.gameDayControlMode,
+    arcadeTimingEnabled: state.arcadeTimingEnabled,
   };
 }
 
@@ -127,6 +133,8 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
       applyPatch({
         gameDayControlMode: get().gameDayControlMode === 'simple' ? 'advanced' : 'simple',
       }),
+    setArcadeTimingEnabled: (enabled) => applyPatch({ arcadeTimingEnabled: enabled }),
+    toggleArcadeTiming: () => applyPatch({ arcadeTimingEnabled: !get().arcadeTimingEnabled }),
     resetDefaults: () => applyPatch({ ...DEFAULT_PREFS }),
   };
 });

@@ -65,9 +65,12 @@ import {
   type StealPlayResolution,
   type StealPlayType,
 } from './baserunning';
+import { resolveBuntPitch } from './buntResolver';
 import {
+  evaluateArcadeTimingEffect,
   evaluateBatterGuessEffect,
   evaluatePitchTargetEffect,
+  type ArcadeTimingInput,
   type BatterPitchGuess,
   type PitchTargetIntent,
 } from './pitchMindGames';
@@ -97,7 +100,7 @@ export interface PitchResolution {
   totalBases?: 1 | 2 | 3 | 4;
   outsAdded: number;
   runnerId?: string;
-  advanceOnOut?: 'sac_fly' | 'double_play' | 'none';
+  advanceOnOut?: 'sac_fly' | 'double_play' | 'sac_bunt' | 'none';
   stealSuccess?: boolean;
   stealResolution?: StealPlayResolution;
   commentary: string;
@@ -215,53 +218,8 @@ function resolveStealAttempt(
   };
 }
 
-function resolveBuntAttempt(
-  rng: SeededRng,
-  batter: Player,
-  pitcher: Player,
-  firstBaseBonus: number,
-  sideX: number,
-  extraBuntBonus = 0,
-  shiftBuntOutBonus = 0,
-): PitchResolution {
-  const buntScore =
-    batter.ratings.bunt + extraBuntBonus + firstBaseBonus * 2 - pitcher.ratings.fielding * 0.25;
-  const hitProb = clampProb(
-    0.24 + (buntScore - 55) * 0.006 - shiftBuntOutBonus,
-    0.08,
-    0.72,
-  );
-  const roll = rng.next();
-  const isSingle = roll < hitProb;
-
-  return {
-    kind: 'plate_complete',
-    outcome: isSingle ? 'bunt_single' : 'bunt_out',
-    totalBases: isSingle ? 1 : undefined,
-    outsAdded: isSingle ? 0 : 1,
-    advanceOnOut: 'none',
-    commentary: isSingle
-      ? `${batter.name} lays down a sneaky bunt and beats the throw!`
-      : `${batter.name} squares to bunt and is thrown out at first.`,
-    soundCue: 'bunt_tap',
-    ballFlight: {
-      style: 'ninja_bunt',
-      landingX: sideX * 4.8,
-      landingZ: -6.4,
-      apexY: 1.3,
-      durationSec: 1.0,
-    },
-    mathBreakdown: {
-      effContact: Math.round(buntScore),
-      effPower: Math.round(batter.ratings.power),
-      effStuff: Math.round(pitcher.ratings.fielding),
-      effControl: Math.round(pitcher.ratings.control),
-      zonePct: 100,
-      hitPct: Math.round(hitProb * 100),
-      diceRoll: Math.max(1, Math.min(100, Math.ceil(roll * 100))),
-      activeModifiers: shiftBuntOutBonus > 0 ? ['Shift: Bunt Def'] : ['Bunt Play'],
-    },
-  };
+function pickBuntCharger(ctx: PitchResolverContext): Player {
+  return ctx.rng.pick([ctx.defender, ctx.catcher, ctx.pitcher]);
 }
 
 function resolveHitType(
@@ -590,6 +548,7 @@ export interface PitchResolverContext {
   pitchTarget?: PitchTargetIntent;
   batterGuess?: BatterPitchGuess;
   nemesisBonus?: NemesisMatchupEvaluation;
+  arcadeTiming?: ArcadeTimingInput;
   battingGameplan?: SeriesGameplanId;
   fieldingGameplan?: SeriesGameplanId;
   battingPlayersById?: Readonly<Record<string, Player>>;
@@ -704,22 +663,35 @@ function computeMindGameAndNemesis(
   const guess = evaluateBatterGuessEffect(ctx.batterGuess ?? 'none', pitchType);
   const target = evaluatePitchTargetEffect(ctx.pitchTarget, pitchType) ?? ZERO_TARGET_EFFECT;
   const nem = ctx.nemesisBonus ?? ZERO_NEMESIS_DELTA;
+  const timing = evaluateArcadeTimingEffect(ctx.arcadeTiming);
   const batPlan = evaluateGameplanEffects(ctx.battingGameplan);
   const fldPlan = evaluateGameplanEffects(ctx.fieldingGameplan);
-  const tags = [guess.label, target.label, nem.badgeText, batPlan.label, fldPlan.label].filter(
-    (t): t is string => Boolean(t),
-  );
+  const tags = [
+    guess.label,
+    target.label,
+    timing.label,
+    nem.badgeText,
+    batPlan.label,
+    fldPlan.label,
+  ].filter((t): t is string => Boolean(t));
 
   return {
-    contactDelta: guess.contactDelta + nem.batterContactDelta + batPlan.batterContactDelta,
-    powerDelta: guess.powerDelta + nem.batterPowerDelta + batPlan.batterPowerDelta,
-    stuffDelta: target.stuffDelta + nem.pitcherStuffDelta + fldPlan.pitcherStuffDelta,
-    controlDelta: target.controlDelta + nem.pitcherControlDelta + fldPlan.pitcherControlDelta,
-    mphBonus: target.mphBonus,
+    contactDelta:
+      guess.contactDelta + timing.contactDelta + nem.batterContactDelta + batPlan.batterContactDelta,
+    powerDelta:
+      guess.powerDelta + timing.powerDelta + nem.batterPowerDelta + batPlan.batterPowerDelta,
+    stuffDelta:
+      target.stuffDelta + timing.stuffDelta + nem.pitcherStuffDelta + fldPlan.pitcherStuffDelta,
+    controlDelta:
+      target.controlDelta +
+      timing.controlDelta +
+      nem.pitcherControlDelta +
+      fldPlan.pitcherControlDelta,
+    mphBonus: target.mphBonus + timing.mphBonus,
     zoneProbDelta: target.zoneProbDelta,
     chaseRateDelta: target.chaseRateDelta,
     whiffBonus: target.whiffBonus + guess.whiffPenalty + batPlan.whiffBonus + fldPlan.whiffBonus,
-    hitProbBonus: guess.hitProbBonus,
+    hitProbBonus: guess.hitProbBonus + timing.hitProbBonus,
     hrCarryMultiplier: target.hrCarryMultiplier * batPlan.hrCarryMultiplier,
     tags,
   };
@@ -1230,8 +1202,6 @@ function computeEffectiveMatchupNumbers(
 
 function resolvePrePitchTacticalAction(
   ctx: PitchResolverContext,
-  powers: PowerBundle,
-  platoon: ReturnType<typeof evaluatePlatoonMatchup>,
 ): PitchResolution | null {
   if (ctx.tacticalCall === 'intentional_walk') {
     return {
@@ -1243,29 +1213,7 @@ function resolvePrePitchTacticalAction(
     };
   }
   const stealPlay = resolveStealPlayTypeFromCall(ctx.tacticalCall, ctx.bases);
-  const stealResult = stealPlay ? resolveStealAttempt(ctx, stealPlay) : null;
-  if (stealResult) return stealResult;
-
-  if (ctx.tacticalCall === 'bunt') {
-    const boxSide = platoon.effectiveBatSide === 'L' ? 1 : -1;
-    const buntExtra =
-      powers.batterCaps.buntBonus +
-      powers.batterRelics.bunt +
-      (powers.batterSurge?.buntBonus ?? 0);
-    return decorateActivePowerOutcome(
-      resolveBuntAttempt(
-        ctx.rng,
-        ctx.batter,
-        ctx.pitcher,
-        platoon.firstBaseStepBonus,
-        boxSide,
-        buntExtra,
-        powers.shift.buntOutBonus,
-      ),
-      powers,
-    );
-  }
-  return null;
+  return stealPlay ? resolveStealAttempt(ctx, stealPlay) : null;
 }
 
 function collectActiveModifierTags(powers: PowerBundle): string[] {
@@ -1310,11 +1258,49 @@ function buildPitchMathBreakdown(
   };
 }
 
+function resolveBuntCall(
+  ctx: PitchResolverContext,
+  pitchType: PitchType,
+  adjustedMatchup: PitchMatchupEvaluation,
+  pitchQuality: number,
+  platoon: ReturnType<typeof evaluatePlatoonMatchup>,
+  fullPowers: PowerBundle,
+): PitchResolution {
+  const buntExtra =
+    fullPowers.batterCaps.buntBonus +
+    fullPowers.batterRelics.bunt +
+    (fullPowers.batterSurge?.buntBonus ?? 0);
+  return attachPitchTelemetry(
+    decorateActivePowerOutcome(
+      resolveBuntPitch({
+        rng: ctx.rng,
+        batter: ctx.batter,
+        pitcher: ctx.pitcher,
+        catcher: ctx.catcher,
+        pitchType,
+        pitchSpeedMph: adjustedMatchup.mph,
+        pitchQuality,
+        pitchTarget: ctx.pitchTarget ?? 'attack_zone',
+        defenseShift: ctx.defensiveShift ?? 'standard',
+        charger: pickBuntCharger(ctx),
+        firstBaseBonus: platoon.firstBaseStepBonus,
+        sideX: platoon.effectiveBatSide === 'L' ? 1 : -1,
+        extraBuntBonus: buntExtra,
+        strikes: ctx.strikes,
+        outs: ctx.outs,
+        hasRunners: ctx.bases.some(Boolean),
+      }),
+      fullPowers,
+    ),
+    adjustedMatchup,
+  );
+}
+
 /** Resolves a single baseball pitch or tactical action cleanly from seeded state. */
 export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const powers = buildPowerBundle(ctx);
   const platoon = evaluatePlatoonMatchup(ctx.batter.bats, ctx.pitcher.throws);
-  const prePitch = resolvePrePitchTacticalAction(ctx, powers, platoon);
+  const prePitch = resolvePrePitchTacticalAction(ctx);
   if (prePitch) return prePitch;
 
   const pitchType = selectPitchForCount(
@@ -1335,6 +1321,10 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     ...pitchMatchup,
     mph: Math.max(58, pitchMatchup.mph + enduranceFx.mphDrop + stats.mphBoost),
   };
+
+  if (ctx.tacticalCall === 'bunt') {
+    return resolveBuntCall(ctx, pitchType, adjustedMatchup, stats.effStuff, platoon, fullPowers);
+  }
 
   const zoneProb = clampProb(0.55 + (stats.effControl - stats.effEye) * 0.0025 + stats.luckZoneShift, 0.38, 0.76);
   const inZone = ctx.rng.chance(zoneProb);

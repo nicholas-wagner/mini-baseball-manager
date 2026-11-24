@@ -33,6 +33,7 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       expect(screen.getByTestId('season-schedule-strip')).toBeInTheDocument();
       // Soundboard now lives exclusively in Design Lab
       expect(screen.queryByTestId('ballpark-soundboard')).not.toBeInTheDocument();
+      await user.click(screen.getByTestId('game-settings-toggle'));
       expect(screen.getByRole('button', { name: /5 inn \(blitz\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /7 inn \(quick\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /9 inn \(classic\)/i })).toBeInTheDocument();
