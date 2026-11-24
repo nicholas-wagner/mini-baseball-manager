@@ -1,4 +1,4 @@
-import { Coins, Sparkles, Trophy, Users } from 'lucide-react';
+import { Coins, Sparkles, Trophy, Users, X } from 'lucide-react';
 import {
   buildMvpDugoutQuote,
   buildPostGameMvpHeadline,
@@ -84,9 +84,19 @@ export function PostGameSummaryModal({
           subtitle={`${humanClub.city} ${humanClub.name} ${summary.isHomeGame ? 'vs' : '@'} ${summary.opponentName} • ${humanScore}-${rivalScore}`}
           headerBg={humanWon ? '#1B4332' : '#7A1C33'}
           badge={
-            <span className="px-2.5 py-1 rounded-full bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C] font-display text-xs">
-              {humanWon ? 'WIN' : 'LOSS'}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="px-2.5 py-1 rounded-full bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C] font-display text-xs">
+                {humanWon ? 'WIN' : 'LOSS'}
+              </span>
+              <button
+                type="button"
+                aria-label="Close Post-Game Recap"
+                onClick={onClose}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-[#FFFDF7] border-2 border-[#181B2C] flex items-center justify-center text-[#181B2C] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           }
         >
           <ScorebookPrint moments={summary.moments ?? []} kept={humanClub.keepsakes} onKeep={keepMoment} />

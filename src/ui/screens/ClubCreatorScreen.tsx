@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Dices, Play, Sparkles } from 'lucide-react';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { ILLUSTRATED_PLAYER_POOL } from '../../art/portraits/illustratedPlayerPool';
@@ -101,6 +101,16 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
   const [paletteIndex, setPaletteIndex] = useState(0);
   const [seedNonce, setSeedNonce] = useState(newCareerSeed);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const customizeSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (customizeOpen) {
+      customizeSectionRef.current?.scrollIntoView?.({
+        behavior: 'auto',
+        block: 'start',
+      });
+    }
+  }, [customizeOpen]);
 
   const palette = SAMPLE_TEAM_PALETTES[paletteIndex];
   const previewTraits = createPortraitTraits(seedNonce);
@@ -230,7 +240,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
               setEditing(false);
               soundEngine.play('ui_pop');
             }}
-            className="px-2.5 py-1.5 min-h-[38px] rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-[#181B2C] font-heading font-extrabold text-xs shadow-[2px_2px_0_#181B2C] cursor-pointer whitespace-nowrap"
+            className="px-2.5 py-1.5 min-h-[44px] rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] text-[#181B2C] font-heading font-extrabold text-xs shadow-[2px_2px_0_#181B2C] cursor-pointer whitespace-nowrap"
           >
             ← Back
           </button>
@@ -459,7 +469,10 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
           </div>
 
           {/* 2. Collapsible Optional Customization, Origin & Rules Drawer (Keeps Screen 0 Clean Above the Fold!) */}
-          <div className="rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] overflow-hidden shadow-[3px_3px_0_#181B2C]">
+          <div
+            ref={customizeSectionRef}
+            className="rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] overflow-hidden shadow-[3px_3px_0_#181B2C] scroll-mt-20"
+          >
             <button
               type="button"
               data-testid="creator-customize-toggle"

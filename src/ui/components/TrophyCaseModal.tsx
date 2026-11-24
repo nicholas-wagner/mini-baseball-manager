@@ -52,7 +52,7 @@ export function TrophyCaseModal({ open, onClose, onInspectPlayerId }: TrophyCase
               type="button"
               aria-label="Close Trophy Album"
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-[#FFFDF7] border-2 border-[#181B2C] flex items-center justify-center text-[#181B2C] cursor-pointer"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-[#FFFDF7] border-2 border-[#181B2C] flex items-center justify-center text-[#181B2C] cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>

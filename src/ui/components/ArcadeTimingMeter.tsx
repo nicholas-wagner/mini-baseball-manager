@@ -68,7 +68,7 @@ export function ArcadeTimingMeter({
     >
       <div className="flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-wide">
         <span className="text-[#FFDC90]">
-          🎯 {isBatting ? 'Tap in the GOLD sweet spot to crush it!' : 'Hit the GOLD spot to paint the corner!'}
+          🎯 {isBatting ? 'Tap in the GOLD sweet spot to crush it!' : 'Hit the GOLD spot for maximum stuff!'}
         </span>
         {badge ? (
           <span

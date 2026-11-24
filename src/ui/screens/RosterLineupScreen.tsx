@@ -388,7 +388,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
             data-testid="coed-synergy-banner"
             className="mb-2.5 px-3 py-1.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] text-xs font-bold text-[#1D3557]"
           >
-            <summary className="cursor-pointer font-display text-[11px] sm:text-xs flex items-center justify-between gap-2 list-none">
+            <summary className="cursor-pointer font-display text-[11px] sm:text-xs min-h-[40px] flex items-center justify-between gap-2 list-none">
               <span className="truncate">
                 ✨ Synergy: {coEdSynergy.label} ({coEdSynergy.maleCount}M / {coEdSynergy.femaleCount}F)
               </span>
@@ -678,7 +678,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                             toggleFavoritePlayer(player.id);
                             soundEngine.play('ui_pop');
                           }}
-                          className={`min-h-[38px] min-w-[36px] rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer transition ${
+                          className={`min-h-[44px] min-w-[44px] rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer transition ${
                             isFavPlayer
                               ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
                               : 'bg-[#FBF4E4] text-[#4A5068] hover:bg-[#FFF3BF]'
@@ -771,12 +771,12 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                 {benchHitters.map((player) => (
                   <div
                     key={player.id}
-                    className="flex flex-wrap items-center justify-between gap-1.5 py-1 border-b border-[#181B2C]/15"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 py-1.5 border-b border-[#181B2C]/15"
                   >
                     <button
                       type="button"
-                      onClick={() => setInspectedPlayerId(player.id)}
-                      className="flex items-center gap-2 text-left text-xs font-bold text-[#181B2C] flex-1 min-h-[44px] min-w-0"
+                      onClick={() => openCardModalFor(player.id)}
+                      className="flex items-center gap-2 text-left flex-1 min-h-[44px] min-w-0 cursor-pointer"
                     >
                       <PlayerPortraitBadge
                         player={player}
@@ -784,12 +784,16 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                         accentColor={humanClub.colors.accent}
                         size="xs"
                       />
-                      <span className="truncate">
-                        {player.position} {player.name} ({player.bats}/{player.throws}) • OVR{' '}
-                        {computePlayerOverall(player)} • {MARKET_TIER_LABELS[player.marketTier]}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-display text-xs text-[#181B2C] leading-tight">
+                          {player.position} {player.name} ({player.bats}/{player.throws})
+                        </div>
+                        <div className="text-[10.5px] font-bold text-[#4A5068]">
+                          OVR {computePlayerOverall(player)} • {MARKET_TIER_LABELS[player.marketTier]}
+                        </div>
+                      </div>
                     </button>
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <ComicButton
                         size="sm"
                         variant="gold"
@@ -815,12 +819,12 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                 {bullpenPitchers.map((rp) => (
                   <div
                     key={rp.id}
-                    className="flex items-center justify-between gap-1.5 py-1 border-b border-[#181B2C]/15 last:border-b-0"
+                    className="flex items-center justify-between gap-1.5 py-1.5 border-b border-[#181B2C]/15 last:border-b-0"
                   >
                     <button
                       type="button"
-                      onClick={() => setInspectedPlayerId(rp.id)}
-                      className="flex items-center gap-2 text-left py-1 text-xs font-bold text-[#4A5068] flex-1 min-h-[44px] min-w-0"
+                      onClick={() => openCardModalFor(rp.id)}
+                      className="flex items-center gap-2 text-left flex-1 min-h-[44px] min-w-0 cursor-pointer"
                     >
                       <PlayerPortraitBadge
                         player={rp}
@@ -828,11 +832,15 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                         accentColor={humanClub.colors.accent}
                         size="xs"
                       />
-                      <span className="truncate">
-                        RP {rp.name} ({rp.throws}HP
-                        {rp.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]}` : ''}) • OVR{' '}
-                        {computePlayerOverall(rp)} • {SPECIALIST_LABELS[rp.specialistArchetype]}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-display text-xs text-[#181B2C] leading-tight">
+                          RP {rp.name} ({rp.throws}HP)
+                        </div>
+                        <div className="text-[10.5px] font-bold text-[#4A5068] truncate">
+                          OVR {computePlayerOverall(rp)}
+                          {rp.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[rp.pitcherRole]}` : ''} • {SPECIALIST_LABELS[rp.specialistArchetype]}
+                        </div>
+                      </div>
                     </button>
                     <ComicButton
                       size="sm"

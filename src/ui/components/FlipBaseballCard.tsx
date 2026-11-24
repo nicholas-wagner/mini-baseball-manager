@@ -176,7 +176,7 @@ export function FlipBaseballCard({
                     type="button"
                     onClick={() => setFlipped(true)}
                     aria-label={`Flip ${player.name} card to stats`}
-                    className="ml-auto min-h-[34px] py-0.5 px-2 rounded-lg bg-[#F1E4C8] text-[#181B2C] border-2 border-[#181B2C] font-heading font-bold text-[10.5px] inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE8A3]"
+                    className="ml-auto min-h-[40px] py-1 px-2.5 rounded-lg bg-[#F1E4C8] text-[#181B2C] border-2 border-[#181B2C] font-heading font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer hover:bg-[#FFE8A3]"
                   >
                     <RotateCw className="w-3 h-3" />
                     Stats
@@ -234,9 +234,9 @@ export function FlipBaseballCard({
           aria-label={`${player.name} baseball card back`}
           className="card-face card-face-back [grid-area:1/1] min-w-0 rounded-[20px] p-2 bg-[#F1E4C8] border-[3px] border-[#181B2C] shadow-[5px_5px_0_#181B2C] flex flex-col"
         >
-          <div className="flex-1 bg-[#FBF4E4] rounded-[14px] border-2 border-[#181B2C] p-3 flex flex-col justify-between">
+          <div className="flex-1 bg-[#FBF4E4] rounded-[14px] border-2 border-[#181B2C] p-2.5 flex flex-col justify-between">
             <div>
-              <div className="flex flex-wrap items-center justify-between border-b-2 border-[#181B2C] pb-1.5 gap-x-2 gap-y-1">
+              <div className="flex flex-wrap items-center justify-between border-b-2 border-[#181B2C] pb-1 gap-x-2 gap-y-0.5">
                 <div className="min-w-0">
                   <div className="font-display text-xs text-[#181B2C] truncate">{player.name}</div>
                   <div className="flex items-center gap-1.5 mt-0.5 text-[10px] font-bold text-[#4A5068]">
@@ -256,19 +256,19 @@ export function FlipBaseballCard({
                 </div>
               </div>
 
-              <div className="mt-2 space-y-1.5">
+              <div className="mt-1.5 space-y-1">
                 {statRows.map((row) => (
                   <StatBadge key={row.key} label={row.label} value={row.value} showBar />
                 ))}
               </div>
               {player.statLine ? (
-                <div className="mt-2 rounded-lg bg-[#181B2C] px-2 py-1 text-center font-mono-tabular text-[9px] font-bold tracking-tight text-[#FFD166]">
+                <div className="mt-1.5 rounded-lg bg-[#181B2C] px-2 py-1 text-center font-mono-tabular text-[9px] font-bold tracking-tight text-[#FFD166]">
                   {player.statLine}
                 </div>
               ) : null}
             </div>
 
-            <p className="my-3 border-l-[3px] pl-2 text-xs italic leading-snug" style={{ borderColor: team.primary }}>
+            <p className="my-2 border-l-[3px] pl-2 text-[11px] italic leading-snug" style={{ borderColor: team.primary }}>
               {player.bio}
             </p>
             <div className="space-y-1.5">

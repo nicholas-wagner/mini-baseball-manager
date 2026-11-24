@@ -132,7 +132,7 @@ export function ArcadeDerbyModal({ open, club, worldSeed, onClose }: ArcadeDerby
               type="button"
               aria-label="Close Home Run Derby"
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-[#FFFDF7] border-2 border-[#181B2C] flex items-center justify-center text-[#181B2C] cursor-pointer"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-[#FFFDF7] border-2 border-[#181B2C] flex items-center justify-center text-[#181B2C] cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -235,7 +235,7 @@ export function ArcadeDerbyModal({ open, club, worldSeed, onClose }: ArcadeDerby
                     onClick={handleSwing}
                     className="flex-1 sm:flex-none min-w-[160px]"
                   >
-                    💥 SWING! ({DERBY_PITCH_COUNT - swings.length} left)
+                    SWING! ({DERBY_PITCH_COUNT - swings.length} left)
                   </ComicButton>
                 ) : (
                   <ComicButton

@@ -4,6 +4,7 @@ import {
   BookOpen,
   Building2,
   Disc3,
+  Download,
   Gamepad2,
   Gift,
   GitBranch,
@@ -586,8 +587,20 @@ export function App() {
                 <ScrollText className="w-4 h-4 shrink-0" />
                 <span>Story &amp; Origins{hasUnreadChapter ? ' ★ NEW!' : ''}</span>
               </button>
-              {humanClub && <button type="button" className="w-full comic-btn bg-[#E0FBFC] text-left min-h-12 px-3"
-                onClick={() => { setMobileMenuOpen(false); setSaveLoadOpen(true); }}>Save / Load</button>}
+              {humanClub ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setSaveLoadOpen(true);
+                    soundEngine.play('ui_pop');
+                  }}
+                  className="w-full comic-btn bg-[#E0FBFC] text-[#1D3557] px-3 py-2.5 text-xs flex items-center gap-2 min-h-[44px]"
+                >
+                  <Download className="w-4 h-4 shrink-0" />
+                  <span>Save / Load (JSON Backup)</span>
+                </button>
+              ) : null}
               <button
                 type="button"
                 aria-label="Open 4 Career Save Slots"

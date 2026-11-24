@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { FastForward, Play, RefreshCw, Shield, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
+import { ClipboardList, FastForward, Play, RefreshCw, Shield, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
 import { PITCH_CALL_GUIDE, SWING_CALL_GUIDE } from '../../engine/gm/openingDayHook';
 import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../engine/models/player';
@@ -89,6 +89,7 @@ interface LiveActionBarProps {
   onInspectBatter?: () => void;
   onInspectPitcher?: () => void;
   onInspectPlayers?: () => void;
+  onOpenBoxScore?: () => void;
 }
 
 const SIMPLE_BAT_APPROACHES = SWING_CALL_GUIDE;
@@ -161,6 +162,7 @@ export function LiveActionBar({
   onInspectBatter,
   onInspectPitcher,
   onInspectPlayers,
+  onOpenBoxScore,
 }: LiveActionBarProps) {
   const [bullpenOpen, setBullpenOpen] = useState(false);
   const [tacticsOpen, setTacticsOpen] = useState(false);
@@ -296,7 +298,7 @@ export function LiveActionBar({
                         tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
                       )
                     }
-                    className={`px-2.5 py-1 min-h-[34px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                    className={`px-2.5 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
                       tacticalCall === quickStealOption.call
                         ? 'bg-[#FFCC49] text-[#152F2E] shadow-[2px_2px_0_#192735]'
                         : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFCC49]'
@@ -407,7 +409,7 @@ export function LiveActionBar({
                 data-testid="arcade-unleash-power-btn"
                 disabled={gameCompleted}
                 onClick={onArmReadyPower}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 min-h-[32px] max-w-[58%] sm:max-w-none rounded-lg border-2 border-[#192735] font-display text-[9.5px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#192735] shrink-0 transition ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[40px] max-w-[60%] sm:max-w-none rounded-lg border-2 border-[#192735] font-display text-[10px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#192735] shrink-0 transition ${
                   powerArmed
                     ? 'bg-[#FF4D6D] text-white'
                     : 'bg-[#FFCC49] text-[#152F2E] ring-2 ring-[#193D37] hover:bg-[#FFD86B]'
@@ -544,6 +546,22 @@ export function LiveActionBar({
               className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
             >
               {arcadeTimingEnabled ? '🎯 ON' : '🎯 Timing'}
+            </ComicButton>
+          ) : null}
+
+          {onOpenBoxScore ? (
+            <ComicButton
+              size="sm"
+              variant="sky"
+              data-testid="arcade-box-score-btn"
+              icon={<ClipboardList className="w-3.5 h-3.5" />}
+              onClick={() => {
+                setTacticsOpen(false);
+                onOpenBoxScore();
+              }}
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+            >
+              Box
             </ComicButton>
           ) : null}
 
@@ -746,38 +764,39 @@ export function LiveActionBar({
         ) : null}
       </div>
 
-      {/* Visible Live Pitcher Stamina / Fatigue Bar (shows pitch count, endurance %, stamina & live effectiveness drop) */}
+      {/* Visible Live Pitcher Stamina / Fatigue Bar (single sleek row on mobile!) */}
       {typeof pitcherEndurance === 'number' ? (
         <div
           data-testid="live-pitcher-fatigue-strip"
-          className="px-2.5 py-1.5 rounded-xl border border-[#192735]/30 bg-[#FFFDF8] flex flex-wrap items-center justify-between gap-2 text-[10px] font-extrabold text-[#193D37]"
+          className="px-2 py-1 rounded-xl border border-[#192735]/30 bg-[#FFFDF8] flex items-center justify-between gap-1.5 text-[10px] font-extrabold text-[#193D37]"
         >
-          <div className="flex items-center gap-2 flex-1 min-w-[160px]">
-            <span className="uppercase shrink-0">
-              💪 {pitcherName ? `${pitcherName.split(' ')[0]} Arm` : 'Pitcher Arm'}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="uppercase shrink-0 truncate max-w-[82px] sm:max-w-none">
+              💪 {pitcherName ? `${pitcherName.split(' ')[0]}` : 'Arm'}
             </span>
-            <div className="h-2 flex-1 min-w-[64px] rounded-full border border-[#192735] bg-[#EFE6D2] overflow-hidden">
+            <div className="h-2 flex-1 min-w-[44px] rounded-full border border-[#192735] bg-[#EFE6D2] overflow-hidden">
               <div
                 className={`h-full transition-all ${enduranceFillClass}`}
                 style={{ width: `${Math.max(4, Math.min(100, pitcherEndurance))}%` }}
               />
             </div>
             <span className="font-mono-tabular shrink-0">
-              {pitcherEndurance}% ({pitcherEnduranceTier.toUpperCase()})
+              {pitcherEndurance}%
+              <span className="hidden sm:inline"> ({pitcherEnduranceTier.toUpperCase()})</span>
             </span>
           </div>
-          <div className="flex items-center gap-1.5 font-mono-tabular shrink-0">
+          <div className="flex items-center gap-1 font-mono-tabular shrink-0">
             {typeof pitcherStamina === 'number' ? (
               <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#192735]/25 text-[#1D3557]">
                 STA {pitcherStamina}
               </span>
             ) : null}
             {pitcherFatigueDropTag ? (
-              <span className="px-1.5 py-0.5 rounded bg-[#FFE5EC] border border-[#9D0208]/40 text-[#9D0208]">
+              <span className="hidden sm:inline px-1.5 py-0.5 rounded bg-[#FFE5EC] border border-[#9D0208]/40 text-[#9D0208]">
                 {pitcherFatigueDropTag}
               </span>
             ) : (
-              <span className="text-[#1B4332]">Full Stuff &amp; Control</span>
+              <span className="hidden sm:inline text-[#1B4332]">Full Stuff &amp; Control</span>
             )}
           </div>
         </div>
@@ -814,13 +833,13 @@ export function LiveActionBar({
               </div>
             ) : null}
             {(onInspectBatter || onInspectPitcher || onInspectPlayers) ? (
-              <div className="flex flex-nowrap sm:flex-wrap items-center gap-1 pt-0.5 overflow-x-auto">
+              <div className="flex flex-nowrap sm:flex-wrap items-center gap-1.5 pt-1 overflow-x-auto">
                 {onInspectBatter ? (
                   <button
                     type="button"
                     data-testid="inspect-batter-card-btn"
                     onClick={onInspectBatter}
-                    className="px-2 py-0.5 min-h-[28px] rounded-lg border border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
+                    className="px-2.5 py-1 min-h-[40px] rounded-lg border border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
                   >
                     🃏 {batterName?.split(' ')[0] ?? 'Batter'}
                   </button>
@@ -830,7 +849,7 @@ export function LiveActionBar({
                     type="button"
                     data-testid="inspect-pitcher-card-btn"
                     onClick={onInspectPitcher}
-                    className="px-2 py-0.5 min-h-[28px] rounded-lg border border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10px] font-extrabold text-[#1D3557] shrink-0 whitespace-nowrap cursor-pointer"
+                    className="px-2.5 py-1 min-h-[40px] rounded-lg border border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#1D3557] shrink-0 whitespace-nowrap cursor-pointer"
                   >
                     🃏 {pitcherName?.split(' ')[0] ?? 'Pitcher'}
                   </button>
@@ -840,7 +859,7 @@ export function LiveActionBar({
                     type="button"
                     data-testid="inspect-game-players-btn"
                     onClick={onInspectPlayers}
-                    className="px-2 py-0.5 min-h-[28px] rounded-lg border border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
+                    className="px-2.5 py-1 min-h-[40px] rounded-lg border border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
                   >
                     🃏 All
                   </button>

@@ -97,7 +97,7 @@ export function PlayerCardModal({
               type="button"
               onClick={onClose}
               aria-label="Close player card"
-              className="w-9 h-9 rounded-xl bg-[#FFFDF7] border-2 border-[#181B2C] flex items-center justify-center text-[#181B2C] cursor-pointer"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-[#FFFDF7] border-2 border-[#181B2C] flex items-center justify-center text-[#181B2C] cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -362,7 +362,7 @@ export function PlayerCardModal({
                     <div className="text-[10px] font-extrabold uppercase text-[#181B2C]">
                       {isLiveGameMode ? 'Tap Any Player in This Game' : 'Jump To Teammate'}
                     </div>
-                    <div className="flex flex-wrap gap-1 max-h-36 overflow-y-auto">
+                    <div className="flex flex-nowrap sm:flex-wrap gap-1.5 overflow-x-auto sm:max-h-36 sm:overflow-y-auto pb-0.5">
                       {allEntries.map((item) => {
                         const active = item.player.id === player.id;
                         return (
@@ -374,7 +374,7 @@ export function PlayerCardModal({
                               soundEngine.play('card_flip');
                               onSelectPlayerId(item.player.id);
                             }}
-                            className={`px-2 py-1 rounded-lg border border-[#181B2C] text-[10px] font-extrabold cursor-pointer ${
+                            className={`px-2.5 py-1.5 min-h-[40px] rounded-lg border border-[#181B2C] text-[10.5px] font-extrabold shrink-0 whitespace-nowrap cursor-pointer ${
                               active
                                 ? 'bg-[#FFC300] text-[#181B2C]'
                                 : 'bg-white text-[#181B2C] hover:bg-[#FFF3BF]'

@@ -34,7 +34,7 @@ export function ComicCard({
           className="px-4 py-2.5 border-b-[3px] border-[#181B2C] flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
           style={{ backgroundColor: headerBg }}
         >
-          <div className="min-w-0">
+          <div className="min-w-[145px] flex-1">
             <h2 className="font-display text-sm sm:text-base tracking-wide text-[#FBF4E4] leading-tight">
               {title}
             </h2>

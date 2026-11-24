@@ -458,7 +458,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                   <div className="font-display text-[11px] sm:text-sm text-[#181B2C]">
                     🏆 {LEAGUE_TIER_LABELS[humanClub.leagueTier].toUpperCase()} — PLAYOFF PICTURE
                   </div>
-                  <div className="text-[10.5px] sm:text-[11px] font-bold text-[#4A5068] truncate sm:whitespace-normal">
+                  <div className="text-[10.5px] sm:text-[11px] font-bold text-[#4A5068] leading-snug">
                     {activeTierBracket
                       ? activeTierBracket.championClubId
                         ? `Champion crowned: ${humanTierClubsById[activeTierBracket.championClubId]?.name ?? 'Winner'}! Proceed to Offseason HQ.`
@@ -599,15 +599,15 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
             <table className="w-full text-left text-xs font-bold text-[#181B2C]">
               <thead className="bg-[#181B2C] text-[#FFD166] font-display text-[10.5px] sm:text-[11px]">
                 <tr>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2">#</th>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2">
+                  <th className="px-1.5 sm:px-3 py-1.5 sm:py-2">#</th>
+                  <th className="px-1.5 sm:px-3 py-1.5 sm:py-2">
                     Club<span className="hidden sm:inline"> ({LEAGUE_TIER_LABELS[activeTier]})</span>
                   </th>
-                  <th className="px-1.5 sm:px-2 py-1.5 sm:py-2 text-right">W</th>
-                  <th className="px-1.5 sm:px-2 py-1.5 sm:py-2 text-right">L</th>
-                  <th className="px-1.5 sm:px-2 py-1.5 sm:py-2 text-right">PCT</th>
+                  <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-right">W</th>
+                  <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-right">L</th>
+                  <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-right">PCT</th>
                   <th className="hidden sm:table-cell px-2 py-2 text-right">GB</th>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-right">Zone</th>
+                  <th className="px-1.5 sm:px-3 py-1.5 sm:py-2 text-right">Zone</th>
                 </tr>
               </thead>
               <tbody>
@@ -620,8 +620,8 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                       row.isHuman ? 'bg-[#FFF3BF]' : ''
                     }`}
                   >
-                    <td className="px-2 sm:px-3 py-1.5 font-display">{row.rank}</td>
-                    <td className="px-2 sm:px-3 py-1.5 font-extrabold max-w-[140px] sm:max-w-none">
+                    <td className="px-1.5 sm:px-3 py-1.5 font-display">{row.rank}</td>
+                    <td className="px-1.5 sm:px-3 py-0.5 font-extrabold max-w-[144px] sm:max-w-none">
                       <button
                         type="button"
                         data-testid="standings-club-btn"
@@ -639,27 +639,42 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                           });
                           soundEngine.play('card_flip');
                         }}
-                        className="flex items-center gap-1.5 text-left hover:text-[#E63946] hover:underline cursor-pointer min-w-0 max-w-full"
+                        className="w-full min-h-[40px] py-1 flex items-center gap-1.5 text-left hover:text-[#E63946] hover:underline cursor-pointer min-w-0 max-w-full"
                       >
                         <span
                           aria-hidden="true"
                           className="w-2.5 h-2.5 rounded-full border border-[#181B2C] shrink-0"
                           style={{ backgroundColor: rowClub?.colors.primary ?? '#1B4332' }}
                         />
-                        <span className="truncate">
-                          {row.clubName} {row.isHuman ? '(YOU)' : ''}
+                        {row.isHuman ? (
+                          <span className="sr-only">{row.clubName} (YOU)</span>
+                        ) : null}
+                        <span
+                          aria-hidden={row.isHuman ? 'true' : undefined}
+                          className="truncate"
+                        >
+                          {row.clubName}
                         </span>
+                        {row.isHuman ? (
+                          <span
+                            aria-hidden="true"
+                            data-testid="standings-you-badge"
+                            className="px-1 py-0.5 rounded bg-[#FFC300] text-[#181B2C] border border-[#181B2C] font-display text-[8.5px] leading-none shrink-0"
+                          >
+                            YOU
+                          </span>
+                        ) : null}
                       </button>
                     </td>
-                    <td className="px-1.5 sm:px-2 py-1.5 text-right font-mono-tabular">{row.wins}</td>
-                    <td className="px-1.5 sm:px-2 py-1.5 text-right font-mono-tabular">{row.losses}</td>
-                    <td className="px-1.5 sm:px-2 py-1.5 text-right font-mono-tabular">
+                    <td className="px-1 sm:px-2 py-1.5 text-right font-mono-tabular">{row.wins}</td>
+                    <td className="px-1 sm:px-2 py-1.5 text-right font-mono-tabular">{row.losses}</td>
+                    <td className="px-1 sm:px-2 py-1.5 text-right font-mono-tabular">
                       {formatRate3(row.winPct)}
                     </td>
                     <td className="hidden sm:table-cell px-2 py-1.5 text-right font-mono-tabular">
                       {row.gamesBack === 0 ? '—' : row.gamesBack.toFixed(1)}
                     </td>
-                    <td className="px-2 sm:px-3 py-1.5 text-right whitespace-nowrap">
+                    <td className="px-1.5 sm:px-3 py-1.5 text-right whitespace-nowrap">
                       {row.rank <= 4 ? (
                         <span className="px-1.5 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[9.5px] sm:text-[10px] text-[#1B4332]">
                           Playoffs
@@ -707,7 +722,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                         soundEngine.play('card_flip');
                       }
                     }}
-                    className="w-full flex justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
+                    className="w-full min-h-[40px] py-1 flex items-center justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
                   >
                     <span className="truncate">🃏 {entry.playerName}</span>
                     <span className="font-mono-tabular text-[#1B4332]">{entry.value} HR</span>
@@ -741,7 +756,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                         soundEngine.play('card_flip');
                       }
                     }}
-                    className="w-full flex justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
+                    className="w-full min-h-[40px] py-1 flex items-center justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
                   >
                     <span className="truncate">🃏 {entry.playerName}</span>
                     <span className="font-mono-tabular text-[#1D3557]">{entry.value} K</span>

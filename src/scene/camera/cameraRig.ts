@@ -86,9 +86,9 @@ export function getCameraPresetPose(
 
     case 'mound_portrait':
       return {
-        position: { x: pitcherThrows === 'R' ? 0.55 : -0.55, y: 2.05, z: -7.10 },
-        lookAt: { x: 0, y: 1.12, z: -10.2 },
-        fov: 37,
+        position: { x: pitcherThrows === 'R' ? 0.55 : -0.55, y: 2.08, z: -6.15 },
+        lookAt: { x: 0, y: 1.24, z: -10.2 },
+        fov: 40,
       };
     case 'showcase_closeup': {
       const angle = turntableAngle + elapsedSec * 0.35;

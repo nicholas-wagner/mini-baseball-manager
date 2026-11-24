@@ -75,15 +75,20 @@ export function StoryChapterModal({ open, onClose }: StoryChapterModalProps) {
           }
         >
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
+            <div
+              data-testid="story-modal-tabs"
+              className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-2"
+            >
               <ComicButton
                 size="sm"
                 variant={tab === 'chapter' ? 'gold' : 'cream'}
                 active={tab === 'chapter'}
                 icon={<ScrollText className="w-3.5 h-3.5" />}
                 onClick={() => setTab('chapter')}
+                className="w-full sm:w-auto px-1.5 sm:px-3 text-[10.5px] sm:text-xs"
               >
-                Active Story Beat {nextChapter ? '★' : ''}
+                <span className="hidden sm:inline">Active Story Beat {nextChapter ? '★' : ''}</span>
+                <span className="sm:hidden">Story{nextChapter ? ' ★' : ''}</span>
               </ComicButton>
               <ComicButton
                 size="sm"
@@ -91,8 +96,10 @@ export function StoryChapterModal({ open, onClose }: StoryChapterModalProps) {
                 active={tab === 'backstories'}
                 icon={<Compass className="w-3.5 h-3.5" />}
                 onClick={() => setTab('backstories')}
+                className="w-full sm:w-auto px-1.5 sm:px-3 text-[10.5px] sm:text-xs"
               >
-                8 Manager Backstories
+                <span className="hidden sm:inline">8 Manager Backstories</span>
+                <span className="sm:hidden">8 Origins</span>
               </ComicButton>
               <ComicButton
                 size="sm"
@@ -100,8 +107,10 @@ export function StoryChapterModal({ open, onClose }: StoryChapterModalProps) {
                 active={tab === 'scrapbook'}
                 icon={<BookMarked className="w-3.5 h-3.5" />}
                 onClick={() => setTab('scrapbook')}
+                className="w-full sm:w-auto px-1.5 sm:px-3 text-[10.5px] sm:text-xs"
               >
-                Persona &amp; Scrapbook ({storyState.scrapbook.length})
+                <span className="hidden sm:inline">Persona &amp; Scrapbook ({storyState.scrapbook.length})</span>
+                <span className="sm:hidden">Book ({storyState.scrapbook.length})</span>
               </ComicButton>
             </div>
 
@@ -188,7 +197,7 @@ export function StoryChapterModal({ open, onClose }: StoryChapterModalProps) {
                           </div>
                           <div className="text-[10px] font-extrabold text-[#4A5068]">
                             {option.cashDelta !== 0
-                              ? `${option.cashDelta > 0 ? '+' : ''}$${option.cashDelta.toLocaleString()} `
+                              ? `${option.cashDelta > 0 ? '+' : '-'}$${Math.abs(option.cashDelta).toLocaleString()} `
                               : ''}
                             {option.hypeDelta !== 0 ? `• +${option.hypeDelta} Hype ` : ''}
                             {option.fanBaseDelta > 0 ? `• +${option.fanBaseDelta} Fans ` : ''}

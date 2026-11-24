@@ -1110,21 +1110,21 @@ export function GameDayScreen({
         {betweenGameSpotlight?.primary ? (
           <div
             data-testid="between-game-spotlight"
-            className="p-3 rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] flex flex-wrap items-center justify-between gap-2.5"
+            className="p-2.5 sm:p-3 rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] flex items-center justify-between gap-2"
           >
             <div className="min-w-0 flex-1 space-y-0.5">
-              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#83601F]">
+              <div className="flex flex-wrap items-center gap-1.5 text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider text-[#83601F]">
                 <span>{betweenGameSpotlight.primary.eyebrow}</span>
                 {betweenGameSpotlight.secondaryCount > 0 ? (
                   <span className="px-1.5 py-0.5 rounded bg-[#E0FBFC] border border-[#192735]/30 text-[#1D3557]">
-                    +{betweenGameSpotlight.secondaryCount} more below
+                    +{betweenGameSpotlight.secondaryCount} more
                   </span>
                 ) : null}
               </div>
-              <div className="font-display text-sm text-[#193D37] leading-snug">
+              <div className="font-display text-xs sm:text-sm text-[#193D37] leading-snug">
                 {betweenGameSpotlight.primary.title}
               </div>
-              <div className="text-[11px] font-bold text-[#4A5068]">
+              <div className="hidden sm:block text-[11px] font-bold text-[#4A5068]">
                 {betweenGameSpotlight.primary.detail}
               </div>
             </div>
@@ -1133,6 +1133,7 @@ export function GameDayScreen({
               variant={betweenGameSpotlight.primary.tone}
               icon={<Sparkles className="w-3.5 h-3.5" />}
               onClick={() => handleSpotlightAction(betweenGameSpotlight.primary!.id)}
+              className="shrink-0 whitespace-nowrap"
             >
               {betweenGameSpotlight.primary.ctaLabel}
             </ComicButton>
@@ -1346,8 +1347,8 @@ export function GameDayScreen({
               ) : null}
 
               {scheduledOpponent ? (
-                <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2.5 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <ClubMascotBuddy
                       mascot={humanClub.mascot}
                       primaryColor={humanClub.colors.primary}
@@ -1360,38 +1361,37 @@ export function GameDayScreen({
                       }
                       size="sm"
                     />
-                    <span
-                      className={`px-2 py-1 rounded-lg border-2 border-[#181B2C] font-display text-[11px] shrink-0 ${
-                        scheduledIsHome
-                          ? 'bg-[#D8F3DC] text-[#1B4332]'
-                          : 'bg-[#E0FBFC] text-[#1D3557]'
-                      }`}
-                    >
-                      {scheduledIsHome ? '🏠 HOME' : '✈️ AWAY'}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-display text-sm text-[#181B2C] flex items-center gap-2 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-xs sm:text-sm text-[#181B2C] flex items-center gap-1.5 flex-wrap leading-tight">
+                        <span
+                          className="w-3 h-3 rounded-full border border-[#181B2C] inline-block shrink-0"
+                          style={{ backgroundColor: scheduledOpponent.colors.primary }}
+                        />
                         <span>
                           {scheduledIsHome ? 'vs' : '@'} {scheduledOpponent.city}{' '}
                           {scheduledOpponent.name}
                         </span>
                         <span
-                          className="w-3.5 h-3.5 rounded-full border border-[#181B2C] inline-block"
-                          style={{ backgroundColor: scheduledOpponent.colors.primary }}
-                        />
+                          className={`px-1.5 py-0.5 rounded-md border border-[#181B2C] font-display text-[9.5px] shrink-0 ${
+                            scheduledIsHome
+                              ? 'bg-[#D8F3DC] text-[#1B4332]'
+                              : 'bg-[#E0FBFC] text-[#1D3557]'
+                          }`}
+                        >
+                          {scheduledIsHome ? '🏠 HOME' : '✈️ AWAY'}
+                        </span>
                       </div>
-                      <div className="text-[11px] font-bold text-[#4A5068]">
-                        {scheduledOpponent.aiArchetype.replace('_', ' ')} • Record{' '}
-                        {scheduledOpponent.wins}-{scheduledOpponent.losses} •{' '}
-                        {scheduledIsHome ? 'You bat BOT (Home Field)' : 'You bat TOP (Road Ballpark)'}
+                      <div className="text-[10.5px] sm:text-[11px] font-bold text-[#4A5068] truncate">
+                        {scheduledOpponent.aiArchetype.replace('_', ' ')} • {scheduledOpponent.wins}-{scheduledOpponent.losses} •{' '}
+                        {scheduledIsHome ? 'You bat BOT' : 'You bat TOP'}
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                     {nextScheduled ? (
                       <span
                         data-testid="series-stakes-badge"
-                        className={`px-2 py-1 rounded-lg border-2 border-[#181B2C] text-[10px] font-extrabold ${
+                        className={`px-2 py-0.5 rounded-lg border-2 border-[#181B2C] text-[10px] font-extrabold ${
                           currentSeriesStakes.isSweepOpportunity || currentSeriesStakes.isRubberMatch
                             ? 'bg-[#FFC300] text-[#181B2C]'
                             : 'bg-[#FFF3BF] text-[#181B2C]'
@@ -1400,7 +1400,7 @@ export function GameDayScreen({
                         {currentSeriesStakes.badgeText}
                       </span>
                     ) : null}
-                    <div className="text-[11px] font-extrabold text-[#1D3557] px-2.5 py-1 rounded-lg border border-[#181B2C]/30 bg-[#FBF4E4]">
+                    <div className="text-[10.5px] font-extrabold text-[#1D3557] px-2 py-0.5 rounded-lg border border-[#181B2C]/30 bg-[#FBF4E4]">
                       🏟️{' '}
                       {
                         getBallparkPreset(
@@ -1412,15 +1412,78 @@ export function GameDayScreen({
                 </div>
               ) : null}
 
+              {/* Calm 1-Hero Play CTA + Tidy Secondary Modes (Always Above the Fold on Mobile!) */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {!pendingLivePlayoff && !nextScheduled && onJumpToTab ? (
+                    <ComicButton
+                      variant="gold"
+                      size="lg"
+                      icon={<Trophy className="w-4 h-4" />}
+                      onClick={() => {
+                        soundEngine.play('level_up');
+                        onJumpToTab('league');
+                      }}
+                    >
+                      Enter League Playoffs
+                    </ComicButton>
+                  ) : null}
+                  <ComicButton
+                    variant="turf"
+                    size="lg"
+                    icon={<Play className="w-4 h-4" />}
+                    onClick={() => handleStartLiveGame(false)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    Start Live 3D Game
+                  </ComicButton>
+                </div>
+
+                <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5">
+                  <ComicButton
+                    variant="violet"
+                    size="sm"
+                    data-testid="start-smart-watch-btn"
+                    icon={<Sparkles className="w-3.5 h-3.5" />}
+                    onClick={() => handleStartLiveGame('smart')}
+                    className="w-full sm:w-auto px-1.5 sm:px-3 text-[10.5px] sm:text-xs"
+                  >
+                    <span className="hidden sm:inline">✨ Smart Watch 3D</span>
+                    <span className="sm:hidden">Smart 3D</span>
+                  </ComicButton>
+                  <ComicButton
+                    variant="coral"
+                    size="sm"
+                    data-testid="start-clutch-moment-btn"
+                    icon={<Flame className="w-3.5 h-3.5" />}
+                    onClick={() => handleStartClutchMoment()}
+                    className="w-full sm:w-auto px-1.5 sm:px-3 text-[10.5px] sm:text-xs"
+                  >
+                    <span className="hidden sm:inline">Play Clutch Moment</span>
+                    <span className="sm:hidden">Clutch</span>
+                  </ComicButton>
+                  <ComicButton
+                    variant="gold"
+                    size="sm"
+                    icon={<Zap className="w-3.5 h-3.5" />}
+                    onClick={handleInstantSimPreGame}
+                    className="w-full sm:w-auto px-1.5 sm:px-3 text-[10.5px] sm:text-xs"
+                  >
+                    <span className="hidden sm:inline">Instant Sim Game</span>
+                    <span className="sm:hidden">Sim Game</span>
+                  </ComicButton>
+                </div>
+              </div>
+
               {probableMatchup && scheduledOpponent ? (
                 <div
                   data-testid="probable-matchup-strip"
-                  className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2"
+                  className="p-2 sm:p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2"
                 >
-                  {/* Unified Cute 90s Manga Portrait Face-Off + Rival Slugger (Tap Any Portrait to Flip Their Card!) */}
+                  {/* Unified Cute 90s Manga Portrait Face-Off + Rival Slugger (Compact 3-col strip on Mobile!) */}
                   <div
                     data-testid="matchup-faceoff-portraits"
-                    className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+                    className="grid grid-cols-3 gap-1.5 sm:gap-2"
                   >
                     <button
                       type="button"
@@ -1429,7 +1492,7 @@ export function GameDayScreen({
                         setPreGameScoutPlayerId(probableMatchup.humanStarter.id);
                         soundEngine.play('card_flip');
                       }}
-                      className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#D8F3DC] hover:bg-[#FFF3BF] flex items-center gap-2 text-left cursor-pointer"
+                      className="p-1.5 sm:p-2 rounded-xl border-2 border-[#181B2C] bg-[#D8F3DC] hover:bg-[#FFF3BF] flex flex-col sm:flex-row items-center text-center sm:text-left gap-1 sm:gap-2 cursor-pointer min-w-0"
                     >
                       <PlayerPortraitBadge
                         player={probableMatchup.humanStarter}
@@ -1437,18 +1500,18 @@ export function GameDayScreen({
                         accentColor={humanClub.colors.accent}
                         size="sm"
                       />
-                      <div className="min-w-0">
-                        <div className="text-[9px] font-extrabold uppercase text-[#1B4332]">
-                          🃏 Your SP ({probableMatchup.humanStarter.throws}HP)
+                      <div className="min-w-0 w-full">
+                        <div className="text-[8.5px] sm:text-[9px] font-extrabold uppercase text-[#1B4332] truncate">
+                          Your SP ({probableMatchup.humanStarter.throws})
                         </div>
-                        <div className="font-display text-xs text-[#181B2C] truncate">
+                        <div className="font-display text-[10.5px] sm:text-xs text-[#181B2C] truncate">
                           {probableMatchup.humanStarter.name}
                         </div>
-                        <div className="text-[10px] font-bold text-[#1B4332]">
+                        <div className="text-[9.5px] sm:text-[10px] font-bold text-[#1B4332]">
                           OVR {computePlayerOverall(probableMatchup.humanStarter)}
                           {probableMatchup.humanStarter.formState === 'hot' ||
                           probableMatchup.humanStarter.formState === 'blazing'
-                            ? ' • 🔥'
+                            ? ' 🔥'
                             : ''}
                         </div>
                       </div>
@@ -1461,7 +1524,7 @@ export function GameDayScreen({
                         setPreGameScoutPlayerId(probableMatchup.opponentStarter.id);
                         soundEngine.play('card_flip');
                       }}
-                      className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] flex items-center gap-2 text-left cursor-pointer"
+                      className="p-1.5 sm:p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] flex flex-col sm:flex-row items-center text-center sm:text-left gap-1 sm:gap-2 cursor-pointer min-w-0"
                     >
                       <PlayerPortraitBadge
                         player={probableMatchup.opponentStarter}
@@ -1469,14 +1532,14 @@ export function GameDayScreen({
                         accentColor={scheduledOpponent.colors.accent}
                         size="sm"
                       />
-                      <div className="min-w-0">
-                        <div className="text-[9px] font-extrabold uppercase text-[#1D3557]">
-                          🃏 Rival SP ({probableMatchup.opponentStarter.throws}HP)
+                      <div className="min-w-0 w-full">
+                        <div className="text-[8.5px] sm:text-[9px] font-extrabold uppercase text-[#1D3557] truncate">
+                          Rival SP ({probableMatchup.opponentStarter.throws})
                         </div>
-                        <div className="font-display text-xs text-[#181B2C] truncate">
+                        <div className="font-display text-[10.5px] sm:text-xs text-[#181B2C] truncate">
                           {probableMatchup.opponentStarter.name}
                         </div>
-                        <div className="text-[10px] font-bold text-[#1D3557]">
+                        <div className="text-[9.5px] sm:text-[10px] font-bold text-[#1D3557]">
                           OVR {computePlayerOverall(probableMatchup.opponentStarter)}
                         </div>
                       </div>
@@ -1489,7 +1552,7 @@ export function GameDayScreen({
                         setPreGameScoutPlayerId(probableMatchup.opponentStarHitter.id);
                         soundEngine.play('card_flip');
                       }}
-                      className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] hover:bg-[#FFF3BF] flex items-center gap-2 text-left cursor-pointer"
+                      className="p-1.5 sm:p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] hover:bg-[#FFF3BF] flex flex-col sm:flex-row items-center text-center sm:text-left gap-1 sm:gap-2 cursor-pointer min-w-0"
                     >
                       <PlayerPortraitBadge
                         player={probableMatchup.opponentStarHitter}
@@ -1497,14 +1560,14 @@ export function GameDayScreen({
                         accentColor={scheduledOpponent.colors.accent}
                         size="sm"
                       />
-                      <div className="min-w-0">
-                        <div className="text-[9px] font-extrabold uppercase text-[#9D0208]">
-                          🃏 Rival Star ({probableMatchup.opponentStarHitter.position})
+                      <div className="min-w-0 w-full">
+                        <div className="text-[8.5px] sm:text-[9px] font-extrabold uppercase text-[#9D0208] truncate">
+                          Rival {probableMatchup.opponentStarHitter.position}
                         </div>
-                        <div className="font-display text-xs text-[#181B2C] truncate">
+                        <div className="font-display text-[10.5px] sm:text-xs text-[#181B2C] truncate">
                           {probableMatchup.opponentStarHitter.name}
                         </div>
-                        <div className="text-[10px] font-bold text-[#9D0208]">
+                        <div className="text-[9.5px] sm:text-[10px] font-bold text-[#9D0208]">
                           OVR {computePlayerOverall(probableMatchup.opponentStarHitter)}
                         </div>
                       </div>
@@ -1564,7 +1627,7 @@ export function GameDayScreen({
                             >
                               {isTuned
                                 ? `✓ Tuned vs ${lineupCheck.starterThrows}HP!`
-                                : `✨ Auto-Tune vs ${lineupCheck.starterThrows}HP`}
+                                : `Auto-Tune vs ${lineupCheck.starterThrows}HP`}
                             </ComicButton>
                           );
                         })()}
@@ -1583,63 +1646,6 @@ export function GameDayScreen({
                 </div>
               ) : null}
 
-              {/* Calm 1-Hero Play CTA + Tidy Secondary Modes */}
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  {!pendingLivePlayoff && !nextScheduled && onJumpToTab ? (
-                    <ComicButton
-                      variant="gold"
-                      size="lg"
-                      icon={<Trophy className="w-4 h-4" />}
-                      onClick={() => {
-                        soundEngine.play('level_up');
-                        onJumpToTab('league');
-                      }}
-                    >
-                      Enter League Playoffs
-                    </ComicButton>
-                  ) : null}
-                  <ComicButton
-                    variant="turf"
-                    size="lg"
-                    icon={<Play className="w-4 h-4" />}
-                    onClick={() => handleStartLiveGame(false)}
-                    className="flex-1 sm:flex-none"
-                  >
-                    Start Live 3D Game
-                  </ComicButton>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <ComicButton
-                    variant="violet"
-                    size="sm"
-                    data-testid="start-smart-watch-btn"
-                    icon={<Sparkles className="w-3.5 h-3.5" />}
-                    onClick={() => handleStartLiveGame('smart')}
-                  >
-                    ✨ Smart Watch 3D
-                  </ComicButton>
-                  <ComicButton
-                    variant="coral"
-                    size="sm"
-                    data-testid="start-clutch-moment-btn"
-                    icon={<Flame className="w-3.5 h-3.5" />}
-                    onClick={() => handleStartClutchMoment()}
-                  >
-                    Play Clutch Moment
-                  </ComicButton>
-                  <ComicButton
-                    variant="gold"
-                    size="sm"
-                    icon={<Zap className="w-3.5 h-3.5" />}
-                    onClick={handleInstantSimPreGame}
-                  >
-                    Instant Sim Game
-                  </ComicButton>
-                </div>
-              </div>
-
               {/* Fun Side Toys: 30s HR Derby, Uniform Studio & Trophy Sticker Album */}
               <div className="flex flex-wrap items-center gap-2">
                 <ComicButton
@@ -1652,7 +1658,7 @@ export function GameDayScreen({
                     soundEngine.play('organ_charge');
                   }}
                 >
-                  💥 30s HR Derby
+                  30s HR Derby
                 </ComicButton>
                 {onOpenUniforms ? (
                   <ComicButton
@@ -1665,7 +1671,7 @@ export function GameDayScreen({
                       onOpenUniforms();
                     }}
                   >
-                    🎨 Uniform Studio
+                    Uniform Studio
                   </ComicButton>
                 ) : null}
                 <ComicButton
@@ -1678,7 +1684,7 @@ export function GameDayScreen({
                     soundEngine.play('ui_pop');
                   }}
                 >
-                  🏆 Trophy &amp; Sticker Album
+                  Trophy &amp; Sticker Album
                 </ComicButton>
               </div>
 
@@ -1700,7 +1706,7 @@ export function GameDayScreen({
                       setGameSettingsOpen((v) => !v);
                       soundEngine.play('ui_pop');
                     }}
-                    className="px-2.5 py-1 min-h-[36px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
+                    className="px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[11px] font-extrabold text-[#181B2C] cursor-pointer"
                   >
                     {gameSettingsOpen ? 'Done ▴' : 'Length & Style ▾'}
                   </button>
@@ -2659,6 +2665,10 @@ export function GameDayScreen({
               onInspectBatter={() => openGamePlayerCard(currentBatter.id)}
               onInspectPitcher={() => openGamePlayerCard(currentPitcher.id)}
               onInspectPlayers={() => openGamePlayerCard(currentBatter.id)}
+              onOpenBoxScore={() => {
+                setBoxScoreOpen(true);
+                soundEngine.play('ui_pop');
+              }}
             />}
 
             {liveNemesis ? (

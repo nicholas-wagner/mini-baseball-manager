@@ -1,3 +1,4 @@
+import { Zap } from "lucide-react";
 import { PITCH_CALL_GUIDE } from "../../engine/gm/openingDayHook";
 import type { TacticalCall } from "../../engine/models/playEvent";
 import type { GameSessionState } from "../../engine/simulation/gameState";
@@ -95,27 +96,43 @@ export function FirstAtBat({
       <header>
         <span>Coach Pops</span>
         <div className="atbat-header-actions">
-          {!expanded && <details className="atbat-options" onKeyDown={event => {
-            if (event.key === 'Escape') {
-              event.currentTarget.open = false;
-              event.currentTarget.querySelector('summary')?.focus();
-            }
-          }} onBlur={event => {
-            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
-          }}>
-            <summary>Options</summary>
-            <div onClick={event => {
-              const details = event.currentTarget.closest('details')!;
-              details.open = false;
-              details.querySelector('summary')?.focus();
+          {!expanded && readyPowerName && onArmPower && (
+            <button
+              type="button"
+              data-testid="guided-unleash-power-btn"
+              className="atbat-power-pill"
+              disabled={locked}
+              aria-pressed={powerArmed}
+              onClick={onArmPower}
+              title={`Tap to ${powerArmed ? 'disarm' : 'arm'} ${readyPowerName}`}
+            >
+              <Zap className="w-3 h-3 shrink-0 fill-current" aria-hidden="true" />
+              <span className="truncate">
+                {powerArmed ? 'ARMED!' : readyPowerName.replace(/\s*\([^)]*\)\s*$/, '')}
+              </span>
+            </button>
+          )}
+          {!expanded && (onToggleArcadeTiming || (tip && !powerArmed)) && (
+            <details className="atbat-options" onKeyDown={event => {
+              if (event.key === 'Escape') {
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector('summary')?.focus();
+              }
+            }} onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
             }}>
-              {onToggleArcadeTiming && <button type="button" data-testid="guided-timing-toggle"
-                aria-pressed={arcadeTimingEnabled} onClick={onToggleArcadeTiming}>{arcadeTimingEnabled ? 'Turn timing off' : 'Try swing or pitch timing'}</button>}
-              {readyPowerName && onArmPower && <button type="button" data-testid="guided-unleash-power-btn"
-                disabled={locked} aria-pressed={powerArmed} onClick={onArmPower}>{powerArmed ? 'Disarm ' : 'Arm '}{readyPowerName}</button>}
-              {tip && !powerArmed && <button type="button" onClick={onSuggested} disabled={locked}>{cue.suggestedAction!.label}</button>}
-            </div>
-          </details>}
+              <summary>Options</summary>
+              <div onClick={event => {
+                const details = event.currentTarget.closest('details')!;
+                details.open = false;
+                details.querySelector('summary')?.focus();
+              }}>
+                {onToggleArcadeTiming && <button type="button" data-testid="guided-timing-toggle"
+                  aria-pressed={arcadeTimingEnabled} onClick={onToggleArcadeTiming}>{arcadeTimingEnabled ? '🎯 Turn timing off' : '🎯 Try swing or pitch timing'}</button>}
+                {tip && !powerArmed && <button type="button" onClick={onSuggested} disabled={locked}>{cue.suggestedAction!.label}</button>}
+              </div>
+            </details>
+          )}
           <button type="button" aria-expanded={expanded} onClick={onExpand}>
             {expanded ? "Fewer controls" : "More controls"}
           </button>

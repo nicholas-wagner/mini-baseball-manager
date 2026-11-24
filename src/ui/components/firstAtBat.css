@@ -10,20 +10,44 @@
   padding: 0 10px;
 }
 .atbat-guide.is-expanded header button {
-  min-height: 36px;
+  min-height: 44px;
 }
 .atbat-guide header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 .atbat-header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
-.atbat-guide header span {
+.atbat-guide header .atbat-power-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 40px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 2px solid #192735;
+  background: #ffcc49;
+  color: #152f2e;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  line-height: 1.1;
+  text-decoration: none;
+  box-shadow: 2px 2px 0 #192735;
+  white-space: nowrap;
+  max-width: 132px;
+  overflow: hidden;
+}
+.atbat-guide header .atbat-power-pill[aria-pressed="true"] {
+  background: #ff4d6d;
+  color: #ffffff;
+}
+.atbat-guide header > span {
   font: 800 11px monospace;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -120,8 +144,9 @@
 .guided-matchup .matchup-scout-line,.guided-matchup .matchup-endurance-wrap,.guided-matchup .matchup-sparkle-badges,.guided-matchup .matchup-memory-line { display:none; }
 .atbat-options { position:relative; }
 .atbat-options summary { font-size:12px; min-width:48px; justify-content:center; }
-.atbat-options > div { position:absolute; right:0; bottom:100%; z-index:5; border:2px solid #193d37; border-radius:10px; padding:4px 8px; background:#fff7e4; width:190px; box-shadow:2px 2px #192735; }
-.atbat-options > div button { width:100%; text-align:left; min-height:48px; }
+.atbat-options > div { position:absolute; right:0; bottom:calc(100% + 4px); z-index:25; border:2px solid #193d37; border-radius:12px; padding:6px; background:#fff7e4; width:212px; box-shadow:3px 3px #192735; display:flex; flex-direction:column; gap:4px; }
+.atbat-options > div button { width:100%; text-align:left; min-height:44px; padding:6px 10px; border-radius:8px; border:1.5px solid #193d37; background:#fffdf8; text-decoration:none; font-size:12px; }
+.atbat-options > div button[aria-pressed="true"] { background:#ffcc49; color:#152f2e; }
 .atbat-guide .atbat-go { min-height:50px; }
 .atbat-choices button { min-height:48px; }
 .atbat-go { box-shadow:2px 2px #192735; }
@@ -219,9 +244,9 @@
   .live-game [data-testid=arcade-call-bar] { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
   .live-game [data-testid=arcade-call-bar] button { white-space:normal; }
   .live-game [data-testid=live-calls-block] > div { display:grid; grid-template-columns:minmax(0,1fr); }
-  .live-game [data-testid=arcade-pitch-sign-bar] { display:flex; flex-wrap:wrap; overflow:visible; }
+  .live-game [data-testid=arcade-pitch-sign-bar] { display:flex; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%; }
   .live-game [data-testid=arcade-hype-bar] { width:100%; }
-  .club-customizer { padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+  .club-customizer { padding-bottom:calc(82px + env(safe-area-inset-bottom)); }
   .club-customizer .club-confirm {
     position:fixed; z-index:35; left:max(14px,env(safe-area-inset-left)); right:max(14px,env(safe-area-inset-right));
     bottom:max(10px,env(safe-area-inset-bottom)); min-height:50px;

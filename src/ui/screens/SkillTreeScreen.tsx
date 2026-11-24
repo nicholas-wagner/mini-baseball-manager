@@ -115,8 +115,8 @@ export function SkillTreeScreen() {
 
   return (
     <div className="space-y-3">
-      <div className="p-2.5 rounded-2xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shadow-[3px_3px_0_#181B2C]">
-        <div className="text-[11px] sm:text-xs font-extrabold text-[#181B2C] leading-snug">
+      <div className="p-2 rounded-2xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 shadow-[3px_3px_0_#181B2C]">
+        <div className="text-[10.5px] sm:text-xs font-extrabold text-[#181B2C] leading-tight">
           ⚡ Spend <span className="underline">Skill Points (SP)</span> for Heritage &amp; Special Powers — base stats auto-level!
         </div>
         <div className="grid grid-cols-2 sm:flex gap-1.5 shrink-0">
@@ -320,22 +320,38 @@ export function SkillTreeScreen() {
           </div>
 
           {/* 3-Tier Cultural Heritage Branch (TASK-020) */}
-          <div className="p-2.5 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#F6EEFF] space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 font-display text-xs text-[#4A148C]">
+          <div className="p-2 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#F6EEFF] space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-display text-[11px] sm:text-xs text-[#4A148C] min-w-0">
                 <Star className="w-4 h-4 fill-[#FFC300] text-[#181B2C] shrink-0" />
-                {heritageBranch.nationName} Heritage: {heritageBranch.ability.name} (
-                {heritageBranch.ability.mythOrAnimal})
+                <span className="truncate">
+                  {heritageBranch.nationName} Heritage: {heritageBranch.ability.name}
+                </span>
               </div>
               <ComicButton
                 size="sm"
                 variant="violet"
                 disabled={!nextHeritage.allowed}
                 onClick={handleUnlockHeritage}
+                aria-label={
+                  player.heritageTierUnlocked >= 3
+                    ? 'Heritage Mastered'
+                    : `Unlock Tier ${player.heritageTierUnlocked + 1} (${nextHeritage.nextTier?.spCost ?? 0} SP)`
+                }
+                className="shrink-0 whitespace-nowrap px-2 text-[10.5px] sm:text-xs"
               >
-                {player.heritageTierUnlocked >= 3
-                  ? 'Heritage Mastered ✓'
-                  : `Unlock Tier ${player.heritageTierUnlocked + 1} (${nextHeritage.nextTier?.spCost ?? 0} SP)`}
+                {player.heritageTierUnlocked >= 3 ? (
+                  'Mastered ✓'
+                ) : (
+                  <>
+                    <span className="sm:hidden">
+                      Unlock T{player.heritageTierUnlocked + 1} ({nextHeritage.nextTier?.spCost ?? 0} SP)
+                    </span>
+                    <span className="hidden sm:inline">
+                      Unlock Tier {player.heritageTierUnlocked + 1} ({nextHeritage.nextTier?.spCost ?? 0} SP)
+                    </span>
+                  </>
+                )}
               </ComicButton>
             </div>
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
@@ -344,15 +360,15 @@ export function SkillTreeScreen() {
                 return (
                   <div
                     key={tierNode.tier}
-                    className={`p-2 sm:p-2.5 rounded-xl border-2 border-[#181B2C] ${
+                    className={`p-1.5 sm:p-2.5 rounded-xl border-2 border-[#181B2C] ${
                       owned ? 'bg-[#D8F3DC]' : 'bg-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-1 text-[10px] sm:text-xs font-display text-[#181B2C]">
-                      <span className="truncate">Tier {tierNode.tier}</span>
-                      <span className="shrink-0">{owned ? '✓' : `${tierNode.spCost} SP`}</span>
+                    <div className="flex items-center justify-between gap-1 text-[9.5px] sm:text-xs font-display text-[#181B2C]">
+                      <span className="truncate">T{tierNode.tier}</span>
+                      <span className="shrink-0">{owned ? '✓' : `${tierNode.spCost}SP`}</span>
                     </div>
-                    <p className="text-[10px] sm:text-[11px] font-bold text-[#4A5068] mt-1 leading-snug">
+                    <p className="text-[9.5px] sm:text-[11px] font-bold text-[#4A5068] mt-0.5 leading-tight line-clamp-3 sm:line-clamp-none">
                       {tierNode.description}
                     </p>
                   </div>
