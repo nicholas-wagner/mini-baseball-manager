@@ -62,6 +62,12 @@ import {
 } from '../../engine/league/rivalryEngine';
 import { evaluateNemesisMatchup } from '../../engine/league/nemesisTracker';
 import { buildCatcherCallSequence } from '../../engine/simulation/catcherCalls';
+import {
+  BULLPEN_MODE_OPTIONS,
+  evaluateBullpenCall,
+  rankBullpenCandidates,
+  type BullpenMode,
+} from '../../engine/simulation/bullpenManager';
 import { catcherSign, personalWatchStop, gazetteCaption, recentContact } from '../../engine/simulation/dugoutCalls';
 import { GazetteCall, ThirdBaseDecision, LeagueWire, ParkLineupCard, WatchSettings } from '../components/DugoutScouting';
 import { seriesRoundSeed, getHumanSeasonSchedule } from '../../engine/league/seasonEngine';
@@ -81,7 +87,6 @@ import type { ManagerPowerId } from '../../engine/models/manager';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import {
   computePlayerOverall,
-  PITCHER_ROLE_SHORT_LABELS,
   PITCH_TYPE_SHORT_LABELS,
   type GameLengthInnings,
   type PitchType,
@@ -342,6 +347,9 @@ export function GameDayScreen({
   const controlMode = useUserPreferencesStore((s) => s.gameDayControlMode);
   const pitchingMode = useUserPreferencesStore((s) => s.pitchingMode);
   const setPitchingMode = useUserPreferencesStore((s) => s.setPitchingMode);
+  const bullpenMode = useUserPreferencesStore((s) => s.bullpenMode);
+  const setBullpenMode = useUserPreferencesStore((s) => s.setBullpenMode);
+  const [dismissedBullpenKey, setDismissedBullpenKey] = useState<string | null>(null);
   const eventInGuide = Boolean(playbackEvent && guidedHalf === playbackEvent.inning + playbackEvent.half);
   const guiding = Boolean(liveSession && controlMode === 'simple' && watchMode === 'paused' &&
     (eventInGuide || guidedHalf === liveSession.inning + liveSession.half));
@@ -559,6 +567,7 @@ export function GameDayScreen({
     setWinProbHistory([estimateHomeWinProbability(session)]);
     setWarmingRelieverIds([]);
     setWarmupCounts({});
+    setDismissedBullpenKey(null);
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setBoxScoreOpen(false);
@@ -614,6 +623,7 @@ export function GameDayScreen({
     setWinProbHistory([estimateHomeWinProbability(clutch.session)]);
     setWarmingRelieverIds([]);
     setWarmupCounts({});
+    setDismissedBullpenKey(null);
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setBoxScoreOpen(false);
@@ -661,6 +671,7 @@ export function GameDayScreen({
           setArmedPowerId(null);
           setPitchTarget('attack_zone');
           setSelectedPitchType(null);
+          setDismissedBullpenKey(null);
         } else if (batterChanged) {
           setTacticalCall((prev) => (prev === 'bunt' ? 'normal' : prev));
           setPitchTarget('attack_zone');
@@ -745,6 +756,7 @@ export function GameDayScreen({
         {
           tacticalCall: callOverride ?? tacticalCall,
           pitchingMode,
+          bullpenMode,
           shakeOffCount,
           pitchTarget,
           selectedPitchType,
@@ -763,6 +775,7 @@ export function GameDayScreen({
     [
       armedPowerId,
       batterGuess,
+      bullpenMode,
       defensiveShift,
       gameWeather,
       nemesisHistory,
@@ -896,6 +909,7 @@ export function GameDayScreen({
     if (swapped.event) {
       setSelectedPitchType(null);
       setShakeOffCount(0);
+      setDismissedBullpenKey(null);
       applyStepResult(swapped.nextSession, [swapped.event], activeOpponentId);
     }
   };
@@ -908,12 +922,22 @@ export function GameDayScreen({
     ) {
       return undefined;
     }
+    const humanKey: 'away' | 'home' = liveSession.home.isHuman ? 'home' : 'away';
+    if (bullpenMode === 'semi_auto') {
+      const pendingCall = evaluateBullpenCall(liveSession, humanKey);
+      if (pendingCall && pendingCall.snoozeKey !== dismissedBullpenKey) {
+        setWatchMode('paused');
+        setSmartPauseReason(`${pendingCall.shortTag} — Coach Pops has a bullpen call!`);
+        return undefined;
+      }
+    }
     if (watchMode === 'smart') {
       const cueNow = computeLiveActionCue({
         session: liveSession,
         tacticalCall,
         armedPowerId,
         moundVisitUsed,
+        bullpenMode,
       });
       const decision = shouldSmartAutoPause(liveSession, playbackEvent, cueNow);
       const reason = watchChoice === 'highlights' ? (playbackEvent && decision.reason) : personalWatchStop(liveSession, watchChoice);
@@ -937,6 +961,8 @@ export function GameDayScreen({
     return () => window.clearTimeout(timer);
   }, [
     armedPowerId,
+    bullpenMode,
+    dismissedBullpenKey,
     handleNextPitch,
     pendingRelief,
     lastChoreo,
@@ -2285,14 +2311,13 @@ export function GameDayScreen({
     : null;
   const liveAwayClub = humanSideKey === 'home' ? activeOpponent : humanClub;
   const liveHomeClub = humanSideKey === 'home' ? humanClub : activeOpponent;
-  const availableRelievers = liveSession[humanSideKey].bullpenIds.filter(
-    (id) => !liveSession[humanSideKey].usedPitcherIds.includes(id),
-  );
+  const rankedBullpenCandidates = rankBullpenCandidates(liveSession, humanSideKey);
   const liveCue = computeLiveActionCue({
     session: liveSession,
     tacticalCall,
     armedPowerId,
     moundVisitUsed,
+    bullpenMode,
   });
   const pendingDecision = Boolean(lastChoreo && revealedPlay !== lastChoreo);
   const playing = Boolean(lastChoreo && finishedPlay !== lastChoreo);
@@ -2426,18 +2451,32 @@ export function GameDayScreen({
     : null;
   const liveLowerThird = buildLiveBroadcastLowerThird(liveSession);
   const liveRunnerIds = liveSession.bases.filter((id): id is string => Boolean(id));
-  const arcadeBullpenOptions = availableRelievers
-    .map((relId) => {
-      const rel = liveSession[humanSideKey].playersById[relId];
-      if (!rel) return null;
-      return {
-        id: rel.id,
-        name: rel.name,
-        throws: rel.throws,
-        roleLabel: rel.pitcherRole ? PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole] : 'RP',
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
+  const arcadeBullpenOptions = rankedBullpenCandidates.map((candidate) => ({
+    id: candidate.player.id,
+    name: candidate.player.name,
+    throws: candidate.player.throws,
+    roleLabel: candidate.roleLabel,
+    ovr: candidate.ovr,
+    isRecommended: candidate.isRecommended,
+    fitTag: candidate.fitTag,
+    platoonEdge: candidate.platoonEdge,
+    freshnessPct: candidate.freshnessPct,
+  }));
+  const rawBullpenRec =
+    !humanIsBatting && bullpenMode === 'semi_auto' && !playing && !handoff
+      ? evaluateBullpenCall(liveSession, humanSideKey)
+      : null;
+  const activeBullpenSuggestion =
+    rawBullpenRec && rawBullpenRec.snoozeKey !== dismissedBullpenKey ? rawBullpenRec : null;
+  const handleSelectBullpenMode = (mode: BullpenMode) => {
+    setBullpenMode(mode);
+    if (mode !== 'semi_auto') setDismissedBullpenKey(null);
+    soundEngine.play('ui_pop');
+  };
+  const handleDismissBullpenSuggestion = (snoozeKey: string) => {
+    setDismissedBullpenKey(snoozeKey);
+    soundEngine.play('ui_pop');
+  };
   const catcherCallSeq = !humanIsBatting ? buildCatcherCallSequence(liveSession) : [];
   const activeCatcherCall =
     catcherCallSeq.length > 0 ? catcherCallSeq[shakeOffCount % catcherCallSeq.length] : null;
@@ -2561,10 +2600,10 @@ export function GameDayScreen({
         className={
           guiding && !showMore
             ? 'max-w-3xl mx-auto space-y-2'
-            : 'grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start'
+            : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-3 items-start'
         }
       >
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           {/* Unified 3D Ballpark + Directly Attached Live Action Bar (always visible together!) */}
           <div className="live-field-controls space-y-2">
             <LiveGameCanvas
@@ -2704,6 +2743,9 @@ export function GameDayScreen({
               readyPowerName={readyPowerOption?.name ?? null}
               arcadeTimingEnabled={arcadeTimingEnabled}
               pitchingMode={pitchingMode}
+              bullpenMode={bullpenMode}
+              bullpenSuggestion={activeBullpenSuggestion}
+              activePitcherFirstName={currentPitcher.name.split(' ')[0]}
               catcherCall={guidedCatcherCall}
               shakeOffTotal={guidedCatcherSeq.length}
               pitcherArsenal={guidedBatting ? [] : livePitcherSignOptions}
@@ -2714,6 +2756,12 @@ export function GameDayScreen({
                 soundEngine.play('ui_pop');
               }}
               onSelectPitchingMode={handleSelectPitchingMode}
+              onSelectBullpenMode={handleSelectBullpenMode}
+              onAcceptBullpenSuggestion={(relId) => {
+                soundEngine.play('bullpen_phone');
+                handleBullpenSwap(relId);
+              }}
+              onDismissBullpenSuggestion={handleDismissBullpenSuggestion}
               onToggleArcadeTiming={() => {
                 toggleArcadeTiming();
                 soundEngine.play('ui_pop');
@@ -2780,6 +2828,14 @@ export function GameDayScreen({
               controlMode={controlMode}
               pitchingMode={pitchingMode}
               onSelectPitchingMode={handleSelectPitchingMode}
+              bullpenMode={bullpenMode}
+              onSelectBullpenMode={handleSelectBullpenMode}
+              bullpenSuggestion={activeBullpenSuggestion}
+              onAcceptBullpenSuggestion={(relId) => {
+                soundEngine.play('bullpen_phone');
+                handleBullpenSwap(relId);
+              }}
+              onDismissBullpenSuggestion={handleDismissBullpenSuggestion}
               catcherCall={activeCatcherCall}
               shakeOffTotal={catcherCallSeq.length}
               onShakeOff={handleShakeOffCatcher}
@@ -3551,42 +3607,74 @@ export function GameDayScreen({
                 </div>
               </ComicCard>
 
-              <ComicCard title="BULLPEN PHONE" headerBg="#2B2D42">
-                {availableRelievers.length === 0 ? (
+              <ComicCard
+                title="BULLPEN PHONE"
+                headerBg="#2B2D42"
+                badge={
+                  <div
+                    role="group"
+                    aria-label="Pro bullpen mode"
+                    className="inline-flex items-center rounded-lg border border-[#181B2C] bg-[#FFFDF7] p-0.5 gap-0.5"
+                  >
+                    {BULLPEN_MODE_OPTIONS.map((modeOpt) => (
+                      <button
+                        key={modeOpt.id}
+                        type="button"
+                        aria-pressed={bullpenMode === modeOpt.id}
+                        onClick={() => handleSelectBullpenMode(modeOpt.id)}
+                        className={`px-2 py-0.5 rounded font-extrabold text-[10px] cursor-pointer ${
+                          bullpenMode === modeOpt.id
+                            ? 'bg-[#1D3557] text-[#FFD166]'
+                            : 'text-[#181B2C] hover:bg-[#FFF3BF]'
+                        }`}
+                      >
+                        {modeOpt.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                }
+              >
+                {rankedBullpenCandidates.length === 0 ? (
                   <p className="text-xs font-bold text-[#4A5068]">No fresh relievers remaining.</p>
                 ) : (
                   <div className="space-y-2">
-                    {availableRelievers.map((relId) => {
-                      const rel = liveSession[humanSideKey].playersById[relId];
-                      if (!rel) return null;
+                    {rankedBullpenCandidates.map((candidate) => {
+                      const rel = candidate.player;
                       const warmup = evaluateBullpenWarmup(rel.id, warmupCounts[rel.id] ?? 0);
                       const isWarming = warmingRelieverIds.includes(rel.id);
                       return (
                         <div
                           key={rel.id}
-                          className="space-y-1 p-2 rounded-xl border border-[#181B2C]/20 bg-[#FFFDF7]"
+                          className={`space-y-1 p-2 rounded-xl border ${
+                            candidate.isRecommended
+                              ? 'border-[#181B2C] bg-[#FFF8DC]'
+                              : 'border-[#181B2C]/20 bg-[#FFFDF7]'
+                          }`}
                         >
-                          <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
+                          <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold">
                             <span className="text-[#181B2C]">
-                              {rel.name} ({rel.throws}HP
-                              {rel.pitcherRole
-                                ? ` • ${PITCHER_ROLE_SHORT_LABELS[rel.pitcherRole]}`
-                                : ''}
-                              )
+                              {rel.name} ({rel.throws}HP • {candidate.roleLabel} • OVR {candidate.ovr})
                             </span>
-                            <span
-                              className={`px-1.5 py-0.5 rounded border border-[#181B2C] uppercase ${
-                                warmup.status === 'hot'
-                                  ? 'bg-[#2FB356] text-white'
-                                  : warmup.status === 'warming'
-                                    ? 'bg-[#FFC300] text-[#181B2C]'
-                                    : warmup.status === 'overcooked'
-                                      ? 'bg-[#FF4D6D] text-white'
-                                      : 'bg-[#E2E8F0] text-[#181B2C]'
-                              }`}
-                            >
-                              {warmup.status}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              {candidate.isRecommended ? (
+                                <span className="px-1.5 py-0.5 rounded border border-[#181B2C] bg-[#FFC300] text-[#181B2C]">
+                                  ★ Pick{candidate.fitTag ? ` · ${candidate.fitTag}` : ''}
+                                </span>
+                              ) : null}
+                              <span
+                                className={`px-1.5 py-0.5 rounded border border-[#181B2C] uppercase ${
+                                  warmup.status === 'hot'
+                                    ? 'bg-[#2FB356] text-white'
+                                    : warmup.status === 'warming'
+                                      ? 'bg-[#FFC300] text-[#181B2C]'
+                                      : warmup.status === 'overcooked'
+                                        ? 'bg-[#FF4D6D] text-white'
+                                        : 'bg-[#E2E8F0] text-[#181B2C]'
+                                }`}
+                              >
+                                {warmup.status}
+                              </span>
+                            </div>
                           </div>
                           <div className="flex gap-1.5">
                             <ComicButton
@@ -3605,7 +3693,7 @@ export function GameDayScreen({
                             </ComicButton>
                             <ComicButton
                               size="sm"
-                              variant="cream"
+                              variant={candidate.isRecommended ? 'gold' : 'cream'}
                               className="flex-1 justify-between"
                               icon={<RefreshCw className="w-3.5 h-3.5" />}
                               onClick={() => handleBullpenSwap(rel.id)}

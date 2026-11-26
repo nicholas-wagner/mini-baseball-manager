@@ -60,10 +60,10 @@ export const DUGOUT_GUIDE_CHAPTERS: readonly DugoutGuideChapter[] = [
       '"Baseball is high-speed chess! Watch handedness matchups, warm up your closer early on the Bullpen Phone, and turn your 90-Speed burners loose on the basepaths!"',
     highlights: [
       'Base Stealing: When a runner reaches base, check the live Steal 2B / Steal 3B / Double Steal / Steal Home odds — Speed vs. Catcher Arm & LHP hold!',
-      'Pitch Calling: Starters pack 4–5 pitches, Relievers pack 2–3. Aim for the batter’s Weak Pitch 🎯 and watch Pitcher Endurance drop mph when tired!',
-      'Defense & Shifts: Call Infield In, No Doubles, Bunt Defense, Hold Runner, or Pitchout right from the Broadcast HUD.',
+      'Pitch Calling: Start in Simple mode (Catcher calls pitch & spot with 1-tap Shake Off), or switch anytime to Normal (Pick Spot) or Advanced (Spot + Pitch)!',
+      'Easy 3-Mode Bullpen: Leave Bullpen on Ask Me (1-tap Coach Pops reliever calls), flip to Auto for hands-free pitching changes, or pick Manual for 100% skipper control.',
     ],
-    popsProTip: 'Don’t bring a Cold reliever straight into a tie game — ring the Bullpen Phone to warm them to HOT first!',
+    popsProTip: 'Coach Pops highlights the ★ Best Fit reliever (Closer, Fireman, Setup, Lefty) so you never have to guess who to bring in!',
     jumpTabId: 'gameday',
     jumpLabel: 'Call Pitches Live',
   },

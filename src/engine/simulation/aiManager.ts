@@ -20,6 +20,7 @@ import type {
   PitchTargetIntent,
 } from './pitchMindGames';
 import { getCatcherCall } from './catcherCalls';
+import type { BullpenMode } from './bullpenManager';
 import type { WeatherSimulationImpact } from './weather';
 import type { DefensiveShiftId } from './winProbability';
 
@@ -34,6 +35,8 @@ export interface StepPitchOptions {
   nemesisBonus?: NemesisMatchupEvaluation;
   arcadeTiming?: ArcadeTimingInput;
   stealDefenseCall?: 'normal' | 'hold_runner' | 'pitchout';
+  /** Controls human-team automatic pitching changes ('auto' | 'semi_auto' | 'manual'). AI clubs always auto-manage. */
+  bullpenMode?: BullpenMode;
   /** When true in a human-vs-AI game, guarantees the AI side ignores human calls and decides independently. */
   enforceSideOwnership?: boolean;
 }
@@ -41,6 +44,7 @@ export interface StepPitchOptions {
 export interface HumanLiveSelections {
   tacticalCall: TacticalCall;
   pitchingMode?: PitchingMode;
+  bullpenMode?: BullpenMode;
   shakeOffCount?: number;
   pitchTarget: PitchTargetIntent;
   selectedPitchType: PitchType | null;
@@ -251,6 +255,7 @@ function resolveHumanBattingInputs(
         ? { actor: 'batter', grade: human.arcadeTimingGrade }
         : undefined,
       stealDefenseCall: 'normal',
+      bullpenMode: human.bullpenMode,
       enforceSideOwnership: true,
     },
   };
@@ -327,6 +332,7 @@ function resolveHumanPitchingInputs(
         ? { actor: 'pitcher', grade: human.arcadeTimingGrade }
         : undefined,
       stealDefenseCall,
+      bullpenMode: human.bullpenMode,
       enforceSideOwnership: true,
     },
   };

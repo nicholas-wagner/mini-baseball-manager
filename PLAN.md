@@ -43,6 +43,7 @@ TASK-088 keeps the Opening Day Customize button at the 44-pixel touch minimum on
 - [x] TASK-090 adds nine Game Day and career features. Managers can wave a runner home, read the relay and tag, scout a venue and adjust the lineup, accept a catcher’s sequence, and choose Smart Watch stops. Player cards describe the painted rig’s habits and chart recent fair contact. Gazette captions and out-of-town finals cover the club’s season.
 - [x] TASK-091 introduces 3-mode pitching (`Simple` default with Catcher's Call + Shake Off and catcher-called fastball High Heat, `Normal` with Over Plate / Corner / Low Chase + location-aware auto pitch selection, and `Advanced` with location + pitch arsenal selection) alongside rebalanced location math and Opening Day Simple pitching default.
 - [x] TASK-092 adds Off the Clock conversations, 78 hobbies, five illustrated prints and a persistent career album.
+- [x] TASK-093 introduces 3-Mode Bullpen Management (`Ask Me` Semi-Auto default with Coach Pops 1-tap Bullpen Call Card & per-inning snooze, `Auto` hands-free bullpen coach handling tired arms/jams/save spots across 5/7/9-inning games, and `Manual` full skipper control that never forcibly pulls human pitchers) plus `★ Coach's Pick` reliever ranking across Quick Bullpen, Guided Options, Pro Bullpen Phone, and Settings.
 
 ## The 10X Vision — What Makes This a Cult Classic
 

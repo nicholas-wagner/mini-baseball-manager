@@ -2,6 +2,7 @@ import { Zap } from "lucide-react";
 import { PITCH_CALL_GUIDE } from "../../engine/gm/openingDayHook";
 import type { PitchType } from "../../engine/models/player";
 import type { TacticalCall } from "../../engine/models/playEvent";
+import type { BullpenMode, BullpenRecommendation } from "../../engine/simulation/bullpenManager";
 import type { CatcherPitchCall } from "../../engine/simulation/catcherCalls";
 import type { GameSessionState } from "../../engine/simulation/gameState";
 import type { LiveActionCue } from "../../engine/simulation/liveActionAdvisor";
@@ -27,6 +28,12 @@ const PITCHING_MODE_OPTIONS: readonly { id: PitchingMode; label: string }[] = [
   { id: "advanced", label: "⚾ Pitching: Advanced (Spot + Pitch)" },
 ];
 
+const BULLPEN_MODE_MENU_OPTIONS: readonly { id: BullpenMode; label: string }[] = [
+  { id: "auto", label: "🤖 Bullpen: Auto (Coach swaps)" },
+  { id: "semi_auto", label: "📞 Bullpen: Ask Me (1-tap call)" },
+  { id: "manual", label: "🧤 Bullpen: Manual (Full control)" },
+];
+
 export function FirstAtBat({
   session,
   batting,
@@ -38,6 +45,9 @@ export function FirstAtBat({
   readyPowerName = null,
   arcadeTimingEnabled = false,
   pitchingMode = "simple",
+  bullpenMode = "semi_auto",
+  bullpenSuggestion = null,
+  activePitcherFirstName = "Pitcher",
   catcherCall = null,
   shakeOffTotal = 0,
   pitcherArsenal = [],
@@ -49,6 +59,9 @@ export function FirstAtBat({
   onShakeOff,
   onSelectPitchType,
   onSelectPitchingMode,
+  onSelectBullpenMode,
+  onAcceptBullpenSuggestion,
+  onDismissBullpenSuggestion,
   onArmPower,
   onToggleArcadeTiming,
   onExpand,
@@ -63,6 +76,9 @@ export function FirstAtBat({
   readyPowerName?: string | null;
   arcadeTimingEnabled?: boolean;
   pitchingMode?: PitchingMode;
+  bullpenMode?: BullpenMode;
+  bullpenSuggestion?: BullpenRecommendation | null;
+  activePitcherFirstName?: string;
   catcherCall?: CatcherPitchCall | null;
   shakeOffTotal?: number;
   pitcherArsenal?: readonly PitcherSignOption[];
@@ -75,6 +91,9 @@ export function FirstAtBat({
   onShakeOff?: () => void;
   onSelectPitchType?: (pitchType: PitchType | null) => void;
   onSelectPitchingMode?: (mode: PitchingMode) => void;
+  onSelectBullpenMode?: (mode: BullpenMode) => void;
+  onAcceptBullpenSuggestion?: (relieverId: string) => void;
+  onDismissBullpenSuggestion?: (snoozeKey: string) => void;
   onArmPower?: () => void;
   onToggleArcadeTiming?: () => void;
   onExpand: () => void;
@@ -120,7 +139,17 @@ export function FirstAtBat({
       (!batting && cue.kind === "pitcher_gassed"));
   const showOptionsMenu =
     !expanded &&
-    Boolean(onToggleArcadeTiming || (tip && !powerArmed) || (!batting && onSelectPitchingMode));
+    Boolean(
+      onToggleArcadeTiming ||
+        (tip && !powerArmed) ||
+        (!batting && (onSelectPitchingMode || onSelectBullpenMode)),
+    );
+  const showGuidedBullpenCall =
+    !expanded &&
+    !batting &&
+    bullpenMode === "semi_auto" &&
+    Boolean(bullpenSuggestion) &&
+    Boolean(onAcceptBullpenSuggestion);
 
   return (
     <section
@@ -182,6 +211,19 @@ export function FirstAtBat({
                       {opt.label}
                     </button>
                   ))}
+                {!batting &&
+                  onSelectBullpenMode &&
+                  BULLPEN_MODE_MENU_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      data-testid={`guided-bullpen-mode-${opt.id}`}
+                      aria-pressed={bullpenMode === opt.id}
+                      onClick={() => onSelectBullpenMode(opt.id)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 {onToggleArcadeTiming && (
                   <button
                     type="button"
@@ -207,6 +249,42 @@ export function FirstAtBat({
       </header>
       {!expanded && (
         <>
+          {showGuidedBullpenCall && bullpenSuggestion ? (
+            <div
+              className="atbat-bullpen-call"
+              data-testid="bullpen-suggestion-banner"
+              role="region"
+              aria-label="Bullpen suggestion"
+            >
+              <p className="atbat-bullpen-headline">
+                <strong>📞 {bullpenSuggestion.shortTag}:</strong> {bullpenSuggestion.headline}
+              </p>
+              <div className="atbat-bullpen-actions">
+                <button
+                  type="button"
+                  className="atbat-bullpen-accept"
+                  data-testid="bullpen-accept-btn"
+                  disabled={locked}
+                  onClick={() =>
+                    onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)
+                  }
+                >
+                  Bring In {bullpenSuggestion.recommendedReliever.name.split(" ")[0]}
+                </button>
+                {onDismissBullpenSuggestion ? (
+                  <button
+                    type="button"
+                    className="atbat-bullpen-keep"
+                    data-testid="bullpen-keep-btn"
+                    disabled={locked}
+                    onClick={() => onDismissBullpenSuggestion(bullpenSuggestion.snoozeKey)}
+                  >
+                    Keep {activePitcherFirstName}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <h3>
             {score} {objective}
           </h3>

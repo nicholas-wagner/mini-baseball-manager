@@ -101,6 +101,45 @@
   border: 2px solid #193e37;
   background: #fffdf8;
 }
+.atbat-bullpen-call {
+  margin-bottom: 6px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 2px solid #192735;
+  background: #fff3bf;
+  box-shadow: 2px 2px 0 #192735;
+}
+.atbat-bullpen-headline {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin-bottom: 6px;
+  color: #192735;
+}
+.atbat-bullpen-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.atbat-bullpen-accept,
+.atbat-bullpen-keep {
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 2px solid #192735;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.atbat-bullpen-accept {
+  flex: 1;
+  background: #2fb356;
+  color: #ffffff;
+}
+.atbat-bullpen-keep {
+  background: #fffdf8;
+  color: #193d37;
+}
 .atbat-catcher-copy {
   min-width: 0;
   font-size: 13px;

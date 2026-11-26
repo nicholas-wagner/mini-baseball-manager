@@ -5,6 +5,11 @@ import { PITCH_CALL_GUIDE, SWING_CALL_GUIDE } from '../../engine/gm/openingDayHo
 import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
+import {
+  BULLPEN_MODE_OPTIONS,
+  type BullpenMode,
+  type BullpenRecommendation,
+} from '../../engine/simulation/bullpenManager';
 import type { CatcherPitchCall } from '../../engine/simulation/catcherCalls';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
 import type {
@@ -26,6 +31,11 @@ export interface ArcadeBullpenOption {
   name: string;
   throws: string;
   roleLabel: string;
+  ovr?: number;
+  isRecommended?: boolean;
+  fitTag?: string | null;
+  platoonEdge?: 'favorable' | 'neutral' | 'tough';
+  freshnessPct?: number;
 }
 
 export interface PitcherSignOption {
@@ -63,6 +73,11 @@ interface LiveActionBarProps {
   controlMode: GameDayControlMode;
   pitchingMode?: PitchingMode;
   onSelectPitchingMode?: (mode: PitchingMode) => void;
+  bullpenMode?: BullpenMode;
+  onSelectBullpenMode?: (mode: BullpenMode) => void;
+  bullpenSuggestion?: BullpenRecommendation | null;
+  onAcceptBullpenSuggestion?: (relieverId: string) => void;
+  onDismissBullpenSuggestion?: (snoozeKey: string) => void;
   catcherCall?: CatcherPitchCall | null;
   shakeOffTotal?: number;
   onShakeOff?: () => void;
@@ -145,6 +160,11 @@ export function LiveActionBar({
   controlMode,
   pitchingMode = 'simple',
   onSelectPitchingMode,
+  bullpenMode = 'semi_auto',
+  onSelectBullpenMode,
+  bullpenSuggestion = null,
+  onAcceptBullpenSuggestion,
+  onDismissBullpenSuggestion,
   catcherCall = null,
   shakeOffTotal = 0,
   onShakeOff,
@@ -208,6 +228,17 @@ export function LiveActionBar({
   const isHypeReady = humanHype >= hypeCost;
   const hypeReadoutLabel = isHypeReady ? 'READY! 100%' : `${hypePct}%`;
   const hasBullpenPicker = bullpenOptions.length > 0 && Boolean(onSelectBullpenReliever);
+  const recommendedReliever = bullpenOptions.find((rel) => rel.isRecommended) ?? bullpenOptions[0] ?? null;
+  const isPitcherTired = typeof pitcherEndurance === 'number' && pitcherEndurance <= 35;
+  const showBullpenSuggestion =
+    !gameCompleted &&
+    !isBatting &&
+    bullpenMode === 'semi_auto' &&
+    Boolean(bullpenSuggestion) &&
+    Boolean(onAcceptBullpenSuggestion);
+  const currentPitcherFirst = pitcherName ? pitcherName.split(' ')[0] : 'Pitcher';
+  const activeBullpenModeMeta =
+    BULLPEN_MODE_OPTIONS.find((opt) => opt.id === bullpenMode) ?? BULLPEN_MODE_OPTIONS[1];
   const hasShiftPicker = !isBatting && Boolean(onSelectDefensiveShift);
   const activeShiftShort =
     DEFENSIVE_SHIFTS.find((s) => s.id === defensiveShift)?.shortLabel ?? 'Standard';
@@ -532,6 +563,65 @@ export function LiveActionBar({
 
       {/* Row 2: Balanced Mobile Controller Grid + Anchored Thumb Drawers (Never opens off-screen!) */}
       <div data-testid="live-control-grid" className="space-y-1.5">
+        {showBullpenSuggestion && bullpenSuggestion ? (
+          <div
+            data-testid="bullpen-suggestion-banner"
+            role="region"
+            aria-label="Bullpen suggestion"
+            className="p-2 rounded-xl border-2 border-[#192735] bg-[#FFF3BF] shadow-[2px_2px_0_#192735] space-y-1.5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold uppercase text-[#193D37]">
+              <span className="px-1.5 py-0.5 rounded bg-[#E63946] text-white border border-[#192735]">
+                📞 BULLPEN CALL · {bullpenSuggestion.shortTag}
+              </span>
+              <span className="hidden sm:inline text-[#1D3557]">
+                {bullpenSuggestion.matchupNote}
+              </span>
+            </div>
+            <div className="text-xs font-extrabold text-[#192735] leading-snug">
+              {bullpenSuggestion.headline}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <ComicButton
+                size="sm"
+                variant="turf"
+                data-testid="bullpen-accept-btn"
+                onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
+                className="flex-1 sm:flex-none min-h-[42px] text-[11px] sm:text-xs"
+              >
+                📞 Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
+              </ComicButton>
+              {onDismissBullpenSuggestion ? (
+                <ComicButton
+                  size="sm"
+                  variant="cream"
+                  data-testid="bullpen-keep-btn"
+                  onClick={() => onDismissBullpenSuggestion(bullpenSuggestion.snoozeKey)}
+                  className="min-h-[42px] text-[11px] sm:text-xs"
+                >
+                  Keep {currentPitcherFirst}
+                </ComicButton>
+              ) : null}
+              {hasBullpenPicker ? (
+                <ComicButton
+                  size="sm"
+                  variant="sky"
+                  data-testid="bullpen-other-btn"
+                  onClick={() => {
+                    setTacticsOpen(true);
+                    setBullpenOpen(true);
+                    setFastSimOpen(false);
+                    setShiftOpen(false);
+                  }}
+                  className="min-h-[42px] text-[11px] sm:text-xs"
+                >
+                  Other ▾
+                </ComicButton>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <div className="live-primary-row">
           {!(arcadeTimingEnabled && !gameCompleted) ? (
             <ComicButton
@@ -549,7 +639,9 @@ export function LiveActionBar({
           ) : null}
 
           <button type="button" className="tactics-toggle shrink-0" aria-expanded={tacticsOpen} aria-controls={tacticsId}
-            onClick={() => setTacticsOpen(!tacticsOpen)}>Tactics</button>
+            onClick={() => setTacticsOpen(!tacticsOpen)}>
+            {!isBatting && isPitcherTired && bullpenMode === 'manual' && hasBullpenPicker ? 'Tactics • Pen!' : 'Tactics'}
+          </button>
         </div>
 
         {catcherSuggestion}
@@ -612,7 +704,13 @@ export function LiveActionBar({
           {hasBullpenPicker ? (
             <ComicButton
               size="sm"
-              variant={bullpenOpen ? 'coral' : 'sky'}
+              variant={
+                bullpenOpen
+                  ? 'coral'
+                  : isPitcherTired && bullpenMode !== 'auto'
+                    ? 'gold'
+                    : 'sky'
+              }
               data-testid="arcade-bullpen-toggle"
               disabled={gameCompleted}
               icon={<RefreshCw className="w-3.5 h-3.5" />}
@@ -806,24 +904,71 @@ export function LiveActionBar({
       {bullpenOpen && bullpenOptions.length > 0 && onSelectBullpenReliever ? (
         <div
           data-testid="arcade-bullpen-drawer"
-          className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
+          className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-2"
         >
-          <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-[#1D3557]">
-            <span>📞 Quick Bullpen Call — Tap a Fresh Arm to Enter</span>
+          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] font-extrabold uppercase text-[#1D3557]">
+            <div className="flex items-center justify-between gap-2 w-full sm:w-auto">
+              <span>📞 Quick Bullpen Call</span>
+              <button
+                type="button"
+                onClick={() => setBullpenOpen(false)}
+                className="underline cursor-pointer sm:hidden"
+              >
+                Close
+              </button>
+            </div>
+            {onSelectBullpenMode ? (
+              <div
+                data-testid="bullpen-mode-switcher"
+                role="group"
+                aria-label="Bullpen mode"
+                className="inline-flex items-center rounded-lg border-2 border-[#193E37] bg-[#FFFDF7] p-0.5 gap-0.5"
+              >
+                {BULLPEN_MODE_OPTIONS.map((modeOpt) => {
+                  const active = bullpenMode === modeOpt.id;
+                  return (
+                    <button
+                      key={modeOpt.id}
+                      type="button"
+                      title={modeOpt.description}
+                      aria-pressed={active}
+                      disabled={gameCompleted}
+                      onClick={() => onSelectBullpenMode(modeOpt.id)}
+                      className={`px-2 py-0.5 min-h-[30px] rounded-md font-heading font-extrabold text-[10px] leading-none normal-case cursor-pointer transition ${
+                        active
+                          ? 'bg-[#224F49] text-[#FFCC49]'
+                          : 'bg-transparent text-[#193D37] hover:bg-[#FFF3BF]'
+                      }`}
+                    >
+                      {modeOpt.shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => setBullpenOpen(false)}
-              className="underline cursor-pointer"
+              className="hidden sm:inline underline cursor-pointer"
             >
               Close
             </button>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10.5px] font-bold text-[#1D3557]">
+            <span>{activeBullpenModeMeta.description}</span>
+            {recommendedReliever ? (
+              <span className="px-1.5 py-0.5 rounded bg-[#FFC300] border border-[#181B2C] text-[#181B2C] text-[10px] font-extrabold shrink-0">
+                ★ Coach’s Pick: {recommendedReliever.name.split(' ')[0]}
+                {recommendedReliever.fitTag ? ` · ${recommendedReliever.fitTag}` : ''}
+              </span>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {bullpenOptions.map((rel) => (
               <ComicButton
                 key={rel.id}
                 size="sm"
-                variant="cream"
+                variant={rel.isRecommended ? 'gold' : 'cream'}
                 data-testid="arcade-bullpen-bring-in"
                 onClick={() => {
                   onSelectBullpenReliever(rel.id);
@@ -831,6 +976,8 @@ export function LiveActionBar({
                 }}
               >
                 Bring In {rel.name} ({rel.throws}HP{rel.roleLabel ? ` • ${rel.roleLabel}` : ''})
+                {rel.isRecommended ? ' ★' : ''}
+                {typeof rel.ovr === 'number' ? ` · ${rel.ovr}` : ''}
               </ComicButton>
             ))}
           </div>

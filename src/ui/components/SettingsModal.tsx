@@ -1,5 +1,6 @@
 import { Eye, Settings, Smartphone, Volume2, X } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
+import { BULLPEN_MODE_OPTIONS } from '../../engine/simulation/bullpenManager';
 import { getAccessibleStatGrade } from '../../scene/core/performanceBudget';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
@@ -20,6 +21,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const enableInjuries = useUserPreferencesStore((s) => s.enableInjuries);
   const enableIllnesses = useUserPreferencesStore((s) => s.enableIllnesses);
   const pitchingMode = useUserPreferencesStore((s) => s.pitchingMode);
+  const bullpenMode = useUserPreferencesStore((s) => s.bullpenMode);
 
   const setSfxVolume = useUserPreferencesStore((s) => s.setSfxVolume);
   const toggleHaptics = useUserPreferencesStore((s) => s.toggleHaptics);
@@ -29,6 +31,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const toggleInjuries = useUserPreferencesStore((s) => s.toggleInjuries);
   const toggleIllnesses = useUserPreferencesStore((s) => s.toggleIllnesses);
   const setPitchingMode = useUserPreferencesStore((s) => s.setPitchingMode);
+  const setBullpenMode = useUserPreferencesStore((s) => s.setBullpenMode);
 
   if (!open) return null;
 
@@ -203,6 +206,36 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 : pitchingMode === 'normal'
                   ? 'Normal: You pick Over Plate, Corner, or Low Chase; pitch type is chosen automatically.'
                   : 'Advanced: You pick both location (Over Plate / Corner / Low Chase) and pitch type from the pitcher’s arsenal.'}
+            </p>
+          </div>
+
+          {/* Bullpen Management Mode */}
+          <div
+            data-testid="settings-bullpen-mode"
+            className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2"
+          >
+            <div className="font-display text-xs text-[#181B2C]">
+              Bullpen Management (Default: Ask Me)
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {BULLPEN_MODE_OPTIONS.map((opt) => (
+                <ComicButton
+                  key={opt.id}
+                  size="sm"
+                  variant={bullpenMode === opt.id ? 'gold' : 'cream'}
+                  active={bullpenMode === opt.id}
+                  aria-pressed={bullpenMode === opt.id}
+                  onClick={() => {
+                    setBullpenMode(opt.id);
+                    soundEngine.play('ui_pop');
+                  }}
+                >
+                  {opt.label}
+                </ComicButton>
+              ))}
+            </div>
+            <p className="text-[11px] font-bold text-[#4A5068]">
+              {BULLPEN_MODE_OPTIONS.find((opt) => opt.id === bullpenMode)?.description}
             </p>
           </div>
 

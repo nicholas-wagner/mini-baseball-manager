@@ -22,6 +22,7 @@ import {
 import { computePitchEnduranceDrain } from '../rpg/pitcherEndurance';
 import { selectBestBullpenReliever } from '../rpg/pitcherRoles';
 import { evaluateHeritageGameplayProfile } from '../rpg/specialPowerEffects';
+import { evaluateBullpenCall, type BullpenMode } from './bullpenManager';
 import {
   advanceHitRunners,
   advanceWalkRunners,
@@ -609,10 +610,37 @@ function applyPlateComplete(
   });
 }
 
-function maybeSwapReliever(state: GameSessionState, events: PlayEvent[]): void {
-  const fielding = getFieldingSide(state);
-  if (fielding.pitcherFatigue < 82) return;
+function applyRelieverSwap(
+  state: GameSessionState,
+  fielding: TeamGameSide,
+  nextRelieverId: string,
+  commentary: string,
+  events: PlayEvent[],
+): void {
+  fielding.usedPitcherIds = [...fielding.usedPitcherIds, nextRelieverId];
+  fielding.activePitcherId = nextRelieverId;
+  fielding.pitcherFatigue = 0;
+  state.atBatPitchHistory = [];
+  const pitcherLines = getPitcherLines(state);
+  pitcherLines[nextRelieverId] = createEmptyPitcherLine(nextRelieverId);
 
+  events.push(
+    makeEvent(state, {
+      type: 'pitching_change',
+      outsBefore: state.outs,
+      pitcherId: nextRelieverId,
+      commentary,
+      soundCue: 'bullpen_phone',
+    }),
+  );
+}
+
+function maybeSwapLegacyFatiguedReliever(
+  state: GameSessionState,
+  fielding: TeamGameSide,
+  events: PlayEvent[],
+): void {
+  if (fielding.pitcherFatigue < 82) return;
   const available = fielding.bullpenIds
     .filter((id) => !fielding.usedPitcherIds.includes(id))
     .map((id) => fielding.playersById[id])
@@ -630,24 +658,42 @@ function maybeSwapReliever(state: GameSessionState, events: PlayEvent[]): void {
   });
   if (!chosen) return;
 
-  const nextRelieverId = chosen.id;
-  fielding.usedPitcherIds = [...fielding.usedPitcherIds, nextRelieverId];
-  fielding.activePitcherId = nextRelieverId;
-  fielding.pitcherFatigue = 0;
-  state.atBatPitchHistory = [];
-  const pitcherLines = getPitcherLines(state);
-  pitcherLines[nextRelieverId] = createEmptyPitcherLine(nextRelieverId);
-
   const roleTag = chosen.pitcherRole ? ` • ${PITCHER_ROLE_SHORT_LABELS[chosen.pitcherRole]}` : '';
-  events.push(
-    makeEvent(state, {
-      type: 'pitching_change',
-      outsBefore: state.outs,
-      pitcherId: nextRelieverId,
-      commentary: `Bullpen call! ${chosen.name} (${chosen.throws}HP${roleTag}) trots in to pitch.`,
-      soundCue: 'bullpen_phone',
-    }),
+  applyRelieverSwap(
+    state,
+    fielding,
+    chosen.id,
+    `Bullpen call! ${chosen.name} (${chosen.throws}HP${roleTag}) trots in to pitch.`,
+    events,
   );
+}
+
+function maybeSwapReliever(
+  state: GameSessionState,
+  events: PlayEvent[],
+  bullpenMode?: BullpenMode,
+): void {
+  const fieldingKey: 'away' | 'home' = state.half === 'TOP' ? 'home' : 'away';
+  const fielding = state[fieldingKey];
+  if (fielding.isHuman && (bullpenMode === 'manual' || bullpenMode === 'semi_auto')) {
+    return;
+  }
+
+  if (fielding.isHuman && bullpenMode === 'auto') {
+    const recommendation = evaluateBullpenCall(state, fieldingKey, true);
+    if (recommendation) {
+      applyRelieverSwap(
+        state,
+        fielding,
+        recommendation.recommendedReliever.id,
+        recommendation.autoCommentary,
+        events,
+      );
+    }
+    return;
+  }
+
+  maybeSwapLegacyFatiguedReliever(state, fielding, events);
 }
 
 /** Manually brings an unused reliever from the bullpen into the active game session. */
@@ -1097,7 +1143,7 @@ export function stepPitch(
   events.push(dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
   advanceHalfOrFinish(next, events);
   if (next.status === 'in_progress' && next.balls === 0 && next.strikes === 0) {
-    maybeSwapReliever(next, events);
+    maybeSwapReliever(next, events, safeOpts.bullpenMode);
   }
 
   return { nextSession: next, events };

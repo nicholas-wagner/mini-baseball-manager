@@ -1,14 +1,16 @@
 import type { ThrowsHand } from '../handedness/types';
-import type {
-  PitcherRole,
-  Player,
-  PlayerRatings,
-  PlayerSpecialistArchetype,
+import {
+  computePlayerOverall,
+  type PitcherRole,
+  type Player,
+  type PlayerRatings,
+  type PlayerSpecialistArchetype,
 } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
 
 export interface PitcherSituationContext {
   inning: number;
+  regulationInnings?: number;
   lead: number; // fieldingScore - battingScore
   hasRunnersOn: boolean;
   leverageIndex: number;
@@ -126,8 +128,32 @@ export function applyPitcherRoleShape(
   };
 }
 
+function getRegulationInnings(ctx: PitcherSituationContext): number {
+  return Math.max(5, ctx.regulationInnings ?? 9);
+}
+
+function isSaveInning(ctx: PitcherSituationContext): boolean {
+  return ctx.inning >= getRegulationInnings(ctx);
+}
+
+function isSetupInning(ctx: PitcherSituationContext): boolean {
+  const reg = getRegulationInnings(ctx);
+  const setupStart = reg <= 5 ? 4 : reg - 2;
+  return ctx.inning >= setupStart && ctx.inning <= reg - 1;
+}
+
+function isFiremanInning(ctx: PitcherSituationContext): boolean {
+  const reg = getRegulationInnings(ctx);
+  return ctx.inning >= Math.max(3, reg - 4);
+}
+
+function isEarlyBridgeInning(ctx: PitcherSituationContext): boolean {
+  const reg = getRegulationInnings(ctx);
+  return ctx.inning <= Math.max(2, reg - 3);
+}
+
 function evalCloser(ctx: PitcherSituationContext): Omit<PitcherRoleEvaluation, 'role' | 'fatiguePerPitchMultiplier'> {
-  const isSaveSpot = ctx.inning >= 9 && ctx.lead >= 1 && ctx.lead <= 3;
+  const isSaveSpot = isSaveInning(ctx) && ctx.lead >= 1 && ctx.lead <= 3;
   if (isSaveSpot) return { roleFit: 'ideal', stuffDelta: 5, controlDelta: 4 };
   if (Math.abs(ctx.lead) >= 5 && ctx.leverageIndex < 0.8) {
     return { roleFit: 'misused', stuffDelta: -1, controlDelta: -3 };
@@ -136,14 +162,14 @@ function evalCloser(ctx: PitcherSituationContext): Omit<PitcherRoleEvaluation, '
 }
 
 function evalSetup(ctx: PitcherSituationContext): Omit<PitcherRoleEvaluation, 'role' | 'fatiguePerPitchMultiplier'> {
-  if (ctx.inning >= 7 && ctx.inning <= 8 && Math.abs(ctx.lead) <= 3) {
+  if (isSetupInning(ctx) && Math.abs(ctx.lead) <= 3) {
     return { roleFit: 'ideal', stuffDelta: 4, controlDelta: 3 };
   }
   return { roleFit: 'neutral', stuffDelta: 0, controlDelta: 0 };
 }
 
 function evalFireman(ctx: PitcherSituationContext): Omit<PitcherRoleEvaluation, 'role' | 'fatiguePerPitchMultiplier'> {
-  if (ctx.leverageIndex >= 1.55 || (ctx.hasRunnersOn && ctx.inning >= 5)) {
+  if (ctx.leverageIndex >= 1.55 || (ctx.hasRunnersOn && isFiremanInning(ctx))) {
     return { roleFit: 'ideal', stuffDelta: 6, controlDelta: 3 };
   }
   return { roleFit: 'neutral', stuffDelta: 0, controlDelta: 0 };
@@ -157,7 +183,7 @@ function evalLoogy(ctx: PitcherSituationContext): Omit<PitcherRoleEvaluation, 'r
 }
 
 function evalLongReliever(ctx: PitcherSituationContext): Omit<PitcherRoleEvaluation, 'role' | 'fatiguePerPitchMultiplier'> {
-  if (ctx.inning <= 6 || Math.abs(ctx.lead) >= 4) {
+  if (isEarlyBridgeInning(ctx) || Math.abs(ctx.lead) >= 4) {
     return { roleFit: 'ideal', stuffDelta: 2, controlDelta: 3 };
   }
   return { roleFit: 'neutral', stuffDelta: 0, controlDelta: 0 };
@@ -198,20 +224,21 @@ const BULLPEN_SITUATION_BONUS: Readonly<
 > = {
   starter: () => 0,
   short_reliever: () => 4,
-  closer: (ctx) => (ctx.inning >= 9 && ctx.lead >= 1 && ctx.lead <= 3 ? 45 : 0),
+  closer: (ctx) => (isSaveInning(ctx) && ctx.lead >= 1 && ctx.lead <= 3 ? 45 : 0),
   fireman: (ctx) => (ctx.leverageIndex >= 1.8 && ctx.hasRunnersOn ? 42 : 0),
   loogy: (ctx) => (ctx.batterEffectiveSide === 'L' && ctx.leverageIndex >= 1.1 ? 36 : 0),
-  setup_man: (ctx) => (ctx.inning >= 7 && ctx.inning <= 8 && Math.abs(ctx.lead) <= 3 ? 32 : 0),
-  long_reliever: (ctx) => (ctx.inning <= 5 || Math.abs(ctx.lead) >= 4 ? 38 : 0),
+  setup_man: (ctx) => (isSetupInning(ctx) && Math.abs(ctx.lead) <= 3 ? 32 : 0),
+  long_reliever: (ctx) => (isEarlyBridgeInning(ctx) || Math.abs(ctx.lead) >= 4 ? 38 : 0),
 };
 
-function scoreBullpenCandidate(
+export function scoreBullpenCandidate(
   reliever: Player,
   ctx: PitcherSituationContext,
 ): number {
   const role = reliever.pitcherRole ?? 'short_reliever';
   const fit = evaluatePitcherRoleSituation(reliever, ctx);
-  return fit.stuffDelta * 3 + fit.controlDelta * 2 + BULLPEN_SITUATION_BONUS[role](ctx);
+  const qualityEdge = computePlayerOverall(reliever) * 0.25 - reliever.fatigue * 0.18;
+  return fit.stuffDelta * 3 + fit.controlDelta * 2 + BULLPEN_SITUATION_BONUS[role](ctx) + qualityEdge;
 }
 
 /** Chooses the best-fitting available reliever from the bullpen for the live game situation. */

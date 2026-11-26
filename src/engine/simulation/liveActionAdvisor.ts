@@ -5,6 +5,7 @@ import { canTriggerSpecialAbility } from '../rpg/abilityCooldowns';
 import { fatigueToEndurance } from '../rpg/pitcherEndurance';
 import { getActivatablePowersForPlayer } from '../rpg/specialPowerEffects';
 import { getEligibleStealPlays, type StealPlayType } from './baserunning';
+import { rankBullpenCandidates, type BullpenMode } from './bullpenManager';
 import { getAvailableBenchPlayers } from './dugoutDrama';
 import {
   getBattingSide,
@@ -58,6 +59,7 @@ export interface LiveActionAdvisorInput {
   tacticalCall: TacticalCall;
   armedPowerId: string | null;
   moundVisitUsed: boolean;
+  bullpenMode?: BullpenMode;
 }
 
 const STEAL_PLAY_TO_CALL: Readonly<Record<StealPlayType, TacticalCall>> = {
@@ -97,20 +99,24 @@ function findBestStealOpportunity(
   };
 }
 
-function findFreshRelieverId(session: GameSessionState, humanSideKey: 'away' | 'home'): string | null {
-  const humanSide = session[humanSideKey];
-  return humanSide.bullpenIds.find((id) => !humanSide.usedPitcherIds.includes(id)) ?? null;
+function findFreshRelieverCandidate(
+  session: GameSessionState,
+  humanSideKey: 'away' | 'home',
+): { id: string; firstName: string } | null {
+  const top = rankBullpenCandidates(session, humanSideKey)[0];
+  if (!top) return null;
+  return { id: top.player.id, firstName: top.player.name.split(' ')[0] };
 }
 
 function buildPitcherGassedCue(
   endurance: number,
   moundVisitUsed: boolean,
-  relieverId: string | null,
+  reliever: { id: string; firstName: string } | null,
   turnLabel: string,
   primaryButtonLabel: string,
 ): LiveActionCue {
-  const relieverAction: SuggestedQuickAction | null = relieverId
-    ? { type: 'bullpen_swap', label: '📞 Bring In Reliever', relieverId }
+  const relieverAction: SuggestedQuickAction | null = reliever
+    ? { type: 'bullpen_swap', label: `📞 Bring In ${reliever.firstName}`, relieverId: reliever.id }
     : null;
   const suggestedAction: SuggestedQuickAction | null = !moundVisitUsed
     ? { type: 'mound_visit', label: '🧘 Calm Mound Visit (+14% End)' }
@@ -290,12 +296,29 @@ function findStealCue(
   };
 }
 
+function findTiredPitcherCue(
+  session: GameSessionState,
+  humanSideKey: 'away' | 'home',
+  isBatting: boolean,
+  moundVisitUsed: boolean,
+  bullpenMode: BullpenMode | undefined,
+  turnLabel: string,
+  primaryButtonLabel: string,
+): LiveActionCue | null {
+  if (isBatting) return null;
+  const endurance = fatigueToEndurance(session[humanSideKey].pitcherFatigue);
+  if (endurance > 35) return null;
+  const reliever = findFreshRelieverCandidate(session, humanSideKey);
+  if (bullpenMode === 'auto' && reliever) return null;
+  return buildPitcherGassedCue(endurance, moundVisitUsed, reliever, turnLabel, primaryButtonLabel);
+}
+
 /**
  * Pure situational advisor powering Coach Pops' one-glance live action bar so new players
  * always know whose turn it is and whether any special action is actually worth pressing now.
  */
 export function computeLiveActionCue(input: LiveActionAdvisorInput): LiveActionCue {
-  const { session, tacticalCall, armedPowerId, moundVisitUsed } = input;
+  const { session, tacticalCall, armedPowerId, moundVisitUsed, bullpenMode } = input;
   const humanSideKey = getHumanSideKey(session);
   const isBatting = (session.half === 'BOT') === (humanSideKey === 'home');
   const turnLabel = isBatting ? '🏏 YOUR TURN TO BAT' : '⚾ YOUR TURN TO PITCH';
@@ -325,26 +348,19 @@ export function computeLiveActionCue(input: LiveActionAdvisorInput): LiveActionC
     };
   }
 
-  const endurance = fatigueToEndurance(session[humanSideKey].pitcherFatigue);
-  if (!isBatting && endurance <= 35) {
-    return buildPitcherGassedCue(
-      endurance,
+  return (
+    findTiredPitcherCue(
+      session,
+      humanSideKey,
+      isBatting,
       moundVisitUsed,
-      findFreshRelieverId(session, humanSideKey),
+      bullpenMode,
       turnLabel,
       primaryButtonLabel,
-    );
-  }
-
-  const powerCue = findReadyPowerCue(session, humanSideKey, isBatting, turnLabel, primaryButtonLabel);
-  if (powerCue) return powerCue;
-
-  const pinchHitCue = findPinchHitCue(session, humanSideKey, isBatting, turnLabel, primaryButtonLabel);
-  if (pinchHitCue) return pinchHitCue;
-
-  const stealCue = findStealCue(session, isBatting, tacticalCall, turnLabel, primaryButtonLabel);
-  if (stealCue) return stealCue;
-
-  const { leverageIndex } = getCurrentLeverage(session);
-  return buildClutchOrDefaultCue(isBatting, leverageIndex, turnLabel, primaryButtonLabel);
+    ) ??
+    findReadyPowerCue(session, humanSideKey, isBatting, turnLabel, primaryButtonLabel) ??
+    findPinchHitCue(session, humanSideKey, isBatting, turnLabel, primaryButtonLabel) ??
+    findStealCue(session, isBatting, tacticalCall, turnLabel, primaryButtonLabel) ??
+    buildClutchOrDefaultCue(isBatting, getCurrentLeverage(session).leverageIndex, turnLabel, primaryButtonLabel)
+  );
 }

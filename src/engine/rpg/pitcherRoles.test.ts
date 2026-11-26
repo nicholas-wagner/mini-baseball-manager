@@ -179,4 +179,77 @@ describe('Specialized Pitching Staff Roles (TASK-058)', () => {
       })?.id,
     ).toBe('rp-long');
   });
+
+  it('scales closer, setup, fireman, and long-reliever windows cleanly for 5-inning and 7-inning games', () => {
+    const template = createPlayer(createSeededRng(303), { position: 'RP', tier: 'aa' });
+    const pen: Player[] = [
+      { ...template, id: 'rp-long', pitcherRole: 'long_reliever', throws: 'R' },
+      { ...template, id: 'rp-setup', pitcherRole: 'setup_man', throws: 'R' },
+      { ...template, id: 'rp-close', pitcherRole: 'closer', throws: 'R' },
+    ];
+
+    // 5-inning game: 5th inning 2-run lead is a true Save Spot for Closer!
+    const closer5 = evaluatePitcherRoleSituation(pen[2], {
+      inning: 5,
+      regulationInnings: 5,
+      lead: 2,
+      hasRunnersOn: false,
+      leverageIndex: 2.1,
+      batterEffectiveSide: 'R',
+    });
+    expect(closer5.roleFit).toBe('ideal');
+    expect(
+      selectBestBullpenReliever(pen, {
+        inning: 5,
+        regulationInnings: 5,
+        lead: 2,
+        hasRunnersOn: false,
+        leverageIndex: 2.1,
+        batterEffectiveSide: 'R',
+      })?.id,
+    ).toBe('rp-close');
+
+    // 5-inning game: 4th inning 1-run lead is ideal Setup spot!
+    const setup5 = evaluatePitcherRoleSituation(pen[1], {
+      inning: 4,
+      regulationInnings: 5,
+      lead: 1,
+      hasRunnersOn: false,
+      leverageIndex: 1.5,
+      batterEffectiveSide: 'R',
+    });
+    expect(setup5.roleFit).toBe('ideal');
+    expect(
+      selectBestBullpenReliever(pen, {
+        inning: 4,
+        regulationInnings: 5,
+        lead: 1,
+        hasRunnersOn: false,
+        leverageIndex: 1.5,
+        batterEffectiveSide: 'R',
+      })?.id,
+    ).toBe('rp-setup');
+
+    // 7-inning game: 7th inning save spot selects Closer and 6th selects Setup!
+    expect(
+      selectBestBullpenReliever(pen, {
+        inning: 7,
+        regulationInnings: 7,
+        lead: 1,
+        hasRunnersOn: false,
+        leverageIndex: 2.0,
+        batterEffectiveSide: 'R',
+      })?.id,
+    ).toBe('rp-close');
+    expect(
+      selectBestBullpenReliever(pen, {
+        inning: 6,
+        regulationInnings: 7,
+        lead: 2,
+        hasRunnersOn: false,
+        leverageIndex: 1.4,
+        batterEffectiveSide: 'R',
+      })?.id,
+    ).toBe('rp-setup');
+  });
 });

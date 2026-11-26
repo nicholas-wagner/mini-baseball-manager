@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { soundEngine } from '../audio/soundEngine';
+import type { BullpenMode } from '../engine/simulation/bullpenManager';
 import type { PitchingMode } from '../engine/simulation/pitchMindGames';
 
 export type GameDayControlMode = 'simple' | 'advanced';
+export type { BullpenMode } from '../engine/simulation/bullpenManager';
 export type { PitchingMode } from '../engine/simulation/pitchMindGames';
 
 export interface UserPreferences {
@@ -15,6 +17,7 @@ export interface UserPreferences {
   enableIllnesses: boolean;
   gameDayControlMode: GameDayControlMode;
   pitchingMode: PitchingMode;
+  bullpenMode: BullpenMode;
   arcadeTimingEnabled: boolean;
 }
 
@@ -30,12 +33,18 @@ const DEFAULT_PREFS: UserPreferences = {
   enableIllnesses: true,
   gameDayControlMode: 'simple',
   pitchingMode: 'simple',
+  bullpenMode: 'semi_auto',
   arcadeTimingEnabled: false,
 };
 
 function parsePitchingMode(raw: unknown): PitchingMode {
   if (raw === 'normal' || raw === 'advanced' || raw === 'simple') return raw;
   return DEFAULT_PREFS.pitchingMode;
+}
+
+function parseBullpenMode(raw: unknown): BullpenMode {
+  if (raw === 'auto' || raw === 'semi_auto' || raw === 'manual') return raw;
+  return DEFAULT_PREFS.bullpenMode;
 }
 
 function readSavedPrefs(): UserPreferences {
@@ -60,6 +69,7 @@ function readSavedPrefs(): UserPreferences {
       gameDayControlMode:
         parsed.gameDayControlMode === 'advanced' ? 'advanced' : DEFAULT_PREFS.gameDayControlMode,
       pitchingMode: parsePitchingMode(parsed.pitchingMode),
+      bullpenMode: parseBullpenMode(parsed.bullpenMode),
       arcadeTimingEnabled: parsed.arcadeTimingEnabled ?? DEFAULT_PREFS.arcadeTimingEnabled,
     };
   } catch {
@@ -100,6 +110,8 @@ interface UserPreferencesStore extends UserPreferences {
   toggleGameDayControlMode: () => void;
   setPitchingMode: (mode: PitchingMode) => void;
   cyclePitchingMode: () => void;
+  setBullpenMode: (mode: BullpenMode) => void;
+  cycleBullpenMode: () => void;
   setArcadeTimingEnabled: (enabled: boolean) => void;
   toggleArcadeTiming: () => void;
   resetDefaults: () => void;
@@ -119,6 +131,7 @@ function extractPrefs(state: UserPreferencesStore): UserPreferences {
     enableIllnesses: state.enableIllnesses,
     gameDayControlMode: state.gameDayControlMode,
     pitchingMode: state.pitchingMode,
+    bullpenMode: state.bullpenMode,
     arcadeTimingEnabled: state.arcadeTimingEnabled,
   };
 }
@@ -151,6 +164,12 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
       const cur = get().pitchingMode;
       const next: PitchingMode = cur === 'simple' ? 'normal' : cur === 'normal' ? 'advanced' : 'simple';
       applyPatch({ pitchingMode: next });
+    },
+    setBullpenMode: (mode) => applyPatch({ bullpenMode: mode }),
+    cycleBullpenMode: () => {
+      const cur = get().bullpenMode;
+      const next: BullpenMode = cur === 'auto' ? 'semi_auto' : cur === 'semi_auto' ? 'manual' : 'auto';
+      applyPatch({ bullpenMode: next });
     },
     setArcadeTimingEnabled: (enabled) => applyPatch({ arcadeTimingEnabled: enabled }),
     toggleArcadeTiming: () => applyPatch({ arcadeTimingEnabled: !get().arcadeTimingEnabled }),
