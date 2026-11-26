@@ -22,8 +22,10 @@ describe('Off the Clock cards', () => {
   });
 
   it('reveals a note without an illustration and keeps it in the album after the player leaves', () => {
-    const club = foundClub();
-    const player = club.roster.find(p => p.id.startsWith('mbm-') && p.id !== 'mbm-0030')!;
+    const initial = foundClub();
+    const player = { ...initial.roster[0], id: 'unillustrated-player' };
+    const club = { ...initial, roster: [player, ...initial.roster.slice(1)] };
+    useGameStore.setState({ leagues: { ...useGameStore.getState().leagues, rookie: [club] } });
     const view = render(<PlayerCardModal open entry={{club,player}} onClose={() => {}} />);
     expect(screen.getByText(/after your first game/i)).toBeVisible();
     const fresh = {...club, wins:1};

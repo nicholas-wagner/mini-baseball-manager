@@ -47,6 +47,9 @@ TASK-088 keeps the Opening Day Customize button at the 44-pixel touch minimum on
 - [x] TASK-094 ships the 3-Audience First-Time Hook & Quality-of-Life Overhaul: discoverable `🎯 Timing` pill directly in Guided `FirstAtBat` and collapsible Smart Watch rules; immediately visible illustrated **Off the Clock** teammate chat card in post-game recaps (plus Sandlot Postcard fallback), live tappable Dugout Mascot Buddy, and 1-tap `⭐ Star Favorite` & `🎨 Style Uniforms` between-game spotlights; plus `Due Up: R · L · L` batter handedness & reliever pitch mix in Quick Bullpen & Pro Bullpen Phone, optional Pro `HOT` warmup `+2 CTL` bonus, and a 3-mode **Front Office Assistant GM** (`Auto` / `Ask Me` / `Manual`) across Settings, Clubhouse HQ, Roster, and Pre-Game.
 - [x] TASK-095 gives hobby stories a signed postcard with portrait postage or player initials when the art is unavailable.
 
+- [x] TASK-096 adds 25 illustrated Off the Clock postcards, bringing the album to 30 of 3,000 players.
+- [/] TASK-097 expands the album across the remaining catalog in groups of 25, with a progress check every 250 illustrated players.
+
 ## The 10X Vision — What Makes This a Cult Classic
 
 **Mini Baseball Manager** is an offline-first, cross-platform web & Android PWA where you are **General Manager, Field Manager, and Ballpark Architect** of a charming baseball dynasty — blending:
@@ -225,6 +228,7 @@ Grow the permanent catalog to **3,000 distinct players across all six tiers**, w
 
 | Date | Area | Change / Decision | Rationale |
 | :--- | :--- | :--- | :--- |
+| 2026-11-26 | Off the Clock album | Pair each newly illustrated player with a personal story and a 560 × 700 WebP. Show the signed postcard when an older saved quote describes a different scene. | A collected memory stays faithful to the conversation that earned it. |
 | 2026-11-23 | Mobile live game (TASK-083) | Use a portrait action dock or landscape action column, keep scouting behind Matchup, and suspend a live game when another career tab is open. | On a 360×640 phone, navigation covered the pitch choices. Visiting Roster after an out also reset the rally. |
 | 2026-11-23 | First at-bat and scorebook | Offer one objective with field previews for the opening hitter, then save credited plays in the career album. | A first-time manager can see what a call means and remember a player through an actual play. |
 | 2026-11-23 | First game and player cards | Preview the actual late-inning session, show both matchup prints, and lead the final with the MVP and rematch. Allow full-size art inspection throughout the card collection. | Give the manager a player to recognize and a decision to make on the first screen. |
