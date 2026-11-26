@@ -178,6 +178,7 @@ import { FoilPackModal } from '../components/FoilPackModal';
 import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { TrophyCaseModal } from '../components/TrophyCaseModal';
 import { LiveActionBar } from '../components/LiveActionBar';
+import { LiveBottomSheet, useWideStudio } from '../components/LiveBottomSheet';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { LiveGameCanvas, type LiveCameraMode } from '../components/LiveGameCanvas';
 import { ManagerClipboardBanner } from '../components/ManagerClipboardBanner';
@@ -316,6 +317,15 @@ export function GameDayScreen({
   const finishEntrance = useCallback(() => setEntranceCue(null), []);
   const [guidedHalf, setGuidedHalf] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const wideStudio = useWideStudio();
+  const liveKeysRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  liveKeysRef.current = () => {};
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => liveKeysRef.current(event);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [recentEvents, setRecentEvents] = useState<PlayEvent[]>([]);
   const [playbackEvent, setPlaybackEvent] = useState<PlayEvent | null>(null);
   const [finishedPlay, setFinishedPlay] = useState<ChoreographedStep | null>(null);
@@ -2649,29 +2659,69 @@ export function GameDayScreen({
         choreo={film} lastEvent={event} cameraMode={cameraMode} onChangeCameraMode={changeCamera} />
     </ThirdBaseDecision>;
   }
+  const showFullHud = !guiding || showMore;
+  const closeTactics = () => {
+    setSheetOpen(false);
+    if (!wideStudio) setShowMore(false);
+  };
+  liveKeysRef.current = (event: KeyboardEvent) => {
+    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+    if (modalSummary || boxScoreOpen || inspectedGamePlayerId || foilModalOpen) return;
+    if (event.key === 'Escape') {
+      if (sheetOpen) closeTactics();
+      return;
+    }
+    if (event.key === 't' || event.key === 'T') {
+      event.preventDefault();
+      setSheetOpen((open) => {
+        const next = !open;
+        if (next) setShowMore(true);
+        return next;
+      });
+      return;
+    }
+    if (playing || handoff || pendingDecision || thirdDecision) return;
+    if (event.key === ' ') {
+      event.preventDefault();
+      handleNextPitch(tacticalCall);
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (key === '1' || key === '2' || key === '3') {
+      event.preventDefault();
+      const index = Number(key) - 1;
+      if (humanIsBatting) {
+        const approach = (['contact', 'normal', 'power'] as const)[index];
+        setTacticalCall(approach);
+      } else {
+        const spot = (['attack_zone', 'paint_corners', 'bury_offspeed'] as const)[index];
+        setPitchTarget(spot);
+      }
+      return;
+    }
+    if (key === 'b' && humanIsBatting) {
+      event.preventDefault();
+      setTacticalCall((call) => (call === 'bunt' ? 'normal' : 'bunt'));
+      return;
+    }
+    if (key === 's' && bestQuickSteal) {
+      event.preventDefault();
+      setTacticalCall(bestQuickSteal.call);
+      return;
+    }
+    if (key === 'h' && readyPowerOption) {
+      event.preventDefault();
+      setArmedPowerId((prev) => (prev === readyPowerOption.id ? null : readyPowerOption.id));
+      soundEngine.play('clutch_stinger');
+    }
+  };
   return (
-    <div className={guiding && !showMore ? 'live-game guided-game space-y-3' : 'live-game space-y-3'}>
-      <div
-        data-testid="sticky-live-scoreboard"
-        className="live-score-row sticky top-[62px] md:top-2 z-20"
-      >
-        {scoreboard}
-        {onOpenDugout && <button type="button" className="dugout-launch" onClick={() => {
-          setWatchMode('paused');
-          onOpenDugout();
-        }}>Dugout</button>}
-      </div>
-
-      <div
-        className={
-          guiding && !showMore
-            ? 'max-w-3xl mx-auto space-y-2'
-            : 'grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-3 items-start'
-        }
-      >
-        <div className="space-y-3 min-w-0">
-          {/* Unified 3D Ballpark + Directly Attached Live Action Bar (always visible together!) */}
-          <div className="live-field-controls space-y-2">
+    <div className={`live-game studio-layout${guiding && !showMore ? ' guided-game' : ''}${sheetOpen ? ' tactics-open' : ''}`}>
+      <div className="live-studio">
+        <div className="live-stage">
             <LiveGameCanvas
               playFinished={Boolean(lastChoreo && !playing)}
               guided={Boolean(guiding && !showMore)}
@@ -2754,6 +2804,22 @@ export function GameDayScreen({
                 </div> : null
               }
             />
+        </div>
+        <div className="live-right">
+          <div
+            data-testid="sticky-live-scoreboard"
+            className="live-score-row sticky z-20"
+          >
+            {scoreboard}
+            {onOpenDugout && <button type="button" className="dugout-launch" onClick={() => {
+              setWatchMode('paused');
+              onOpenDugout();
+            }}>Dugout</button>}
+          </div>
+          <p className="studio-shortcuts" data-testid="studio-shortcuts">
+            Space swing or throw · 1 2 3 approach · B bunt · S steal · H hype · T tactics · Esc close
+          </p>
+          <div className="live-dock">
             {(() => {
               const scoutLine = buildMatchupScoutLine(picturedBatter, picturedPitcher, shown);
               return (
@@ -2842,7 +2908,17 @@ export function GameDayScreen({
                     }
                   : undefined
               }
-              cue={liveCue} onExpand={()=>setShowMore(v=>!v)}
+              cue={liveCue} onExpand={() => {
+                setShowMore((open) => {
+                  const next = !open;
+                  if (!wideStudio) setSheetOpen(next);
+                  else if (!next) setSheetOpen(false);
+                  return next;
+                });
+              }}
+              mascotName={(!guiding || showMore) && (wideStudio || sheetOpen) ? null : humanClub.mascot}
+              mascotColors={humanClub.colors}
+              mascotMood={liveMascotMood}
               onTarget={target=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setPitchTarget(target);}}
               onSwing={call=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setTacticalCall(call);}}
               onPitch={(grade) => handleNextPitch(tacticalCall, grade)} onSuggested={()=>{
@@ -2856,7 +2932,12 @@ export function GameDayScreen({
               </aside>}
             {(!guiding || showMore) && replayable && lastChoreo && <button className="atbat-tip"
               onClick={replayFromPitch}>Watch again · {playReadout(playbackEvent)?.label}</button>}
-            {(!guiding || showMore) && <LiveActionBar
+            {showFullHud && !sheetOpen && (wideStudio || !guiding) && <LiveActionBar
+              density={wideStudio ? 'full' : 'dock'}
+              onOpenTactics={() => {
+                setSheetOpen(true);
+                setShowMore(true);
+              }}
               watchSettings={<WatchSettings open={watchMode === 'smart'} side={{...humanClub,lineup:[...liveSession[humanSideKey].lineup]}} value={watchChoice} onChange={v=>{lastStop.current=null; setWatchChoice(v)}}/>}
               catcherSuggestion={acceptSign}
               cue={liveCue}
@@ -2997,6 +3078,143 @@ export function GameDayScreen({
               </div>
             ) : null}
           </div>
+
+          <LiveBottomSheet
+            presentation={sheetOpen || !wideStudio ? 'sheet' : 'inline'}
+            open={sheetOpen || (wideStudio && showFullHud)}
+            title="Tactics"
+            onClose={closeTactics}
+          >
+            {showFullHud && (sheetOpen || !wideStudio) && <LiveActionBar
+              watchSettings={<WatchSettings open={watchMode === 'smart'} side={{...humanClub,lineup:[...liveSession[humanSideKey].lineup]}} value={watchChoice} onChange={v=>{lastStop.current=null; setWatchChoice(v)}}/>}
+              catcherSuggestion={acceptSign}
+              cue={liveCue}
+              matchupLabel={`${currentBatter.name} vs ${currentPitcher.name}`}
+              basesLabel={`Bases: ${liveSession.bases.map((b, idx) => (b ? `${idx + 1}B` : '·')).join(' ')}`}
+              batterName={currentBatter.name}
+              pitcherName={currentPitcher.name}
+              lowerThird={liveLowerThird}
+              clutchRecap={clutchRecap}
+              firstPitchTip={firstPitchTip}
+              bullpenOptions={humanIsBatting ? [] : arcadeBullpenOptions}
+              upcomingBatters={humanIsBatting ? [] : upcomingBatters}
+              clubMascot={humanClub.mascot}
+              clubColors={humanClub.colors}
+              mascotMood={liveMascotMood}
+              buntPreviewLine={buntPreviewLine}
+              defensiveShift={defensiveShift}
+              onSelectDefensiveShift={(shift) => {
+                setDefensiveShift(shift);
+                soundEngine.play('ui_pop');
+              }}
+              aiDefenseShiftLabel={
+                humanIsBatting
+                  ? (DEFENSIVE_SHIFTS.find((s) => s.id === chooseAiDefensiveShift(liveSession))
+                      ?.shortLabel ?? null)
+                  : null
+              }
+              pitcherArsenal={humanIsBatting ? [] : livePitcherSignOptions}
+              selectedPitchType={selectedPitchType}
+              onSelectPitchType={(pt) => {
+                setSelectedPitchType(pt);
+                soundEngine.play('ui_pop');
+              }}
+              pitcherEndurance={pitcherEndurance}
+              pitcherEnduranceTier={enduranceFx.tier}
+              pitcherStamina={currentPitcher.ratings.stamina}
+              pitcherFatigueDropTag={pitcherFatigueDropTag}
+              latestEvent={recentEvents[0] ?? null}
+              controlMode={controlMode}
+              pitchingMode={pitchingMode}
+              onSelectPitchingMode={handleSelectPitchingMode}
+              bullpenMode={bullpenMode}
+              onSelectBullpenMode={handleSelectBullpenMode}
+              bullpenSuggestion={activeBullpenSuggestion}
+              onAcceptBullpenSuggestion={(relId) => {
+                soundEngine.play('bullpen_phone');
+                handleBullpenSwap(relId);
+              }}
+              onDismissBullpenSuggestion={handleDismissBullpenSuggestion}
+              catcherCall={activeCatcherCall}
+              shakeOffTotal={catcherCallSeq.length}
+              onShakeOff={handleShakeOffCatcher}
+              repeatPitchWarning={repeatPitchWarning}
+              batterWeakPitch={currentBatter.batterPitchProfile.weakPitch}
+              batterFavoritePitch={currentBatter.batterPitchProfile.favoritePitch}
+              watchMode={watchMode}
+              smartPauseReason={smartPauseReason}
+              tacticalCall={tacticalCall}
+              pitchTarget={pitchTarget}
+              isBatting={humanIsBatting}
+              gameCompleted={liveSession.status === 'completed'}
+              humanHype={humanHypeNow}
+              hypeCost={SPECIAL_ABILITY_HYPE_COST}
+              readyPowerLabel={readyPowerOption?.name ?? null}
+              powerArmed={Boolean(armedPowerId)}
+              speed={speed}
+              onCycleSpeed={() => {
+                setSpeed((s) => (s === 1 ? 2 : s === 2 ? 4 : 1));
+                soundEngine.play('ui_pop');
+              }}
+              arcadeTimingEnabled={arcadeTimingEnabled}
+              onToggleArcadeTiming={() => {
+                toggleArcadeTiming();
+                soundEngine.play('ui_pop');
+              }}
+              quickStealOption={bestQuickSteal}
+              isBatterFavorite={favoritePlayerIds.includes(currentBatter.id)}
+              onArmReadyPower={
+                readyPowerOption
+                  ? () => {
+                      setArmedPowerId((prev) =>
+                        prev === readyPowerOption.id ? null : readyPowerOption.id,
+                      );
+                      soundEngine.play('clutch_stinger');
+                    }
+                  : undefined
+              }
+              onNextPitch={(grade) => {
+                setSmartPauseReason(null);
+                handleNextPitch(tacticalCall, grade);
+              }}
+              onToggleWatchMode={() => {
+                setSmartPauseReason(null);
+                setWatchMode((w) => (w === 'live' ? 'paused' : 'live'));
+              }}
+              onToggleSmartWatch={() => {
+                setSmartPauseReason(null);
+                setWatchMode((w) => (w === 'smart' ? 'paused' : 'smart'));
+                soundEngine.play('ui_pop');
+              }}
+              onSimAtBat={handleSimAtBat}
+              onSimHalfInning={handleSimHalfInning}
+              onClutchSim={handleClutchSim}
+              onSimToEnd={handleSimToEnd}
+              onSelectTacticalCall={(call) => {
+                setTacticalCall(call);
+                soundEngine.play('ui_pop');
+              }}
+              onSelectPitchTarget={(intent) => {
+                setPitchTarget(intent);
+                soundEngine.play('ui_pop');
+              }}
+              onSuggestedAction={handleSuggestedAction}
+              onToggleControlMode={() => {
+                toggleControlMode();
+                soundEngine.play('ui_pop');
+              }}
+              onSelectBullpenReliever={(relId) => {
+                soundEngine.play('bullpen_phone');
+                handleBullpenSwap(relId);
+              }}
+              onInspectBatter={() => openGamePlayerCard(currentBatter.id)}
+              onInspectPitcher={() => openGamePlayerCard(currentPitcher.id)}
+              onInspectPlayers={() => openGamePlayerCard(currentBatter.id)}
+              onOpenBoxScore={() => {
+                setBoxScoreOpen(true);
+                soundEngine.play('ui_pop');
+              }}
+            />}
 
           {/* Quiet Guided Mode: keep Weather, Rivalry & Broadcast HUD hidden until More Controls or full game */}
           {(!guiding || showMore) ? (() => {
@@ -3472,7 +3690,6 @@ export function GameDayScreen({
               </div>
             </ComicCard>
           ) : null}
-        </div>
 
         {(!guiding || showMore) ? (
         <div className="space-y-3">
@@ -3795,6 +4012,8 @@ export function GameDayScreen({
           ) : null}
         </div>
         ) : null}
+          </LiveBottomSheet>
+        </div>
       </div>
 
       <LiveBoxScoreModal

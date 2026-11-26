@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Zap } from "lucide-react";
-import { PITCH_CALL_GUIDE } from "../../engine/gm/openingDayHook";
+import { soundEngine } from "../../audio/soundEngine";
+import { buildMascotCheerQuip, PITCH_CALL_GUIDE } from "../../engine/gm/openingDayHook";
+import { ClubMascotBuddy } from "./ClubMascotBuddy";
 import type { PitchType } from "../../engine/models/player";
 import type { TacticalCall } from "../../engine/models/playEvent";
 import type { BullpenMode, BullpenRecommendation } from "../../engine/simulation/bullpenManager";
@@ -66,6 +69,9 @@ export function FirstAtBat({
   onToggleArcadeTiming,
   onExpand,
   onSuggested,
+  mascotName = null,
+  mascotColors = null,
+  mascotMood = "happy",
 }: {
   session: GameSessionState;
   batting: boolean;
@@ -98,7 +104,12 @@ export function FirstAtBat({
   onToggleArcadeTiming?: () => void;
   onExpand: () => void;
   onSuggested: () => void;
+  mascotName?: string | null;
+  mascotColors?: { primary: string; secondary: string; accent: string } | null;
+  mascotMood?: "happy" | "cheering" | "rally" | "determined";
 }) {
+  const [mascotTapCount, setMascotTapCount] = useState(0);
+  const [mascotCheerText, setMascotCheerText] = useState<string | null>(null);
   const ours = session.home.isHuman ? session.home.score : session.away.score;
   const theirs = session.home.isHuman ? session.away.score : session.home.score;
   const score =
@@ -244,11 +255,42 @@ export function FirstAtBat({
               </div>
             </details>
           )}
+          {mascotName && mascotColors && (
+            <button
+              type="button"
+              data-testid="live-dugout-mascot-btn"
+              aria-label={`High-five ${mascotName}`}
+              className="atbat-mascot"
+              onClick={() => {
+                const nextTap = mascotTapCount + 1;
+                setMascotTapCount(nextTap);
+                setMascotCheerText(buildMascotCheerQuip(mascotName, mascotMood, nextTap));
+                soundEngine.play(mascotMood === "cheering" ? "crowd_cheer" : "ui_pop");
+              }}
+            >
+              <ClubMascotBuddy
+                mascot={mascotName}
+                primaryColor={mascotColors.primary}
+                secondaryColor={mascotColors.secondary}
+                accentColor={mascotColors.accent}
+                mood={mascotMood}
+                size="sm"
+              />
+            </button>
+          )}
           <button type="button" aria-expanded={expanded} onClick={onExpand}>
             {expanded ? "Fewer controls" : "More controls"}
           </button>
         </div>
       </header>
+      {mascotCheerText && (
+        <div className="atbat-mascot-cheer" data-testid="live-mascot-cheer-bubble" role="status">
+          <span>📣 {mascotCheerText}</span>
+          <button type="button" onClick={() => setMascotCheerText(null)}>
+            Hide
+          </button>
+        </div>
+      )}
       {!expanded && (
         <>
           {showGuidedBullpenCall && bullpenSuggestion ? (
