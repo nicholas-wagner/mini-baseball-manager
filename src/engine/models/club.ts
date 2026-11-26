@@ -1,3 +1,4 @@
+import type { HobbyMemory } from '../rpg/playerHobbies';
 import type { ScorebookMoment } from '../gm/scorebookMoments';
 import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
 import type { FieldPosition } from '../handedness/types';
@@ -128,6 +129,8 @@ export interface LeagueWireFinal {
 }
 
 export interface Club {
+  priorHobbyGames?: number;
+  hobbyMemories?: HobbyMemory[];
   leagueWireFinal?: LeagueWireFinal;
   keepsakes?: ScorebookMoment[];
   earnedStickerIds?: string[];

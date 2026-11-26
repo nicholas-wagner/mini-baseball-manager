@@ -61,7 +61,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: /\/assets\/.*\.png$/i,
+            urlPattern: /\/assets\/.*\.(?:png|webp)$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'mbm-portraits-v1',

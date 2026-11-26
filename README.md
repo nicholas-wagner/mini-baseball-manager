@@ -61,6 +61,12 @@ Each of the 3,000 players keeps their illustration when they change clubs. Open 
 
 ---
 
+## Off the Clock
+
+After your first game, open **Talk to a teammate** in the recap or inspect a roster card. Pick anyone on the active roster, including the bench. Each conversation reveals a personal hobby, adds a signed note to your Trophy & Sticker Album and gives that teammate up to two morale points. You earn another conversation every two games, including games you simulate. Five players also have illustrated hobby prints.
+
+[See the phone recap](docs/screenshots/off-the-clock-mobile.webp) · [See the desktop recap](docs/screenshots/off-the-clock-desktop.webp)
+
 ## Calling the game
 
 On a close single with a runner rounding third, the field holds at the bag. Read the outfielder’s arm and choose **Send home** or **Hold at third**. Watch the cutoff throw and the catcher’s tag, then check the result in the scorebook.

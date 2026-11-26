@@ -1,3 +1,4 @@
+import { clubHobbyGames } from '../rpg/playerHobbies';
 import { createCatalogDraw } from '../catalog/playerCatalog';
 import type { SeriesGameplanId } from '../gm/gmSeasonPulse';
 import { generateMarketPool } from '../gm/marketTiers';
@@ -638,6 +639,7 @@ function resetClubForNewSeason(club: Club, targetTier: LeagueTierId, seed: numbe
   return {
     ...club,
     leagueTier: targetTier,
+    ...(club.isHuman && { priorHobbyGames: clubHobbyGames(club) }),
     wins: 0,
     losses: 0,
     streak: 0,

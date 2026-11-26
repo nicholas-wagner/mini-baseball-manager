@@ -1,3 +1,4 @@
+import { discoverPlayerHobby } from '../engine/rpg/playerHobbies';
 import { selectScorebookMoments, type ScorebookMoment } from '../engine/gm/scorebookMoments';
 import { create } from 'zustand';
 import {
@@ -183,6 +184,7 @@ export interface GameStoreState {
   swapTiredStarterToFresh: (freshPitcherId: string) => boolean;
   autoTuneHumanLineupForStarter: (starterThrows: 'L' | 'R') => { tuned: boolean; summary: string };
   clearLastSeriesRecap: () => void;
+  chatAboutHobby: (playerId: string) => void;
   keepScorebookMoment: (id: string) => void;
   unlockCelebrationSticker: (stickerId: string) => boolean;
   toggleFavoritePlayer: (playerId: string) => void;
@@ -600,6 +602,14 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
 
     clearLastSeriesRecap: () => {
       set({ lastSeriesRecap: null });
+    },
+
+    chatAboutHobby: (id) => {
+      const state = get();
+      const club = state.getHumanClub();
+      if (!club || state.activeOffseason) return;
+      const updated = discoverPlayerHobby(club, id);
+      if (updated !== club) set({ leagues: updateHumanClubInLeagues(state.leagues, updated) });
     },
 
     keepScorebookMoment: (id) => {

@@ -1,3 +1,4 @@
+import { HobbyConversation } from './OffTheClock';
 import { Coins, Sparkles, Trophy, Users, X } from 'lucide-react';
 import {
   buildMvpDugoutQuote,
@@ -123,7 +124,8 @@ export function PostGameSummaryModal({
               ) : null}
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
+          <HobbyConversation />
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
             <div className={isHumanMvp || !summary.moments?.length ? "mx-auto w-full max-w-[260px]" : "mx-auto w-full max-w-[195px]"}>
               <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[#9E1B32]">
                 <Trophy className="w-4 h-4 text-[#FFC300]" />{' '}

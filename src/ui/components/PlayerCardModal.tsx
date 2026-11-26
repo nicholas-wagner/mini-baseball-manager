@@ -1,3 +1,4 @@
+import { PlayerHobbyPanel } from './OffTheClock';
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, FileSearch, Pencil, Star, X } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
@@ -163,6 +164,7 @@ export function PlayerCardModal({
                   team={teamColors}
                   mood={formStateToCardMood(player.formState)}
                 />
+                <PlayerHobbyPanel playerId={player.id} clubId={club.id} />
                 {canCycle ? (
                   <div className="flex items-center justify-between gap-2">
                     <ComicButton

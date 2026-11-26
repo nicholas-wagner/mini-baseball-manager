@@ -1,3 +1,4 @@
+import { HobbyAlbum } from './OffTheClock';
 import { ScorebookPrint } from './ScorebookPrint';
 import { Heart, Sparkles, Trophy, X } from 'lucide-react';
 import { soundEngine } from '../../audio/soundEngine';
@@ -64,6 +65,7 @@ export function TrophyCaseModal({ open, onClose, onInspectPlayerId }: TrophyCase
         >
           <div className="space-y-4">
             <ScorebookPrint moments={club.keepsakes ?? []} />
+            <HobbyAlbum club={club} />
             {/* Mascot Header & Counters */}
             <div className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF8E7] flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">

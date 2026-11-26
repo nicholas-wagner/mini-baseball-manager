@@ -25,6 +25,12 @@ flowchart LR
 
 ## 2. Core Domain Interfaces (`src/engine/models/`)
 
+### Off the Clock
+
+`getPlayerHobby` resolves each fixed identity to a clue and story. Featured players have authored assignments. The remaining players draw deterministically from the first-edition shared pool or a locally rooted activity. Individual illustrations are optional WebP assets keyed by player ID.
+
+The club earns a conversation on its first recorded game and every second game thereafter. Unused conversations carry into future seasons through `priorHobbyGames`. A discovery adds a snapshot to `Club.hobbyMemories` and up to two morale to that roster member in one state transition. The album keeps the snapshot through trades, retirement and save imports. Missing fields on older saves default to an empty album and credit for the current season’s record.
+
 ### 2.1 Player & RPG Profile (`src/engine/models/player.ts`)
 
 ```ts
