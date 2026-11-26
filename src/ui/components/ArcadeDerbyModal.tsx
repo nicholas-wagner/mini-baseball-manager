@@ -4,6 +4,8 @@ import { soundEngine } from '../../audio/soundEngine';
 import {
   DERBY_PITCH_COUNT,
   DERBY_WIN_CASH,
+  evaluateDerbyHotStreak,
+  getDerbyComboBadge,
   resolveDerbyTimingSwing,
   rollDerbyRivalTarget,
   type DerbySwingResult,
@@ -13,12 +15,13 @@ import { isPitcherPosition } from '../../engine/models/player';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
+import { useUserPreferencesStore } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { PlayerPortraitBadge } from './PlayerPortraitBadge';
 
-interface ArcadeDerbyModalProps {
+export interface ArcadeDerbyModalProps {
   open: boolean;
   club: Club;
   worldSeed: number;
@@ -26,6 +29,12 @@ interface ArcadeDerbyModalProps {
   onWin?: () => void;
   onHomeRun?: (sluggerName: string) => void;
 }
+
+const STREAK_BADGE_STYLES: Readonly<Record<'hot' | 'on_fire' | 'blazing', string>> = {
+  hot: 'bg-[#FFC300] text-[#181B2C] border-[#181B2C]',
+  on_fire: 'bg-gradient-to-r from-[#FF4D6D] to-[#FFC300] text-[#181B2C] border-[#FFFDF7]',
+  blazing: 'bg-gradient-to-r from-[#9B5DE5] via-[#FF4D6D] to-[#FFC300] text-white border-[#FFD166]',
+};
 
 export function ArcadeDerbyModal({
   open,
@@ -37,6 +46,7 @@ export function ArcadeDerbyModal({
 }: ArcadeDerbyModalProps) {
   const recordArcadeDerbyWin = useGameStore((s) => s.recordArcadeDerbyWin);
   const awardPack = useFoilPackStore((s) => s.awardPack);
+  const reducedMotion = useUserPreferencesStore((s) => s.reducedMotion);
 
   const hitters = useMemo(
     () =>
@@ -63,12 +73,14 @@ export function ArcadeDerbyModal({
 
   const roundOver = swings.length >= DERBY_PITCH_COUNT;
   const homeRuns = swings.filter((s) => s.outcome === 'home_run').length;
-  const longestFt = swings.reduce((max, s) => Math.max(max, s.distanceFt), 0);
+  const longestFt = swings.reduce((max, s) => Math.max(max, s.estimatedHrDistanceFt ?? 0), 0);
+  const streakState = useMemo(() => evaluateDerbyHotStreak(swings), [swings]);
+  const latestSwing = swings.length > 0 ? swings[swings.length - 1] : null;
   const wonDerby = roundOver && homeRuns >= rival.targetHomeRuns;
 
   // Smooth oscillating timing cursor while round is active!
   useEffect(() => {
-    if (!open || roundOver) return undefined;
+    if (!open || roundOver || reducedMotion) return undefined;
     let frameId = 0;
     const start = performance.now();
     const tick = (now: number) => {
@@ -79,7 +91,7 @@ export function ArcadeDerbyModal({
     };
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
-  }, [open, roundOver, roundNonce]);
+  }, [open, roundOver, roundNonce, reducedMotion]);
 
   if (!open) return null;
 
@@ -90,9 +102,10 @@ export function ArcadeDerbyModal({
     const pitchSpeedMph = rng.int(82, 92);
     const res = resolveDerbyTimingSwing({
       batterPower: slugger.ratings.power,
-      timingCursor: cursorPos,
+      timingCursor: reducedMotion ? 50 : cursorPos,
       pitchSpeedMph,
       swingStyle,
+      currentStreak: streakState.currentStreak,
       rng,
     });
     const nextSwings = [...swings, res];
@@ -126,17 +139,22 @@ export function ArcadeDerbyModal({
     soundEngine.play('organ_charge');
   };
 
+  const activeStreakTone =
+    streakState.tier === 'blazing' || streakState.tier === 'on_fire' || streakState.tier === 'hot'
+      ? STREAK_BADGE_STYLES[streakState.tier]
+      : '';
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#181B2C]/80 p-3 sm:p-5 flex items-start sm:items-center justify-center overflow-y-auto"
+      className="fixed inset-0 z-50 bg-[#181B2C]/80 p-2 sm:p-5 flex items-start sm:items-center justify-center overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="90s Arcade Home Run Derby"
     >
-      <div data-testid="arcade-derby-modal" className="w-full max-w-2xl my-2 sm:my-auto">
+      <div data-testid="arcade-derby-modal" className="w-full max-w-2xl my-1 sm:my-auto">
         <ComicCard
           title="💥 30-SECOND ARCADE HOME RUN DERBY!"
-          subtitle={`5 Pitches • Beat ${rival.rivalName}’s ${rival.targetHomeRuns} HR to win +$${DERBY_WIN_CASH.toLocaleString()} & a Shiny Foil Pack!`}
+          subtitle={`5 Pitches • Beat ${rival.rivalName}’s ${rival.targetHomeRuns} HR to win +$${DERBY_WIN_CASH.toLocaleString()} & a Foil Pack!`}
           headerBg="#9D0208"
           badge={
             <button
@@ -149,9 +167,9 @@ export function ArcadeDerbyModal({
             </button>
           }
         >
-          <div className="space-y-3.5">
-            {/* Slugger Picker Strip */}
-            <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="space-y-2.5 sm:space-y-3.5">
+            {/* Compact Slugger Picker Strip */}
+            <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-0.5">
               {hitters.slice(0, 6).map((h) => {
                 const selected = h.id === slugger.id;
                 return (
@@ -163,7 +181,7 @@ export function ArcadeDerbyModal({
                       setSelectedSluggerId(h.id);
                       soundEngine.play('ui_pop');
                     }}
-                    className={`shrink-0 px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] flex items-center gap-2 text-left cursor-pointer ${
+                    className={`shrink-0 min-h-[44px] px-2 py-1 rounded-xl border-2 border-[#181B2C] flex items-center gap-1.5 text-left cursor-pointer ${
                       selected ? 'bg-[#FFC300] shadow-[2px_2px_0_#181B2C]' : 'bg-[#FFFDF7]'
                     }`}
                   >
@@ -174,29 +192,75 @@ export function ArcadeDerbyModal({
                       size="xs"
                     />
                     <div>
-                      <div className="font-display text-[11px] text-[#181B2C]">{h.name.split(' ')[0]}</div>
-                      <div className="text-[10px] font-extrabold text-[#9D0208]">PWR {h.ratings.power}</div>
+                      <div className="font-display text-[11px] text-[#181B2C] leading-tight">
+                        {h.name.split(' ')[0]}
+                      </div>
+                      <div className="text-[10px] font-extrabold text-[#9D0208] leading-tight">
+                        PWR {h.ratings.power}
+                      </div>
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            {/* Live Scoreboard + Moving Sweet-Spot Timing Meter */}
-            <div className="p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#181B2C] text-[#FBF4E4] space-y-3 shadow-[4px_4px_0_#181B2C]">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold">
-                <span className="text-[#FFD166] font-display">
-                  🏏 {slugger.name} “{slugger.nickname}” (PWR {slugger.ratings.power})
+            {/* Live Scoreboard + Hot Streak Badges + Moving Sweet-Spot Timing Meter */}
+            <div className="p-3 sm:p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-[#181B2C] text-[#FBF4E4] space-y-2.5 shadow-[4px_4px_0_#181B2C]">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs font-extrabold">
+                <span className="text-[#FFD166] font-display truncate">
+                  🏏 {slugger.name} (PWR {slugger.ratings.power})
                 </span>
-                <span className="px-2 py-0.5 rounded bg-[#2FB356] text-[#181B2C]">
-                  HR: {homeRuns} / Target {rival.targetHomeRuns} • Pitch {Math.min(DERBY_PITCH_COUNT, swings.length + 1)}/{DERBY_PITCH_COUNT}
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="px-2 py-0.5 rounded bg-[#2FB356] text-[#181B2C] font-mono-tabular text-[11px]">
+                    HR {homeRuns}/{rival.targetHomeRuns} • P{Math.min(DERBY_PITCH_COUNT, swings.length + 1)}/{DERBY_PITCH_COUNT}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#2B2D42] text-[#FFD166] border border-[#FFD166]/40 font-mono-tabular text-[11px]">
+                    {streakState.totalPoints.toLocaleString()} PTS
+                  </span>
+                </div>
               </div>
 
+              {/* Latest Swing Pop Callout: Estimated HR Distance (375-465 FT) + Live Hot Streak Multiplier */}
+              {latestSwing ? (
+                <div
+                  data-testid="derby-last-swing-callout"
+                  className="px-2.5 py-1.5 rounded-xl border-2 border-[#FFD166]/60 bg-[#23263A] flex flex-wrap items-center justify-between gap-2"
+                >
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    <span className="font-display text-xs text-[#FFFDF7]">
+                      {latestSwing.ratingBadge}
+                    </span>
+                    {latestSwing.estimatedHrDistanceFt !== null ? (
+                      <span
+                        data-testid="derby-hr-distance"
+                        className="px-2 py-0.5 rounded-lg bg-[#FFC300] text-[#181B2C] border-2 border-[#181B2C] font-display text-xs font-mono-tabular shadow-[2px_2px_0_#181B2C]"
+                      >
+                        📏 {latestSwing.estimatedHrDistanceFt} FT
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-[#CBD5E1]">
+                        {latestSwing.distanceFt} ft
+                      </span>
+                    )}
+                  </div>
+
+                  {streakState.comboBadge ? (
+                    <span
+                      data-testid="derby-streak-badge"
+                      className={`px-2.5 py-0.5 rounded-full border-2 font-display text-xs shadow-[2px_2px_0_#000000] ${activeStreakTone} ${
+                        reducedMotion ? '' : 'transition-transform scale-105'
+                      }`}
+                    >
+                      {streakState.comboBadge}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+
               {/* Moving Sweet-Spot Bar */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="text-[10px] font-extrabold uppercase tracking-wider text-center text-[#FFD166]">
-                  Tap 💥 SWING! when the baseball hits the GOLD center sweet spot!
+                  Tap SWING! when the baseball hits the GOLD sweet spot!
                 </div>
                 <div className="relative h-9 rounded-full border-2 border-[#FFD166] bg-[#2B2D42] overflow-hidden">
                   {/* Outer solid barrel zone */}
@@ -212,7 +276,7 @@ export function ArcadeDerbyModal({
                   {/* Moving baseball marker */}
                   <div
                     className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-white border-2 border-[#E63946] shadow flex items-center justify-center text-xs"
-                    style={{ left: `${cursorPos}%` }}
+                    style={{ left: `${reducedMotion ? 50 : cursorPos}%` }}
                   >
                     ⚾
                   </div>
@@ -226,14 +290,14 @@ export function ArcadeDerbyModal({
                     variant={swingStyle === 'normal' ? 'sky' : 'cream'}
                     onClick={() => setSwingStyle('normal')}
                   >
-                    🎯 Easy Sweet Spot
+                    🎯 Easy
                   </ComicButton>
                   <ComicButton
                     size="sm"
                     variant={swingStyle === 'power' ? 'coral' : 'cream'}
                     onClick={() => setSwingStyle('power')}
                   >
-                    💥 Moonshot Power
+                    💥 Power
                   </ComicButton>
                 </div>
 
@@ -244,7 +308,7 @@ export function ArcadeDerbyModal({
                     data-testid="derby-swing-btn"
                     icon={<Flame className="w-4 h-4" />}
                     onClick={handleSwing}
-                    className="flex-1 sm:flex-none min-w-[160px]"
+                    className="flex-1 sm:flex-none min-w-[156px]"
                   >
                     SWING! ({DERBY_PITCH_COUNT - swings.length} left)
                   </ComicButton>
@@ -261,13 +325,13 @@ export function ArcadeDerbyModal({
               </div>
             </div>
 
-            {/* Pitch-by-Pitch Launch Chips */}
+            {/* Compact 5-Column Pitch-by-Pitch Launch Chips (fits 360x640 cleanly without stacking!) */}
             {swings.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-1.5">
+              <div data-testid="derby-launch-chips" className="grid grid-cols-5 gap-1 sm:gap-1.5">
                 {swings.map((sw, idx) => (
                   <div
                     key={idx}
-                    className={`p-2 rounded-xl border-2 border-[#181B2C] text-center ${
+                    className={`p-1.5 sm:p-2 rounded-xl border-2 border-[#181B2C] text-center ${
                       sw.outcome === 'home_run'
                         ? 'bg-[#FFC300] text-[#181B2C]'
                         : sw.outcome === 'warning_track'
@@ -275,8 +339,20 @@ export function ArcadeDerbyModal({
                           : 'bg-[#FFE5EC] text-[#9D0208]'
                     }`}
                   >
-                    <div className="font-display text-[10px]">P{idx + 1}: {sw.distanceFt} ft</div>
-                    <div className="text-[9px] font-extrabold leading-tight mt-0.5">{sw.ratingBadge}</div>
+                    <div className="flex items-center justify-center gap-0.5 font-display text-[10px]">
+                      <span>P{idx + 1}</span>
+                      {sw.comboMultiplier >= 2 ? (
+                        <span className="px-1 rounded bg-[#9D0208] text-[#FFD166] text-[8.5px]">
+                          {sw.comboMultiplier}x
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="font-mono-tabular font-extrabold text-[10.5px] sm:text-xs leading-tight">
+                      {sw.estimatedHrDistanceFt !== null ? `${sw.estimatedHrDistanceFt} FT` : `${sw.distanceFt} ft`}
+                    </div>
+                    <div className="text-[8.5px] font-extrabold leading-tight truncate mt-0.5">
+                      {sw.outcome === 'home_run' ? 'HR!' : sw.outcome === 'warning_track' ? 'WALL' : 'OUT'}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -285,27 +361,37 @@ export function ArcadeDerbyModal({
             {roundOver ? (
               <div
                 data-testid="derby-final-card"
-                className={`p-3.5 rounded-2xl border-[3px] border-[#181B2C] flex flex-wrap items-center justify-between gap-3 ${
+                className={`p-3 rounded-2xl border-[3px] border-[#181B2C] flex flex-wrap items-center justify-between gap-2.5 ${
                   wonDerby ? 'bg-[#D8F3DC] text-[#1B4332]' : 'bg-[#FFF3BF] text-[#181B2C]'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <ClubMascotBuddy
                     mascot={club.mascot}
                     primaryColor={club.colors.primary}
                     secondaryColor={club.colors.secondary}
                     accentColor={club.colors.accent}
                     mood={wonDerby ? 'cheering' : 'determined'}
-                    size="md"
+                    size="sm"
                   />
-                  <div>
-                    <div className="font-display text-sm flex items-center gap-1.5">
-                      <Trophy className="w-4 h-4 text-[#F77F00]" />
-                      {wonDerby
-                        ? `DERBY CHAMPION! ${homeRuns} HR (Longest ${longestFt} ft)!`
-                        : `Great Swings! ${homeRuns} HR vs Target ${rival.targetHomeRuns} HR`}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-display text-xs sm:text-sm flex flex-wrap items-center gap-1.5">
+                      <Trophy className="w-4 h-4 text-[#F77F00] shrink-0" />
+                      <span>
+                        {wonDerby
+                          ? `DERBY CHAMPION! ${homeRuns} HR${longestFt > 0 ? ` (Longest ${longestFt} FT)` : ''}!`
+                          : `Great Swings! ${homeRuns} HR vs Target ${rival.targetHomeRuns} HR`}
+                      </span>
                     </div>
-                    <div className="text-xs font-bold mt-0.5">
+                    <div className="text-[11px] font-extrabold mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                      <span>Score: {streakState.totalPoints.toLocaleString()} PTS</span>
+                      {streakState.bestStreak >= 2 ? (
+                        <span>
+                          • Best Streak: {getDerbyComboBadge(streakState.bestStreak) ?? `${streakState.bestStreak}x`}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-[11px] font-bold mt-0.5">
                       {wonDerby
                         ? `Earned +$${DERBY_WIN_CASH.toLocaleString()} Cash + 🎁 1994 Sandlot Foil Pack!`
                         : 'Try Easy Sweet Spot or pick your biggest slugger for a rematch!'}

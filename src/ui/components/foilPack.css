@@ -1,0 +1,108 @@
+/* Tactile 1994 Foil Pack 3D Flip + Corner-Peel Shimmer Animations */
+
+.foil-card-stage {
+  perspective: 950px;
+}
+
+@keyframes foil-shimmer-sweep {
+  0% {
+    transform: translateX(-140%) skewX(-22deg);
+  }
+  55%,
+  100% {
+    transform: translateX(220%) skewX(-22deg);
+  }
+}
+
+@keyframes foil-card-flip-in {
+  0% {
+    opacity: 0.35;
+    transform: rotateY(-84deg) scale(0.94);
+  }
+  65% {
+    opacity: 1;
+    transform: rotateY(10deg) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: rotateY(0deg) scale(1);
+  }
+}
+
+.foil-card-sealed {
+  position: relative;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease;
+}
+
+.foil-card-sealed:hover,
+.foil-card-sealed:focus-visible {
+  transform: translateY(-2px) scale(1.015);
+}
+
+.foil-shimmer-sheen {
+  position: absolute;
+  inset: -10% -35%;
+  width: 55%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.14) 30%,
+    rgba(255, 255, 255, 0.52) 50%,
+    rgba(255, 214, 102, 0.25) 70%,
+    transparent 100%
+  );
+  animation: foil-shimmer-sweep 2.8s ease-in-out infinite;
+}
+
+.foil-corner-peel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  background: linear-gradient(
+    225deg,
+    #fbf4e4 0% 47%,
+    #181b2c 47% 52%,
+    #ffd166 52% 76%,
+    #e09f3e 100%
+  );
+  border-bottom-left-radius: 8px;
+  box-shadow: -2px 2px 4px rgba(24, 27, 44, 0.38);
+  transition: width 180ms ease, height 180ms ease;
+}
+
+.foil-card-sealed:hover .foil-corner-peel,
+.foil-card-sealed:focus-visible .foil-corner-peel {
+  width: 36px;
+  height: 36px;
+}
+
+.foil-card-revealed {
+  transform-style: preserve-3d;
+  animation: foil-card-flip-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-reduced-motion='true'] .foil-shimmer-sheen,
+[data-reduced-motion='true'] .foil-card-revealed,
+[data-reduced-motion='true'] .foil-card-sealed,
+[data-reduced-motion='true'] .foil-corner-peel {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foil-shimmer-sheen,
+  .foil-card-revealed,
+  .foil-card-sealed,
+  .foil-corner-peel {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

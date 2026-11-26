@@ -5,6 +5,7 @@ import {
   buildFirstPitchCoachTip,
   buildMvpDugoutQuote,
   buildPostGameMvpHeadline,
+  buildTeammateDugoutCheer,
   evaluateMatchupCardSparkle,
   evaluateTrophyCaseProgress,
   evaluateWelcomeChecklist,
@@ -438,5 +439,121 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
     const diff = summarizeLineupChange(club.lineup, swapped, 'vs LHP');
     expect(diff.changedCount).toBe(2);
     expect(diff.message).toMatch(/2 lineup spots.*vs LHP/i);
+  });
+
+  it('deterministically builds cute <=7-word dugout cheer reactions from favorite or bench teammates across hits, Ks, bunts, steals, and web gems', () => {
+    const club = makeClub(1994);
+    const batter = club.roster[0];
+    const favoriteBuddy = club.roster[2];
+    const pitcher = club.roster.find((p) => p.position === 'SP')!;
+
+    const baseEvent: PlayEvent = {
+      seq: 12,
+      inning: 2,
+      half: 'BOT',
+      type: 'ball_in_play',
+      outsBefore: 0,
+      outsAfter: 0,
+      balls: 1,
+      strikes: 1,
+      awayScore: 0,
+      homeScore: 1,
+      basesAfter: [null, null, null],
+      batterId: batter.id,
+      pitcherId: pitcher.id,
+      isClutchMoment: false,
+      commentary: 'Play!',
+    };
+
+    // Routine pitch events stay quiet (null)
+    expect(buildTeammateDugoutCheer(null, club.roster, [favoriteBuddy.id], 1994)).toBeNull();
+    expect(buildTeammateDugoutCheer({ ...baseEvent, type: 'pitch_thrown', outcome: 'ball' }, club.roster, [], 1994)).toBeNull();
+    expect(buildTeammateDugoutCheer({ ...baseEvent, outcome: 'home_run' }, [], [], 1994)).toBeNull();
+
+    // Cheer-worthy plays return deterministic <=7-word reactions from a non-actor teammate
+    const scenarios: PlayEvent[] = [
+      { ...baseEvent, seq: 10, outcome: 'home_run' },
+      { ...baseEvent, seq: 11, outcome: 'double' },
+      { ...baseEvent, seq: 12, outcome: 'single' },
+      { ...baseEvent, seq: 13, outcome: 'walk' },
+      { ...baseEvent, seq: 14, outcome: 'bunt_single' },
+      { ...baseEvent, seq: 15, outcome: 'strikeout' },
+      { ...baseEvent, seq: 16, outcome: 'double_play' },
+      {
+        ...baseEvent,
+        seq: 17,
+        type: 'stolen_base_attempt',
+        outsBefore: 1,
+        outsAfter: 1,
+        commentary: 'Stolen base! Safe at second!',
+      },
+      {
+        ...baseEvent,
+        seq: 18,
+        outcome: 'fly_out',
+        fieldingHighlight: { fielderId: club.roster[4].id, fielderPos: 'CF', anim: 'field_dive' },
+      },
+      {
+        ...baseEvent,
+        seq: 19,
+        outcome: 'single',
+        specialPowerTriggered: {
+          actor: 'batter',
+          powerId: 'comet',
+          calloutText: 'COMET!',
+          vfxColor: '#FFC300',
+        },
+      },
+    ];
+
+    for (const ev of scenarios) {
+      const cheer = buildTeammateDugoutCheer(ev, club.roster, [favoriteBuddy.id], 1994);
+      const repeat = buildTeammateDugoutCheer(ev, club.roster, [favoriteBuddy.id], 1994);
+      expect(cheer).not.toBeNull();
+      expect(cheer).toEqual(repeat);
+      expect(cheer!.teammate.id).not.toBe(batter.id);
+      expect(cheer!.teammate.id).not.toBe(pitcher.id);
+      const wordCount = cheer!.message.trim().split(/\s+/).length;
+      expect(wordCount).toBeLessThanOrEqual(7);
+      expect(wordCount).toBeGreaterThanOrEqual(2);
+    }
+
+    // Caught stealing does NOT trigger a happy steal cheer
+    const caughtStealing = buildTeammateDugoutCheer(
+      {
+        ...baseEvent,
+        seq: 20,
+        type: 'stolen_base_attempt',
+        outsBefore: 0,
+        outsAfter: 1,
+        commentary: 'Caught stealing at second!',
+      },
+      club.roster,
+      [favoriteBuddy.id],
+      1994,
+    );
+    expect(caughtStealing).toBeNull();
+
+    // Favorites are prioritized frequently across seeds
+    let favHits = 0;
+    for (let s = 1; s <= 20; s += 1) {
+      const c = buildTeammateDugoutCheer(
+        { ...baseEvent, seq: s, outcome: 'home_run' },
+        club.roster,
+        [favoriteBuddy.id],
+        1000 + s,
+      );
+      if (c?.isFavorite) favHits += 1;
+    }
+    expect(favHits).toBeGreaterThanOrEqual(8);
+
+    // Works cleanly with a 1-player fallback roster
+    const solo = buildTeammateDugoutCheer(
+      { ...baseEvent, seq: 30, outcome: 'home_run' },
+      [batter],
+      [],
+      1994,
+    );
+    expect(solo?.teammate.id).toBe(batter.id);
   });
 });
