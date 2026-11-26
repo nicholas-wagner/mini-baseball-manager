@@ -69,12 +69,12 @@ export function HobbyConversation() {
       </span>
     </div>
     <div className="flex items-start gap-3">
-      <div
+      {!club.hobbyMemories?.some(memory => memory.playerId === player.id) && <div
         data-testid="off-the-clock-portrait"
         className="w-14 h-[68px] shrink-0 overflow-hidden rounded-lg border-2 border-[#624367] bg-[#fffdf5] [&>img]:h-full [&>img]:w-full [&>img]:object-cover"
       >
         <PlayerPrint player={player} />
-      </div>
+      </div>}
       <div className="min-w-0 flex-1 space-y-2">
         <label className="block text-xs font-bold">Choose a teammate
           <select className="mt-1 block min-h-11 w-full rounded-lg border border-[#624367]/50 bg-white p-2 text-sm font-bold" value={player.id} onChange={e => choose(e.target.value)}>

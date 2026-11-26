@@ -11,7 +11,12 @@ test('talk to a teammate from the game recap and keep their off-field story', as
   await page.getByRole('button', {name:/sim to end/i}).click();
   const conversation = page.getByRole('region', {name:'Off the Clock', exact:true});
   await conversation.getByText('Talk to a teammate').click();
+  // Ordinary catalog players have a signed postcard even before a hobby print exists.
+  const select = conversation.getByRole('combobox', { name: 'Choose a teammate' });
+  const id = await select.locator('option[value^="mbm-"]:not([value="mbm-0030"])').first().getAttribute('value');
+  await select.selectOption(id!);
   await conversation.getByRole('button', {name:'Ask about the clue'}).click();
+  await expect(conversation.getByRole('figure', { name: /hobby postcard$/ })).toBeVisible();
   await expect(conversation.locator('blockquote')).toBeVisible();
   await conversation.scrollIntoViewIfNeeded();
   await page.screenshot({path:testInfo.outputPath('hobby-recap.png')});

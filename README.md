@@ -63,7 +63,7 @@ Each of the 3,000 players keeps their illustration when they change clubs. Open 
 
 ## Off the Clock
 
-After your first game, **Off the Clock** appears right inside your post-game recap with your teammate’s portrait and clue ready to tap (or inspect any roster card anytime). Pick anyone on the active roster, including the bench. Each conversation reveals a personal hobby, adds a signed note or Sandlot Postcard to your Trophy & Sticker Album and gives that teammate up to two morale points. You earn another conversation every two games, including games you simulate. Five players also have illustrated hobby prints.
+After your first game, **Off the Clock** appears right inside your post-game recap with your teammate’s portrait and clue ready to tap (or inspect any roster card anytime). Pick anyone on the active roster, including the bench. Each conversation reveals a personal hobby, adds a signed note or Sandlot Postcard to your Trophy & Sticker Album and gives that teammate up to two morale points. You earn another conversation every two games, including games you simulate. Five players also have illustrated hobby prints. For the rest of the roster, the signed postcard carries their baseball portrait as a postage stamp. Their initials stand in if the portrait is unavailable offline.
 
 [See the phone recap](docs/screenshots/off-the-clock-mobile.webp) · [See the desktop recap](docs/screenshots/off-the-clock-desktop.webp)
 

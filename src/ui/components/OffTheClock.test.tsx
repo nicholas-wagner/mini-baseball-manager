@@ -22,6 +22,7 @@ describe('Off the Clock cards', () => {
     fireEvent.click(screen.getByRole('button', {name:/ask about the clue/i}));
     const memory = useGameStore.getState().getHumanClub()!.hobbyMemories![0];
     expect(screen.getByText(memory.quote, {exact:false})).toBeVisible();
+    expect(screen.getByRole('figure', {name:player.name + ' hobby postcard'})).toBeVisible();
     view.unmount();
     const unlocked = useGameStore.getState().getHumanClub()!;
     useGameStore.setState({leagues:{...useGameStore.getState().leagues, rookie:[{...unlocked,roster:unlocked.roster.filter(p=>p.id!==player.id)}]}});
@@ -41,6 +42,10 @@ describe('Off the Clock cards', () => {
     const print = screen.getByRole('img',{name:/Paige Clark.*crocheting/i});
     fireEvent.error(print);
     expect(screen.queryByRole('img',{name:/Paige Clark.*crocheting/i})).toBeNull();
+    const postcard = screen.getByRole('figure',{name:'Paige Clark hobby postcard'});
+    const stamp = within(postcard).getByRole('img', {name:'Paige Clark baseball portrait'});
+    fireEvent.error(stamp);
+    expect(within(postcard).getByText('PC')).toBeVisible();
     expect(within(screen.getByRole('region',{name:'Off the Clock'})).getByText(/cantaloupe/i)).toBeVisible();
   });
 });

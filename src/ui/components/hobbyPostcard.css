@@ -1,0 +1,56 @@
+.hobby-postcard {
+  --postcard-ink: #224b55;
+  width: 100%;
+  max-width: 33rem;
+  margin: .4rem auto;
+  padding: .9rem 1rem .75rem;
+  border: 1px solid #b6a98d;
+  border-radius: .3rem;
+  color: #263645;
+  overflow-wrap: anywhere;
+  background:
+    repeating-linear-gradient(120deg, #32717b 0 11px, #ffedcf 11px 18px, #a34e49 18px 29px, #ffedcf 29px 36px) top / 100% 4px no-repeat,
+    linear-gradient(110deg, #fffaf0, #f8ecd4);
+  box-shadow: 2px 3px 0 #59422c29;
+}
+.hobby-postcard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+}
+.hobby-postcard-heading h4 {
+  font: 700 clamp(1.2rem, 3vw, 1.6rem)/1.12 var(--font-heading);
+  color: var(--postcard-ink);
+}
+.hobby-postcard-stamp {
+  width: 3.35rem;
+  height: 3.8rem;
+  flex: none;
+  padding: 3px;
+  background: #fffaea;
+  border: 2px dotted #738b87;
+  transform: rotate(4deg);
+}
+.hobby-postcard-stamp img, .hobby-postcard-stamp span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  object-fit: cover;
+  object-position: center 18%;
+  color: #fff7e3;
+  background: var(--postcard-ink);
+  font: 700 1.25rem var(--font-heading);
+}
+.hobby-postcard blockquote {
+  margin: .65rem 0 .4rem;
+  font: 500 1rem/1.55 var(--font-body);
+}
+.hobby-postcard figcaption {
+  border-top: 1px solid #cbc0a5;
+  padding-top: .4rem;
+  text-align: right;
+  font: italic 700 1rem var(--font-heading);
+  color: var(--postcard-ink);
+}
