@@ -7,6 +7,7 @@ import {
   type Player,
 } from '../models/player';
 import { fatigueToEndurance } from '../rpg/pitcherEndurance';
+import { createSeededRng, type SeededRng } from '../rng/seededRng';
 import type { GameSessionState } from '../simulation/gameState';
 import type { PitchTargetIntent } from '../simulation/pitchMindGames';
 
@@ -741,4 +742,198 @@ export function sortPlayersForSkillTree(
       return a.index - b.index;
     })
     .map((entry) => entry.player);
+}
+
+export type DugoutCheerMood = 'hype' | 'clutch' | 'sparkle' | 'rally';
+
+export interface TeammateDugoutCheer {
+  /** Stable identifier per event + teammate for transitions & dismiss tracking. */
+  id: string;
+  /** PlayEvent sequence number that sparked this dugout cheer. */
+  eventSeq: number;
+  /** Cheering teammate (preferring starred Favorites & non-active bench buddies). */
+  teammate: Player;
+  /** True when the cheering teammate is one of the user's starred Favorites. */
+  isFavorite: boolean;
+  /** Cute, upbeat 1-line reaction (strictly <= 7 words). */
+  message: string;
+  /** Expressive comic emoji accent. */
+  emoji: string;
+  /** Visual pill tone matching the play moment. */
+  mood: DugoutCheerMood;
+}
+
+type DugoutCheerKind =
+  | 'home_run'
+  | 'extra_base'
+  | 'single'
+  | 'walk'
+  | 'bunt'
+  | 'steal'
+  | 'strikeout'
+  | 'defense'
+  | 'power';
+
+interface DugoutCheerTemplate {
+  mood: DugoutCheerMood;
+  emoji: string;
+  lines: readonly string[];
+}
+
+const DUGOUT_CHEER_TEMPLATES: Readonly<Record<DugoutCheerKind, DugoutCheerTemplate>> = {
+  home_run: {
+    mood: 'hype',
+    emoji: '💥',
+    lines: [
+      'Moonshot! High-fives at home plate!',
+      'See ya! Popcorn is on me!',
+      'Whoa! That ball is in orbit!',
+      'Crushed it! Ring the dugout bell!',
+    ],
+  },
+  extra_base: {
+    mood: 'hype',
+    emoji: '⚡',
+    lines: [
+      'Ripped to the gap! Go, go!',
+      'Wheels turning! What a laser!',
+      'Extra bases! Dugout going wild!',
+    ],
+  },
+  single: {
+    mood: 'sparkle',
+    emoji: '✨',
+    lines: [
+      'Nice knock! Rally starts right here!',
+      'Way to battle! Keep it rolling!',
+      'Sparkplug on base! Let us go!',
+    ],
+  },
+  walk: {
+    mood: 'sparkle',
+    emoji: '👀',
+    lines: [
+      'Sharp eye! Free pass aboard!',
+      'Patient plate vision! Love it!',
+      'Good take! Traffic on the bases!',
+    ],
+  },
+  bunt: {
+    mood: 'sparkle',
+    emoji: '🏏',
+    lines: [
+      'Sneaky bunt! Love that hustle!',
+      'Textbook smallball! Total team player!',
+      'Beauty bunt! Moving runners over!',
+    ],
+  },
+  steal: {
+    mood: 'hype',
+    emoji: '💨',
+    lines: [
+      'Lightning wheels! Safe by a mile!',
+      'Catch ya later! Slick steal!',
+      'Zoom zoom! Dusty cleats club!',
+    ],
+  },
+  strikeout: {
+    mood: 'clutch',
+    emoji: '🔥',
+    lines: [
+      'Sit them down! Pure filth!',
+      'Painted the corner! Unhittable heat!',
+      'Ring them up! Ice cold K!',
+    ],
+  },
+  defense: {
+    mood: 'clutch',
+    emoji: '🧤',
+    lines: [
+      'Web gem! Frame that golden glove!',
+      'Smooth defense! Big-time out!',
+      'Glove magic! Dugout loves it!',
+    ],
+  },
+  power: {
+    mood: 'rally',
+    emoji: '🌟',
+    lines: [
+      'Star power unleashed! Look at that!',
+      'Whoa! Signature magic right there!',
+      'Hype meter maxed! Unstoppable spark!',
+    ],
+  },
+};
+
+const OUTCOME_CHEER_MAP: Readonly<Partial<Record<AtBatOutcome, DugoutCheerKind>>> = {
+  home_run: 'home_run',
+  triple: 'extra_base',
+  double: 'extra_base',
+  single: 'single',
+  walk: 'walk',
+  bunt_single: 'bunt',
+  bunt_out: 'bunt',
+  sac_fly: 'bunt',
+  strikeout: 'strikeout',
+  double_play: 'defense',
+};
+
+function isSafeStolenBaseEvent(event: PlayEvent): boolean {
+  return event.type === 'stolen_base_attempt' && event.outsAfter === event.outsBefore;
+}
+
+function classifyDugoutCheerKind(event: PlayEvent): DugoutCheerKind | null {
+  if (event.specialPowerTriggered) return 'power';
+  if (isSafeStolenBaseEvent(event)) return 'steal';
+  const mapped = event.outcome ? OUTCOME_CHEER_MAP[event.outcome] : undefined;
+  if (mapped) return mapped;
+  if (event.fieldingHighlight) return 'defense';
+  return null;
+}
+
+function pickCheeringTeammate(
+  teammates: readonly Player[],
+  favoriteIds: readonly string[],
+  event: PlayEvent,
+  rng: SeededRng,
+): { teammate: Player; isFavorite: boolean } {
+  const nonActors = teammates.filter((p) => p.id !== event.batterId && p.id !== event.pitcherId);
+  const pool = nonActors.length > 0 ? nonActors : teammates;
+  const favSet = new Set(favoriteIds);
+  const favPool = pool.filter((p) => favSet.has(p.id));
+
+  if (favPool.length > 0 && rng.chance(0.75)) {
+    return { teammate: rng.pick(favPool), isFavorite: true };
+  }
+  const picked = rng.pick(pool);
+  return { teammate: picked, isFavorite: favSet.has(picked.id) };
+}
+
+/**
+ * Deterministically builds a charming <=7-word dugout cheer reaction from a favorite or bench
+ * teammate for cheer-worthy plays (hits, Ks, bunts, steals, web gems, and signature powers).
+ */
+export function buildTeammateDugoutCheer(
+  event: PlayEvent | null,
+  teammates: readonly Player[],
+  favoriteIds: readonly string[],
+  rngSeed: number,
+): TeammateDugoutCheer | null {
+  if (!event || teammates.length === 0) return null;
+  const kind = classifyDugoutCheerKind(event);
+  if (!kind) return null;
+
+  const rng = createSeededRng((rngSeed + event.seq * 131 + 17) >>> 0);
+  const { teammate, isFavorite } = pickCheeringTeammate(teammates, favoriteIds, event, rng);
+  const template = DUGOUT_CHEER_TEMPLATES[kind];
+
+  return {
+    id: `cheer-${event.seq}-${teammate.id}`,
+    eventSeq: event.seq,
+    teammate,
+    isFavorite,
+    message: rng.pick(template.lines),
+    emoji: template.emoji,
+    mood: template.mood,
+  };
 }

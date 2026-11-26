@@ -1,6 +1,6 @@
-import { HobbyAlbum } from './OffTheClock';
-import { ScorebookPrint } from './ScorebookPrint';
+import { useState } from 'react';
 import { Heart, Sparkles, Trophy, X } from 'lucide-react';
+import { getStickerArtworkUrl, type StickerArtworkMap } from '../../art/stickers/stickerPrint';
 import { soundEngine } from '../../audio/soundEngine';
 import { buildStickerAlbumShelf } from '../../engine/gm/celebrationStickers';
 import { evaluateTrophyCaseProgress } from '../../engine/gm/openingDayHook';
@@ -8,15 +8,55 @@ import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
 import { ComicCard } from '../design-system/ComicCard';
 import { ClubMascotBuddy } from './ClubMascotBuddy';
+import { HobbyAlbum } from './OffTheClock';
 import { PlayerPortraitBadge } from './PlayerPortraitBadge';
+import { ScorebookPrint } from './ScorebookPrint';
 
-interface TrophyCaseModalProps {
+export interface TrophyCaseModalProps {
   open: boolean;
   onClose: () => void;
   onInspectPlayerId?: (playerId: string) => void;
+  /** Optional map of `stickerId -> WebP URL` (falls back gracefully to emoji badges when absent). */
+  stickerArtworkMap?: StickerArtworkMap;
 }
 
-export function TrophyCaseModal({ open, onClose, onInspectPlayerId }: TrophyCaseModalProps) {
+function StickerAlbumBadge({
+  stickerId,
+  title,
+  emoji,
+  unlocked,
+  stickerArtworkMap,
+}: {
+  stickerId: string;
+  title: string;
+  emoji: string;
+  unlocked: boolean;
+  stickerArtworkMap?: StickerArtworkMap;
+}) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const artUrl = unlocked ? getStickerArtworkUrl(stickerId, stickerArtworkMap) : undefined;
+
+  if (unlocked && artUrl && failedUrl !== artUrl) {
+    return (
+      <img
+        src={artUrl}
+        alt={`${title} sticker`}
+        data-testid="album-sticker-artwork"
+        onError={() => setFailedUrl(artUrl)}
+        className="w-10 h-10 object-contain drop-shadow-[1px_2px_0_#181B2C]"
+      />
+    );
+  }
+
+  return <span className="text-lg leading-none">{unlocked ? emoji : '🔒'}</span>;
+}
+
+export function TrophyCaseModal({
+  open,
+  onClose,
+  onInspectPlayerId,
+  stickerArtworkMap,
+}: TrophyCaseModalProps) {
   const club = useGameStore((s) => s.getHumanClub());
   const favoritePlayerIds = useGameStore((s) => s.favoritePlayerIds);
   const derbyWins = useGameStore((s) => s.derbyWins);
@@ -122,9 +162,13 @@ export function TrophyCaseModal({ open, onClose, onInspectPlayerId }: TrophyCase
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-lg leading-none">
-                        {sticker.unlocked ? sticker.emoji : '🔒'}
-                      </span>
+                      <StickerAlbumBadge
+                        stickerId={sticker.id}
+                        title={sticker.title}
+                        emoji={sticker.emoji}
+                        unlocked={sticker.unlocked}
+                        stickerArtworkMap={stickerArtworkMap}
+                      />
                       <span
                         className={`px-1.5 py-0.5 rounded font-display text-[8.5px] border border-[#181B2C] ${
                           sticker.unlocked
