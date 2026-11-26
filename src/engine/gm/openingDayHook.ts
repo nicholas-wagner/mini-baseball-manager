@@ -96,6 +96,8 @@ export interface BetweenGameSpotlightInput {
   totalUnspentSp: number;
   hasSeriesRecap: boolean;
   seriesRecapHeadline?: string;
+  needsFavoritePick?: boolean;
+  needsUniformStudio?: boolean;
 }
 
 export type BetweenGameSpotlightKind =
@@ -105,6 +107,8 @@ export type BetweenGameSpotlightKind =
   | 'gm_dilemma'
   | 'skill_points'
   | 'series_recap'
+  | 'favorite_player'
+  | 'uniform_studio'
   | 'derby_invite';
 
 export interface BetweenGameSpotlightCard {
@@ -379,6 +383,33 @@ function collectSecondarySpotlightCards(
   return cards;
 }
 
+function collectClubCharmSpotlightCards(
+  input: BetweenGameSpotlightInput,
+): BetweenGameSpotlightCard[] {
+  const cards: BetweenGameSpotlightCard[] = [];
+  if (input.needsFavoritePick) {
+    cards.push({
+      id: 'favorite_player',
+      eyebrow: '⭐ CLUBHOUSE BOND',
+      title: 'Star Your Clubhouse Favorite!',
+      detail: 'Give a star a golden ⭐ badge, custom nickname & sticker stamp.',
+      ctaLabel: 'Star a Favorite',
+      tone: 'gold',
+    });
+  }
+  if (input.needsUniformStudio) {
+    cards.push({
+      id: 'uniform_studio',
+      eyebrow: '🎨 TEAM STYLE STUDIO',
+      title: 'Design Your Team Jerseys!',
+      detail: 'Pick throwback pinstripes, neon gradients, crests & stirrup socks.',
+      ctaLabel: 'Style Uniforms',
+      tone: 'sky',
+    });
+  }
+  return cards;
+}
+
 /** Selects 1 calm prioritized Between-Game Spotlight card to prevent post-game dashboard overload. */
 export function selectBetweenGameSpotlight(
   input: BetweenGameSpotlightInput,
@@ -386,6 +417,7 @@ export function selectBetweenGameSpotlight(
   const combined = [
     ...collectPrimarySpotlightCards(input),
     ...collectSecondarySpotlightCards(input),
+    ...collectClubCharmSpotlightCards(input),
   ];
   const all = combined.length > 0 ? combined : [DERBY_INVITE_CARD];
   return {

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { soundEngine } from '../audio/soundEngine';
+import type { FrontOfficeMode } from '../engine/gm/frontOfficeMode';
 import type { BullpenMode } from '../engine/simulation/bullpenManager';
 import type { PitchingMode } from '../engine/simulation/pitchMindGames';
 
 export type GameDayControlMode = 'simple' | 'advanced';
+export type { FrontOfficeMode } from '../engine/gm/frontOfficeMode';
 export type { BullpenMode } from '../engine/simulation/bullpenManager';
 export type { PitchingMode } from '../engine/simulation/pitchMindGames';
 
@@ -18,6 +20,8 @@ export interface UserPreferences {
   gameDayControlMode: GameDayControlMode;
   pitchingMode: PitchingMode;
   bullpenMode: BullpenMode;
+  frontOfficeMode: FrontOfficeMode;
+  hasCustomizedUniform: boolean;
   arcadeTimingEnabled: boolean;
 }
 
@@ -34,6 +38,8 @@ const DEFAULT_PREFS: UserPreferences = {
   gameDayControlMode: 'simple',
   pitchingMode: 'simple',
   bullpenMode: 'semi_auto',
+  frontOfficeMode: 'auto',
+  hasCustomizedUniform: false,
   arcadeTimingEnabled: false,
 };
 
@@ -45,6 +51,11 @@ function parsePitchingMode(raw: unknown): PitchingMode {
 function parseBullpenMode(raw: unknown): BullpenMode {
   if (raw === 'auto' || raw === 'semi_auto' || raw === 'manual') return raw;
   return DEFAULT_PREFS.bullpenMode;
+}
+
+function parseFrontOfficeMode(raw: unknown): FrontOfficeMode {
+  if (raw === 'auto' || raw === 'semi_auto' || raw === 'manual') return raw;
+  return DEFAULT_PREFS.frontOfficeMode;
 }
 
 function readSavedPrefs(): UserPreferences {
@@ -70,6 +81,8 @@ function readSavedPrefs(): UserPreferences {
         parsed.gameDayControlMode === 'advanced' ? 'advanced' : DEFAULT_PREFS.gameDayControlMode,
       pitchingMode: parsePitchingMode(parsed.pitchingMode),
       bullpenMode: parseBullpenMode(parsed.bullpenMode),
+      frontOfficeMode: parseFrontOfficeMode(parsed.frontOfficeMode),
+      hasCustomizedUniform: parsed.hasCustomizedUniform ?? DEFAULT_PREFS.hasCustomizedUniform,
       arcadeTimingEnabled: parsed.arcadeTimingEnabled ?? DEFAULT_PREFS.arcadeTimingEnabled,
     };
   } catch {
@@ -112,6 +125,9 @@ interface UserPreferencesStore extends UserPreferences {
   cyclePitchingMode: () => void;
   setBullpenMode: (mode: BullpenMode) => void;
   cycleBullpenMode: () => void;
+  setFrontOfficeMode: (mode: FrontOfficeMode) => void;
+  cycleFrontOfficeMode: () => void;
+  markUniformCustomized: () => void;
   setArcadeTimingEnabled: (enabled: boolean) => void;
   toggleArcadeTiming: () => void;
   resetDefaults: () => void;
@@ -132,6 +148,8 @@ function extractPrefs(state: UserPreferencesStore): UserPreferences {
     gameDayControlMode: state.gameDayControlMode,
     pitchingMode: state.pitchingMode,
     bullpenMode: state.bullpenMode,
+    frontOfficeMode: state.frontOfficeMode,
+    hasCustomizedUniform: state.hasCustomizedUniform,
     arcadeTimingEnabled: state.arcadeTimingEnabled,
   };
 }
@@ -171,6 +189,14 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
       const next: BullpenMode = cur === 'auto' ? 'semi_auto' : cur === 'semi_auto' ? 'manual' : 'auto';
       applyPatch({ bullpenMode: next });
     },
+    setFrontOfficeMode: (mode) => applyPatch({ frontOfficeMode: mode }),
+    cycleFrontOfficeMode: () => {
+      const cur = get().frontOfficeMode;
+      const next: FrontOfficeMode =
+        cur === 'auto' ? 'semi_auto' : cur === 'semi_auto' ? 'manual' : 'auto';
+      applyPatch({ frontOfficeMode: next });
+    },
+    markUniformCustomized: () => applyPatch({ hasCustomizedUniform: true }),
     setArcadeTimingEnabled: (enabled) => applyPatch({ arcadeTimingEnabled: enabled }),
     toggleArcadeTiming: () => applyPatch({ arcadeTimingEnabled: !get().arcadeTimingEnabled }),
     resetDefaults: () => applyPatch({ ...DEFAULT_PREFS }),

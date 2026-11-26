@@ -80,9 +80,14 @@ import {
   equipRelicOnPlayer,
   unequipRelicFromPlayer,
 } from '../engine/rpg/relics';
+import {
+  applyRoutineFrontOfficeAutomation,
+} from '../engine/gm/frontOfficeMode';
+import type { ThrowsHand } from '../engine/handedness/types';
 import { hireRetiredLegendCoachForClub } from '../engine/league/playoffBracket';
 import type { RetiredLegendCoachCandidate } from '../engine/rpg/lifecycle';
 import { useGameStore } from './gameStore';
+import { useUserPreferencesStore } from './userPreferences';
 
 function replaceHumanClub(
   leagues: Record<LeagueTierId, Club[]>,
@@ -419,7 +424,25 @@ export function applyHumanUniformCustomization(
   if (!club) return { applied: false, reason: 'No active club.' };
   const updated = applyUniformToClub(club, config);
   useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updated) });
+  useUserPreferencesStore.getState().markUniformCustomized();
   return { applied: true };
+}
+
+export function runHumanRoutineFrontOfficePass(
+  opponentStarterThrows?: ThrowsHand,
+): { applied: boolean; actions: readonly string[] } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { applied: false, actions: [] };
+  const res = applyRoutineFrontOfficeAutomation(club, opponentStarterThrows);
+  if (res.actionsApplied.length === 0) {
+    return { applied: false, actions: [] };
+  }
+  useGameStore.setState({
+    rosterActionNonce: state.rosterActionNonce + 1,
+    leagues: replaceHumanClub(state.leagues, res.club),
+  });
+  return { applied: true, actions: res.actionsApplied };
 }
 
 const ACADEMY_SCOUT_COST = 900;

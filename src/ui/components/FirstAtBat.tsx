@@ -140,8 +140,7 @@ export function FirstAtBat({
   const showOptionsMenu =
     !expanded &&
     Boolean(
-      onToggleArcadeTiming ||
-        (tip && !powerArmed) ||
+      (tip && !powerArmed) ||
         (!batting && (onSelectPitchingMode || onSelectBullpenMode)),
     );
   const showGuidedBullpenCall =
@@ -159,6 +158,19 @@ export function FirstAtBat({
       <header>
         <span>Coach Pops</span>
         <div className="atbat-header-actions">
+          {!expanded && onToggleArcadeTiming && (
+            <button
+              type="button"
+              data-testid="guided-timing-toggle"
+              className="atbat-timing-pill"
+              disabled={locked}
+              aria-pressed={arcadeTimingEnabled}
+              onClick={onToggleArcadeTiming}
+              title="Toggle optional arcade sweet-spot timing bar"
+            >
+              {arcadeTimingEnabled ? "🎯 ON" : "🎯 Timing"}
+            </button>
+          )}
           {!expanded && readyPowerName && onArmPower && (
             <button
               type="button"
@@ -224,16 +236,6 @@ export function FirstAtBat({
                       {opt.label}
                     </button>
                   ))}
-                {onToggleArcadeTiming && (
-                  <button
-                    type="button"
-                    data-testid="guided-timing-toggle"
-                    aria-pressed={arcadeTimingEnabled}
-                    onClick={onToggleArcadeTiming}
-                  >
-                    {arcadeTimingEnabled ? "🎯 Turn timing off" : "🎯 Try swing or pitch timing"}
-                  </button>
-                )}
                 {tip && !powerArmed && (
                   <button type="button" onClick={onSuggested} disabled={locked}>
                     {cue.suggestedAction!.label}

@@ -164,27 +164,32 @@ export function WatchSettings({
   side,
   value,
   onChange,
+  open = false,
 }: {
   side: Club;
   value: string;
   onChange: (value: string) => void;
+  open?: boolean;
 }) {
   return (
-    <label className="watch-settings">
-      Pause Smart Watch
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="highlights">Game highlights</option>
-        <option value="tying">When the tying run reaches base</option>
-        <option value="starter">When my starter tires</option>
-        <optgroup label="When this hitter bats">
-          {side.lineup.map((slot) => (
-            <option key={slot.playerId} value={slot.playerId}>
-              {side.roster.find((p) => p.id === slot.playerId)?.name}
-            </option>
-          ))}
-        </optgroup>
-      </select>
-    </label>
+    <details className="watch-settings-drawer" open={open || undefined}>
+      <summary>Smart Watch rules ▾</summary>
+      <label className="watch-settings">
+        Pause Smart Watch
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="highlights">Game highlights</option>
+          <option value="tying">When the tying run reaches base</option>
+          <option value="starter">When my starter tires</option>
+          <optgroup label="When this hitter bats">
+            {side.lineup.map((slot) => (
+              <option key={slot.playerId} value={slot.playerId}>
+                {side.roster.find((p) => p.id === slot.playerId)?.name}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+      </label>
+    </details>
   );
 }
 

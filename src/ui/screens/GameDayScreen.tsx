@@ -65,6 +65,7 @@ import { buildCatcherCallSequence } from '../../engine/simulation/catcherCalls';
 import {
   BULLPEN_MODE_OPTIONS,
   evaluateBullpenCall,
+  getUpcomingBatters,
   rankBullpenCandidates,
   type BullpenMode,
 } from '../../engine/simulation/bullpenManager';
@@ -153,6 +154,7 @@ import {
   type DefensiveShiftId,
 } from '../../engine/simulation/winProbability';
 import { choreographPlayEvent, type ChoreographedStep } from '../../scene/playback/eventChoreographer';
+import { runHumanRoutineFrontOfficePass } from '../../store/clubHubActions';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore, type PostGameSummary } from '../../store/gameStore';
 import { useNemesisStore } from '../../store/nemesisStore';
@@ -173,6 +175,7 @@ import { decisionDelayMs, scoringDetail, playReadout } from '../../scene/playbac
 import { BroadcastHud } from '../components/BroadcastHud';
 import { ClubMascotBuddy } from '../components/ClubMascotBuddy';
 import { FoilPackModal } from '../components/FoilPackModal';
+import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { TrophyCaseModal } from '../components/TrophyCaseModal';
 import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
@@ -349,7 +352,14 @@ export function GameDayScreen({
   const setPitchingMode = useUserPreferencesStore((s) => s.setPitchingMode);
   const bullpenMode = useUserPreferencesStore((s) => s.bullpenMode);
   const setBullpenMode = useUserPreferencesStore((s) => s.setBullpenMode);
+  const frontOfficeMode = useUserPreferencesStore((s) => s.frontOfficeMode);
+  const hasCustomizedUniform = useUserPreferencesStore((s) => s.hasCustomizedUniform);
+  const markUniformCustomized = useUserPreferencesStore((s) => s.markUniformCustomized);
   const [dismissedBullpenKey, setDismissedBullpenKey] = useState<string | null>(null);
+  const [activeRelieverWarmupBonus, setActiveRelieverWarmupBonus] = useState<{
+    pitcherId: string;
+    controlBonus: number;
+  } | null>(null);
   const eventInGuide = Boolean(playbackEvent && guidedHalf === playbackEvent.inning + playbackEvent.half);
   const guiding = Boolean(liveSession && controlMode === 'simple' && watchMode === 'paused' &&
     (eventInGuide || guidedHalf === liveSession.inning + liveSession.half));
@@ -503,6 +513,9 @@ export function GameDayScreen({
         playerStatDeltas: buildPlayerStatDeltas(finalState.boxScore),
       };
       const summary = commitCompletedGame(opponentId, result, isHumanHome, guidedPitchEvents.current);
+      if (useUserPreferencesStore.getState().frontOfficeMode === 'auto') {
+        runHumanRoutineFrontOfficePass();
+      }
       if (pendingLivePlayoff && pendingLivePlayoff.opponentClubId === opponentId) {
         recordLivePlayoffResult(result.winnerClubId, result.awayScore, result.homeScore);
       }
@@ -568,6 +581,7 @@ export function GameDayScreen({
     setWarmingRelieverIds([]);
     setWarmupCounts({});
     setDismissedBullpenKey(null);
+    setActiveRelieverWarmupBonus(null);
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setBoxScoreOpen(false);
@@ -624,6 +638,7 @@ export function GameDayScreen({
     setWarmingRelieverIds([]);
     setWarmupCounts({});
     setDismissedBullpenKey(null);
+    setActiveRelieverWarmupBonus(null);
     setPowerTracker(createInGameManagerPowerTracker());
     setModalSummary(null);
     setBoxScoreOpen(false);
@@ -751,6 +766,10 @@ export function GameDayScreen({
       const aiRng = createSeededRng(
         (session.rngSeed ^ Math.imul(session.stepCounter + 1, 0x9e3779b1)) >>> 0,
       );
+      const warmupBonus =
+        activeRelieverWarmupBonus && activeRelieverWarmupBonus.pitcherId === pitcherNow.id
+          ? activeRelieverWarmupBonus.controlBonus
+          : undefined;
       return resolveIsolatedStepInputs(
         session,
         {
@@ -764,6 +783,7 @@ export function GameDayScreen({
           batterGuess,
           armedPowerId,
           arcadeTimingGrade: timingGrade,
+          relieverWarmupControlBonus: warmupBonus,
         },
         aiRng,
         {
@@ -773,6 +793,7 @@ export function GameDayScreen({
       );
     },
     [
+      activeRelieverWarmupBonus,
       armedPowerId,
       batterGuess,
       bullpenMode,
@@ -905,11 +926,15 @@ export function GameDayScreen({
   const handleBullpenSwap = (relieverId: string) => {
     if (!liveSession) return;
     const sideKey = liveSession.home.isHuman ? 'home' : 'away';
+    const warmup = evaluateBullpenWarmup(relieverId, warmupCounts[relieverId] ?? 0);
     const swapped = manualSwapPitcher(liveSession, sideKey, relieverId);
     if (swapped.event) {
       setSelectedPitchType(null);
       setShakeOffCount(0);
       setDismissedBullpenKey(null);
+      setActiveRelieverWarmupBonus(
+        warmup.status === 'hot' ? { pitcherId: relieverId, controlBonus: 2 } : null,
+      );
       applyStepResult(swapped.nextSession, [swapped.event], activeOpponentId);
     }
   };
@@ -1032,6 +1057,9 @@ export function GameDayScreen({
 
     const handleFastSimSeries = () => {
       const res = simNextSeriesRound(gameLength);
+      if (useUserPreferencesStore.getState().frontOfficeMode === 'auto') {
+        runHumanRoutineFrontOfficePass();
+      }
       soundEngine.play(res.winsGained && res.winsGained >= 2 ? 'level_up' : 'ui_pop');
       if (res.winsGained && res.winsGained >= 2) {
         awardFoilPack('sandlot_foil', `Series ${res.seriesCompleted} Victory!`);
@@ -1076,7 +1104,9 @@ export function GameDayScreen({
       ? humanClub.roster.find((p) => p.id === lastSeriesRecap.seriesMvp.playerId) ?? null
       : null;
     const isOpeningDay = humanClub.wins + humanClub.losses === 0;
-    const spotlightTrio = isOpeningDay ? selectClubSpotlightTrio(humanClub) : [];
+    const clubStars = selectClubSpotlightTrio(humanClub);
+    const spotlightTrio = isOpeningDay ? clubStars : [];
+    const captainStar = clubStars[0]?.player ?? humanClub.roster[0] ?? null;
     const skillsUnlockedCount = humanClub.roster.reduce(
       (sum, p) => sum + p.unlockedSkillIds.length + p.heritageTierUnlocked,
       0,
@@ -1111,7 +1141,7 @@ export function GameDayScreen({
         },
       );
     }
-    for (const star of spotlightTrio) {
+    for (const star of clubStars) {
       if (!preGameScoutEntries.some((entry) => entry.player.id === star.player.id)) {
         preGameScoutEntries.push({
           player: star.player,
@@ -1156,6 +1186,8 @@ export function GameDayScreen({
           totalUnspentSp,
           hasSeriesRecap: Boolean(lastSeriesRecap),
           seriesRecapHeadline: lastSeriesRecap?.headline,
+          needsFavoritePick: favoritePlayerIds.length === 0,
+          needsUniformStudio: !hasCustomizedUniform && Boolean(onOpenUniforms),
         })
       : null;
 
@@ -1182,6 +1214,17 @@ export function GameDayScreen({
       if (id === 'skill_points' && onJumpToTab) {
         soundEngine.play('ui_pop');
         onJumpToTab('skills');
+        return;
+      }
+      if (id === 'favorite_player' && captainStar) {
+        setPreGameScoutPlayerId(captainStar.id);
+        soundEngine.play('card_flip');
+        return;
+      }
+      if (id === 'uniform_studio' && onOpenUniforms) {
+        markUniformCustomized();
+        soundEngine.play('ui_pop');
+        onOpenUniforms();
         return;
       }
       if (id === 'derby_invite') {
@@ -1318,6 +1361,14 @@ export function GameDayScreen({
 
         {showFullSeasonHub ? (
           <div ref={fullSeasonSectionRef} className="space-y-4 scroll-mt-20">
+        {frontOfficeMode === 'semi_auto' ? (
+          <FrontOfficeModeBar
+            compact
+            club={humanClub}
+            opponentStarterThrows={probableMatchup?.opponentStarter.throws}
+            onApplied={(msg) => setGmQuickFeedback(msg)}
+          />
+        ) : null}
         {lastSeriesRecap ? (
           <div
             data-testid="series-recap-card"
@@ -2451,6 +2502,7 @@ export function GameDayScreen({
     : null;
   const liveLowerThird = buildLiveBroadcastLowerThird(liveSession);
   const liveRunnerIds = liveSession.bases.filter((id): id is string => Boolean(id));
+  const upcomingBatters = getUpcomingBatters(liveSession, humanSideKey, 3);
   const arcadeBullpenOptions = rankedBullpenCandidates.map((candidate) => ({
     id: candidate.player.id,
     name: candidate.player.name,
@@ -2461,7 +2513,21 @@ export function GameDayScreen({
     fitTag: candidate.fitTag,
     platoonEdge: candidate.platoonEdge,
     freshnessPct: candidate.freshnessPct,
+    pitchMixLabels: candidate.pitchMixLabels,
   }));
+  const humanScoreNow = liveSession[humanSideKey].score;
+  const oppScoreNow = (humanSideKey === 'home' ? liveSession.away : liveSession.home).score;
+  const latestEv = recentEvents[0] ?? null;
+  const liveMascotMood: 'happy' | 'cheering' | 'rally' | 'determined' =
+    latestEv?.outcome === 'home_run' ||
+    (humanIsBatting && (latestEv?.outcome === 'double' || latestEv?.outcome === 'triple' || latestEv?.outcome === 'single')) ||
+    (!humanIsBatting && latestEv?.outcome === 'strikeout')
+      ? 'cheering'
+      : currentLeverage.leverageIndex >= 1.4 || liveSession.bases.some(Boolean)
+        ? 'rally'
+        : humanScoreNow < oppScoreNow
+          ? 'determined'
+          : 'happy';
   const rawBullpenRec =
     !humanIsBatting && bullpenMode === 'semi_auto' && !playing && !handoff
       ? evaluateBullpenCall(liveSession, humanSideKey)
@@ -2791,7 +2857,7 @@ export function GameDayScreen({
             {(!guiding || showMore) && replayable && lastChoreo && <button className="atbat-tip"
               onClick={replayFromPitch}>Watch again · {playReadout(playbackEvent)?.label}</button>}
             {(!guiding || showMore) && <LiveActionBar
-              watchSettings={<WatchSettings side={{...humanClub,lineup:[...liveSession[humanSideKey].lineup]}} value={watchChoice} onChange={v=>{lastStop.current=null; setWatchChoice(v)}}/>}
+              watchSettings={<WatchSettings open={watchMode === 'smart'} side={{...humanClub,lineup:[...liveSession[humanSideKey].lineup]}} value={watchChoice} onChange={v=>{lastStop.current=null; setWatchChoice(v)}}/>}
               catcherSuggestion={acceptSign}
               cue={liveCue}
               matchupLabel={`${currentBatter.name} vs ${currentPitcher.name}`}
@@ -2802,6 +2868,10 @@ export function GameDayScreen({
               clutchRecap={clutchRecap}
               firstPitchTip={firstPitchTip}
               bullpenOptions={humanIsBatting ? [] : arcadeBullpenOptions}
+              upcomingBatters={humanIsBatting ? [] : upcomingBatters}
+              clubMascot={humanClub.mascot}
+              clubColors={humanClub.colors}
+              mascotMood={liveMascotMood}
               buntPreviewLine={buntPreviewLine}
               defensiveShift={defensiveShift}
               onSelectDefensiveShift={(shift) => {
@@ -3638,6 +3708,15 @@ export function GameDayScreen({
                   <p className="text-xs font-bold text-[#4A5068]">No fresh relievers remaining.</p>
                 ) : (
                   <div className="space-y-2">
+                    {upcomingBatters.length > 0 ? (
+                      <div
+                        data-testid="pro-bullpen-due-up-strip"
+                        className="px-2 py-1 rounded-lg border border-[#181B2C]/30 bg-[#E0FBFC] text-[10.5px] font-extrabold text-[#1D3557]"
+                      >
+                        Due Up: {upcomingBatters.map((b) => b.bats).join(' · ')} (
+                        {upcomingBatters.map((b) => `${b.name.split(' ').at(-1)} ${b.bats}`).join(', ')})
+                      </div>
+                    ) : null}
                     {rankedBullpenCandidates.map((candidate) => {
                       const rel = candidate.player;
                       const warmup = evaluateBullpenWarmup(rel.id, warmupCounts[rel.id] ?? 0);
@@ -3672,10 +3751,15 @@ export function GameDayScreen({
                                         : 'bg-[#E2E8F0] text-[#181B2C]'
                                 }`}
                               >
-                                {warmup.status}
+                                {warmup.status === 'hot' ? '🔥 HOT (+2 CTL)' : warmup.status}
                               </span>
                             </div>
                           </div>
+                          {candidate.pitchMixLabels.length > 0 ? (
+                            <div className="text-[9.5px] font-bold text-[#1D3557]">
+                              ⚾ Mix: {candidate.pitchMixLabels.join(' · ')}
+                            </div>
+                          ) : null}
                           <div className="flex gap-1.5">
                             <ComicButton
                               size="sm"

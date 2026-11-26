@@ -1,5 +1,6 @@
 import {
   computePlayerOverall,
+  PITCH_TYPE_SHORT_LABELS,
   PITCHER_ROLE_SHORT_LABELS,
   type PitcherRole,
   type Player,
@@ -77,6 +78,39 @@ export interface BullpenCandidateSummary {
   fitTag: string | null;
   platoonEdge: 'favorable' | 'neutral' | 'tough';
   freshnessPct: number;
+  pitchMixLabels: readonly string[];
+}
+
+export interface UpcomingBatterSummary {
+  id: string;
+  name: string;
+  bats: Player['bats'];
+  ovr: number;
+}
+
+/** Returns the next opposing batters due up against sideKey (wrapping cleanly around the 9-man order). */
+export function getUpcomingBatters(
+  session: GameSessionState,
+  sideKey: 'away' | 'home',
+  count = 3,
+): UpcomingBatterSummary[] {
+  const oppSide = sideKey === 'home' ? session.away : session.home;
+  const orderLen = oppSide.lineup.length;
+  if (orderLen === 0 || count <= 0) return [];
+  const total = Math.min(count, orderLen);
+  const result: UpcomingBatterSummary[] = [];
+  for (let offset = 0; offset < total; offset += 1) {
+    const slot = oppSide.lineup[(oppSide.lineupIndex + offset) % orderLen];
+    const batter = oppSide.playersById[slot.playerId];
+    if (!batter) continue;
+    result.push({
+      id: batter.id,
+      name: batter.name,
+      bats: batter.bats,
+      ovr: computePlayerOverall(batter),
+    });
+  }
+  return result;
 }
 
 function getAvailableRelievers(session: GameSessionState, sideKey: 'away' | 'home'): Player[] {
@@ -152,6 +186,9 @@ export function rankBullpenCandidates(
     .sort((a, b) => scoreBullpenCandidate(b, ctx) - scoreBullpenCandidate(a, ctx))
     .map((player) => {
       const roleLabel = player.pitcherRole ? PITCHER_ROLE_SHORT_LABELS[player.pitcherRole] : 'RP';
+      const pitchMixLabels = (player.pitchArsenal?.repertoire ?? []).map(
+        (slot) => PITCH_TYPE_SHORT_LABELS[slot.pitchType],
+      );
       return {
         player,
         ovr: computePlayerOverall(player),
@@ -160,6 +197,7 @@ export function rankBullpenCandidates(
         fitTag: resolveFitTag(player, ctx),
         platoonEdge: resolvePlatoonEdge(player.throws, batterBats),
         freshnessPct: fatigueToEndurance(player.fatigue),
+        pitchMixLabels,
       };
     });
 }

@@ -56,6 +56,7 @@ import {
 import { useGameStore } from '../../store/gameStore';
 import { BallparkEconomyPanel } from '../components/BallparkEconomyPanel';
 import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
+import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
 import { UniformDesignerPanel } from '../components/UniformDesignerPanel';
 import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
@@ -482,6 +483,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
 
         {subTab === 'staff' ? (
           <div className="space-y-4">
+            <FrontOfficeModeBar club={club} onApplied={setNotice} />
             <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold">
               <span>
                 Active Staff Slots: {activeStaff.length} / {staffSlotCap} ({club.leagueTier.toUpperCase()} Cap)

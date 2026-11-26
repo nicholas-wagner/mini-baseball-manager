@@ -24,6 +24,50 @@
   gap: 8px;
   min-width: 0;
 }
+.atbat-guide header .atbat-timing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 40px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 2px solid #192735;
+  background: #fffdf8;
+  color: #152f2e;
+  font-family: var(--font-display);
+  font-size: 10px;
+  line-height: 1.1;
+  text-decoration: none;
+  box-shadow: 2px 2px 0 #192735;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.atbat-guide header .atbat-timing-pill[aria-pressed="true"] {
+  background: #2fb356;
+  color: #ffffff;
+}
+@media (max-width: 480px) {
+  .atbat-guide:not(.is-expanded) header > span {
+    display: none;
+  }
+  .atbat-guide header {
+    justify-content: flex-end;
+  }
+  .atbat-header-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 5px;
+  }
+  .atbat-guide header .atbat-timing-pill,
+  .atbat-guide header .atbat-power-pill {
+    padding: 2px 7px;
+    font-size: 9.5px;
+  }
+  .atbat-guide header button {
+    white-space: nowrap;
+    font-size: 11px;
+  }
+}
 .atbat-guide header .atbat-power-pill {
   display: inline-flex;
   align-items: center;

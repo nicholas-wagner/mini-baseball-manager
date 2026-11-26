@@ -53,6 +53,7 @@ import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises'
 import { useGameStore } from '../../store/gameStore';
 import { RosterPrintGallery } from '../components/GameDayPrints';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
+import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import {
   PlayerCardModal,
   type InspectableCardEntry,
@@ -308,6 +309,12 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
 
   return (
     <div className="space-y-3 sm:space-y-4">
+      <FrontOfficeModeBar
+        compact
+        club={humanClub}
+        onApplied={(msg) => setRosterMessage(msg)}
+      />
+
       <ComicCard
         title={`${humanClub.city} ${humanClub.name} Roster`}
         subtitle={`Record ${humanClub.wins}-${humanClub.losses} • Roster ${humanClub.roster.length}/${MAX_ACTIVE_ROSTER_SIZE} • Payroll $${clubPayroll.toLocaleString()}/$${salaryCap.toLocaleString()} • Cash $${humanClub.economy.cash.toLocaleString()} • Hype ${humanClub.economy.teamHype}/100`}

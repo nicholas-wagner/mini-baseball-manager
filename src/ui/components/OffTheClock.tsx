@@ -1,3 +1,4 @@
+import { HobbyPostcard } from './HobbyPostcard';
 import { useState } from 'react';
 import { MessageCircle, NotebookPen } from 'lucide-react';
 import { hobbyPrint } from '../../art/hobbies/hobbyPrint';
@@ -6,14 +7,16 @@ import type { Player } from '../../engine/models/player';
 import { availableHobbyChats, clubHobbyGames, getPlayerHobby, type HobbyMemory } from '../../engine/rpg/playerHobbies';
 import { useGameStore } from '../../store/gameStore';
 import { ComicButton } from '../design-system/ComicButton';
+import { PlayerPrint } from './GameDayPrints';
 
 function MemoryPrint({ memory }: { memory: HobbyMemory }) {
   const [failed, setFailed] = useState(false);
   const print = hobbyPrint(memory.playerId);
+  if (!print || failed) return <HobbyPostcard memory={memory} />;
   return (
     <figure className="overflow-hidden rounded-lg border border-[#bba683] bg-[#fffdf5]">
-      {print && !failed && <img src={print} alt={memory.playerName + ' · ' + memory.title}
-        className="mx-auto block w-full max-w-72" loading="lazy" onError={() => setFailed(true)} />}
+      <img src={print} alt={memory.playerName + ' · ' + memory.title}
+        className="mx-auto block w-full max-w-72" loading="lazy" onError={() => setFailed(true)} />
       <figcaption className="p-3">
         <h4 className="font-heading text-lg font-bold">{memory.title}</h4>
         <blockquote className="mt-1 text-sm italic">“{memory.quote}”</blockquote>
@@ -59,15 +62,28 @@ export function HobbyConversation() {
   const player = club.roster.find(p => p.id === chosen) ?? remaining[0];
   if (!player || (!chosen && !availableHobbyChats(club))) return null;
   return <section className={panel} aria-label="Off the Clock">
-    <Title/>
-    <details><summary className="min-h-11 cursor-pointer py-2 font-bold">Talk to a teammate</summary>
-      <label className="block text-xs font-bold">Choose a teammate
-        <select className="my-2 block min-h-11 w-full rounded-lg border bg-white p-2 text-sm" value={player.id} onChange={e => choose(e.target.value)}>
-          {club.roster.map(member => <option key={member.id} value={member.id}>{member.name} · {member.position}</option>)}
-        </select>
-      </label>
-      <PlayerConversation club={club} player={player} onDiscover={() => choose(player.id)}/>
-    </details>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <Title/>
+      <span className="rounded-full border border-[#624367]/35 bg-[#FFFDF7] px-2.5 py-0.5 text-[11px] font-extrabold text-[#624367]">
+        Talk to a teammate
+      </span>
+    </div>
+    <div className="flex items-start gap-3">
+      <div
+        data-testid="off-the-clock-portrait"
+        className="w-14 h-[68px] shrink-0 overflow-hidden rounded-lg border-2 border-[#624367] bg-[#fffdf5] [&>img]:h-full [&>img]:w-full [&>img]:object-cover"
+      >
+        <PlayerPrint player={player} />
+      </div>
+      <div className="min-w-0 flex-1 space-y-2">
+        <label className="block text-xs font-bold">Choose a teammate
+          <select className="mt-1 block min-h-11 w-full rounded-lg border border-[#624367]/50 bg-white p-2 text-sm font-bold" value={player.id} onChange={e => choose(e.target.value)}>
+            {club.roster.map(member => <option key={member.id} value={member.id}>{member.name} · {member.position}</option>)}
+          </select>
+        </label>
+        <PlayerConversation club={club} player={player} onDiscover={() => choose(player.id)}/>
+      </div>
+    </div>
   </section>;
 }
 

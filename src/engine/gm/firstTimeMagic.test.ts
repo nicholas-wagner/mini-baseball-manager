@@ -205,6 +205,31 @@ describe('TASK-079 — First-Time Magic Engine Foundations', () => {
       hasSeriesRecap: false,
     });
     expect(quietFallback.primary?.id).toBe('derby_invite');
+
+    const favSpotlight = selectBetweenGameSpotlight({
+      canClaimStarterReward: false,
+      unopenedPackCount: 0,
+      hasUnreadStoryBeat: false,
+      hasGmDilemma: false,
+      totalUnspentSp: 0,
+      hasSeriesRecap: false,
+      needsFavoritePick: true,
+      needsUniformStudio: true,
+    });
+    expect(favSpotlight.primary?.id).toBe('favorite_player');
+    expect(favSpotlight.all.some((c) => c.id === 'uniform_studio')).toBe(true);
+
+    const uniformSpotlight = selectBetweenGameSpotlight({
+      canClaimStarterReward: false,
+      unopenedPackCount: 0,
+      hasUnreadStoryBeat: false,
+      hasGmDilemma: false,
+      totalUnspentSp: 0,
+      hasSeriesRecap: false,
+      needsFavoritePick: false,
+      needsUniformStudio: true,
+    });
+    expect(uniformSpotlight.primary?.id).toBe('uniform_studio');
   });
 
   it('evaluates optional Arcade Timing cursor grades and applies batting & pitching bonuses cleanly inside stepPitch', () => {

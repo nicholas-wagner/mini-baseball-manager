@@ -1002,6 +1002,7 @@ function sanitizeStepOptionsForSide(
       defensiveShift: options.defensiveShift ?? chooseAiDefensiveShift(state),
       pitchTarget: options.pitchTarget ?? chooseAiPitchTarget(rng, state),
       stealDefenseCall: 'normal',
+      relieverWarmupControlBonus: undefined,
       arcadeTiming: options.arcadeTiming?.actor === 'batter' ? options.arcadeTiming : undefined,
     };
   }
@@ -1137,6 +1138,7 @@ export function stepPitch(
     battingPlayersById: batting.playersById,
     catcherPopTimeBonus: fielding.catcherPopTimeBonus,
     stealDefenseCall: resolveStealDefenseCall(tacticalCall, safeOpts.stealDefenseCall),
+    relieverWarmupControlBonus: safeOpts.relieverWarmupControlBonus,
   });
 
   resolveThirdBaseCall(next, resolution, rng, safeOpts);

@@ -571,6 +571,7 @@ export interface PitchResolverContext {
   battingPlayersById?: Readonly<Record<string, Player>>;
   catcherPopTimeBonus?: number;
   stealDefenseCall?: StealDefenseCall;
+  relieverWarmupControlBonus?: number;
 }
 
 const ZERO_STAFF: ClubStaffBonuses = {
@@ -1186,7 +1187,8 @@ function computeEffectiveMatchupNumbers(
     powers.mindGames.controlDelta +
     pSurge.controlDelta +
     coEd.controlDelta +
-    enduranceFx.controlDrop;
+    enduranceFx.controlDrop +
+    (ctx.relieverWarmupControlBonus ?? 0);
 
   const luckZoneShift =
     pitcherMental.luckZoneProbDelta -
@@ -1238,7 +1240,7 @@ function resolvePrePitchTacticalAction(
   return stealPlay ? resolveStealAttempt(ctx, stealPlay) : null;
 }
 
-function collectActiveModifierTags(powers: PowerBundle): string[] {
+function collectActiveModifierTags(powers: PowerBundle, warmupControlBonus = 0): string[] {
   const tags: string[] = [powers.batterHeritage.summaryTag, powers.pitcherHeritage.summaryTag];
   if (powers.shift.id !== 'standard') {
     tags.push(`Shift: ${powers.shift.shortLabel}`);
@@ -1248,6 +1250,9 @@ function collectActiveModifierTags(powers: PowerBundle): string[] {
   }
   if (powers.weather.pitcherControlPenalty < 0) {
     tags.push(`Drizzle Grip ${powers.weather.pitcherControlPenalty}`);
+  }
+  if (warmupControlBonus > 0) {
+    tags.push(`Warmup: HOT (+${warmupControlBonus} CTL)`);
   }
   if (powers.batterSurge) tags.push(`⚡ ${powers.batterSurge.calloutText}`);
   if (powers.pitcherSurge) tags.push(`⚡ ${powers.pitcherSurge.calloutText}`);
@@ -1260,6 +1265,7 @@ function buildPitchMathBreakdown(
   stats: ReturnType<typeof computeEffectiveMatchupNumbers>,
   zoneProb: number,
   powers: PowerBundle,
+  warmupControlBonus = 0,
 ): PlayMathBreakdown {
   const hitEstimate = clampProb(0.295 + (stats.effContact - stats.effStuff) * 0.0044, 0.05, 0.72);
   const hrEstimate = clampProb(
@@ -1276,7 +1282,7 @@ function buildPitchMathBreakdown(
     hitPct: Math.round(hitEstimate * 100),
     hrPct: Math.round(hrEstimate * 100),
     diceRoll: rng.int(1, 100),
-    activeModifiers: collectActiveModifierTags(powers),
+    activeModifiers: collectActiveModifierTags(powers, warmupControlBonus),
   };
 }
 
@@ -1382,6 +1388,12 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
       );
 
   const decorated = decorateActivePowerOutcome(rawResult, fullPowers);
-  decorated.mathBreakdown = buildPitchMathBreakdown(ctx.rng, stats, zoneProb, fullPowers);
+  decorated.mathBreakdown = buildPitchMathBreakdown(
+    ctx.rng,
+    stats,
+    zoneProb,
+    fullPowers,
+    ctx.relieverWarmupControlBonus ?? 0,
+  );
   return attachPitchTelemetry(decorated, adjustedMatchup);
 }

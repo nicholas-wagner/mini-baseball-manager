@@ -1,7 +1,12 @@
 import { useId, useState } from 'react';
 import { ClipboardList, FastForward, Play, RefreshCw, Shield, SkipForward, Sliders, Sparkles, Zap } from 'lucide-react';
+import { soundEngine } from '../../audio/soundEngine';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
-import { PITCH_CALL_GUIDE, SWING_CALL_GUIDE } from '../../engine/gm/openingDayHook';
+import {
+  buildMascotCheerQuip,
+  PITCH_CALL_GUIDE,
+  SWING_CALL_GUIDE,
+} from '../../engine/gm/openingDayHook';
 import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
@@ -9,6 +14,7 @@ import {
   BULLPEN_MODE_OPTIONS,
   type BullpenMode,
   type BullpenRecommendation,
+  type UpcomingBatterSummary,
 } from '../../engine/simulation/bullpenManager';
 import type { CatcherPitchCall } from '../../engine/simulation/catcherCalls';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
@@ -24,6 +30,7 @@ import {
 import type { GameDayControlMode } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
 import { ArcadeTimingMeter } from './ArcadeTimingMeter';
+import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { CoachPopsAvatar } from './CoachPopsAvatar';
 
 export interface ArcadeBullpenOption {
@@ -36,6 +43,7 @@ export interface ArcadeBullpenOption {
   fitTag?: string | null;
   platoonEdge?: 'favorable' | 'neutral' | 'tough';
   freshnessPct?: number;
+  pitchMixLabels?: readonly string[];
 }
 
 export interface PitcherSignOption {
@@ -58,6 +66,10 @@ interface LiveActionBarProps {
   clutchRecap?: string | null;
   firstPitchTip?: string | null;
   bullpenOptions?: readonly ArcadeBullpenOption[];
+  upcomingBatters?: readonly UpcomingBatterSummary[];
+  clubMascot?: string;
+  clubColors?: { primary: string; secondary: string; accent: string };
+  mascotMood?: 'happy' | 'cheering' | 'rally' | 'determined';
   buntPreviewLine?: string | null;
   defensiveShift?: DefensiveShiftId;
   onSelectDefensiveShift?: (shift: DefensiveShiftId) => void;
@@ -145,6 +157,10 @@ export function LiveActionBar({
   clutchRecap,
   firstPitchTip = null,
   bullpenOptions = [],
+  upcomingBatters = [],
+  clubMascot,
+  clubColors,
+  mascotMood = 'happy',
   buntPreviewLine = null,
   defensiveShift = 'standard',
   onSelectDefensiveShift,
@@ -210,6 +226,8 @@ export function LiveActionBar({
   const tacticsId = useId();
   const [fastSimOpen, setFastSimOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
+  const [mascotTapCount, setMascotTapCount] = useState(0);
+  const [mascotCheerText, setMascotCheerText] = useState<string | null>(null);
   const cuePalette =
     cue.urgency === 'high'
       ? 'bg-[#FFF3BF] border-[#E63946] text-[#181B2C]'
@@ -963,22 +981,44 @@ export function LiveActionBar({
               </span>
             ) : null}
           </div>
+          {upcomingBatters.length > 0 ? (
+            <div
+              data-testid="bullpen-due-up-strip"
+              className="px-2 py-1 rounded-lg border border-[#181B2C]/35 bg-[#FFFDF7] flex flex-wrap items-center gap-1.5 text-[10.5px] font-extrabold text-[#181B2C]"
+            >
+              <span className="uppercase text-[#1D3557]">
+                Due Up: {upcomingBatters.map((b) => b.bats).join(' · ')}
+              </span>
+              <span className="text-[#4A5068] font-bold">
+                ({upcomingBatters.map((b) => `${b.name.split(' ').at(-1)} ${b.bats}`).join(', ')})
+              </span>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-1.5">
             {bullpenOptions.map((rel) => (
-              <ComicButton
-                key={rel.id}
-                size="sm"
-                variant={rel.isRecommended ? 'gold' : 'cream'}
-                data-testid="arcade-bullpen-bring-in"
-                onClick={() => {
-                  onSelectBullpenReliever(rel.id);
-                  setBullpenOpen(false);
-                }}
-              >
-                Bring In {rel.name} ({rel.throws}HP{rel.roleLabel ? ` • ${rel.roleLabel}` : ''})
-                {rel.isRecommended ? ' ★' : ''}
-                {typeof rel.ovr === 'number' ? ` · ${rel.ovr}` : ''}
-              </ComicButton>
+              <div key={rel.id} className="flex flex-col gap-0.5">
+                <ComicButton
+                  size="sm"
+                  variant={rel.isRecommended ? 'gold' : 'cream'}
+                  data-testid="arcade-bullpen-bring-in"
+                  onClick={() => {
+                    onSelectBullpenReliever(rel.id);
+                    setBullpenOpen(false);
+                  }}
+                >
+                  Bring In {rel.name} ({rel.throws}HP{rel.roleLabel ? ` • ${rel.roleLabel}` : ''})
+                  {rel.isRecommended ? ' ★' : ''}
+                  {typeof rel.ovr === 'number' ? ` · ${rel.ovr}` : ''}
+                </ComicButton>
+                {rel.pitchMixLabels && rel.pitchMixLabels.length > 0 ? (
+                  <span
+                    data-testid="bullpen-pitch-mix"
+                    className="px-1.5 text-[9.5px] font-bold text-[#1D3557]"
+                  >
+                    ⚾ {rel.pitchMixLabels.join(' · ')}
+                  </span>
+                ) : null}
+              </div>
             ))}
           </div>
         </div>
@@ -1125,16 +1165,59 @@ export function LiveActionBar({
           </div>
         </div>
 
-        {cue.suggestedAction ? (
-          <ComicButton
-            size="sm"
-            variant={cue.urgency === 'high' ? 'gold' : 'turf'}
-            icon={<Sparkles className="w-3.5 h-3.5" />}
-            disabled={gameCompleted}
-            onClick={() => onSuggestedAction(cue.suggestedAction!)}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {clubMascot && clubColors ? (
+            <button
+              type="button"
+              data-testid="live-dugout-mascot-btn"
+              aria-label={`High-five ${clubMascot}`}
+              title={`Tap ${clubMascot} for a dugout cheer!`}
+              onClick={() => {
+                const nextTap = mascotTapCount + 1;
+                setMascotTapCount(nextTap);
+                setMascotCheerText(buildMascotCheerQuip(clubMascot, mascotMood, nextTap));
+                soundEngine.play(mascotMood === 'cheering' ? 'crowd_cheer' : 'ui_pop');
+              }}
+              className="rounded-2xl p-0.5 cursor-pointer hover:scale-105 active:scale-95 transition shrink-0"
+            >
+              <ClubMascotBuddy
+                mascot={clubMascot}
+                primaryColor={clubColors.primary}
+                secondaryColor={clubColors.secondary}
+                accentColor={clubColors.accent}
+                mood={mascotMood}
+                size="sm"
+                testId="live-dugout-mascot-buddy"
+              />
+            </button>
+          ) : null}
+          {cue.suggestedAction ? (
+            <ComicButton
+              size="sm"
+              variant={cue.urgency === 'high' ? 'gold' : 'turf'}
+              icon={<Sparkles className="w-3.5 h-3.5" />}
+              disabled={gameCompleted}
+              onClick={() => onSuggestedAction(cue.suggestedAction!)}
+            >
+              {cue.suggestedAction.label}
+            </ComicButton>
+          ) : null}
+        </div>
+        {mascotCheerText ? (
+          <div
+            data-testid="live-mascot-cheer-bubble"
+            role="status"
+            className="w-full px-2.5 py-1 rounded-xl border border-[#181B2C]/35 bg-[#FFFDF7] text-[11px] font-extrabold text-[#193D37] flex items-center justify-between gap-2"
           >
-            {cue.suggestedAction.label}
-          </ComicButton>
+            <span>📣 {mascotCheerText}</span>
+            <button
+              type="button"
+              onClick={() => setMascotCheerText(null)}
+              className="text-[10px] underline cursor-pointer shrink-0"
+            >
+              Hide
+            </button>
+          </div>
         ) : null}
       </div>
 

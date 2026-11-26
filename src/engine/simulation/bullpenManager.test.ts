@@ -4,9 +4,11 @@ import type { Club } from '../models/club';
 import type { GameLengthInnings, PitcherRole, Player } from '../models/player';
 import { createSeededRng } from '../rng/seededRng';
 import { createGameSession, stepPitch } from './baseballEngine';
+import { resolveIsolatedStepInputs } from './aiManager';
 import {
   BULLPEN_MODE_OPTIONS,
   evaluateBullpenCall,
+  getUpcomingBatters,
   hasAvailableFieldingReliever,
   rankBullpenCandidates,
 } from './bullpenManager';
@@ -357,5 +359,72 @@ describe('3-Mode Bullpen Manager (Auto / Semi-Auto / Manual) — TASK-093', () =
       bullpenMode: 'auto',
     });
     expect(autoCue.kind).not.toBe('pitcher_gassed');
+  });
+
+  it('returns the next 3 upcoming opposing batters with wrap-around and includes reliever pitch mix labels', () => {
+    const { session } = makeControlledMatch(5);
+    const lateOrderSession: GameSessionState = {
+      ...session,
+      away: { ...session.away, lineupIndex: 7 }, // #8, #9, #1 due up!
+    };
+
+    const dueUp = getUpcomingBatters(lateOrderSession, 'home', 3);
+    expect(dueUp).toHaveLength(3);
+    expect(dueUp.map((b) => b.id)).toEqual([
+      session.away.lineup[7].playerId,
+      session.away.lineup[8].playerId,
+      session.away.lineup[0].playerId,
+    ]);
+    expect(dueUp.every((b) => ['L', 'R', 'S'].includes(b.bats) && b.ovr > 0)).toBe(true);
+
+    const ranked = rankBullpenCandidates(lateOrderSession, 'home');
+    expect(ranked.length).toBeGreaterThan(0);
+    expect(ranked.every((c) => c.pitchMixLabels.length >= 2)).toBe(true);
+  });
+
+  it('applies optional Pro HOT warmup +2 CTL bonus when provided and keeps zero change when omitted', () => {
+    const { session } = makeControlledMatch(5);
+    const baseline = stepPitch(session, 'normal', {});
+    const boosted = stepPitch(session, 'normal', { relieverWarmupControlBonus: 2 });
+
+    const baseMath = baseline.events.find((e) => e.mathBreakdown)?.mathBreakdown;
+    const boostMath = boosted.events.find((e) => e.mathBreakdown)?.mathBreakdown;
+    expect(baseMath).toBeDefined();
+    expect(boostMath).toBeDefined();
+    expect(boostMath!.effControl).toBe(baseMath!.effControl + 2);
+    expect(boostMath!.activeModifiers.some((m) => /warmup.*hot.*\+2 ctl/i.test(m))).toBe(true);
+    expect(baseMath!.activeModifiers.some((m) => /warmup/i.test(m))).toBe(false);
+
+    // Side ownership strips human warmup bonus when human is batting!
+    const humanBattingSession: GameSessionState = { ...session, half: 'BOT' };
+    const batStep = resolveIsolatedStepInputs(
+      humanBattingSession,
+      {
+        tacticalCall: 'normal',
+        pitchTarget: 'attack_zone',
+        selectedPitchType: null,
+        defensiveShift: 'standard',
+        batterGuess: 'none',
+        armedPowerId: null,
+        relieverWarmupControlBonus: 2,
+      },
+      createSeededRng(77),
+    );
+    expect(batStep.options.relieverWarmupControlBonus).toBeUndefined();
+
+    const pitchStep = resolveIsolatedStepInputs(
+      session,
+      {
+        tacticalCall: 'normal',
+        pitchTarget: 'attack_zone',
+        selectedPitchType: null,
+        defensiveShift: 'standard',
+        batterGuess: 'none',
+        armedPowerId: null,
+        relieverWarmupControlBonus: 2,
+      },
+      createSeededRng(77),
+    );
+    expect(pitchStep.options.relieverWarmupControlBonus).toBe(2);
   });
 });

@@ -37,6 +37,8 @@ export interface StepPitchOptions {
   stealDefenseCall?: 'normal' | 'hold_runner' | 'pitchout';
   /** Controls human-team automatic pitching changes ('auto' | 'semi_auto' | 'manual'). AI clubs always auto-manage. */
   bullpenMode?: BullpenMode;
+  /** Optional small Pro-mode control bonus (+2 CTL) when bringing in a reliever warmed up to HOT. */
+  relieverWarmupControlBonus?: number;
   /** When true in a human-vs-AI game, guarantees the AI side ignores human calls and decides independently. */
   enforceSideOwnership?: boolean;
 }
@@ -52,6 +54,7 @@ export interface HumanLiveSelections {
   batterGuess: BatterPitchGuess;
   armedPowerId: string | null;
   arcadeTimingGrade?: ArcadeTimingGrade;
+  relieverWarmupControlBonus?: number;
 }
 
 const OFFENSIVE_CALLS: ReadonlySet<TacticalCall> = new Set([
@@ -333,6 +336,7 @@ function resolveHumanPitchingInputs(
         : undefined,
       stealDefenseCall,
       bullpenMode: human.bullpenMode,
+      relieverWarmupControlBonus: human.relieverWarmupControlBonus,
       enforceSideOwnership: true,
     },
   };
