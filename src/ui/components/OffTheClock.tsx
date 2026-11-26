@@ -11,7 +11,7 @@ import { PlayerPrint } from './GameDayPrints';
 
 function MemoryPrint({ memory }: { memory: HobbyMemory }) {
   const [failed, setFailed] = useState(false);
-  const print = hobbyPrint(memory.playerId);
+  const print = hobbyPrint(memory);
   if (!print || failed) return <HobbyPostcard memory={memory} />;
   return (
     <figure className="overflow-hidden rounded-lg border border-[#bba683] bg-[#fffdf5]">

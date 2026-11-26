@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { useGameStore } from '../../store/gameStore';
 import { PlayerCardModal } from './PlayerCardModal';
 import { TrophyCaseModal } from './TrophyCaseModal';
-import { HobbyConversation } from './OffTheClock';
+import { HobbyAlbum, HobbyConversation } from './OffTheClock';
 
 function foundClub() {
   const state = useGameStore.getState();
@@ -12,6 +12,15 @@ function foundClub() {
   return state.getHumanClub()!;
 }
 describe('Off the Clock cards', () => {
+  it('preserves the signed note when a saved quote differs from the illustrated story', () => {
+    const memory = { playerId: 'showcase-manny', playerName: 'Manny Guerrero', hobbyId: 'camping',
+      title: 'Camping', quote: 'The tent leaked, the cocoa did not, and we all remember that weekend as a success.' };
+    render(<HobbyAlbum club={{ ...foundClub(), hobbyMemories: [memory] }} />);
+    fireEvent.click(screen.getByText(/Manny Guerrero/, { selector: 'summary' }));
+    const postcard = screen.getByRole('figure', { name: 'Manny Guerrero hobby postcard' });
+    expect(within(postcard).getByText(memory.quote, { exact: false })).toBeVisible();
+  });
+
   it('reveals a note without an illustration and keeps it in the album after the player leaves', () => {
     const club = foundClub();
     const player = club.roster.find(p => p.id.startsWith('mbm-') && p.id !== 'mbm-0030')!;

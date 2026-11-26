@@ -2,6 +2,7 @@ import type { Club } from '../models/club';
 import type { Player } from '../models/player';
 import { createSeededRng } from '../rng/seededRng';
 import { localHobbies, sharedHobbies, womensHobbies } from './hobbyCatalog';
+import { playerHobbyStories } from './playerHobbyStories';
 
 export interface HobbyMemory {
   playerId: string;
@@ -17,13 +18,20 @@ const featured: Record<string, string> = {
   'showcase-finn': 'fantasy-cards', 'catalog-wade': 'sewing', 'catalog-bento': 'band',
 };
 
+const hobbiesById = new Map(
+  [...sharedHobbies, ...womensHobbies, ...Object.values(localHobbies)].map(hobby => [hobby.id, hobby]),
+);
+
 export function getPlayerHobby(player: Pick<Player, 'id' | 'traits' | 'nationalityId'>) {
+  const story = playerHobbyStories[player.id];
+  const fixed = hobbiesById.get(story?.id ?? featured[player.id]);
+  if (fixed) {
+    return { id: fixed.id, title: fixed.title, clue: story?.clue ?? fixed.clue, quote: story?.quote ?? fixed.stories[0] };
+  }
   const rng = createSeededRng(player.traits.seed);
-  const fixed = sharedHobbies.find(hobby => hobby.id === featured[player.id]);
   const pool = player.traits.playerLook === 'female' ? [...sharedHobbies, ...womensHobbies] : sharedHobbies;
-  const hobby = fixed ?? (rng.chance(0.18) ? localHobbies[player.nationalityId] : rng.pick(pool));
-  const quote = fixed ? hobby.stories[0] : rng.pick(hobby.stories);
-  return { id: hobby.id, title: hobby.title, clue: hobby.clue, quote };
+  const hobby = rng.chance(0.18) ? localHobbies[player.nationalityId] : rng.pick(pool);
+  return { id: hobby.id, title: hobby.title, clue: hobby.clue, quote: rng.pick(hobby.stories) };
 }
 
 export function clubHobbyGames(club: Club): number {

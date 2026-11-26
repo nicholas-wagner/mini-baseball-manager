@@ -5,6 +5,15 @@ import { createSeededRng } from '../rng/seededRng';
 import { availableHobbyChats, discoverPlayerHobby, getPlayerHobby } from './playerHobbies';
 
 describe('Off the Clock', () => {
+  it('gives the player both a personal clue and the story pictured in the print', () => {
+    const manny = PLAYER_CATALOG.find(player => player.id === 'showcase-manny')!;
+    expect(getPlayerHobby(manny)).toMatchObject({
+      id: 'camping',
+      clue: 'Ever seen a boat you could swallow in one bite?',
+      quote: expect.stringContaining('a little sail'),
+    });
+  });
+
   it('assigns stable stories across the catalog, including fandom and exclusive figure modeling', () => {
     const hobbies = PLAYER_CATALOG.map(getPlayerHobby);
     const ids = hobbies.map(h => h.id);
