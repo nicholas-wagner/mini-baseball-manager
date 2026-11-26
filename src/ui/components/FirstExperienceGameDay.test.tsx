@@ -41,11 +41,14 @@ describe('Simplified First-Experience Game Day & Design-Lab-Only Soundboard', ()
     expect(screen.queryByTestId('dugout-chess-card')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pitch-selector-bar')).not.toBeInTheDocument();
 
-    // Toggling to Pro Manager unlocks all deep controls cleanly
+    // Toggling to Pro Manager unlocks deep dugout & mind-games controls cleanly
     fireEvent.click(screen.getByTestId('control-mode-toggle'));
     expect(useUserPreferencesStore.getState().gameDayControlMode).toBe('advanced');
     expect(screen.getByTestId('mind-games-bar')).toBeInTheDocument();
     expect(screen.getByTestId('dugout-chess-card')).toBeInTheDocument();
+    // Pitching defaults to Simple mode even in Pro; switching Pitching Mode to Adv reveals pitch-selector-bar
+    expect(screen.queryByTestId('pitch-selector-bar')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^adv$/i }));
     expect(screen.getByTestId('pitch-selector-bar')).toBeInTheDocument();
 
     // Toggling back returns to clean Arcade Mode

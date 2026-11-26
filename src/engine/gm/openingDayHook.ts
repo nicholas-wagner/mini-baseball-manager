@@ -36,31 +36,24 @@ export interface SwingCallGuideOption {
 export const PITCH_CALL_GUIDE: readonly PitchCallGuideOption[] = [
   {
     id: 'attack_zone',
-    label: 'Over the plate',
+    label: 'Over Plate',
     shortLabel: '🎯 Over Plate',
     actionLabel: 'Pitch over the plate',
-    tradeoff: 'Safe strike. Easier to hit.',
+    tradeoff: 'More strikes. More likely to be hit.',
   },
   {
     id: 'paint_corners',
     label: 'Corner',
     shortLabel: '🎨 Corner',
     actionLabel: 'Pitch to the corner',
-    tradeoff: 'More strikeouts. Risk a walk.',
+    tradeoff: 'More looking Ks. More balls & walks.',
   },
   {
     id: 'bury_offspeed',
-    label: 'Low and away',
+    label: 'Low Chase',
     shortLabel: '🌀 Low Chase',
-    actionLabel: 'Pitch low',
-    tradeoff: 'Chase pitch. Great with 2 strikes.',
-  },
-  {
-    id: 'high_heat',
-    label: 'High heat',
-    shortLabel: '🔥 Heat',
-    actionLabel: 'Throw high heat',
-    tradeoff: 'Extra velocity. Risky if squared.',
+    actionLabel: 'Pitch low chase',
+    tradeoff: 'More balls. More swings & misses.',
   },
 ];
 
@@ -408,7 +401,7 @@ export function buildFirstPitchCoachTip(input: FirstPitchTipInput): string | nul
   if (input.isBatting) {
     return 'Welcome to Opening Day! Pick Contact, Normal, or 💥 Swing Big below — or tap ✨ Smart Watch to cruise & jump in on big moments!';
   }
-  return 'Welcome to Opening Day! Pick 🔥 Heat, 🌀 Trick, or 🎯 Corner below & tap Throw Pitch — or tap ✨ Smart Watch to watch the highlights!';
+  return 'Welcome to Opening Day! Your catcher calls the pitch & spot — tap Throw Pitch (or Shake off), or switch to Normal / Advanced pitching anytime!';
 }
 
 /** Grants +1 Opening Day Spark SP to the Captain & Staff Ace so Skill Tree is fun on Minute 1! */

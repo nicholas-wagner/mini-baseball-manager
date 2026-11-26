@@ -720,3 +720,7 @@ Game Day stays mounted in a career-keyed React Activity during a visit to anothe
 A managed single can stage a decision while its runner rounds third. The live session and game log advance only when the manager chooses. Both calls use the same pre-pitch session and isolated pitch inputs. The recorded third-base result drives runner advances, fielding credits, camera cuts and the scoring call.
 
 Players retain up to six fair-contact locations. Older careers start recording locations on their next game. The out-of-town final belongs to the scheduled series and game, and its two clubs receive their record and stat updates once.
+
+### 3-Mode Pitching Controls (`PitchingMode`)
+
+Pitching controls are persisted independently of Pro dugout panels in `useUserPreferencesStore.pitchingMode` (`'simple' | 'normal' | 'advanced'`, defaulting to `'simple'` including Opening Day guided mode). In `'simple'`, `src/engine/simulation/catcherCalls.ts` deterministically generates a 2–3 sign sequence (`Over Plate`, `Corner`, `Low Chase`, or fastball-only `High Heat`) that the player can accept or cycle via Shake Off while `resolveIsolatedStepInputs` guarantees exact 1:1 execution; in `'normal'`, the player selects `Over Plate`, `Corner`, or `Low Chase` while `selectPitchForCount` selects a location-matched pitch automatically; in `'advanced'`, the player selects both location and pitch type from the active pitcher's arsenal.

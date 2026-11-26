@@ -647,6 +647,7 @@ interface MindGameModifiers {
   controlDelta: number;
   mphBonus: number;
   zoneProbDelta: number;
+  inZoneSwingDelta: number;
   chaseRateDelta: number;
   whiffBonus: number;
   hitProbBonus: number;
@@ -659,8 +660,11 @@ const ZERO_TARGET_EFFECT = {
   controlDelta: 0,
   mphBonus: 0,
   zoneProbDelta: 0,
+  inZoneSwingDelta: 0,
   chaseRateDelta: 0,
   whiffBonus: 0,
+  batterContactDelta: 0,
+  hitProbBonus: 0,
   hrCarryMultiplier: 1,
   label: '',
 };
@@ -694,7 +698,11 @@ function computeMindGameAndNemesis(
 
   return {
     contactDelta:
-      guess.contactDelta + timing.contactDelta + nem.batterContactDelta + batPlan.batterContactDelta,
+      guess.contactDelta +
+      target.batterContactDelta +
+      timing.contactDelta +
+      nem.batterContactDelta +
+      batPlan.batterContactDelta,
     powerDelta:
       guess.powerDelta + timing.powerDelta + nem.batterPowerDelta + batPlan.batterPowerDelta,
     stuffDelta:
@@ -706,9 +714,10 @@ function computeMindGameAndNemesis(
       fldPlan.pitcherControlDelta,
     mphBonus: target.mphBonus + timing.mphBonus,
     zoneProbDelta: target.zoneProbDelta,
+    inZoneSwingDelta: target.inZoneSwingDelta,
     chaseRateDelta: target.chaseRateDelta,
     whiffBonus: target.whiffBonus + guess.whiffPenalty + batPlan.whiffBonus + fldPlan.whiffBonus,
-    hitProbBonus: guess.hitProbBonus + timing.hitProbBonus,
+    hitProbBonus: guess.hitProbBonus + target.hitProbBonus + timing.hitProbBonus,
     hrCarryMultiplier: target.hrCarryMultiplier * batPlan.hrCarryMultiplier,
     tags,
   };
@@ -1006,6 +1015,7 @@ const ZERO_MIND_GAMES: MindGameModifiers = {
   controlDelta: 0,
   mphBonus: 0,
   zoneProbDelta: 0,
+  inZoneSwingDelta: 0,
   chaseRateDelta: 0,
   whiffBonus: 0,
   hitProbBonus: 0,
@@ -1327,6 +1337,7 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     ctx.strikes,
     ctx.atBatPitchHistory,
     ctx.requestedPitchType,
+    ctx.pitchTarget,
   );
   const fullPowers: PowerBundle = { ...powers, mindGames: computeMindGameAndNemesis(ctx, pitchType) };
   const repeatCount = countTrailingPitchRepeats(ctx.atBatPitchHistory, pitchType);
@@ -1342,11 +1353,15 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     return resolveBuntCall(ctx, pitchType, adjustedMatchup, stats.effStuff, platoon, fullPowers);
   }
 
-  const zoneProb = clampProb(0.55 + (stats.effControl - stats.effEye) * 0.0025 + stats.luckZoneShift, 0.38, 0.76);
+  const zoneProb = clampProb(
+    0.55 + (stats.effControl - stats.effEye) * 0.0025 + stats.luckZoneShift,
+    0.24,
+    0.82,
+  );
   const inZone = ctx.rng.chance(zoneProb);
   const swingProb = inZone
-    ? clampProb(0.67 + stats.swingMod, 0.52, 0.86)
-    : clampProb(0.26 - (stats.effEye - 65) * 0.002 + stats.chaseShift, 0.08, 0.54);
+    ? clampProb(0.67 + stats.swingMod + fullPowers.mindGames.inZoneSwingDelta, 0.36, 0.88)
+    : clampProb(0.26 - (stats.effEye - 65) * 0.002 + stats.chaseShift, 0.08, 0.56);
 
   const rawResult = !ctx.rng.chance(swingProb)
     ? inZone

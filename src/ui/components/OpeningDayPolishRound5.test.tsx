@@ -90,14 +90,14 @@ describe('Opening Day Polish Round 5 (Clean Badges, Unified Opening Story, 2-Row
     expect(screen.getByTestId('scheduled-matchup-card')).toBeInTheDocument();
   });
 
-  it('defaults Arcade pitching to Heat selected, shows READY! 100% Hype with high-contrast power button, compact 2-row control grid, and top-left 3D overlay', () => {
+  it('defaults Arcade pitching to Simple Catcher Call + Shake Off, shows READY! 100% Hype with high-contrast power button, compact 2-row control grid, and top-left 3D overlay', () => {
     render(<GameDayScreen />);
     fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
 
-    // When pitching in Arcade mode, 🔥 Heat starts already selected!
-    const heatBtn = screen.getByRole('button', { name: /🔥 heat/i });
-    expect(heatBtn).toHaveAttribute('aria-pressed', 'true');
+    // When pitching in default Simple mode, Catcher Call + Shake off appear cleanly!
+    expect(screen.getByTestId('arcade-catcher-call')).toBeInTheDocument();
+    expect(screen.getByTestId('arcade-shake-off-btn')).toBeInTheDocument();
 
     // Compact 2-row control grid with Last Play Readout directly below controls (before Coach Cue)
     const grid = screen.getByTestId('live-control-grid');

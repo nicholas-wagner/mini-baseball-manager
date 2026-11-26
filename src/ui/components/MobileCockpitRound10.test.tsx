@@ -39,24 +39,22 @@ describe('TASK-084 — Mobile One-Screen Live Cockpit, Guided Heat/Bunt, Arcade 
     expect(changeBtn.className).toMatch(/opening-customize-pill/);
   });
 
-  it('includes High Heat (pitching) and Bunt (batting) in Guided First At-Bat and hides the duplicate heading when expanded', () => {
+  it('includes Catcher Call (pitching) and Bunt (batting) in Guided First At-Bat and hides the duplicate heading when expanded', () => {
     // Seed 2089 starts batting in guided Opening Day moment
     render(<GameDayScreen />);
     fireEvent.click(screen.getByRole('button', { name: /^(Bat|Pitch) with / }));
 
     const guide = within(screen.getByRole('region', { name: 'First at-bat' }));
     const buntChoice = guide.queryByRole('button', { name: /bunt/i });
-    const heatChoice = guide.queryByRole('button', { name: /heat/i });
-    expect(buntChoice || heatChoice).toBeTruthy();
+    const catcherCall = guide.queryByTestId('guided-catcher-call');
+    expect(buntChoice || catcherCall).toBeTruthy();
 
     if (buntChoice) {
       fireEvent.click(buntChoice);
       expect(buntChoice).toHaveAttribute('aria-pressed', 'true');
       expect(guide.getByRole('button', { name: /bunt/i })).toBeInTheDocument();
-    } else if (heatChoice) {
-      fireEvent.click(heatChoice);
-      expect(heatChoice).toHaveAttribute('aria-pressed', 'true');
-      expect(guide.getByRole('button', { name: /throw high heat/i })).toBeInTheDocument();
+    } else if (catcherCall) {
+      expect(guide.getByRole('button', { name: /throw pitch/i })).toBeInTheDocument();
     }
 
     // Expanding More controls hides the duplicate h3 objective inside FirstAtBat

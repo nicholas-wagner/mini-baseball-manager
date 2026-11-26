@@ -16,8 +16,10 @@ import type {
   ArcadeTimingGrade,
   ArcadeTimingInput,
   BatterPitchGuess,
+  PitchingMode,
   PitchTargetIntent,
 } from './pitchMindGames';
+import { getCatcherCall } from './catcherCalls';
 import type { WeatherSimulationImpact } from './weather';
 import type { DefensiveShiftId } from './winProbability';
 
@@ -38,6 +40,8 @@ export interface StepPitchOptions {
 
 export interface HumanLiveSelections {
   tacticalCall: TacticalCall;
+  pitchingMode?: PitchingMode;
+  shakeOffCount?: number;
   pitchTarget: PitchTargetIntent;
   selectedPitchType: PitchType | null;
   defensiveShift: DefensiveShiftId;
@@ -272,6 +276,29 @@ function resolveOwnedPitcherPower(
   return owns ? armedPowerId : undefined;
 }
 
+function resolveHumanPitchPlan(
+  session: GameSessionState,
+  human: HumanLiveSelections,
+): { pitchTarget: PitchTargetIntent; requestedPitchType?: PitchType } {
+  if (human.pitchingMode === 'simple') {
+    const catcherCall = getCatcherCall(session, human.shakeOffCount ?? 0);
+    return {
+      pitchTarget: catcherCall.target,
+      requestedPitchType: catcherCall.pitchType,
+    };
+  }
+  if (human.pitchingMode === 'normal') {
+    return {
+      pitchTarget: human.pitchTarget,
+      requestedPitchType: undefined,
+    };
+  }
+  return {
+    pitchTarget: human.pitchTarget,
+    requestedPitchType: resolveOwnedPitchType(session, human.selectedPitchType),
+  };
+}
+
 function resolveHumanPitchingInputs(
   session: GameSessionState,
   human: HumanLiveSelections,
@@ -284,13 +311,14 @@ function resolveHumanPitchingInputs(
     human.tacticalCall === 'hold_runner' || human.tacticalCall === 'pitchout'
       ? human.tacticalCall
       : 'normal';
+  const pitchPlan = resolveHumanPitchPlan(session, human);
 
   return {
     tacticalCall: isPrePitchDefense ? human.tacticalCall : chooseAiBattingCall(rng, session),
     options: {
       defensiveShift: human.defensiveShift,
-      pitchTarget: human.pitchTarget,
-      requestedPitchType: resolveOwnedPitchType(session, human.selectedPitchType),
+      pitchTarget: pitchPlan.pitchTarget,
+      requestedPitchType: pitchPlan.requestedPitchType,
       batterGuess: 'none',
       requestedPowerId: resolveOwnedPitcherPower(session, human.armedPowerId),
       weatherImpact: extra?.weatherImpact,

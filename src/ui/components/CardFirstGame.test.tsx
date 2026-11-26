@@ -33,10 +33,10 @@ it('hands the pictured Opening Day player to the manager and lets them inspect e
   const guide = within(screen.getByRole('region', {name:'First at-bat'}));
   expect(guide.getByRole('button',{name:'More controls'})).toBeVisible();
   expect(screen.queryByTestId('fast-sim-toggle')).toBeNull();
-  const corner = guide.queryByRole('button',{name:'Corner'});
-  if (corner) {
-    fireEvent.click(corner);
-    expect(guide.getByRole('button',{name:'Pitch to the corner'})).toBeVisible();
+  const catcherCall = guide.queryByTestId('guided-catcher-call');
+  if (catcherCall) {
+    expect(catcherCall).toBeVisible();
+    expect(guide.getByRole('button', { name: 'Throw Pitch' })).toBeVisible();
   } else {
     fireEvent.click(guide.getByRole('button',{name:'Power'}));
     expect(guide.getByRole('button',{name:'Swing'})).toBeVisible();

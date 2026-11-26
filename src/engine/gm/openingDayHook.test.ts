@@ -75,7 +75,7 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
       isBatting: false,
       hasThrownPitch: false,
     });
-    expect(pitchingTip).toMatch(/heat|trick|corner|smart watch/i);
+    expect(pitchingTip).toMatch(/catcher|throw pitch|shake off|normal|advanced/i);
 
     const battingTip = buildFirstPitchCoachTip({
       isOpeningDay: true,

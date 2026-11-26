@@ -11,6 +11,7 @@ import {
   type PlayerSpecialistArchetype,
 } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
+import type { PitchTargetIntent } from '../simulation/pitchMindGames';
 
 export interface PitchCatalogSpec {
   family: 'fastball' | 'breaking' | 'offspeed';
@@ -206,6 +207,58 @@ export function rollBatterPitchProfile(
   };
 }
 
+const TARGET_PITCH_WEIGHTS: Readonly<
+  Record<PitchTargetIntent, Readonly<Record<PitchType, number>>>
+> = {
+  attack_zone: {
+    four_seam: 1.75,
+    two_seam: 1.75,
+    cutter: 1.75,
+    changeup: 1.15,
+    slider: 0.7,
+    curveball: 0.7,
+    splitter: 0.7,
+    knuckleball: 0.7,
+  },
+  paint_corners: {
+    four_seam: 1.1,
+    two_seam: 1.3,
+    cutter: 1.3,
+    changeup: 1.3,
+    slider: 1.1,
+    curveball: 1.1,
+    splitter: 1.1,
+    knuckleball: 0.75,
+  },
+  bury_offspeed: {
+    four_seam: 0.3,
+    two_seam: 0.75,
+    cutter: 0.3,
+    changeup: 2.8,
+    slider: 2.8,
+    curveball: 2.8,
+    splitter: 2.8,
+    knuckleball: 2.8,
+  },
+  high_heat: {
+    four_seam: 3.2,
+    two_seam: 1.8,
+    cutter: 1.8,
+    changeup: 0.22,
+    slider: 0.22,
+    curveball: 0.22,
+    splitter: 0.22,
+    knuckleball: 0.22,
+  },
+};
+
+function targetPitchWeightMultiplier(
+  pitchType: PitchType,
+  pitchTarget?: PitchTargetIntent,
+): number {
+  return pitchTarget ? TARGET_PITCH_WEIGHTS[pitchTarget][pitchType] : 1;
+}
+
 function scorePitchSelectionWeight(
   slot: PitchSlot,
   arsenal: PitcherArsenalProfile,
@@ -213,8 +266,9 @@ function scorePitchSelectionWeight(
   balls: number,
   strikes: number,
   recentTail: readonly PitchType[],
+  pitchTarget?: PitchTargetIntent,
 ): number {
-  let weight = 1 + slot.mastery * 0.015;
+  let weight = (1 + slot.mastery * 0.015) * targetPitchWeightMultiplier(slot.pitchType, pitchTarget);
   if (slot.pitchType === arsenal.favoritePitch && strikes >= 2) weight *= 1.65;
   if (PITCH_CATALOG[slot.pitchType].family === 'fastball' && balls >= 2) weight *= 1.45;
   if (slot.pitchType === batterProfile.weakPitch) weight *= 1.25;
@@ -228,7 +282,7 @@ function scorePitchSelectionWeight(
   return weight;
 }
 
-/** Selects the next pitch strictly from the pitcher's repertoire, honoring valid manual calls. */
+/** Selects the next pitch strictly from the pitcher's repertoire, honoring valid manual calls and target location. */
 export function selectPitchForCount(
   rng: SeededRng,
   pitcher: Player,
@@ -237,6 +291,7 @@ export function selectPitchForCount(
   strikes: number,
   recentPitchTypes: readonly PitchType[],
   requestedPitchType?: PitchType,
+  pitchTarget?: PitchTargetIntent,
 ): PitchType {
   const arsenal = pitcher.pitchArsenal;
   if (!arsenal || arsenal.repertoire.length === 0) return 'four_seam';
@@ -250,7 +305,15 @@ export function selectPitchForCount(
 
   const tail = recentPitchTypes.slice(-2);
   const weights = arsenal.repertoire.map((slot) =>
-    scorePitchSelectionWeight(slot, arsenal, batter.batterPitchProfile, balls, strikes, tail),
+    scorePitchSelectionWeight(
+      slot,
+      arsenal,
+      batter.batterPitchProfile,
+      balls,
+      strikes,
+      tail,
+      pitchTarget,
+    ),
   );
   const total = weights.reduce((sum, value) => sum + value, 0);
   const roll = rng.next() * total;

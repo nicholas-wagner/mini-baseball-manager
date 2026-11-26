@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
 import { useNemesisStore } from '../../store/nemesisStore';
@@ -31,9 +31,10 @@ describe('Mind Games, Live Dugout Chess, 1994 Foil Packs & Nemesis Matchups UI',
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
     fireEvent.click(screen.getByTestId('control-mode-toggle'));
 
-    // Top 1: Human is pitching -> Target Intent bar + Mound Visit + Kick Dirt button available
+    // Top 1: Human is pitching -> Mind Games bar (with Pitching Mode switcher) + Mound Visit + Kick Dirt button available
     expect(screen.getByTestId('mind-games-bar')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /paint corners/i })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId('pitching-mode-switcher')).getByRole('button', { name: /^normal$/i }));
+    expect(screen.getByRole('button', { name: /^corner$/i })).toBeInTheDocument();
     expect(screen.getByTestId('dugout-chess-card')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /mound visit: calm breath/i }));

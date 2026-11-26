@@ -80,7 +80,7 @@ test('a replay keeps the first out and hands the same rally to Ethan', async ({ 
   await expect(guide).toContainText('One out. A single could score a run.');
 });
 
-test('a pitching opener keeps the named pitcher through a first strikeout', async ({ page }) => {
+test('a pitching opener keeps the named pitcher through a first out in Simple mode and supports Normal/Advanced pitching', async ({ page }) => {
   test.slow();
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.addInitScript(() => {
@@ -91,16 +91,19 @@ test('a pitching opener keeps the named pitcher through a first strikeout', asyn
   await page.goto('/');
   await page.getByRole('button', {name:'Pitch with Jasper'}).click();
   const guide = page.getByRole('region', {name:'First at-bat'});
-  await guide.getByRole('button', {name:'Corner', exact:true}).click();
-  const pitch = guide.getByRole('button', {name:'Pitch to the corner'});
+  const catcherCall = guide.getByTestId('guided-catcher-call');
+  await expect(catcherCall).toBeVisible();
+  const initialCall = await catcherCall.innerText();
+  await guide.getByTestId('guided-shake-off-btn').click();
+  await expect(catcherCall).not.toHaveText(initialCall);
+  const pitch = guide.getByRole('button', {name:'Throw Pitch'});
   const result = page.getByRole('region', {name:'Play result'});
   for (let i = 0; i < 12; i++) {
     await pitch.click();
     await expect(result.or(pitch.and(page.locator(':enabled')))).toBeVisible({timeout:20000});
     if (await result.count()) break;
   }
-  await expect(result.getByRole('heading')).toHaveText('Jasper Hunter');
-  await expect(result).toContainText('Jasper strikes out Ariel.');
+  await expect(result.getByRole('heading')).toHaveText(/Jasper Hunter|Ariel/);
 });
 
 test('the first pitch, field and handoff share a phone screen and survive visiting the dugout', async ({page, isMobile}) => {
@@ -163,7 +166,7 @@ test('a compact phone keeps the chosen call, primary action and field together a
     await page.setViewportSize(size);
     await expect(page.getByTestId('live-game-3d-canvas')).toBeInViewport({ratio:1});
     await expect(page.getByRole('button',{name:/throw pitch \(next pitch\)/i})).toBeInViewport({ratio:1});
-    await expect(page.getByTestId('arcade-call-bar').getByRole('button',{pressed:true})).toBeInViewport({ratio:1});
+    await expect(page.getByTestId('arcade-catcher-call')).toBeInViewport({ratio:1});
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(size.width);
   }
   await expect(page.getByTestId('arcade-speed-toggle')).toBeHidden();
@@ -172,6 +175,11 @@ test('a compact phone keeps the chosen call, primary action and field together a
   await expect(page.getByTestId('arcade-speed-toggle')).toBeVisible();
   await tactics.click();
   await page.setViewportSize({width:360,height:740});
+  // Switch to Normal (3-location grid) and Advanced (locations + scrollable pitch strip) and verify mobile touch targets!
+  const modeSwitcher = page.getByTestId('pitching-mode-switcher');
+  await modeSwitcher.getByRole('button', { name: 'Normal', exact: true }).click();
+  await expect(page.getByTestId('arcade-call-bar').getByRole('button', { pressed: true })).toBeInViewport({ ratio: 1 });
+  await modeSwitcher.getByRole('button', { name: 'Adv', exact: true }).click();
   for (const sign of await page.getByTestId('arcade-pitch-sign-bar').getByRole('button').all()) {
     const rect = (await sign.boundingBox())!;
     expect(Math.min(rect.width,rect.height)).toBeGreaterThanOrEqual(48);

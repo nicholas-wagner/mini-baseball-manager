@@ -64,7 +64,7 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
     expect(onOpenStory).toHaveBeenCalledTimes(1);
   });
 
-  it('gives Simple Arcade Mode interactive Pitching Calls (Heat/Trick/Corner), Batting Calls, First-Pitch Tip & glowing Hype Power Bar', () => {
+  it('gives Simple Arcade Mode Catcher Call + Shake Off, Normal 3-location Pitching Calls, First-Pitch Tip & glowing Hype Power Bar', () => {
     render(<GameDayScreen />);
     fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
@@ -75,10 +75,12 @@ describe('First-Time User Hook (5-Sec Toy Box Creator, Meet Your Squad, Arcade C
     // Glowing Hype meter visible directly in Arcade Mode!
     expect(screen.getByTestId('arcade-hype-bar')).toBeInTheDocument();
 
-    // Home team pitches TOP 1 -> interactive Arcade Pitch Call bar with unified trade-off hints!
+    // Home team pitches TOP 1 -> starts in Simple Mode (Catcher Call + Shake Off), switch to Normal for 3 location buttons!
+    expect(screen.getByTestId('arcade-catcher-call')).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId('pitching-mode-switcher')).getByRole('button', { name: /normal/i }));
     const callBar = screen.getByTestId('arcade-call-bar');
     expect(callBar).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /🔥 heat/i }));
+    fireEvent.click(screen.getByRole('button', { name: /🎯 over plate/i }));
     fireEvent.click(screen.getByRole('button', { name: /🌀 low chase/i }));
     fireEvent.click(screen.getByRole('button', { name: /🎨 corner/i }));
     expect(screen.getByTestId('arcade-tradeoff-hint')).toBeInTheDocument();

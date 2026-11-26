@@ -24,7 +24,8 @@ describe('TASK-081 — Bunt UI, Visible Pitcher Fatigue, Manager Pitch Sign & Ti
     });
   });
 
-  it('shows a visible Pitcher Endurance Meter, Catcher Pitch Sign strip, live Pitch Radar Pill, and Arcade Bunt button with live odds preview', () => {
+  it('shows a visible Pitcher Endurance Meter, Catcher Pitch Sign strip (in Advanced pitching), live Pitch Radar Pill, and Arcade Bunt button with live odds preview', () => {
+    useUserPreferencesStore.getState().setPitchingMode('advanced');
     render(<GameDayScreen />);
     fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
@@ -110,11 +111,11 @@ describe('TASK-081 — Bunt UI, Visible Pitcher Fatigue, Manager Pitch Sign & Ti
     fireEvent.click(screen.getByRole('button', { name: /sim half-inn/i }));
 
     // Now human is pitching (PC is batting) — throw 6 pitches and confirm PC is NOT forced into bunting
-    expect(screen.getByTestId('arcade-pitch-sign-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('arcade-catcher-call')).toBeInTheDocument();
     let buntMentions = 0;
     for (let i = 0; i < 6; i += 1) {
       const nextBtn = screen.queryByRole('button', { name: /next pitch/i });
-      if (!nextBtn || nextBtn.hasAttribute('disabled') || !screen.queryByTestId('arcade-pitch-sign-bar')) {
+      if (!nextBtn || nextBtn.hasAttribute('disabled') || !screen.queryByTestId('arcade-catcher-call')) {
         break;
       }
       fireEvent.click(nextBtn);

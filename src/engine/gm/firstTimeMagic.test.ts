@@ -149,7 +149,7 @@ describe('TASK-079 — First-Time Magic Engine Foundations', () => {
   });
 
   it('provides plain-English pitching trade-off hints, 2-second matchup scouting lines, mascot cheers, and a prioritized 1-card Between-Game Spotlight', () => {
-    expect(PITCH_CALL_GUIDE.length).toBeGreaterThanOrEqual(4);
+    expect(PITCH_CALL_GUIDE).toHaveLength(3);
     for (const opt of PITCH_CALL_GUIDE) {
       expect(opt.tradeoff.length).toBeGreaterThan(8);
       expect(opt.actionLabel.length).toBeGreaterThan(5);

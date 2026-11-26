@@ -5,9 +5,11 @@ import { PITCH_CALL_GUIDE, SWING_CALL_GUIDE } from '../../engine/gm/openingDayHo
 import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
+import type { CatcherPitchCall } from '../../engine/simulation/catcherCalls';
 import type { LiveActionCue, SuggestedQuickAction } from '../../engine/simulation/liveActionAdvisor';
 import type {
   ArcadeTimingGrade,
+  PitchingMode,
   PitchTargetIntent,
 } from '../../engine/simulation/pitchMindGames';
 import {
@@ -59,6 +61,14 @@ interface LiveActionBarProps {
   pitcherFatigueDropTag?: string | null;
   latestEvent: PlayEvent | null;
   controlMode: GameDayControlMode;
+  pitchingMode?: PitchingMode;
+  onSelectPitchingMode?: (mode: PitchingMode) => void;
+  catcherCall?: CatcherPitchCall | null;
+  shakeOffTotal?: number;
+  onShakeOff?: () => void;
+  repeatPitchWarning?: boolean;
+  batterWeakPitch?: PitchType;
+  batterFavoritePitch?: PitchType;
   watchMode: 'live' | 'smart' | 'clutch' | 'paused';
   smartPauseReason?: string | null;
   tacticalCall: TacticalCall;
@@ -96,12 +106,13 @@ interface LiveActionBarProps {
 
 const SIMPLE_BAT_APPROACHES = SWING_CALL_GUIDE;
 
-const SIMPLE_PITCH_CALLS = [
-  PITCH_CALL_GUIDE[3], // 🔥 Heat
-  PITCH_CALL_GUIDE[0], // 🎯 Over Plate
-  PITCH_CALL_GUIDE[1], // 🎨 Corner
-  PITCH_CALL_GUIDE[2], // 🌀 Low Chase
-] as const;
+const SIMPLE_PITCH_CALLS = PITCH_CALL_GUIDE;
+
+const PITCHING_MODE_PILLS: readonly { id: PitchingMode; label: string; title: string }[] = [
+  { id: 'simple', label: 'Simple', title: 'Catcher calls pitch & location (optional Shake off)' },
+  { id: 'normal', label: 'Normal', title: 'Pick Over Plate, Corner, or Low Chase (auto pitch)' },
+  { id: 'advanced', label: 'Adv', title: 'Pick location AND pitch type from arsenal' },
+];
 
 function formEmoji(form: FormState): string {
   if (form === 'blazing' || form === 'hot') return ' 🔥';
@@ -132,10 +143,18 @@ export function LiveActionBar({
   pitcherFatigueDropTag = null,
   latestEvent,
   controlMode,
+  pitchingMode = 'simple',
+  onSelectPitchingMode,
+  catcherCall = null,
+  shakeOffTotal = 0,
+  onShakeOff,
+  repeatPitchWarning = false,
+  batterWeakPitch,
+  batterFavoritePitch,
   watchMode,
   smartPauseReason,
   tacticalCall,
-  pitchTarget = 'high_heat',
+  pitchTarget = 'attack_zone',
   isBatting,
   gameCompleted,
   humanHype = 25,
@@ -200,8 +219,10 @@ export function LiveActionBar({
       ? buntPreviewLine
       : (SIMPLE_BAT_APPROACHES.find((opt) => opt.id === tacticalCall)?.tradeoff ??
         SIMPLE_BAT_APPROACHES[1].tradeoff)
-    : (SIMPLE_PITCH_CALLS.find((opt) => opt.id === pitchTarget)?.tradeoff ??
-      SIMPLE_PITCH_CALLS[0].tradeoff);
+    : pitchingMode === 'simple'
+      ? (catcherCall?.reason ?? 'Catcher calls pitch & location — tap Shake off for another sign.')
+      : (SIMPLE_PITCH_CALLS.find((opt) => opt.id === pitchTarget)?.tradeoff ??
+        SIMPLE_PITCH_CALLS[0].tradeoff);
 
   const battingAction = tacticalCall.includes('steal') ? 'Send runners' : tacticalCall === 'bunt' ? 'Lay down bunt' : 'Swing';
   const pitchAction = isBatting ? battingAction : 'Throw Pitch';
@@ -221,54 +242,71 @@ export function LiveActionBar({
       data-testid="live-action-bar"
       className="rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] p-2.5 sm:p-3 space-y-2"
     >
-      {/* Row 1: Unified Single-Row Arcade Call Bar + 1-Line Scrollable Pitch Signs + Slim Hype Bar */}
+      {/* Row 1: Unified Single-Row Arcade Call Bar + 3-Mode Pitching Controls + Slim Hype Bar */}
       <div data-testid="live-calls-block" className="space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-1.5">
           {controlMode === 'simple' ? (
             <div className="space-y-1 flex-1 min-w-0 w-full">
-              <div
-                data-testid="arcade-call-bar"
-                className="grid grid-cols-4 sm:flex sm:flex-wrap items-center gap-1"
-              >
-                <span className="hidden sm:inline font-display text-[10px] uppercase text-[#193D37] mr-0.5">
-                  {isBatting ? 'Swing:' : 'Pitch:'}
-                </span>
-                {isBatting
-                  ? SIMPLE_BAT_APPROACHES.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        title={opt.tradeoff}
-                        aria-pressed={tacticalCall === opt.id}
-                        disabled={gameCompleted}
-                        onClick={() => onSelectTacticalCall(opt.id)}
-                        className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
-                          tacticalCall === opt.id
-                            ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
-                            : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
-                        }`}
-                      >
-                        {opt.shortLabel}
-                      </button>
-                    ))
-                  : SIMPLE_PITCH_CALLS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        title={opt.tradeoff}
-                        aria-pressed={pitchTarget === opt.id}
-                        disabled={gameCompleted}
-                        onClick={() => onSelectPitchTarget?.(opt.id)}
-                        className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
-                          pitchTarget === opt.id
-                            ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
-                            : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
-                        }`}
-                      >
-                        {opt.shortLabel}
-                      </button>
-                    ))}
-                {isBatting ? (
+              {!isBatting && onSelectPitchingMode ? (
+                <div
+                  data-testid="pitching-mode-switcher"
+                  role="group"
+                  aria-label="Pitching mode"
+                  className="flex items-center justify-between sm:justify-start gap-2"
+                >
+                  <span className="font-display text-[9.5px] uppercase text-[#193D37]/80 shrink-0">
+                    Pitching:
+                  </span>
+                  <div className="inline-flex items-center rounded-lg border-2 border-[#193E37] bg-[#F5EAD0] p-0.5 gap-0.5">
+                    {PITCHING_MODE_PILLS.map((modeOpt) => {
+                      const active = pitchingMode === modeOpt.id;
+                      return (
+                        <button
+                          key={modeOpt.id}
+                          type="button"
+                          title={modeOpt.title}
+                          aria-pressed={active}
+                          disabled={gameCompleted}
+                          onClick={() => onSelectPitchingMode(modeOpt.id)}
+                          className={`px-2 py-0.5 min-h-[28px] rounded-md font-heading font-extrabold text-[10px] leading-none cursor-pointer transition ${
+                            active
+                              ? 'bg-[#224F49] text-[#FFCC49]'
+                              : 'bg-transparent text-[#193D37] hover:bg-[#FFFDF8]'
+                          }`}
+                        >
+                          {modeOpt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {isBatting ? (
+                <div
+                  data-testid="arcade-call-bar"
+                  className="grid grid-cols-4 sm:flex sm:flex-wrap items-center gap-1"
+                >
+                  <span className="hidden sm:inline font-display text-[10px] uppercase text-[#193D37] mr-0.5">
+                    Swing:
+                  </span>
+                  {SIMPLE_BAT_APPROACHES.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      title={opt.tradeoff}
+                      aria-pressed={tacticalCall === opt.id}
+                      disabled={gameCompleted}
+                      onClick={() => onSelectTacticalCall(opt.id)}
+                      className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
+                        tacticalCall === opt.id
+                          ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
+                          : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                      }`}
+                    >
+                      {opt.shortLabel}
+                    </button>
+                  ))}
                   <button
                     type="button"
                     data-testid="arcade-bunt-btn"
@@ -286,8 +324,62 @@ export function LiveActionBar({
                   >
                     🏏 Bunt
                   </button>
-                ) : null}
-              </div>
+                </div>
+              ) : pitchingMode === 'simple' ? (
+                <div
+                  data-testid="arcade-catcher-call"
+                  aria-live="polite"
+                  className="px-2.5 py-1.5 rounded-xl border-2 border-[#193E37] bg-[#FFFDF8] flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-heading font-extrabold text-xs text-[#193D37] truncate">
+                      🧤 Catcher:{' '}
+                      {catcherCall
+                        ? `${catcherCall.targetLabel} · ${catcherCall.pitchShortLabel}`
+                        : 'Over Plate · 4-Seam'}
+                    </div>
+                  </div>
+                  {onShakeOff && shakeOffTotal > 1 ? (
+                    <button
+                      type="button"
+                      data-testid="arcade-shake-off-btn"
+                      disabled={gameCompleted}
+                      onClick={onShakeOff}
+                      className="px-2.5 py-1 min-h-[38px] rounded-lg border-2 border-[#193E37] bg-[#FFF3BF] hover:bg-[#FFCC49] text-[#193D37] font-heading font-extrabold text-[11px] shrink-0 whitespace-nowrap cursor-pointer transition"
+                    >
+                      Shake off
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <div
+                  data-testid="arcade-call-bar"
+                  data-pitching-cols="3"
+                  className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1"
+                >
+                  <span className="hidden sm:inline font-display text-[10px] uppercase text-[#193D37] mr-0.5">
+                    Spot:
+                  </span>
+                  {SIMPLE_PITCH_CALLS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      title={opt.tradeoff}
+                      aria-pressed={pitchTarget === opt.id}
+                      disabled={gameCompleted}
+                      onClick={() => onSelectPitchTarget?.(opt.id)}
+                      className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
+                        pitchTarget === opt.id
+                          ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
+                          : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                      }`}
+                    >
+                      {opt.shortLabel}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {isBatting && quickStealOption ? (
                 <div className="flex items-center gap-1.5">
                   <button
@@ -310,13 +402,17 @@ export function LiveActionBar({
                   </button>
                 </div>
               ) : null}
-              {!isBatting && pitcherArsenal.length > 0 && onSelectPitchType ? (
+
+              {!isBatting &&
+              pitchingMode === 'advanced' &&
+              pitcherArsenal.length > 0 &&
+              onSelectPitchType ? (
                 <div
                   data-testid="arcade-pitch-sign-bar"
                   className="flex flex-nowrap sm:flex-wrap items-center gap-1 pt-0.5 overflow-x-auto pb-0.5"
                 >
                   <span className="font-display text-[9.5px] uppercase text-[#193D37]/80 mr-0.5 shrink-0">
-                    Sign:
+                    Pitch:
                   </span>
                   <button
                     type="button"
@@ -333,6 +429,8 @@ export function LiveActionBar({
                   </button>
                   {pitcherArsenal.map((slot) => {
                     const active = selectedPitchType === slot.pitchType;
+                    const hitsWeak = batterWeakPitch === slot.pitchType;
+                    const hitsFav = batterFavoritePitch === slot.pitchType;
                     return (
                       <button
                         key={slot.pitchType}
@@ -350,17 +448,24 @@ export function LiveActionBar({
                       >
                         {slot.isFavorite ? '★ ' : slot.isWeak ? '⚠ ' : ''}
                         {slot.label} {slot.mastery}
+                        {hitsWeak ? ' 🎯' : hitsFav ? ' ⚠️' : ''}
                       </button>
                     );
                   })}
                 </div>
               ) : null}
+
               <div className="flex flex-wrap items-center justify-between gap-1.5">
                 <div
                   data-testid="arcade-tradeoff-hint"
                   className="text-[10.5px] sm:text-[11px] font-bold text-[#193D37]/85 min-w-0 flex-1"
                 >
                   {activeTradeoff}
+                  {!isBatting && repeatPitchWarning ? (
+                    <span className="ml-1.5 text-[#9D0208] font-extrabold">
+                      · ⚠️ 3rd in a row (predictable!)
+                    </span>
+                  ) : null}
                 </div>
                 {showCpuShiftChip ? (
                   <span

@@ -1,13 +1,17 @@
 import { Zap } from "lucide-react";
 import { PITCH_CALL_GUIDE } from "../../engine/gm/openingDayHook";
+import type { PitchType } from "../../engine/models/player";
 import type { TacticalCall } from "../../engine/models/playEvent";
+import type { CatcherPitchCall } from "../../engine/simulation/catcherCalls";
 import type { GameSessionState } from "../../engine/simulation/gameState";
 import type { LiveActionCue } from "../../engine/simulation/liveActionAdvisor";
 import type {
   ArcadeTimingGrade,
+  PitchingMode,
   PitchTargetIntent,
 } from "../../engine/simulation/pitchMindGames";
 import { ArcadeTimingMeter } from "./ArcadeTimingMeter";
+import type { PitcherSignOption } from "./LiveActionBar";
 import "./firstAtBat.css";
 
 const pitches = PITCH_CALL_GUIDE;
@@ -16,6 +20,12 @@ const swings = [
   { id: "power" as const, name: "Power" },
   { id: "bunt" as const, name: "🏏 Bunt" },
 ] as const;
+
+const PITCHING_MODE_OPTIONS: readonly { id: PitchingMode; label: string }[] = [
+  { id: "simple", label: "🧤 Pitching: Simple (Catcher calls)" },
+  { id: "normal", label: "🎯 Pitching: Normal (Pick location)" },
+  { id: "advanced", label: "⚾ Pitching: Advanced (Spot + Pitch)" },
+];
 
 export function FirstAtBat({
   session,
@@ -27,10 +37,18 @@ export function FirstAtBat({
   powerArmed,
   readyPowerName = null,
   arcadeTimingEnabled = false,
+  pitchingMode = "simple",
+  catcherCall = null,
+  shakeOffTotal = 0,
+  pitcherArsenal = [],
+  selectedPitchType = null,
   cue,
   onTarget,
   onSwing,
   onPitch,
+  onShakeOff,
+  onSelectPitchType,
+  onSelectPitchingMode,
   onArmPower,
   onToggleArcadeTiming,
   onExpand,
@@ -44,11 +62,19 @@ export function FirstAtBat({
   powerArmed: boolean;
   readyPowerName?: string | null;
   arcadeTimingEnabled?: boolean;
+  pitchingMode?: PitchingMode;
+  catcherCall?: CatcherPitchCall | null;
+  shakeOffTotal?: number;
+  pitcherArsenal?: readonly PitcherSignOption[];
+  selectedPitchType?: PitchType | null;
   expanded: boolean;
   cue: LiveActionCue;
   onTarget: (target: PitchTargetIntent) => void;
   onSwing: (call: TacticalCall) => void;
   onPitch: (timingGrade?: ArcadeTimingGrade) => void;
+  onShakeOff?: () => void;
+  onSelectPitchType?: (pitchType: PitchType | null) => void;
+  onSelectPitchingMode?: (mode: PitchingMode) => void;
   onArmPower?: () => void;
   onToggleArcadeTiming?: () => void;
   onExpand: () => void;
@@ -76,18 +102,26 @@ export function FirstAtBat({
     ? call === "bunt"
       ? "Lay down bunt"
       : "Swing"
-    : activePitch.actionLabel;
+    : pitchingMode === "simple"
+      ? "Throw Pitch"
+      : activePitch.actionLabel;
   const tradeoffText = batting
     ? call === "bunt"
       ? "Tap down the line. Great with speed or runners."
       : call === "power"
         ? "More power. Easier to miss."
         : "Easier to connect. Less power."
-    : activePitch.tradeoff;
+    : pitchingMode === "simple"
+      ? catcherCall?.reason ?? "Catcher calls pitch and spot."
+      : activePitch.tradeoff;
   const tip =
     cue.suggestedAction &&
     ((batting && cue.kind === "steal_opportunity") ||
       (!batting && cue.kind === "pitcher_gassed"));
+  const showOptionsMenu =
+    !expanded &&
+    Boolean(onToggleArcadeTiming || (tip && !powerArmed) || (!batting && onSelectPitchingMode));
+
   return (
     <section
       className={expanded ? "atbat-guide is-expanded" : "atbat-guide"}
@@ -104,32 +138,65 @@ export function FirstAtBat({
               disabled={locked}
               aria-pressed={powerArmed}
               onClick={onArmPower}
-              title={`Tap to ${powerArmed ? 'disarm' : 'arm'} ${readyPowerName}`}
+              title={`Tap to ${powerArmed ? "disarm" : "arm"} ${readyPowerName}`}
             >
               <Zap className="w-3 h-3 shrink-0 fill-current" aria-hidden="true" />
               <span className="truncate">
-                {powerArmed ? 'ARMED!' : readyPowerName.replace(/\s*\([^)]*\)\s*$/, '')}
+                {powerArmed ? "ARMED!" : readyPowerName.replace(/\s*\([^)]*\)\s*$/, "")}
               </span>
             </button>
           )}
-          {!expanded && (onToggleArcadeTiming || (tip && !powerArmed)) && (
-            <details className="atbat-options" onKeyDown={event => {
-              if (event.key === 'Escape') {
-                event.currentTarget.open = false;
-                event.currentTarget.querySelector('summary')?.focus();
-              }
-            }} onBlur={event => {
-              if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
-            }}>
+          {showOptionsMenu && (
+            <details
+              className="atbat-options"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.currentTarget.open = false;
+                  event.currentTarget.querySelector("summary")?.focus();
+                }
+              }}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  event.currentTarget.open = false;
+                }
+              }}
+            >
               <summary>Options</summary>
-              <div onClick={event => {
-                const details = event.currentTarget.closest('details')!;
-                details.open = false;
-                details.querySelector('summary')?.focus();
-              }}>
-                {onToggleArcadeTiming && <button type="button" data-testid="guided-timing-toggle"
-                  aria-pressed={arcadeTimingEnabled} onClick={onToggleArcadeTiming}>{arcadeTimingEnabled ? '🎯 Turn timing off' : '🎯 Try swing or pitch timing'}</button>}
-                {tip && !powerArmed && <button type="button" onClick={onSuggested} disabled={locked}>{cue.suggestedAction!.label}</button>}
+              <div
+                onClick={(event) => {
+                  const details = event.currentTarget.closest("details")!;
+                  details.open = false;
+                  details.querySelector("summary")?.focus();
+                }}
+              >
+                {!batting &&
+                  onSelectPitchingMode &&
+                  PITCHING_MODE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      data-testid={`guided-pitching-mode-${opt.id}`}
+                      aria-pressed={pitchingMode === opt.id}
+                      onClick={() => onSelectPitchingMode(opt.id)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                {onToggleArcadeTiming && (
+                  <button
+                    type="button"
+                    data-testid="guided-timing-toggle"
+                    aria-pressed={arcadeTimingEnabled}
+                    onClick={onToggleArcadeTiming}
+                  >
+                    {arcadeTimingEnabled ? "🎯 Turn timing off" : "🎯 Try swing or pitch timing"}
+                  </button>
+                )}
+                {tip && !powerArmed && (
+                  <button type="button" onClick={onSuggested} disabled={locked}>
+                    {cue.suggestedAction!.label}
+                  </button>
+                )}
               </div>
             </details>
           )}
@@ -143,47 +210,108 @@ export function FirstAtBat({
           <h3>
             {score} {objective}
           </h3>
-          <div
-            className="atbat-choices"
-            role="group"
-            aria-label={batting ? "Swing approach" : "Pitch target"}
-          >
-            {batting
-              ? swings.map((s) => (
-                  <button
-                    key={s.id}
-                    disabled={locked}
-                    aria-pressed={s.id === call}
-                    onClick={() => onSwing(s.id)}
-                  >
-                    {s.name}
-                  </button>
-                ))
-              : pitches.map((p) => (
+          {batting ? (
+            <div className="atbat-choices" role="group" aria-label="Swing approach">
+              {swings.map((s) => (
+                <button
+                  key={s.id}
+                  disabled={locked}
+                  aria-pressed={s.id === call}
+                  onClick={() => onSwing(s.id)}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          ) : pitchingMode === "simple" ? (
+            <div
+              className="atbat-catcher-call"
+              data-testid="guided-catcher-call"
+              aria-live="polite"
+            >
+              <div className="atbat-catcher-copy">
+                <strong>
+                  🧤 Catcher:{" "}
+                  {catcherCall
+                    ? `${catcherCall.targetLabel} · ${catcherCall.pitchShortLabel}`
+                    : "Over Plate · 4-Seam"}
+                </strong>
+              </div>
+              {onShakeOff && shakeOffTotal > 1 && (
+                <button
+                  type="button"
+                  className="atbat-shake-btn"
+                  data-testid="guided-shake-off-btn"
+                  disabled={locked}
+                  onClick={onShakeOff}
+                >
+                  Shake off
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="atbat-choices" role="group" aria-label="Pitch target">
+                {pitches.map((p) => (
                   <button
                     key={p.id}
                     disabled={locked}
                     aria-pressed={p.id === target}
                     onClick={() => onTarget(p.id)}
                   >
-                    {p.id === "high_heat" ? "🔥 Heat" : p.label}
+                    {p.label}
                   </button>
                 ))}
-          </div>
+              </div>
+              {pitchingMode === "advanced" && pitcherArsenal.length > 0 && onSelectPitchType && (
+                <div
+                  className="atbat-pitch-signs"
+                  data-testid="guided-pitch-sign-bar"
+                  role="group"
+                  aria-label="Pitch selection"
+                >
+                  <button
+                    type="button"
+                    disabled={locked}
+                    aria-pressed={selectedPitchType === null}
+                    onClick={() => onSelectPitchType(null)}
+                  >
+                    Auto
+                  </button>
+                  {pitcherArsenal.map((slot) => {
+                    const active = selectedPitchType === slot.pitchType;
+                    return (
+                      <button
+                        key={slot.pitchType}
+                        type="button"
+                        disabled={locked}
+                        aria-pressed={active}
+                        onClick={() => onSelectPitchType(active ? null : slot.pitchType)}
+                      >
+                        {slot.isFavorite ? "★ " : slot.isWeak ? "⚠ " : ""}
+                        {slot.label} {slot.mastery}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
           <p className="swing-tradeoff" data-testid="guided-tradeoff-hint" aria-live="polite">
             {tradeoffText}
           </p>
           {arcadeTimingEnabled ? (
-              <ArcadeTimingMeter
-                isBatting={batting}
-                disabled={locked}
-                actionLabel={action}
-                powerArmed={powerArmed}
-                onLockTiming={(grade) => onPitch(grade)}
-              />
+            <ArcadeTimingMeter
+              isBatting={batting}
+              disabled={locked}
+              actionLabel={action}
+              powerArmed={powerArmed}
+              onLockTiming={(grade) => onPitch(grade)}
+            />
           ) : (
             <button className="atbat-go" disabled={locked} onClick={() => onPitch()}>
-              {powerArmed ? "⚡ " : ""}{action}
+              {powerArmed ? "⚡ " : ""}
+              {action}
             </button>
           )}
         </>

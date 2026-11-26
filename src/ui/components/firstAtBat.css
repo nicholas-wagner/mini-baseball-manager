@@ -91,6 +91,60 @@
   color: white;
   box-shadow: inset 0 -3px #f2c44f;
 }
+.atbat-catcher-call {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid #193e37;
+  background: #fffdf8;
+}
+.atbat-catcher-copy {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.atbat-shake-btn {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 2px solid #193e37;
+  background: #fff3bf;
+  color: #193d37;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.atbat-pitch-signs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-top: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.atbat-pitch-signs button {
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 2px solid #193e37;
+  background: #fffdf8;
+  color: #193d37;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.atbat-pitch-signs button[aria-pressed="true"] {
+  background: #ffcc49;
+  color: #152f2e;
+}
 .atbat-go {
   width: 100%;
   margin-top: 8px;
@@ -242,6 +296,7 @@
   .tactics-buttons button, .live-primary-row button, [data-testid=arcade-call-bar] button,
   [data-testid=arcade-pitch-sign-bar] button { min-height:48px; min-width:48px; }
   .live-game [data-testid=arcade-call-bar] { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .live-game [data-testid=arcade-call-bar][data-pitching-cols="3"] { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .live-game [data-testid=arcade-call-bar] button { white-space:normal; }
   .live-game [data-testid=live-calls-block] > div { display:grid; grid-template-columns:minmax(0,1fr); }
   .live-game [data-testid=arcade-pitch-sign-bar] { display:flex; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%; }

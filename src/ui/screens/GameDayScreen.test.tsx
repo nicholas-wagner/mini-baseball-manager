@@ -46,8 +46,9 @@ describe('GameDayScreen — Live 3D Game Day Flow (TASK-016)', () => {
       expect(screen.getByTestId('live-action-bar')).toBeInTheDocument();
       expect(screen.getByTestId('coach-action-cue')).toBeInTheDocument();
 
-      // Expand Pro Manager controls to access full pitch arsenal, bullpen phone, and telemetry
+      // Expand Pro Manager controls and switch Pitching Mode to Adv for full 4-5 SP & 2-3 RP pitch selectors
       await user.click(screen.getByTestId('control-mode-toggle'));
+      await user.click(screen.getByRole('button', { name: /^adv$/i }));
 
       // Home SP pitches in TOP 1 with 4-5 selectable pitches + Endurance, Leverage & Special Ability HUD
       expect(screen.getByTestId('leverage-hud').textContent).toMatch(/LI /i);

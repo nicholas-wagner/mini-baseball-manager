@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { soundEngine } from '../audio/soundEngine';
+import type { PitchingMode } from '../engine/simulation/pitchMindGames';
 
 export type GameDayControlMode = 'simple' | 'advanced';
+export type { PitchingMode } from '../engine/simulation/pitchMindGames';
 
 export interface UserPreferences {
   sfxVolume: number;
@@ -12,6 +14,7 @@ export interface UserPreferences {
   enableInjuries: boolean;
   enableIllnesses: boolean;
   gameDayControlMode: GameDayControlMode;
+  pitchingMode: PitchingMode;
   arcadeTimingEnabled: boolean;
 }
 
@@ -26,8 +29,14 @@ const DEFAULT_PREFS: UserPreferences = {
   enableInjuries: true,
   enableIllnesses: true,
   gameDayControlMode: 'simple',
+  pitchingMode: 'simple',
   arcadeTimingEnabled: false,
 };
+
+function parsePitchingMode(raw: unknown): PitchingMode {
+  if (raw === 'normal' || raw === 'advanced' || raw === 'simple') return raw;
+  return DEFAULT_PREFS.pitchingMode;
+}
 
 function readSavedPrefs(): UserPreferences {
   try {
@@ -50,6 +59,7 @@ function readSavedPrefs(): UserPreferences {
       enableIllnesses: parsed.enableIllnesses ?? DEFAULT_PREFS.enableIllnesses,
       gameDayControlMode:
         parsed.gameDayControlMode === 'advanced' ? 'advanced' : DEFAULT_PREFS.gameDayControlMode,
+      pitchingMode: parsePitchingMode(parsed.pitchingMode),
       arcadeTimingEnabled: parsed.arcadeTimingEnabled ?? DEFAULT_PREFS.arcadeTimingEnabled,
     };
   } catch {
@@ -88,6 +98,8 @@ interface UserPreferencesStore extends UserPreferences {
   toggleIllnesses: () => void;
   setGameDayControlMode: (mode: GameDayControlMode) => void;
   toggleGameDayControlMode: () => void;
+  setPitchingMode: (mode: PitchingMode) => void;
+  cyclePitchingMode: () => void;
   setArcadeTimingEnabled: (enabled: boolean) => void;
   toggleArcadeTiming: () => void;
   resetDefaults: () => void;
@@ -106,6 +118,7 @@ function extractPrefs(state: UserPreferencesStore): UserPreferences {
     enableInjuries: state.enableInjuries,
     enableIllnesses: state.enableIllnesses,
     gameDayControlMode: state.gameDayControlMode,
+    pitchingMode: state.pitchingMode,
     arcadeTimingEnabled: state.arcadeTimingEnabled,
   };
 }
@@ -133,6 +146,12 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
       applyPatch({
         gameDayControlMode: get().gameDayControlMode === 'simple' ? 'advanced' : 'simple',
       }),
+    setPitchingMode: (mode) => applyPatch({ pitchingMode: mode }),
+    cyclePitchingMode: () => {
+      const cur = get().pitchingMode;
+      const next: PitchingMode = cur === 'simple' ? 'normal' : cur === 'normal' ? 'advanced' : 'simple';
+      applyPatch({ pitchingMode: next });
+    },
     setArcadeTimingEnabled: (enabled) => applyPatch({ arcadeTimingEnabled: enabled }),
     toggleArcadeTiming: () => applyPatch({ arcadeTimingEnabled: !get().arcadeTimingEnabled }),
     resetDefaults: () => applyPatch({ ...DEFAULT_PREFS }),

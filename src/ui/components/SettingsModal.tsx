@@ -19,6 +19,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const colorblindStatSymbols = useUserPreferencesStore((s) => s.colorblindStatSymbols);
   const enableInjuries = useUserPreferencesStore((s) => s.enableInjuries);
   const enableIllnesses = useUserPreferencesStore((s) => s.enableIllnesses);
+  const pitchingMode = useUserPreferencesStore((s) => s.pitchingMode);
 
   const setSfxVolume = useUserPreferencesStore((s) => s.setSfxVolume);
   const toggleHaptics = useUserPreferencesStore((s) => s.toggleHaptics);
@@ -27,6 +28,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const toggleColorblindStatSymbols = useUserPreferencesStore((s) => s.toggleColorblindStatSymbols);
   const toggleInjuries = useUserPreferencesStore((s) => s.toggleInjuries);
   const toggleIllnesses = useUserPreferencesStore((s) => s.toggleIllnesses);
+  const setPitchingMode = useUserPreferencesStore((s) => s.setPitchingMode);
 
   if (!open) return null;
 
@@ -162,6 +164,46 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 );
               })}
             </div>
+          </div>
+
+          {/* Pitching Controls Mode */}
+          <div
+            data-testid="settings-pitching-mode"
+            className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2"
+          >
+            <div className="font-display text-xs text-[#181B2C]">
+              Pitching Controls (Default: Simple)
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { id: 'simple', label: 'Simple (Catcher Calls)' },
+                  { id: 'normal', label: 'Normal (Pick Location)' },
+                  { id: 'advanced', label: 'Advanced (Spot + Pitch)' },
+                ] as const
+              ).map((opt) => (
+                <ComicButton
+                  key={opt.id}
+                  size="sm"
+                  variant={pitchingMode === opt.id ? 'gold' : 'cream'}
+                  active={pitchingMode === opt.id}
+                  aria-pressed={pitchingMode === opt.id}
+                  onClick={() => {
+                    setPitchingMode(opt.id);
+                    soundEngine.play('ui_pop');
+                  }}
+                >
+                  {opt.label}
+                </ComicButton>
+              ))}
+            </div>
+            <p className="text-[11px] font-bold text-[#4A5068]">
+              {pitchingMode === 'simple'
+                ? 'Simple: Catcher calls both pitch and location automatically (optional Shake off).'
+                : pitchingMode === 'normal'
+                  ? 'Normal: You pick Over Plate, Corner, or Low Chase; pitch type is chosen automatically.'
+                  : 'Advanced: You pick both location (Over Plate / Corner / Low Chase) and pitch type from the pitcher’s arsenal.'}
+            </p>
           </div>
 
           {/* Dynasty Health Realism */}

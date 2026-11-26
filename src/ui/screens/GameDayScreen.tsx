@@ -61,6 +61,7 @@ import {
   createCrosstownStarterRivalry,
 } from '../../engine/league/rivalryEngine';
 import { evaluateNemesisMatchup } from '../../engine/league/nemesisTracker';
+import { buildCatcherCallSequence } from '../../engine/simulation/catcherCalls';
 import { catcherSign, personalWatchStop, gazetteCaption, recentContact } from '../../engine/simulation/dugoutCalls';
 import { GazetteCall, ThirdBaseDecision, LeagueWire, ParkLineupCard, WatchSettings } from '../components/DugoutScouting';
 import { seriesRoundSeed, getHumanSeasonSchedule } from '../../engine/league/seasonEngine';
@@ -129,6 +130,7 @@ import {
   PITCH_TARGET_OPTIONS,
   type ArcadeTimingGrade,
   type BatterPitchGuess,
+  type PitchingMode,
   type PitchTargetIntent,
 } from '../../engine/simulation/pitchMindGames';
 import {
@@ -318,7 +320,8 @@ export function GameDayScreen({
   const [cameraMode, setCameraMode] = useState<LiveCameraMode>('auto');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
-  const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('high_heat');
+  const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('attack_zone');
+  const [shakeOffCount, setShakeOffCount] = useState(0);
   const [batterGuess, setBatterGuess] = useState<BatterPitchGuess>('none');
   const [moundVisitUsed, setMoundVisitUsed] = useState(false);
   const [argueUsed, setArgueUsed] = useState(false);
@@ -337,6 +340,8 @@ export function GameDayScreen({
   const [delayedSummary,setDelayedSummary]=useState<{summary:PostGameSummary; delay:number}|null>(null);
   const [pendingRelief,setPendingRelief]=useState<{event:PlayEvent;delay:number}|null>(null);
   const controlMode = useUserPreferencesStore((s) => s.gameDayControlMode);
+  const pitchingMode = useUserPreferencesStore((s) => s.pitchingMode);
+  const setPitchingMode = useUserPreferencesStore((s) => s.setPitchingMode);
   const eventInGuide = Boolean(playbackEvent && guidedHalf === playbackEvent.inning + playbackEvent.half);
   const guiding = Boolean(liveSession && controlMode === 'simple' && watchMode === 'paused' &&
     (eventInGuide || guidedHalf === liveSession.inning + liveSession.half));
@@ -536,7 +541,8 @@ export function GameDayScreen({
     setRecentEvents([]);
     setAtBatEvents([]);
     setArmedPowerId(null);
-    setPitchTarget('high_heat');
+    setPitchTarget('attack_zone');
+    setShakeOffCount(0);
     setBatterGuess('none');
     setMoundVisitUsed(false);
     setArgueUsed(false);
@@ -595,7 +601,8 @@ export function GameDayScreen({
     setRecentEvents([...clutch.events].reverse());
     setAtBatEvents([]);
     setArmedPowerId(null);
-    setPitchTarget(guided ? 'attack_zone' : 'high_heat');
+    setPitchTarget('attack_zone');
+    setShakeOffCount(0);
     setBatterGuess('none');
     setMoundVisitUsed(false);
     setArgueUsed(false);
@@ -641,6 +648,7 @@ export function GameDayScreen({
       setEntranceCue(null);
       setPrePlaySession(liveSession);
       setLiveSession(nextSession);
+      setShakeOffCount(0);
       if (liveSession) {
         const halfChanged =
           nextSession.half !== liveSession.half || nextSession.inning !== liveSession.inning;
@@ -651,8 +659,11 @@ export function GameDayScreen({
           setTacticalCall('normal');
           setBatterGuess('none');
           setArmedPowerId(null);
+          setPitchTarget('attack_zone');
+          setSelectedPitchType(null);
         } else if (batterChanged) {
           setTacticalCall((prev) => (prev === 'bunt' ? 'normal' : prev));
+          setPitchTarget('attack_zone');
         }
       }
       setWinProbHistory((prev) => [...prev.slice(-23), estimateHomeWinProbability(nextSession)]);
@@ -733,6 +744,8 @@ export function GameDayScreen({
         session,
         {
           tacticalCall: callOverride ?? tacticalCall,
+          pitchingMode,
+          shakeOffCount,
           pitchTarget,
           selectedPitchType,
           defensiveShift,
@@ -754,7 +767,9 @@ export function GameDayScreen({
       gameWeather,
       nemesisHistory,
       pitchTarget,
+      pitchingMode,
       selectedPitchType,
+      shakeOffCount,
       tacticalCall,
     ],
   );
@@ -880,6 +895,7 @@ export function GameDayScreen({
     const swapped = manualSwapPitcher(liveSession, sideKey, relieverId);
     if (swapped.event) {
       setSelectedPitchType(null);
+      setShakeOffCount(0);
       applyStepResult(swapped.nextSession, [swapped.event], activeOpponentId);
     }
   };
@@ -2422,9 +2438,35 @@ export function GameDayScreen({
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
-  const sign = !humanIsBatting ? catcherSign(liveSession) : null;
+  const catcherCallSeq = !humanIsBatting ? buildCatcherCallSequence(liveSession) : [];
+  const activeCatcherCall =
+    catcherCallSeq.length > 0 ? catcherCallSeq[shakeOffCount % catcherCallSeq.length] : null;
+  const guidedCatcherSeq = !guidedBatting ? buildCatcherCallSequence(shown) : [];
+  const guidedCatcherCall =
+    guidedCatcherSeq.length > 0 ? guidedCatcherSeq[shakeOffCount % guidedCatcherSeq.length] : null;
+  const repeatPitchWarning = Boolean(
+    !humanIsBatting &&
+      pitchingMode === 'advanced' &&
+      selectedPitchType &&
+      liveSession.atBatPitchHistory.length >= 2 &&
+      liveSession.atBatPitchHistory.slice(-2).every((p) => p === selectedPitchType),
+  );
+  const handleSelectPitchingMode = (mode: PitchingMode) => {
+    setPitchingMode(mode);
+    setShakeOffCount(0);
+    if (mode !== 'advanced') setSelectedPitchType(null);
+    soundEngine.play('ui_pop');
+  };
+  const handleShakeOffCatcher = () => {
+    setEntranceCue(null);
+    setLastChoreo(null);
+    setPlaybackEvent(null);
+    setShakeOffCount((c) => c + 1);
+    soundEngine.play('ui_pop');
+  };
+  const sign = !humanIsBatting && pitchingMode !== 'simple' ? catcherSign(liveSession) : null;
   const acceptSign = sign && <button className="catcher-sign" onClick={()=>{
-    setSelectedPitchType(sign.pitch);
+    if (pitchingMode === 'advanced') setSelectedPitchType(sign.pitch);
     setPitchTarget(sign.target);
     setLastChoreo(null);
     setPlaybackEvent(null);
@@ -2530,7 +2572,7 @@ export function GameDayScreen({
               guided={Boolean(guiding && !showMore)}
               onEntranceEnd={finishEntrance}
               entranceCue={guiding && !showMore ? entranceCue : null}
-              preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' || tacticalCall === 'bunt' ? tacticalCall : 'contact') : pitchTarget) : null}
+              preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' || tacticalCall === 'bunt' ? tacticalCall : 'contact') : pitchingMode === 'simple' ? (guidedCatcherCall?.target ?? 'attack_zone') : pitchTarget) : null}
               awayClub={liveAwayClub}
               homeClub={liveHomeClub}
               session={!pitchingChange && prePlaySession && lastChoreo && !showNextMatchup ? prePlaySession : liveSession}
@@ -2661,6 +2703,17 @@ export function GameDayScreen({
               locked={playing} expanded={showMore} powerArmed={Boolean(armedPowerId)}
               readyPowerName={readyPowerOption?.name ?? null}
               arcadeTimingEnabled={arcadeTimingEnabled}
+              pitchingMode={pitchingMode}
+              catcherCall={guidedCatcherCall}
+              shakeOffTotal={guidedCatcherSeq.length}
+              pitcherArsenal={guidedBatting ? [] : livePitcherSignOptions}
+              selectedPitchType={selectedPitchType}
+              onShakeOff={handleShakeOffCatcher}
+              onSelectPitchType={(pt) => {
+                setSelectedPitchType(pt);
+                soundEngine.play('ui_pop');
+              }}
+              onSelectPitchingMode={handleSelectPitchingMode}
               onToggleArcadeTiming={() => {
                 toggleArcadeTiming();
                 soundEngine.play('ui_pop');
@@ -2725,6 +2778,14 @@ export function GameDayScreen({
               pitcherFatigueDropTag={pitcherFatigueDropTag}
               latestEvent={recentEvents[0] ?? null}
               controlMode={controlMode}
+              pitchingMode={pitchingMode}
+              onSelectPitchingMode={handleSelectPitchingMode}
+              catcherCall={activeCatcherCall}
+              shakeOffTotal={catcherCallSeq.length}
+              onShakeOff={handleShakeOffCatcher}
+              repeatPitchWarning={repeatPitchWarning}
+              batterWeakPitch={currentBatter.batterPitchProfile.weakPitch}
+              batterFavoritePitch={currentBatter.batterPitchProfile.favoritePitch}
               watchMode={watchMode}
               smartPauseReason={smartPauseReason}
               tacticalCall={tacticalCall}
@@ -3083,14 +3144,72 @@ export function GameDayScreen({
                   data-testid="mind-games-bar"
                   className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] space-y-1.5"
                 >
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
-                    {!humanIsBatting
-                      ? 'Pitch Target Intent (Trade Strikes vs Whiffs / Chase)'
-                      : 'Guess Pitch Mind-Game (Guess Right: +14 CON/+12 PWR • Wrong: -8)'}
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
+                      {!humanIsBatting
+                        ? pitchingMode === 'simple'
+                          ? 'Pitching Mode: Simple (Catcher calls pitch & location)'
+                          : 'Pitch Target Location (Over Plate / Corner / Low Chase)'
+                        : 'Guess Pitch Mind-Game (Guess Right: +14 CON/+12 PWR • Wrong: -8)'}
+                    </div>
+                    {!humanIsBatting ? (
+                      <div
+                        data-testid="pitching-mode-switcher"
+                        role="group"
+                        aria-label="Pitching mode"
+                        className="inline-flex items-center rounded-lg border border-[#181B2C] bg-[#FFFDF7] p-0.5 gap-0.5"
+                      >
+                        {(
+                          [
+                            { id: 'simple', label: 'Simple' },
+                            { id: 'normal', label: 'Normal' },
+                            { id: 'advanced', label: 'Adv' },
+                          ] as const
+                        ).map((modeOpt) => (
+                          <button
+                            key={modeOpt.id}
+                            type="button"
+                            aria-pressed={pitchingMode === modeOpt.id}
+                            onClick={() => handleSelectPitchingMode(modeOpt.id)}
+                            className={`px-2 py-0.5 rounded font-extrabold text-[10px] cursor-pointer ${
+                              pitchingMode === modeOpt.id
+                                ? 'bg-[#1D3557] text-[#FFD166]'
+                                : 'text-[#181B2C] hover:bg-[#FFF3BF]'
+                            }`}
+                          >
+                            {modeOpt.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {!humanIsBatting
-                      ? PITCH_TARGET_OPTIONS.map((opt) => (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {!humanIsBatting ? (
+                      pitchingMode === 'simple' ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+                          <span
+                            data-testid="arcade-catcher-call"
+                            className="text-xs font-extrabold text-[#181B2C]"
+                          >
+                            🧤 Catcher:{' '}
+                            {activeCatcherCall
+                              ? `${activeCatcherCall.targetLabel} · ${activeCatcherCall.pitchShortLabel} (${activeCatcherCall.reason})`
+                              : 'Over Plate · 4-Seam'}
+                          </span>
+                          {catcherCallSeq.length > 1 ? (
+                            <ComicButton
+                              size="sm"
+                              variant="gold"
+                              data-testid="arcade-shake-off-btn"
+                              disabled={liveSession.status === 'completed'}
+                              onClick={handleShakeOffCatcher}
+                            >
+                              Shake off
+                            </ComicButton>
+                          ) : null}
+                        </div>
+                      ) : (
+                        PITCH_TARGET_OPTIONS.map((opt) => (
                           <ComicButton
                             key={opt.id}
                             size="sm"
@@ -3104,24 +3223,27 @@ export function GameDayScreen({
                             {opt.label}
                           </ComicButton>
                         ))
-                      : BATTER_GUESS_OPTIONS.map((opt) => (
-                          <ComicButton
-                            key={opt.id}
-                            size="sm"
-                            variant={batterGuess === opt.id ? 'gold' : 'cream'}
-                            active={batterGuess === opt.id}
-                            onClick={() => {
-                              setBatterGuess(opt.id);
-                              soundEngine.play('ui_pop');
-                            }}
-                          >
-                            {opt.label}
-                          </ComicButton>
-                        ))}
+                      )
+                    ) : (
+                      BATTER_GUESS_OPTIONS.map((opt) => (
+                        <ComicButton
+                          key={opt.id}
+                          size="sm"
+                          variant={batterGuess === opt.id ? 'gold' : 'cream'}
+                          active={batterGuess === opt.id}
+                          onClick={() => {
+                            setBatterGuess(opt.id);
+                            soundEngine.play('ui_pop');
+                          }}
+                        >
+                          {opt.label}
+                        </ComicButton>
+                      ))
+                    )}
                   </div>
                 </div>
 
-                {!humanIsBatting && currentPitcher.pitchArsenal ? (
+                {!humanIsBatting && pitchingMode === 'advanced' && currentPitcher.pitchArsenal ? (
                   <div
                     data-testid="pitch-selector-bar"
                     className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5"

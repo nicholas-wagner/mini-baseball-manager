@@ -2,7 +2,9 @@ import type { PitchType } from '../models/player';
 
 export type PitchFamily = 'fastball' | 'offspeed';
 export type BatterPitchGuess = 'none' | PitchFamily;
-export type PitchTargetIntent = 'attack_zone' | 'paint_corners' | 'high_heat' | 'bury_offspeed';
+export type PitchingMode = 'simple' | 'normal' | 'advanced';
+export type ManualPitchTargetIntent = 'attack_zone' | 'paint_corners' | 'bury_offspeed';
+export type PitchTargetIntent = ManualPitchTargetIntent | 'high_heat';
 export type ArcadeTimingGrade = 'perfect' | 'good' | 'late';
 
 export interface ArcadeTimingInput {
@@ -36,17 +38,34 @@ export interface PitchTargetEvaluation {
   stuffDelta: number;
   mphBonus: number;
   zoneProbDelta: number;
+  inZoneSwingDelta: number;
   chaseRateDelta: number;
   whiffBonus: number;
+  batterContactDelta: number;
+  hitProbBonus: number;
   hrCarryMultiplier: number;
 }
 
-export const PITCH_TARGET_OPTIONS: readonly { id: PitchTargetIntent; label: string; tip: string }[] = [
-  { id: 'attack_zone', label: 'Attack Zone', tip: '+Strikes, steady contact' },
-  { id: 'paint_corners', label: 'Paint Corners', tip: '+Control & whiffs, tighter margin' },
-  { id: 'high_heat', label: 'High Heat', tip: '+2 mph & K upside, HR risk if squared' },
-  { id: 'bury_offspeed', label: 'Bury Chase', tip: '+Chase & whiffs out of zone' },
+export const PITCH_TARGET_OPTIONS: readonly {
+  id: ManualPitchTargetIntent;
+  label: string;
+  tip: string;
+}[] = [
+  { id: 'attack_zone', label: 'Over Plate', tip: 'More strikes, easier to hit' },
+  { id: 'paint_corners', label: 'Corner', tip: 'More looking Ks, more balls & walks' },
+  { id: 'bury_offspeed', label: 'Low Chase', tip: 'More balls, more swings & misses' },
 ];
+
+const TARGET_DISPLAY_LABELS: Readonly<Record<PitchTargetIntent, string>> = {
+  attack_zone: 'Over Plate',
+  paint_corners: 'Corner',
+  bury_offspeed: 'Low Chase',
+  high_heat: 'High Heat',
+};
+
+export function formatPitchTargetLabel(target: PitchTargetIntent): string {
+  return TARGET_DISPLAY_LABELS[target];
+}
 
 export const BATTER_GUESS_OPTIONS: readonly { id: BatterPitchGuess; label: string; tip: string }[] = [
   { id: 'none', label: 'Read & React', tip: 'Balanced — no guess risk' },
@@ -104,25 +123,31 @@ export function evaluateBatterGuessEffect(
 const TARGET_TEMPLATES: Readonly<Record<PitchTargetIntent, PitchTargetEvaluation>> = {
   attack_zone: {
     intent: 'attack_zone',
-    label: 'Target: Attack Zone',
+    label: 'Target: Over Plate',
     controlDelta: 2,
-    stuffDelta: -1,
+    stuffDelta: -2,
     mphBonus: 0,
-    zoneProbDelta: 0.06,
+    zoneProbDelta: 0.11,
+    inZoneSwingDelta: 0.08,
     chaseRateDelta: -0.02,
-    whiffBonus: -0.02,
-    hrCarryMultiplier: 1.0,
+    whiffBonus: -0.04,
+    batterContactDelta: 5,
+    hitProbBonus: 0.05,
+    hrCarryMultiplier: 1.08,
   },
   paint_corners: {
     intent: 'paint_corners',
     label: 'Target: Paint Corners',
-    controlDelta: 4,
+    controlDelta: 2,
     stuffDelta: 2,
     mphBonus: 0,
-    zoneProbDelta: -0.02,
-    chaseRateDelta: 0.03,
-    whiffBonus: 0.04,
-    hrCarryMultiplier: 0.96,
+    zoneProbDelta: -0.055,
+    inZoneSwingDelta: -0.18,
+    chaseRateDelta: 0.01,
+    whiffBonus: 0.03,
+    batterContactDelta: -3,
+    hitProbBonus: -0.02,
+    hrCarryMultiplier: 0.93,
   },
   high_heat: {
     intent: 'high_heat',
@@ -130,25 +155,31 @@ const TARGET_TEMPLATES: Readonly<Record<PitchTargetIntent, PitchTargetEvaluation
     controlDelta: -2,
     stuffDelta: 4,
     mphBonus: 2,
-    zoneProbDelta: -0.03,
-    chaseRateDelta: 0.04,
-    whiffBonus: 0.06,
-    hrCarryMultiplier: 1.08,
+    zoneProbDelta: -0.05,
+    inZoneSwingDelta: 0.03,
+    chaseRateDelta: 0.07,
+    whiffBonus: 0.09,
+    batterContactDelta: 0,
+    hitProbBonus: 0.01,
+    hrCarryMultiplier: 1.12,
   },
   bury_offspeed: {
     intent: 'bury_offspeed',
-    label: 'Target: Bury Chase',
+    label: 'Target: Low Chase',
     controlDelta: 0,
     stuffDelta: 3,
     mphBonus: 0,
-    zoneProbDelta: -0.06,
-    chaseRateDelta: 0.1,
-    whiffBonus: 0.06,
-    hrCarryMultiplier: 0.94,
+    zoneProbDelta: -0.22,
+    inZoneSwingDelta: -0.03,
+    chaseRateDelta: 0.13,
+    whiffBonus: 0.12,
+    batterContactDelta: -2,
+    hitProbBonus: -0.015,
+    hrCarryMultiplier: 0.92,
   },
 };
 
-/** Evaluates pitcher target intent trade-offs (strikes vs whiffs/chase/velo/HR risk). */
+/** Evaluates pitcher target intent trade-offs (strikes/hits vs taken strikes/walks vs balls/whiffs). */
 export function evaluatePitchTargetEffect(
   intent: PitchTargetIntent | undefined,
   thrownPitch: PitchType,
@@ -157,10 +188,10 @@ export function evaluatePitchTargetEffect(
   const base = TARGET_TEMPLATES[intent];
   const family = classifyPitchFamily(thrownPitch);
   if (intent === 'high_heat' && family !== 'fastball') {
-    return { ...base, mphBonus: 0, stuffDelta: 1, whiffBonus: 0.02 };
+    return { ...base, mphBonus: 0, stuffDelta: 1, whiffBonus: 0.02, chaseRateDelta: 0.02 };
   }
   if (intent === 'bury_offspeed' && family !== 'offspeed') {
-    return { ...base, chaseRateDelta: 0.03, whiffBonus: 0.02 };
+    return { ...base, chaseRateDelta: 0.07, whiffBonus: 0.07 };
   }
   return base;
 }
