@@ -27,7 +27,9 @@ flowchart LR
 
 ### Off the Clock
 
-`getPlayerHobby` resolves each fixed identity to a clue and story. Featured players have authored assignments. The remaining players draw deterministically from the first-edition shared pool or a locally rooted activity. Personal clues and quotes in `playerHobbyStories.ts` are pinned to the player’s catalog ID. Individual illustrations are 560 × 700 WebP assets keyed by that ID. The album checks the saved hobby and quote against the illustrated story before displaying its print. Earlier quotes keep their signed postcards.
+`getPlayerHobby` resolves each of the 3,000 fixed catalog IDs to a personal clue and quote. Nine featured players retain their original hobby-catalog text. The other 2,991 have a hobby, clue and quote pinned to their player ID in `playerHobbyStories.ts` and its batch files. Players outside the fixed catalog keep the seeded selection of shared or locally rooted activities. The service worker precaches the story data and caches the 560 × 700 WebP prints on demand.
+
+The album displays a player’s print when the saved hobby ID and quote match the illustrated story. It uses the saved title and quote. If the quote differs or the print is unavailable, the signed postcard uses the player’s portrait or initials as its stamp.
 
 The club earns a conversation on its first recorded game and every second game thereafter. Unused conversations carry into future seasons through `priorHobbyGames`. A discovery adds a snapshot to `Club.hobbyMemories` and up to two morale to that roster member in one state transition. The album keeps the snapshot through trades, retirement and save imports. Missing fields on older saves default to an empty album and credit for the current season’s record.
 

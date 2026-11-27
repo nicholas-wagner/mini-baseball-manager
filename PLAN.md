@@ -48,7 +48,7 @@ TASK-088 keeps the Opening Day Customize button at the 44-pixel touch minimum on
 - [x] TASK-095 gives hobby stories a signed postcard with portrait postage or player initials when the art is unavailable.
 
 - [x] TASK-096 adds 25 illustrated Off the Clock postcards, bringing the album to 30 of 3,000 players.
-- [/] TASK-097 expands the album across the remaining catalog in groups of 25, with a progress check every 250 illustrated players. The first 1,000 have passed phone and desktop album checks.
+- [/] TASK-097 adds a personal illustrated memory for each of the 3,000 catalog players across 78 hobbies. Every postcard passed phone and desktop album checks. Earlier saved stories keep their original wording. Repository-wide browser verification remains open.
 - [x] TASK-098 brings the 3D ballpark alive with dynamic weather/lighting/wind pennants, dt-synced clouds & crowd excitement, 60ms barrel hitstop, 3D home run fireworks, clean catcher target posture, and a default behind-the-catcher batting camera.
 - [x] TASK-099 unifies mobile live play into a zero-scroll `100dvh` thumb cockpit with one Tactics bottom sheet, adds a 2-column Desktop Broadcast Studio with keyboard shortcuts (`Space`, `1/2/3`, `B`, `S`, `H`, `T`, `Esc`), and locks Swing/Throw Pitch controls until each pitch or play completes.
 - [x] TASK-100 upgrades the first-60s 3-audience hook with a 3-tab Post-Game modal (`Highlights` / `Clubhouse` / `Box Score`), 3D corner-peel Foil Pack reveals, deterministic HR Derby distance & Hot Streak rewards, a standalone TV K-Zone `StrikeZoneOverlay`, and live teammate `DugoutCheerBubble` reactions.

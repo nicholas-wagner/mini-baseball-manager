@@ -63,7 +63,9 @@ Each of the 3,000 players keeps their illustration when they change clubs. Open 
 
 ## Off the Clock
 
-After your first game, **Off the Clock** appears right inside your post-game recap with your teammate’s portrait and clue ready to tap (or inspect any roster card anytime). Pick anyone on the active roster, including the bench. Each conversation reveals a personal hobby, adds a signed note or Sandlot Postcard to your Trophy & Sticker Album and gives that teammate up to two morale points. You earn another conversation every two games, including games you simulate. More than 1,000 players have illustrated hobby stories. Look for Rico’s moonlit mecha, Wade’s star-lined dance jacket, or the tiny wool toaster Everth crocheted for his dad. For the rest of the roster, the signed postcard carries their baseball portrait as a postage stamp. Their initials stand in if the portrait is unavailable offline.
+After your first game, open **Off the Clock** on the **Clubhouse** tab of the post-game recap or on any active player’s roster card, including the bench. Ask about the clue to hear the player’s story, add their postcard to your Trophy & Sticker Album and give them up to two morale points. You earn another conversation every two games, including games you simulate.
+
+All 3,000 players have a personal clue, a story and a 560 × 700 WebP illustration. The album spans 78 hobbies. Look for the tiny wool toaster Everth crocheted for his dad, the dragon that knits while Kai’s sister types her password, or Tomás dancing in his kitchen while the coffee perks. If an older save recalls a different story or a print is unavailable offline, the album shows the saved title and quote on a signed postcard. The player’s baseball portrait serves as its postage stamp, with their initials as a fallback.
 
 [Phone album](docs/screenshots/hobby-album-phone.webp) · [Desktop album](docs/screenshots/hobby-album-desktop.webp) · [Phone recap](docs/screenshots/off-the-clock-mobile.webp) · [Desktop recap](docs/screenshots/off-the-clock-desktop.webp)
 
