@@ -51,6 +51,7 @@ import {
 } from '../engine/gm/rosterFactory';
 import type { StartingRosterPreset } from '../engine/gm/rosterPresets';
 import type { FieldPosition } from '../engine/handedness/types';
+import { applyBossBountyLedgerEntry } from '../engine/league/bossClubs';
 import {
   advanceOffseasonWorld,
   generateSixTierWorld,
@@ -140,6 +141,13 @@ export interface PostGameSummary {
   result: GameSessionResult;
   levelUps?: readonly PlayerLevelUpEvent[];
   sweepBonusAwarded?: boolean;
+  bossShowdown?: {
+    bossTitle: string;
+    badgeEmoji: string;
+    tagline: string;
+    bountyAwarded: number;
+    headline: string;
+  };
 }
 
 export const MAX_INDIVIDUAL_DRILLS_PER_ROUND = 2;
@@ -1275,6 +1283,17 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         won,
         result.events,
       );
+      const bossSettlement = applyBossBountyLedgerEntry(
+        progressed.club,
+        opponentClub,
+        won,
+        {
+          season: state.seasonNumber,
+          gameIndex: humanClub.wins + humanClub.losses + 1,
+          ledgerCap: LEDGER_HISTORY_CAP,
+        },
+      );
+      const settledHumanClub = bossSettlement.club;
       const updatedOpponent = applyGameStatDeltasToClub(
         opponentClub,
         result.playerStatDeltas,
@@ -1282,7 +1301,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         result.events,
       );
 
-      let nextLeagues = updateHumanClubInLeagues(leagues, progressed.club);
+      let nextLeagues = updateHumanClubInLeagues(leagues, settledHumanClub);
       nextLeagues = {
         ...nextLeagues,
         [updatedOpponent.leagueTier]: nextLeagues[updatedOpponent.leagueTier].map((club) =>
@@ -1310,10 +1329,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         if (candidateGame >= 3 && updatedSeriesWins >= 3 && updatedSeriesLosses === 0) {
           sweepBonusAwarded = true;
           const sweptClub: Club = {
-            ...progressed.club,
+            ...settledHumanClub,
             economy: {
-              ...progressed.club.economy,
-              cash: progressed.club.economy.cash + SERIES_SWEEP_BONUS_CASH,
+              ...settledHumanClub.economy,
+              cash: settledHumanClub.economy.cash + SERIES_SWEEP_BONUS_CASH,
             },
           };
           nextLeagues = updateHumanClubInLeagues(nextLeagues, sweptClub);
@@ -1360,6 +1379,8 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
 
       const side = isHomeGame ? result.finalState.home : result.finalState.away;
       const gameId = [state.seasonNumber,humanClub.id,opponentClub.id,humanClub.wins + humanClub.losses,result.finalState.rngSeed].join('/');
+      const extraCashBonus =
+        (sweepBonusAwarded ? SERIES_SWEEP_BONUS_CASH : 0) + bossSettlement.bounty.bountyAwarded;
       const summary: PostGameSummary = {
         moments: selectScorebookMoments(result.events, side.playersById, isHomeGame, opponentClub.name, gameId, guidedEvents),
         opponentClubId: opponentClub.id,
@@ -1369,12 +1390,24 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         awayScore: result.awayScore,
         homeScore: result.homeScore,
         mvp,
-        rewards: sweepBonusAwarded
-          ? { ...rewards, cashDelta: rewards.cashDelta + SERIES_SWEEP_BONUS_CASH }
-          : rewards,
+        rewards:
+          extraCashBonus > 0
+            ? { ...rewards, cashDelta: rewards.cashDelta + extraCashBonus }
+            : rewards,
         result,
         levelUps,
         sweepBonusAwarded,
+        ...(bossSettlement.bounty.isBossShowdown && bossSettlement.bounty.boss && bossSettlement.bounty.headline
+          ? {
+              bossShowdown: {
+                bossTitle: bossSettlement.bounty.boss.bossTitle,
+                badgeEmoji: bossSettlement.bounty.boss.badgeEmoji,
+                tagline: bossSettlement.bounty.boss.tagline,
+                bountyAwarded: bossSettlement.bounty.bountyAwarded,
+                headline: bossSettlement.bounty.headline,
+              },
+            }
+          : {}),
       };
 
       set({

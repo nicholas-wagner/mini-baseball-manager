@@ -27,10 +27,17 @@ describe('LeagueScreen — 6-Tier Pyramid & Full Offseason HQ (TASK-024, TASK-06
 
       expect(screen.getByText(/6-tier baseball pyramid • season 1/i)).toBeInTheDocument();
       expect(screen.getByText(/sandlot comets \(you\)/i)).toBeInTheDocument();
+      expect(screen.getAllByTestId('standings-boss-badge')).toHaveLength(1);
+      expect(screen.getByTestId('standings-boss-badge')).toHaveTextContent(/👑 BOSS/i);
 
-      // Switch to Mini Major League tier and verify its clubs render
+      // Switch to Mini Major League tier and verify its clubs + Empire Dynasty Boss badge render
       await user.click(screen.getByRole('button', { name: /mini major league/i }));
       expect(screen.getAllByText(/empire monarchs/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByTestId('standings-boss-badge')).toHaveLength(1);
+      expect(screen.getByTestId('standings-boss-badge')).toHaveAttribute(
+        'title',
+        expect.stringMatching(/Empire Dynasty/i),
+      );
 
       // Simulate 1 three-game series from UI button
       await user.click(screen.getByRole('button', { name: /sim next 3-game series/i }));

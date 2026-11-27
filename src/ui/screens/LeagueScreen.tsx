@@ -7,6 +7,7 @@ import {
   TIER_SALARY_CAPS,
   validateSalaryCapRoom,
 } from '../../engine/gm/offseasonEngine';
+import { matchBossClubProfile } from '../../engine/league/bossClubs';
 import { LEAGUE_TIER_LABELS } from '../../engine/league/clubCatalog';
 import {
   getNextHumanPlayoffMatchup,
@@ -613,6 +614,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
               <tbody>
                 {standings.map((row) => {
                   const rowClub = tierClubs.find((c) => c.id === row.clubId);
+                  const bossProfile = rowClub ? matchBossClubProfile(rowClub) : null;
                   return (
                   <tr
                     key={row.clubId}
@@ -662,6 +664,14 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                             className="px-1 py-0.5 rounded bg-[#FFC300] text-[#181B2C] border border-[#181B2C] font-display text-[8.5px] leading-none shrink-0"
                           >
                             YOU
+                          </span>
+                        ) : bossProfile ? (
+                          <span
+                            data-testid="standings-boss-badge"
+                            title={`${bossProfile.bossTitle} · ${bossProfile.signatureStyle} (+$${bossProfile.bountyCash.toLocaleString()} bounty)`}
+                            className="px-1 py-0.5 rounded bg-[#181B2C] text-[#FFD166] border border-[#FFD166] font-display text-[8.5px] leading-none shrink-0 whitespace-nowrap"
+                          >
+                            👑 BOSS
                           </span>
                         ) : null}
                       </button>
