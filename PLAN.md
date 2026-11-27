@@ -49,6 +49,11 @@ TASK-088 keeps the Opening Day Customize button at the 44-pixel touch minimum on
 
 - [x] TASK-096 adds 25 illustrated Off the Clock postcards, bringing the album to 30 of 3,000 players.
 - [/] TASK-097 expands the album across the remaining catalog in groups of 25, with a progress check every 250 illustrated players.
+- [x] TASK-098 brings the 3D ballpark alive with dynamic weather/lighting/wind pennants, dt-synced clouds & crowd excitement, 60ms barrel hitstop, 3D home run fireworks, clean catcher target posture, and a default behind-the-catcher batting camera.
+- [x] TASK-099 unifies mobile live play into a zero-scroll `100dvh` thumb cockpit with one Tactics bottom sheet, adds a 2-column Desktop Broadcast Studio with keyboard shortcuts (`Space`, `1/2/3`, `B`, `S`, `H`, `T`, `Esc`), and locks Swing/Throw Pitch controls until each pitch or play completes.
+- [x] TASK-100 upgrades the first-60s 3-audience hook with a 3-tab Post-Game modal (`Highlights` / `Clubhouse` / `Box Score`), 3D corner-peel Foil Pack reveals, deterministic HR Derby distance & Hot Streak rewards, a standalone TV K-Zone `StrikeZoneOverlay`, and live teammate `DugoutCheerBubble` reactions.
+- [x] TASK-101 adds 14 collectible retro WebP prints (6 die-cut Celebration Stickers + 8 holographic 1994 Foil Pack Relics) wired into toast/album/pack modals alongside a 4-viewport Playwright visual audit (`360×640`, `390×844`, `844×390`, `1280×800`).
+- [x] TASK-102 polishes off-diamond mobile & desktop ergonomics across Roster, Uniform Studio, Clubhouse HQ, League Standings, and Club Creator.
 
 ## The 10X Vision — What Makes This a Cult Classic
 

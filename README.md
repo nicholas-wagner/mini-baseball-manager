@@ -79,6 +79,18 @@ Open **Park scouting** before first pitch to see the fence distances and move a 
 
 In **Tactics**, choose when **Smart Watch** should pause for you, including a particular hitter, the tying run reaching base, or a tiring starter. The **Sandlot Gazette** calls selected career matchups. Between innings, the out-of-town board posts a final from another scheduled game in your tier.
 
+### Behind-the-catcher batting, mobile cockpit & desktop broadcast studio
+
+When your club is batting, the default camera sits right behind the catcher looking out to the mound, and the **Swing** / **Throw Pitch** controls stay locked until each pitch or play finishes. On phones, live play fits in one zero-scroll screen (`360×640`, `390×844`, and `844×390` landscape) with a single **Tactics** bottom sheet, a live TV K-Zone pitch plot, teammate dugout cheers, and a 3-tab post-game recap (**Highlights**, **Clubhouse**, **Box Score**). On desktop (`1280×800`), the 2-column Broadcast Studio pairs the 3D ballpark with keyboard shortcuts (`Space` swing/throw, `1/2/3` approach, `B` bunt, `S` steal, `H` hype, `T` tactics, `Esc` close), dynamic weather lighting, 3D home run fireworks, and illustrated 1994 Foil Pack relics and die-cut celebration stickers.
+
+| Behind-the-catcher on a compact phone | Phone landscape cockpit | Unified Tactics sheet |
+| --- | --- | --- |
+| ![Behind-the-catcher batting view on a 360 by 640 phone with Contact, Power, Bunt and Swing above the fold](./docs/screenshots/council-mobile-batting.webp) | ![Two-column behind-the-catcher landscape layout at 844 by 390](./docs/screenshots/council-landscape-batting.webp) | ![Unified mobile Tactics bottom sheet with Smart Watch, speed, sim, timing, box score and approach controls](./docs/screenshots/council-tactics-sheet.webp) |
+
+| 3-tab post-game celebration | Desktop Broadcast Studio |
+| --- | --- |
+| ![Mobile 3-tab Post-Game modal with Highlights, Clubhouse and Box Score tabs above the fold](./docs/screenshots/council-postgame-tabs.webp) | ![1280 by 800 Desktop Broadcast Studio pairing the behind-the-catcher 3D ballpark with live shortcuts, Hype meter and pitcher endurance](./docs/screenshots/council-desktop-studio.webp) |
+
 ## Core Pillars
 
 - **GM-First Core Loop, Predetermined Home & Away Schedule, Sports-Page Recaps & Special Skill Trees**: Start a club in seconds and play through a predetermined **7-Series (21-Game) Home & Away Season Schedule** with live **3-Game Series Scoreboards** (*Rubber Matches*, *3-0 Sweep Bonuses*, and Road Trips inside rival 3D ballparks!), **Sports-Page Post-Series Recap Cards** (3 game scores, clickable Series MVP card & standings movement), **Pre-Game Probable Pitcher & Free-Agent Scout Cards** + 1-tap **Auto-Tune Lineup vs LHP/RHP**, clickable **League Leaders & Rival Club Cards**, and **Coach Pops' Manager Clipboard** — track your live **Promotion Chase & Season Owner Goal**, pick **1 focused Team Practice per game/series** (*Batting Cage*, *Bullpen Lab*, *Full-Squad*, or *Rest & Film*) and a **Pre-Series Gameplan** (*Balanced*, *Swing for the Fences*, *Small-Ball Chaos*, or *Bullpen Lockdown*) with real simulation trade-offs, react to **Incoming AI Trade Offers & Clubhouse Dilemmas**, spotlight **Hot-Hand / Breakout Watch** stars, swap tired starters in 1 tap, and let **1-tap Sim Next 3-Game Series** automatically grow core ratings while earning **Skill Points (SP)** for unified **Player & Manager Skill Trees** (with live nav badges for `🩺` injuries, `⚡` ready SP, `🏆` Playoffs, and `⬆` Ballpark upgrades).
@@ -123,9 +135,9 @@ Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.g
 
 This repository is structured so both **human contributors** and **AI coding agents** can immediately understand the architecture, invariants, and exact next TDD ticket:
 
-- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-088.
+- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-102.
 - **[docs/SIMULATION_MATH.md](./docs/SIMULATION_MATH.md)** — Full pitch-by-pitch seeded dice-roll formulas, all 15 attribute effects, National/Capstone powers, Weather, Shifts, Mind Games & Nemesis math.
-- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-088**.
+- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-102**.
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Canonical TypeScript interfaces, `PlayEvent` stream contracts, and 3D ballpark coordinates.
 - **[docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)** — Exact 90s color tokens, typography, touch targets, and chibi scale units.
 - **[AGENTS.md](./AGENTS.md)** — AI Agent onboarding guide, hard architectural invariants, and Definition of Done.
