@@ -15,6 +15,7 @@ import {
   deriveCardRarity,
   isPitcherPosition,
   rollPlayerPortraitTraits,
+  type CareerServiceProfile,
   type PersonalityArchetype,
   type Player,
   type PlayerMarketTier,
@@ -24,7 +25,7 @@ import {
 import { generatePlayerIdentity } from '../nationalities/pickNationality';
 import type { NationalityId } from '../nationalities/types';
 import type { SeededRng } from '../rng/seededRng';
-import { rollInitialCareerService } from '../rpg/careerExperience';
+import { deriveExperienceTier, rollInitialCareerService } from '../rpg/careerExperience';
 import {
   applyCoEdAttributeTilt,
   rollCoEdSpecialTrait,
@@ -47,6 +48,7 @@ import {
   computeMarketContract,
   MARKET_TIER_SPECS,
   rollClubStarterMarketTier,
+  rollLeagueTierAge,
   rollStatCapsForMarketTier,
 } from './marketTiers';
 
@@ -61,6 +63,8 @@ export interface CreatePlayerOptions {
   jerseyNumber?: number;
   idPrefix?: string;
   marketTier?: PlayerMarketTier;
+  /** `league` keeps a rolled market tier but uses the league age pyramid. Presets omit this and lock age to the market tier. */
+  ageMode?: 'market' | 'league';
   specialistArchetype?: PlayerSpecialistArchetype;
 }
 
@@ -313,6 +317,41 @@ function playerProfile(
   return { birthplace, bats, throws, traits, personality, mental, eligibility };
 }
 
+function alignServiceToLeagueAge(service: CareerServiceProfile, age: number): CareerServiceProfile {
+  if (age <= 21) {
+    const experienceScore = Math.min(4, service.experienceScore);
+    return {
+      seasonsPlayed: 0,
+      careerPlayoffGames: 0,
+      experienceScore,
+      experienceTier: deriveExperienceTier(experienceScore),
+    };
+  }
+  if (age >= 34) {
+    const seasonsPlayed = Math.min(12, Math.max(7, age - 26));
+    const experienceScore = Math.max(service.experienceScore, Math.min(100, seasonsPlayed * 8));
+    return {
+      seasonsPlayed,
+      careerPlayoffGames: Math.max(service.careerPlayoffGames, 2),
+      experienceScore,
+      experienceTier: deriveExperienceTier(experienceScore),
+    };
+  }
+  return service;
+}
+
+function careerServiceForPlayer(
+  rng: SeededRng,
+  marketTier: PlayerMarketTier,
+  age: number,
+  position: FieldPosition,
+  locked: boolean,
+): CareerServiceProfile {
+  const rolled = rollInitialCareerService(rng, marketTier, age, position);
+  if (locked) return rolled;
+  return alignServiceToLeagueAge(rolled, age);
+}
+
 function playerId(rng: SeededRng, options: CreatePlayerOptions): string {
   if (options.identity) return options.identity.id;
   const token = rng.int(100000, 999999);
@@ -322,7 +361,8 @@ function playerId(rng: SeededRng, options: CreatePlayerOptions): string {
 /** Generates a single deterministic player calibrated to position, league tier, market tier, and specialist role. */
 export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Player {
   const band = TIER_RATING_BANDS[options.tier];
-  const marketTier = options.marketTier ?? rollClubStarterMarketTier(rng);
+  const lockedAge = options.marketTier != null && options.ageMode !== 'league';
+  const marketTier = options.marketTier ?? rollClubStarterMarketTier(rng, options.tier);
   const marketSpec = MARKET_TIER_SPECS[marketTier];
   const specialistArchetype =
     options.specialistArchetype ?? rollSpecialistArchetype(rng, options.position, marketTier);
@@ -355,8 +395,8 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     pitchArsenal?.favoritePitch,
   );
   const totalRatingBudget = computeTotalRatingBudget(marketTier, options.position);
-  const age = rng.int(marketSpec.ageRange[0], marketSpec.ageRange[1]);
-  const careerService = rollInitialCareerService(rng, marketTier, age, options.position);
+  const age = rollLeagueTierAge(rng, options.tier, marketTier, lockedAge);
+  const careerService = careerServiceForPlayer(rng, marketTier, age, options.position, lockedAge);
   const overall = computePlayerOverall({ position: options.position, ratings });
   return {
     id: playerId(rng, options),

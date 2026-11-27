@@ -397,3 +397,41 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
     }
   });
 });
+
+describe('TASK-110 roster factory age pyramid', () => {
+  it('builds full clubs whose ages climb with the league tier', () => {
+    const agesFor = (tier: LeagueTierId) => {
+      const ages: number[] = [];
+      for (let clubIndex = 0; clubIndex < 24; clubIndex += 1) {
+        const club = createClub(createSeededRng(11_000 + LEAGUE_TIER_ORDER.indexOf(tier) * 100 + clubIndex), {
+          ...BASE_CLUB_OPTIONS,
+          id: `club-${tier}-${clubIndex}`,
+          leagueTier: tier,
+        });
+        ages.push(...club.roster.map((player) => player.age));
+      }
+      return ages;
+    };
+    const share = (ages: number[], predicate: (age: number) => boolean) =>
+      ages.filter(predicate).length / ages.length;
+    const rookie = agesFor('rookie');
+    const majors = agesFor('majors');
+    const sortedRookie = [...rookie].sort((a, b) => a - b);
+    const rookieMedian = sortedRookie[Math.floor(sortedRookie.length / 2)];
+
+    expect(rookieMedian).toBeGreaterThanOrEqual(18);
+    expect(rookieMedian).toBeLessThanOrEqual(19);
+    expect(share(rookie, (age) => age > 25)).toBeLessThan(0.05);
+    expect(share(majors, (age) => age >= 25 && age <= 35)).toBeGreaterThanOrEqual(0.7);
+    expect(share(majors, (age) => age <= 19)).toBeLessThan(0.04);
+    expect(share(majors, (age) => age >= 40)).toBeLessThan(0.04);
+
+    const means = LEAGUE_TIER_ORDER.map((tier) => {
+      const ages = agesFor(tier);
+      return ages.reduce((sum, age) => sum + age, 0) / ages.length;
+    });
+    for (let index = 1; index < means.length; index += 1) {
+      expect(means[index]).toBeGreaterThan(means[index - 1]);
+    }
+  });
+});
