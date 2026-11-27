@@ -801,4 +801,101 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
     expect(noop.events).toEqual([]);
     expect(noop.decidingEvent).toBeNull();
   });
+
+  it('executes 1B/2B pickoffs without changing count or pitchesThrown, stacks pickoffHoldModifier, and ends half-inning on 3rd out (TASK-118)', () => {
+    const { away, home } = makeMatchupClubs('R', 'L', 1188);
+    const runnerId = away.lineup[1].playerId;
+
+    let sawOut1B = false;
+    let sawSafe1B = false;
+    let sawOut2B = false;
+    let sawThirdOutSwap = false;
+
+    for (let i = 0; i < 160; i += 1) {
+      const spot: GameSessionState = {
+        ...createGameSession(away, home, 61800 + i),
+        outs: 1,
+        balls: 2,
+        strikes: 1,
+        bases: [runnerId, null, null],
+      };
+      const pitcherId = spot.home.activePitcherId;
+      const beforeFatigue = spot.home.pitcherFatigue;
+      const res = stepPitch(spot, 'pickoff_1b', { enforceSideOwnership: true });
+      const ev = res.events.find((e) => e.type === 'pickoff');
+
+      expect(ev).toBeDefined();
+      expect(ev?.pickoffBase).toBe(1);
+      // Pickoff never changes balls, strikes, or pitchesThrown!
+      expect(res.nextSession.balls).toBe(2);
+      expect(res.nextSession.strikes).toBe(1);
+      expect(res.nextSession.boxScore.homePitchers[pitcherId].pitchesThrown).toBe(0);
+      expect(res.nextSession.home.pitcherFatigue).toBe(Math.min(100, beforeFatigue + 1));
+
+      if (ev?.outcome === 'pickoff_out') {
+        sawOut1B = true;
+        expect(res.nextSession.outs).toBe(2);
+        expect(res.nextSession.bases[0]).toBeNull();
+        expect(res.nextSession.boxScore.awayBatters[runnerId].caughtStealing).toBe(1);
+        expect(ev.soundCue).toBe('double_play_snap');
+        expect(ev.fieldingHighlight?.anim).toBe('field_dive');
+        expect(ev.fieldingHighlight?.fielderPos).toBe('1B');
+      } else if (ev?.outcome === 'pickoff_safe') {
+        sawSafe1B = true;
+        expect(res.nextSession.outs).toBe(1);
+        expect(res.nextSession.bases[0]).toBe(runnerId);
+        expect(res.nextSession.pickoffHoldModifier).toBeCloseTo(0.06, 2);
+        expect(ev.soundCue).toBe('dirt_slide');
+
+        // Second safe pickoff caps at 0.12
+        const secondTry = stepPitch(res.nextSession, 'pickoff_1b', { enforceSideOwnership: true });
+        if (secondTry.events.some((e) => e.outcome === 'pickoff_safe')) {
+          expect(secondTry.nextSession.pickoffHoldModifier).toBeCloseTo(0.12, 2);
+          const thirdTry = stepPitch(secondTry.nextSession, 'pickoff_1b', { enforceSideOwnership: true });
+          if (thirdTry.events.some((e) => e.outcome === 'pickoff_safe')) {
+            expect(thirdTry.nextSession.pickoffHoldModifier).toBeCloseTo(0.12, 2);
+          }
+        }
+      }
+
+      // Check 2B pickoff & 3rd-out half-inning rotation
+      const spot2B: GameSessionState = {
+        ...createGameSession(away, home, 62800 + i),
+        outs: 2,
+        balls: 1,
+        strikes: 2,
+        bases: [null, runnerId, null],
+      };
+      const res2b = stepPitch(spot2B, 'pickoff_2b', { enforceSideOwnership: true });
+      const ev2b = res2b.events.find((e) => e.type === 'pickoff');
+      expect(ev2b?.pickoffBase).toBe(2);
+      if (ev2b?.outcome === 'pickoff_out') {
+        sawOut2B = true;
+        expect(['2B', 'SS']).toContain(ev2b.fieldingHighlight?.fielderPos);
+        if (res2b.nextSession.half === 'BOT' && res2b.nextSession.outs === 0) {
+          sawThirdOutSwap = true;
+          expect(res2b.nextSession.pickoffHoldModifier ?? 0).toBe(0);
+        }
+      }
+    }
+
+    expect(sawOut1B).toBe(true);
+    expect(sawSafe1B).toBe(true);
+    expect(sawOut2B).toBe(true);
+    expect(sawThirdOutSwap).toBe(true);
+
+    // stepOnePitchAtBat delegates pickoffs immediately to 1 single step without throwing pitches
+    const onePitchSpot: GameSessionState = {
+      ...createGameSession(away, home, 63900),
+      outs: 0,
+      balls: 1,
+      strikes: 1,
+      bases: [runnerId, null, null],
+    };
+    const oneStep = stepOnePitchAtBat(onePitchSpot, 'pickoff_1b', { enforceSideOwnership: true });
+    expect(oneStep.decidingEvent?.type).toBe('pickoff');
+    expect(oneStep.nextSession.boxScore.homePitchers[onePitchSpot.home.activePitcherId].pitchesThrown).toBe(0);
+    expect(oneStep.nextSession.balls).toBe(1);
+    expect(oneStep.nextSession.strikes).toBe(1);
+  });
 });

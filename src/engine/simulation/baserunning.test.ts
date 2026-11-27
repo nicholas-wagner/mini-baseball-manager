@@ -3,6 +3,7 @@ import { createClub, createPlayer } from '../gm/rosterFactory';
 import { createSeededRng } from '../rng/seededRng';
 import {
   computeEffectiveStealSpeed,
+  computePickoffOutProbability,
   computeStealSuccessProbability,
   computeStealSuccessRate,
   getEligibleStealPlays,
@@ -10,6 +11,7 @@ import {
   isStealPlayLegal,
   resolveBaseStealPlay,
   resolveDefaultStealPlay,
+  resolvePickoffAttempt,
   shouldAiAttemptSteal,
   stealPlayToTacticalCall,
   tacticalCallToStealPlay,
@@ -245,5 +247,81 @@ describe('Speed-Driven Base Stealing & Baserunning Engine (TASK-070)', () => {
     expect(tacticalCallToStealPlay('steal', [null, 'r2', null])).toBe('steal_3b');
     expect(tacticalCallToStealPlay('steal_3b', [null, 'r2', null])).toBe('steal_3b');
     expect(tacticalCallToStealPlay('normal', ['r1', null, null])).toBeNull();
+  });
+
+  it('computes realistic 1B/2B pickoff odds (LHP edge, runner speed/eye) and lowers steal odds with pickoffHoldModifier (TASK-118)', () => {
+    const rng = createSeededRng(11801);
+    const lhp = createPlayer(rng, { position: 'SP', tier: 'aa' });
+    lhp.throws = 'L';
+    lhp.ratings.control = 80;
+    lhp.ratings.fielding = 78;
+    const rhp = { ...lhp, id: 'rhp-118', throws: 'R' as const };
+    const fastRunner = createPlayer(rng, { position: 'CF', tier: 'aa' });
+    fastRunner.ratings.speed = 92;
+    fastRunner.ratings.eye = 86;
+    const slowRunner = createPlayer(rng, { position: '1B', tier: 'aa' });
+    slowRunner.ratings.speed = 40;
+    slowRunner.ratings.eye = 45;
+    const firstBaseman = createPlayer(rng, { position: '1B', tier: 'aa' });
+    const catcher = createPlayer(rng, { position: 'C', tier: 'aa' });
+
+    const lhp1b = computePickoffOutProbability(lhp, slowRunner, 1);
+    const rhp1b = computePickoffOutProbability(rhp, slowRunner, 1);
+    const lhpFast1b = computePickoffOutProbability(lhp, fastRunner, 1);
+    const lhp2b = computePickoffOutProbability(lhp, slowRunner, 2);
+
+    expect(lhp1b).toBeGreaterThanOrEqual(0.06);
+    expect(lhp1b).toBeLessThanOrEqual(0.14);
+    expect(lhp2b).toBeGreaterThanOrEqual(0.04);
+    expect(lhp2b).toBeLessThanOrEqual(0.1);
+    expect(lhp1b).toBeGreaterThan(rhp1b);
+    expect(lhp1b).toBeGreaterThan(lhpFast1b);
+    expect(lhp1b).toBeGreaterThan(lhp2b);
+
+    let sawOut = false;
+    let sawSafe = false;
+    for (let s = 1; s <= 120; s += 1) {
+      const res = resolvePickoffAttempt(createSeededRng(11850 + s), {
+        base: 1,
+        pitcher: lhp,
+        runner: slowRunner,
+        fielder: firstBaseman,
+        fielderPos: '1B',
+      });
+      if (res.out) {
+        sawOut = true;
+        expect(res.soundCue).toBe('double_play_snap');
+        expect(res.commentary).toMatch(/picked off/i);
+      } else {
+        sawSafe = true;
+        expect(res.soundCue).toBe('dirt_slide');
+        expect(res.commentary).toMatch(/safe|back/i);
+      }
+    }
+    expect(sawOut && sawSafe).toBe(true);
+
+    // pickoffHoldModifier reduces next-pitch steal success chance cleanly (up to -12%)
+    const baseSteal = computeStealSuccessProbability({
+      playType: 'steal_2b',
+      runner: fastRunner,
+      pitcher: rhp,
+      catcher,
+    });
+    const heldOnce = computeStealSuccessProbability({
+      playType: 'steal_2b',
+      runner: fastRunner,
+      pitcher: rhp,
+      catcher,
+      pickoffHoldModifier: 0.06,
+    });
+    const heldTwice = computeStealSuccessProbability({
+      playType: 'steal_2b',
+      runner: fastRunner,
+      pitcher: rhp,
+      catcher,
+      pickoffHoldModifier: 0.12,
+    });
+    expect(baseSteal - heldOnce).toBeCloseTo(0.06, 2);
+    expect(baseSteal - heldTwice).toBeCloseTo(0.12, 2);
   });
 });

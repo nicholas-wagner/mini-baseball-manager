@@ -55,7 +55,9 @@ export type TacticalCall =
   | 'steal_home'
   | 'pitchout'
   | 'hold_runner'
-  | 'intentional_walk';
+  | 'intentional_walk'
+  | 'pickoff_1b'
+  | 'pickoff_2b';
 
 export type PlayEventType =
   | 'game_start'
@@ -65,6 +67,7 @@ export type PlayEventType =
   | 'pitch_thrown'
   | 'ball_in_play'
   | 'stolen_base_attempt'
+  | 'pickoff'
   | 'pitching_change'
   | 'inning_end'
   | 'game_end';
@@ -87,7 +90,9 @@ export type AtBatOutcome =
   | 'sac_fly'
   | 'fielding_error'
   | 'bunt_single'
-  | 'bunt_out';
+  | 'bunt_out'
+  | 'pickoff_out'
+  | 'pickoff_safe';
 
 export interface PlayEvent {
   seq: number;
@@ -104,6 +109,7 @@ export interface PlayEvent {
   batterId?: string;
   pitcherId?: string;
   outcome?: AtBatOutcome;
+  pickoffBase?: 1 | 2;
   isClutchMoment: boolean;
   leverageIndex?: number;
   isRivalrySpark?: boolean;
@@ -125,6 +131,8 @@ export interface PlayEvent {
     fielderId: string;
     fielderPos: FieldPosition;
     anim: 'field_run' | 'field_dive' | 'field_high_jump';
+    robbedHomeRun?: boolean;
+    webGem?: boolean;
   };
   pitchThrown?: {
     pitchType: PitchType;

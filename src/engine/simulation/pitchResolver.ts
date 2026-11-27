@@ -145,6 +145,8 @@ const TACTICAL_CONFIG: Readonly<Record<TacticalCall, TacticalModifiers>> = {
   pitchout: { contactMod: 0, powerMod: 0, swingMod: -0.5, chaseMod: -0.5 },
   hold_runner: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
   intentional_walk: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
+  pickoff_1b: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
+  pickoff_2b: { contactMod: 0, powerMod: 0, swingMod: 0, chaseMod: 0 },
 };
 
 const OUTFIELD_SPOTS: readonly {
@@ -218,6 +220,7 @@ function resolveStealOnBases(
       pitcherFatigue: ctx.pitcherFatigue,
       catcherPopTimeBonus: ctx.catcherPopTimeBonus,
       defenseCall: ctx.stealDefenseCall,
+      pickoffHoldModifier: ctx.pickoffHoldModifier,
     },
   );
 }
@@ -546,6 +549,7 @@ function buildSimpleOut(
       fielderId: defender.id,
       fielderPos: spot.pos,
       anim: preset.anim,
+      ...(preset.anim === 'field_dive' ? { webGem: true } : {}),
     },
   };
 }
@@ -689,6 +693,7 @@ export interface PitchResolverContext {
   catcherPopTimeBonus?: number;
   stealDefenseCall?: StealDefenseCall;
   stealPlay?: StealPlayType | null;
+  pickoffHoldModifier?: number;
   hitAndRun?: boolean;
   relieverWarmupControlBonus?: number;
 }
@@ -732,32 +737,76 @@ const BATTED_BALL_BABIP_SHIFT: Readonly<Record<BattedBallType, number>> = {
   pop_up: -0.22,
 };
 
-function maybeRobHomeRunWithLeap(
-  rng: SeededRng,
+function resolveWallOutfielder(
   hit: PitchResolution,
   defender: Player,
-  defenderCaps: CapstoneGameplayProfile,
+  outfielders?: Readonly<Record<'LF' | 'CF' | 'RF', Player>>,
+): { fielder: Player; spot: (typeof OUTFIELD_SPOTS)[number] } {
+  const pos = hit.fieldingHighlight?.fielderPos;
+  const spot = OUTFIELD_SPOTS.find((entry) => entry.pos === pos) ?? OUTFIELD_SPOTS[1];
+  const fielder =
+    pos === 'LF' || pos === 'CF' || pos === 'RF'
+      ? (outfielders?.[pos] ?? defender)
+      : defender;
+  return { fielder, spot };
+}
+
+function buildWallRobberyOut(
+  fielder: Player,
+  spot: (typeof OUTFIELD_SPOTS)[number],
+  capstone: boolean,
 ): PitchResolution {
-  if (hit.outcome !== 'home_run' || defenderCaps.hrRobberyChance <= 0) return hit;
-  if (!rng.chance(defenderCaps.hrRobberyChance)) return hit;
-  const spot = rng.pick(OUTFIELD_SPOTS);
+  const commentary = capstone
+    ? `ROBBERY AT THE WALL! ${fielder.name} scales the fence with SKY-HIGH LEAP to steal a home run!`
+    : `ROBBED AT THE WALL! ${fielder.name} climbs the fence to steal a home run!`;
   return {
     kind: 'plate_complete',
     outcome: 'fly_out',
     outsAdded: 1,
     advanceOnOut: 'none',
     battedBallType: 'fly_ball',
-    commentary: `ROBBERY AT THE WALL! ${defender.name} scales the fence with SKY-HIGH LEAP to steal a home run!`,
+    commentary,
     soundCue: 'spring_boing',
     ballFlight: { style: 'line_drive', landingX: spot.x, landingZ: -38, apexY: 13.5, durationSec: 1.5 },
-    fieldingHighlight: { fielderId: defender.id, fielderPos: spot.pos, anim: 'field_high_jump' },
-    specialPowerTriggered: {
-      actor: 'fielder',
-      powerId: 'sky_high_leap',
-      calloutText: 'SKY-HIGH LEAP! HR ROBBED!',
-      vfxColor: '#00E5FF',
+    fieldingHighlight: {
+      fielderId: fielder.id,
+      fielderPos: spot.pos,
+      anim: 'field_high_jump',
+      robbedHomeRun: true,
+      webGem: true,
     },
+    ...(capstone
+      ? {
+          specialPowerTriggered: {
+            actor: 'fielder' as const,
+            powerId: 'sky_high_leap',
+            calloutText: 'SKY-HIGH LEAP! HR ROBBED!',
+            vfxColor: '#00E5FF',
+          },
+        }
+      : {}),
   };
+}
+
+function isEliteWallOutfielder(player: Player): boolean {
+  return player.ratings.range >= 82 || player.ratings.fielding >= 84;
+}
+
+function maybeRobHomeRunWithLeap(
+  rng: SeededRng,
+  hit: PitchResolution,
+  defender: Player,
+  defenderCaps: CapstoneGameplayProfile,
+  outfielders?: Readonly<Record<'LF' | 'CF' | 'RF', Player>>,
+): PitchResolution {
+  if (hit.outcome !== 'home_run') return hit;
+  if (defenderCaps.hrRobberyChance > 0) {
+    if (!rng.chance(defenderCaps.hrRobberyChance)) return hit;
+    return buildWallRobberyOut(defender, rng.pick(OUTFIELD_SPOTS), true);
+  }
+  const { fielder, spot } = resolveWallOutfielder(hit, defender, outfielders);
+  if (!isEliteWallOutfielder(fielder) || !rng.chance(0.03)) return hit;
+  return buildWallRobberyOut(fielder, spot, false);
 }
 
 interface MindGameModifiers {
@@ -940,7 +989,13 @@ function resolveContactResult(
       effSpeed,
       effGapPower,
     );
-    const hit = maybeRobHomeRunWithLeap(ctx.rng, rawHit, ctx.defender, powers.defenderCaps);
+    const hit = maybeRobHomeRunWithLeap(
+      ctx.rng,
+      rawHit,
+      ctx.defender,
+      powers.defenderCaps,
+      ctx.outfielders,
+    );
     if (hit.outcome !== 'fly_out' && ctx.canBatterTriggerSpecial && !powers.batterSurge) {
       hit.specialPowerTriggered = buildHeritagePowerTrigger(ctx.batter, 'batter');
     }

@@ -124,6 +124,7 @@ export interface GameSessionState {
   balls: number;
   strikes: number;
   bases: BaseState;
+  pickoffHoldModifier?: number;
   atBatPitchHistory: PitchType[];
   abilityCooldowns: AbilityCooldownState;
   away: TeamGameSide;

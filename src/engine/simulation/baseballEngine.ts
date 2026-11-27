@@ -51,7 +51,7 @@ import {
   isOffensiveTacticalCall,
   type StepPitchOptions,
 } from './aiManager';
-import { shouldAiAttemptSteal } from './baserunning';
+import { resolvePickoffAttempt, shouldAiAttemptSteal } from './baserunning';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
 
 export type { StepPitchOptions } from './aiManager';
@@ -112,6 +112,7 @@ function makeEvent(
     batterId: partial.batterId,
     pitcherId: partial.pitcherId,
     outcome: partial.outcome,
+    pickoffBase: partial.pickoffBase,
     isClutchMoment: isClutchSituation(state),
     leverageIndex: getCurrentLeverage(state).leverageIndex,
     specialPowerTriggered: partial.specialPowerTriggered,
@@ -868,6 +869,7 @@ function rotateToNextHalfInning(state: GameSessionState): void {
   state.outs = 0;
   state.balls = 0;
   state.strikes = 0;
+  state.pickoffHoldModifier = 0;
   state.atBatPitchHistory = [];
 
   if (state.half === 'TOP') {
@@ -1036,7 +1038,14 @@ function resolveOwnedEffectiveCall(
   if (batting.isHuman) {
     return isOffensiveTacticalCall(requested) ? requested : 'normal';
   }
-  if (requested === 'intentional_walk' || requested === 'pitchout') return requested;
+  if (
+    requested === 'intentional_walk' ||
+    requested === 'pitchout' ||
+    requested === 'pickoff_1b' ||
+    requested === 'pickoff_2b'
+  ) {
+    return requested;
+  }
   return chooseAiBattingCall(rng, state);
 }
 
@@ -1153,37 +1162,104 @@ function resolveThirdBaseCall(
   }
 }
 
-/** Advances the deterministic baseball simulation by one pitch or tactical action. */
-export function stepPitch(
-  session: GameSessionState,
-  tacticalCall: TacticalCall = 'normal',
-  options: StepPitchOptions = {},
-): { nextSession: GameSessionState; events: PlayEvent[] } {
-  if (session.status === 'completed') {
-    return { nextSession: session, events: [] };
+function isPickoffCall(call: TacticalCall): call is 'pickoff_1b' | 'pickoff_2b' {
+  return call === 'pickoff_1b' || call === 'pickoff_2b';
+}
+
+function basesChanged(before: BaseState, after: BaseState): boolean {
+  return before[0] !== after[0] || before[1] !== after[1] || before[2] !== after[2];
+}
+
+function applyPickoffOutBoxStats(
+  state: GameSessionState,
+  runnerId: string,
+  fielderId: string,
+  pitcherId: string,
+): void {
+  const battingLines = getBatterLines(state);
+  if (battingLines[runnerId]) battingLines[runnerId].caughtStealing += 1;
+  getPitcherLines(state)[pitcherId].outsRecorded += 1;
+  const fieldingLines =
+    state.half === 'TOP' ? state.boxScore.homeBatters : state.boxScore.awayBatters;
+  if (fieldingLines[fielderId]) fieldingLines[fielderId].putouts += 1;
+}
+
+function tryExecutePickoffStep(
+  next: GameSessionState,
+  rng: ReturnType<typeof createSeededRng>,
+  effectiveCall: TacticalCall,
+  batterId: string,
+  pitcher: ReturnType<typeof getCurrentPitcher>,
+  batting: TeamGameSide,
+  fielding: TeamGameSide,
+  events: PlayEvent[],
+): boolean {
+  if (!isPickoffCall(effectiveCall)) return false;
+  const base: 1 | 2 = effectiveCall === 'pickoff_1b' ? 1 : 2;
+  const runnerId = next.bases[base - 1];
+  const runner = runnerId ? batting.playersById[runnerId] : undefined;
+  if (!runner) return false;
+
+  fielding.pitcherFatigue = Math.min(100, fielding.pitcherFatigue + 1);
+  const fielderPos: '1B' | '2B' | 'SS' = base === 1 ? '1B' : rng.chance(0.5) ? 'SS' : '2B';
+  const fielder = getDefenderAtPosition(fielding, fielderPos);
+  const pickoff = resolvePickoffAttempt(rng, { base, pitcher, runner, fielder, fielderPos });
+  const outsBefore = next.outs;
+
+  if (pickoff.out) {
+    next.bases[base - 1] = null;
+    next.outs += 1;
+    next.pickoffHoldModifier = 0;
+    applyPickoffOutBoxStats(next, runner.id, fielder.id, pitcher.id);
+    events.push(
+      makeEvent(next, {
+        type: 'pickoff',
+        outsBefore,
+        batterId,
+        pitcherId: pitcher.id,
+        outcome: 'pickoff_out',
+        pickoffBase: base,
+        fieldingHighlight: { fielderId: fielder.id, fielderPos, anim: 'field_dive' },
+        commentary: pickoff.commentary,
+        soundCue: 'double_play_snap',
+      }),
+    );
+    advanceHalfOrFinish(next, events);
+    return true;
   }
 
-  const next = cloneSessionForStep(session);
-  const events: PlayEvent[] = [];
-  emitOpeningEventsIfNeeded(next, events);
+  next.pickoffHoldModifier = Math.min(0.12, Number(((next.pickoffHoldModifier ?? 0) + 0.06).toFixed(2)));
+  events.push(
+    makeEvent(next, {
+      type: 'pickoff',
+      outsBefore,
+      batterId,
+      pitcherId: pitcher.id,
+      outcome: 'pickoff_safe',
+      pickoffBase: base,
+      commentary: pickoff.commentary,
+      soundCue: 'dirt_slide',
+    }),
+  );
+  return true;
+}
 
-  const stepSeed = (next.rngSeed ^ Math.imul(next.stepCounter, 0x9e3779b1)) >>> 0;
-  const rng = createSeededRng(stepSeed);
-  const batter = getCurrentBatter(next);
-  const pitcher = getCurrentPitcher(next);
-  const fielding = getFieldingSide(next);
-  const batting = getBattingSide(next);
-  const firstBaseRunner = next.bases[0] ? batting.playersById[next.bases[0]] : null;
-
-  const effectiveCall = resolveEffectiveCall(rng, next, tacticalCall, Boolean(options.enforceSideOwnership));
-  const safeOpts = sanitizeStepOptionsForSide(rng, next, options);
-  const leverage = getCurrentLeverage(next).leverageIndex;
-  const pitchingLead = fielding.score - batting.score;
-  recordPitchFatigueIfThrown(next, effectiveCall, pitcher, fielding, leverage);
-
+function buildPitchStepResolution(
+  next: GameSessionState,
+  rng: ReturnType<typeof createSeededRng>,
+  batter: ReturnType<typeof getCurrentBatter>,
+  pitcher: ReturnType<typeof getCurrentPitcher>,
+  batting: TeamGameSide,
+  fielding: TeamGameSide,
+  tacticalCall: TacticalCall,
+  pitchCall: TacticalCall,
+  safeOpts: StepPitchOptions,
+  leverage: number,
+): PitchResolution {
   const readiness = getSpecialReadinessForStep(next, batter, pitcher);
   const defenderPos = rng.pick(['SS', '2B', 'CF', 'LF', 'RF'] as const);
-  const resolution = resolveSinglePitch({
+  const firstBaseRunner = next.bases[0] ? batting.playersById[next.bases[0]] : null;
+  return resolveSinglePitch({
     rng,
     batter,
     pitcher,
@@ -1200,7 +1276,7 @@ export function stepPitch(
     strikes: next.strikes,
     outs: next.outs,
     inning: next.inning,
-    pitchingLead,
+    pitchingLead: fielding.score - batting.score,
     bases: next.bases,
     pitcherFatigue: fielding.pitcherFatigue,
     battingHype: batting.hypeGauge,
@@ -1208,7 +1284,7 @@ export function stepPitch(
     canBatterTriggerSpecial: readiness.canBatterTriggerSpecial,
     canPitcherTriggerSpecial: readiness.canPitcherTriggerSpecial,
     leverageIndex: leverage,
-    tacticalCall: effectiveCall,
+    tacticalCall: pitchCall,
     atBatPitchHistory: next.atBatPitchHistory,
     requestedPitchType: safeOpts.requestedPitchType,
     requestedPowerId: safeOpts.requestedPowerId,
@@ -1231,16 +1307,73 @@ export function stepPitch(
     catcherPopTimeBonus: fielding.catcherPopTimeBonus,
     stealDefenseCall: resolveStealDefenseCall(tacticalCall, safeOpts.stealDefenseCall),
     stealPlay: safeOpts.stealPlay ?? null,
+    pickoffHoldModifier: next.pickoffHoldModifier ?? 0,
     hitAndRun: Boolean(safeOpts.hitAndRun),
     relieverWarmupControlBonus: safeOpts.relieverWarmupControlBonus,
   });
+}
 
-  resolveThirdBaseCall(next, resolution, rng, safeOpts);
-  events.push(...dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
+function finalizePitchStep(
+  next: GameSessionState,
+  prevBases: BaseState,
+  events: PlayEvent[],
+  bullpenMode: BullpenMode | undefined,
+): void {
+  if (basesChanged(prevBases, next.bases)) {
+    next.pickoffHoldModifier = 0;
+  }
   advanceHalfOrFinish(next, events);
   if (next.status === 'in_progress' && next.balls === 0 && next.strikes === 0) {
-    maybeSwapReliever(next, events, safeOpts.bullpenMode);
+    maybeSwapReliever(next, events, bullpenMode);
   }
+}
+
+/** Advances the deterministic baseball simulation by one pitch or tactical action. */
+export function stepPitch(
+  session: GameSessionState,
+  tacticalCall: TacticalCall = 'normal',
+  options: StepPitchOptions = {},
+): { nextSession: GameSessionState; events: PlayEvent[] } {
+  if (session.status === 'completed') {
+    return { nextSession: session, events: [] };
+  }
+
+  const next = cloneSessionForStep(session);
+  const events: PlayEvent[] = [];
+  emitOpeningEventsIfNeeded(next, events);
+
+  const stepSeed = (next.rngSeed ^ Math.imul(next.stepCounter, 0x9e3779b1)) >>> 0;
+  const rng = createSeededRng(stepSeed);
+  const batter = getCurrentBatter(next);
+  const pitcher = getCurrentPitcher(next);
+  const fielding = getFieldingSide(next);
+  const batting = getBattingSide(next);
+  const prevBases: BaseState = [...next.bases] as BaseState;
+
+  const effectiveCall = resolveEffectiveCall(rng, next, tacticalCall, Boolean(options.enforceSideOwnership));
+  if (tryExecutePickoffStep(next, rng, effectiveCall, batter.id, pitcher, batting, fielding, events)) {
+    return { nextSession: next, events };
+  }
+  const pitchCall: TacticalCall = isPickoffCall(effectiveCall) ? 'normal' : effectiveCall;
+  const safeOpts = sanitizeStepOptionsForSide(rng, next, options);
+  const leverage = getCurrentLeverage(next).leverageIndex;
+  recordPitchFatigueIfThrown(next, pitchCall, pitcher, fielding, leverage);
+
+  const resolution = buildPitchStepResolution(
+    next,
+    rng,
+    batter,
+    pitcher,
+    batting,
+    fielding,
+    tacticalCall,
+    pitchCall,
+    safeOpts,
+    leverage,
+  );
+  resolveThirdBaseCall(next, resolution, rng, safeOpts);
+  events.push(...dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
+  finalizePitchStep(next, prevBases, events, safeOpts.bullpenMode);
 
   return { nextSession: next, events };
 }
@@ -1288,7 +1421,8 @@ export function stepAtBat(
     const step = stepPitch(current, activeCall, stepOpts);
     current = step.nextSession;
     events.push(...step.events);
-    activeCall = STEAL_TACTICAL_CALLS.has(activeCall) ? 'normal' : activeCall;
+    activeCall =
+      STEAL_TACTICAL_CALLS.has(activeCall) || isPickoffCall(activeCall) ? 'normal' : activeCall;
     stepOpts = clearOneShotStealOptions(stepOpts);
     if (isPlateAppearanceResolved(current, startHalf, startInning, startBatterIdx)) break;
   }
@@ -1306,7 +1440,7 @@ export interface OnePitchAtBatResult {
 
 function findDecidingPlayEvent(events: readonly PlayEvent[]): PlayEvent | null {
   for (let i = events.length - 1; i >= 0; i -= 1) {
-    if (events[i].outcome || events[i].type === 'stolen_base_attempt') {
+    if (events[i].outcome || events[i].type === 'stolen_base_attempt' || events[i].type === 'pickoff') {
       return events[i];
     }
   }
@@ -1314,12 +1448,12 @@ function findDecidingPlayEvent(events: readonly PlayEvent[]): PlayEvent | null {
 }
 
 function hasActiveStealRequest(call: TacticalCall, options: StepPitchOptions): boolean {
-  return Boolean(options.stealPlay) || STEAL_TACTICAL_CALLS.has(call);
+  return Boolean(options.stealPlay) || STEAL_TACTICAL_CALLS.has(call) || isPickoffCall(call);
 }
 
 /**
  * Simulates a plate appearance pitch-by-pitch to its deciding pitch while preserving
- * full realistic pitch counts, fatigue, and box score; executes just 1 pitch if a steal is active.
+ * full realistic pitch counts, fatigue, and box score; executes just 1 step if a steal or pickoff is active.
  */
 export function stepOnePitchAtBat(
   session: GameSessionState,
@@ -1343,7 +1477,7 @@ export function stepOnePitchAtBat(
       preDecidingSession: session,
       events: step.events,
       decidingEvent: findDecidingPlayEvent(step.events),
-      pitchesInAtBat: 1,
+      pitchesInAtBat: isPickoffCall(tacticalCall) ? 0 : 1,
     };
   }
 

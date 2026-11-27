@@ -602,4 +602,178 @@ describe('Mobile Live Polish, 1-Tap Steal UX, Auto-Dismiss Tactics Sheet & 2-Str
       vi.useRealTimers();
     }
   });
+
+  it('surfaces 1-tap Pickoff 1B/2B chips while pitching, honors playLocked, and auto-dismisses Tactics sheet when fired (TASK-118)', () => {
+    const onPickoff = vi.fn();
+
+    // 1. Guided FirstAtBat: shows Pickoff 1B when runner on 1B, switches to Pickoff 2B when 1B empty & 2B occupied, hides while batting
+    const sess1B = { ...makeSession(0), half: 'TOP' as const };
+    const sess2B = {
+      ...sess1B,
+      bases: [null, sess1B.away.lineup[1].playerId, null] as [null, string, null],
+    };
+    const guidedView = render(
+      <FirstAtBat
+        session={sess1B}
+        batting={false}
+        target="attack_zone"
+        call="normal"
+        locked={false}
+        expanded={false}
+        powerArmed={false}
+        pickoffOption={{ base: 1, call: 'pickoff_1b', label: 'Pickoff 1B' }}
+        onPickoff={onPickoff}
+        cue={BASE_CUE}
+        onTarget={vi.fn()}
+        onSwing={vi.fn()}
+        onPitch={vi.fn()}
+        onExpand={vi.fn()}
+        onSuggested={vi.fn()}
+      />,
+    );
+    const guidedPickoff = screen.getByTestId('guided-pickoff-btn');
+    expect(guidedPickoff).toHaveTextContent(/Pickoff 1B/i);
+    expect(guidedPickoff.closest('details')).toBeNull();
+    fireEvent.click(guidedPickoff);
+    expect(onPickoff).toHaveBeenCalledWith(1);
+
+    // Respects locked on FirstAtBat
+    guidedView.rerender(
+      <FirstAtBat
+        session={sess2B}
+        batting={false}
+        target="attack_zone"
+        call="normal"
+        locked
+        expanded={false}
+        powerArmed={false}
+        pickoffOption={{ base: 2, call: 'pickoff_2b', label: 'Pickoff 2B' }}
+        onPickoff={onPickoff}
+        cue={BASE_CUE}
+        onTarget={vi.fn()}
+        onSwing={vi.fn()}
+        onPitch={vi.fn()}
+        onExpand={vi.fn()}
+        onSuggested={vi.fn()}
+      />,
+    );
+    const lockedGuidedPickoff = screen.getByTestId('guided-pickoff-btn');
+    expect(lockedGuidedPickoff).toHaveTextContent(/Pickoff 2B/i);
+    expect(lockedGuidedPickoff).toBeDisabled();
+    guidedView.unmount();
+
+    // 2. LiveActionBar (dock + full + sheet): surfaces 1-tap Pickoff chip with >=44px tap target & playLocked guard
+    const onBarPickoff = vi.fn();
+    const barProps = {
+      cue: BASE_CUE,
+      matchupLabel: 'Rival vs Ace',
+      basesLabel: 'Bases: 1B · ·',
+      latestEvent: null,
+      controlMode: 'simple' as const,
+      pitchingMode: 'simple' as const,
+      watchMode: 'paused' as const,
+      tacticalCall: 'normal' as const,
+      isBatting: false,
+      gameCompleted: false,
+      locked: false,
+      pickoffOption: { base: 1 as const, call: 'pickoff_1b' as const, label: 'Pickoff 1B' },
+      onPickoff: onBarPickoff,
+      onNextPitch: vi.fn(),
+      onToggleWatchMode: vi.fn(),
+      onSimAtBat: vi.fn(),
+      onSimHalfInning: vi.fn(),
+      onClutchSim: vi.fn(),
+      onSimToEnd: vi.fn(),
+      onSelectTacticalCall: vi.fn(),
+      onSuggestedAction: vi.fn(),
+      onToggleControlMode: vi.fn(),
+    };
+
+    const barView = render(<LiveActionBar {...barProps} density="dock" />);
+    const dockPickoff = screen.getByTestId('arcade-pickoff-btn');
+    expect(dockPickoff).toHaveTextContent(/Pickoff 1B/i);
+    fireEvent.click(dockPickoff);
+    expect(onBarPickoff).toHaveBeenCalledWith(1);
+
+    // Full / sheet mode honors locked & keeps >=44px tap target
+    barView.rerender(
+      <LiveActionBar
+        {...barProps}
+        density="sheet"
+        locked
+        pickoffOption={{ base: 2, call: 'pickoff_2b', label: 'Pickoff 2B' }}
+      />,
+    );
+    const sheetPickoff = screen.getByTestId('arcade-pickoff-btn');
+    expect(sheetPickoff).toHaveTextContent(/Pickoff 2B/i);
+    expect(sheetPickoff).toBeDisabled();
+    expect(sheetPickoff.className).toMatch(/min-h-\[44px\]/);
+    barView.unmount();
+
+    // 3. Real mobile GameDayScreen pitching with runner on 1B:
+    //    - Guided dock shows 1-tap Pickoff 1B
+    //    - Opening More controls -> LiveBottomSheet -> firing Pickoff 1B auto-dismisses the sheet immediately & emits pickoff!
+    const origMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    try {
+      const store = useGameStore.getState();
+      const human = store.getHumanClub()!;
+      const rival = store.leagues[human.leagueTier].find((c) => c.id !== human.id)!;
+      const baseSess = createGameSession(rival, human, 11888, 'regular', 5);
+      const runnerOnFirst = rival.lineup[1].playerId;
+      const openingRequest = {
+        gameEvents: [],
+        events: [],
+        recapHeadline: 'Runner on 1B!',
+        session: {
+          ...baseSess,
+          half: 'TOP' as const,
+          outs: 1,
+          balls: 1,
+          strikes: 1,
+          bases: [runnerOnFirst, null, null] as [string, null, null],
+        },
+      };
+      render(<GameDayScreen openingRequest={openingRequest} />);
+
+      expect(screen.getByTestId('guided-pickoff-btn')).toHaveTextContent(/Pickoff 1B/i);
+
+      // Open Tactics bottom sheet on mobile and fire Pickoff 1B inside LiveBottomSheet
+      fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
+      const sheet = screen.getByTestId('tactics-sheet');
+      const sheetPickoffBtn = within(sheet).getByTestId('arcade-pickoff-btn');
+      expect(sheetPickoffBtn).toHaveTextContent(/Pickoff 1B/i);
+      fireEvent.click(sheetPickoffBtn);
+
+      // Sheet auto-dismisses immediately, locks play during throw, and emits a real pickoff event!
+      expect(screen.queryByTestId('tactics-sheet')).toBeNull();
+      expect(screen.getByTestId('live-primary-pitch-btn')).toBeDisabled();
+      const dockPickoffAfter = screen.queryByTestId('arcade-pickoff-btn');
+      if (dockPickoffAfter) expect(dockPickoffAfter).toBeDisabled();
+
+      // Re-opening Tactics confirms the live pickoff event was recorded cleanly without changing count!
+      fireEvent.click(screen.getByRole('button', { name: /^Tactics$/i }));
+      const reopened = screen.getByTestId('tactics-sheet');
+      expect(within(reopened).getByTestId('live-last-pitch-readout').textContent).toMatch(
+        /pickoff|picked off/i,
+      );
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: origMatchMedia,
+      });
+    }
+  });
 });
