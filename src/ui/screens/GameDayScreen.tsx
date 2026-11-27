@@ -355,6 +355,8 @@ export function GameDayScreen({
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
   const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('attack_zone');
   const [shakeOffCount, setShakeOffCount] = useState(0);
+  const [shakeOffTrigger, setShakeOffTrigger] = useState(0);
+  const [audioMuted, setAudioMuted] = useState(() => soundEngine.getState().muted);
   const [batterGuess, setBatterGuess] = useState<BatterPitchGuess>('none');
   const [moundVisitUsed, setMoundVisitUsed] = useState(false);
   const [argueUsed, setArgueUsed] = useState(false);
@@ -612,6 +614,7 @@ export function GameDayScreen({
     setArmedPowerId(null);
     setPitchTarget('attack_zone');
     setShakeOffCount(0);
+    setShakeOffTrigger(0);
     setBatterGuess('none');
     setMoundVisitUsed(false);
     setArgueUsed(false);
@@ -680,6 +683,7 @@ export function GameDayScreen({
     setArmedPowerId(null);
     setPitchTarget('attack_zone');
     setShakeOffCount(0);
+    setShakeOffTrigger(0);
     setBatterGuess('none');
     setMoundVisitUsed(false);
     setArgueUsed(false);
@@ -2773,6 +2777,13 @@ export function GameDayScreen({
     if (mode !== 'advanced') setSelectedPitchType(null);
     soundEngine.play('ui_pop');
   };
+  const handleToggleLiveAudio = () => {
+    soundEngine.unlock();
+    const nextMuted = soundEngine.toggleMute();
+    bgmEngine.setMasterMuted(nextMuted);
+    setAudioMuted(nextMuted);
+    if (!nextMuted) soundEngine.play('ui_pop');
+  };
   const handleShakeOffCatcher = () => {
     soundEngine.unlock();
     if (playLocked || playLockedRef.current) return;
@@ -2782,6 +2793,7 @@ export function GameDayScreen({
     playLockedRef.current = false;
     setPlaybackEvent(null);
     setShakeOffCount((c) => c + 1);
+    setShakeOffTrigger((n) => n + 1);
     soundEngine.play('ui_pop');
   };
   const sign = !humanIsBatting && pitchingMode !== 'simple' ? catcherSign(liveSession) : null;
@@ -2874,9 +2886,20 @@ export function GameDayScreen({
       {scoreboard}
       <LiveGameCanvas onAudioCue={playTimelineCue} guided awayClub={liveAwayClub} homeClub={liveHomeClub} session={baseSession}
         weather={gameWeather}
+        audioMuted={audioMuted} onToggleAudio={handleToggleLiveAudio}
         choreo={film} lastEvent={event} cameraMode={cameraMode} onChangeCameraMode={changeCamera} />
     </ThirdBaseDecision>;
   }
+  const selectLiveBattingCall = (call: TacticalCall) => {
+    setTacticalCall(call);
+    if (!playing && !handoff && humanIsBatting) {
+      setLastChoreo(null);
+      setPlaybackEvent(null);
+      setEntranceCue(null);
+      setDecidingPitchCue(null);
+    }
+    soundEngine.play('ui_pop');
+  };
   const showFullHud = !guiding || showMore;
   const closeTactics = () => setSheetOpen(false);
   liveKeysRef.current = (event: KeyboardEvent) => {
@@ -2911,7 +2934,7 @@ export function GameDayScreen({
       const index = Number(key) - 1;
       if (humanIsBatting) {
         const approach = (['contact', 'normal', 'power'] as const)[index];
-        setTacticalCall(approach);
+        selectLiveBattingCall(approach);
       } else {
         const spot = (['attack_zone', 'paint_corners', 'bury_offspeed'] as const)[index];
         setPitchTarget(spot);
@@ -2920,7 +2943,7 @@ export function GameDayScreen({
     }
     if (key === 'b' && humanIsBatting) {
       event.preventDefault();
-      setTacticalCall((call) => (call === 'bunt' ? 'normal' : 'bunt'));
+      selectLiveBattingCall(tacticalCall === 'bunt' ? 'normal' : 'bunt');
       return;
     }
     if (key === 's' && bestCandidate) {
@@ -2936,6 +2959,33 @@ export function GameDayScreen({
       soundEngine.play('clutch_stinger');
     }
   };
+  const liveBattingPreview =
+    tacticalCall === 'power'
+      ? 'power'
+      : tacticalCall === 'bunt'
+        ? 'bunt'
+        : tacticalCall === 'contact'
+          ? 'contact'
+          : 'balanced';
+  const liveIdlePreview =
+    (!lastChoreo || showNextMatchup) &&
+    !handoff &&
+    !pendingDecision &&
+    liveSession.status === 'in_progress'
+      ? humanIsBatting
+        ? liveBattingPreview
+        : guiding && !showMore
+          ? pitchingMode === 'simple'
+            ? (guidedCatcherCall?.target ?? 'attack_zone')
+            : pitchTarget
+          : null
+      : null;
+  const showStretchCue = Boolean(
+    shown.bases.some(Boolean) &&
+      liveSession.status === 'in_progress' &&
+      !entranceCue &&
+      !liveDugoutCheer,
+  );
   return (
     <div className={`live-game studio-layout${guiding && !showMore ? ' guided-game' : ''}${sheetOpen ? ' tactics-open' : ''}`}>
       <div className="live-studio">
@@ -2946,7 +2996,11 @@ export function GameDayScreen({
               guided={Boolean(guiding && !showMore)}
               onEntranceEnd={finishEntrance}
               entranceCue={guiding && !showMore ? entranceCue : null}
-              preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' || tacticalCall === 'bunt' ? tacticalCall : 'contact') : pitchingMode === 'simple' ? (guidedCatcherCall?.target ?? 'attack_zone') : pitchTarget) : null}
+              preview={liveIdlePreview}
+              shakeOffSignal={shakeOffTrigger}
+              showStretchCue={showStretchCue}
+              audioMuted={audioMuted}
+              onToggleAudio={handleToggleLiveAudio}
               awayClub={liveAwayClub}
               homeClub={liveHomeClub}
               weather={gameWeather}
@@ -3272,6 +3326,8 @@ export function GameDayScreen({
                 toggleOnePitchMode();
                 soundEngine.play('ui_pop');
               }}
+              audioMuted={audioMuted}
+              onToggleAudio={handleToggleLiveAudio}
               quickStealOption={bestQuickSteal}
               stealOptions={quickStealCandidates}
               armedStealPlay={effectiveArmedSteal}
@@ -3318,10 +3374,7 @@ export function GameDayScreen({
                 setSheetOpen(false);
                 handleSimToEnd();
               }}
-              onSelectTacticalCall={(call) => {
-                setTacticalCall(call);
-                soundEngine.play('ui_pop');
-              }}
+              onSelectTacticalCall={selectLiveBattingCall}
               onSelectPitchTarget={(intent) => {
                 setPitchTarget(intent);
                 soundEngine.play('ui_pop');
@@ -3448,6 +3501,8 @@ export function GameDayScreen({
                 toggleOnePitchMode();
                 soundEngine.play('ui_pop');
               }}
+              audioMuted={audioMuted}
+              onToggleAudio={handleToggleLiveAudio}
               quickStealOption={bestQuickSteal}
               stealOptions={quickStealCandidates}
               armedStealPlay={effectiveArmedSteal}
@@ -3494,10 +3549,7 @@ export function GameDayScreen({
                 setSheetOpen(false);
                 handleSimToEnd();
               }}
-              onSelectTacticalCall={(call) => {
-                setTacticalCall(call);
-                soundEngine.play('ui_pop');
-              }}
+              onSelectTacticalCall={selectLiveBattingCall}
               onSelectPitchTarget={(intent) => {
                 setPitchTarget(intent);
                 soundEngine.play('ui_pop');
@@ -3993,7 +4045,7 @@ export function GameDayScreen({
                       size="sm"
                       variant={tacticalCall === opt.id ? 'coral' : 'cream'}
                       active={tacticalCall === opt.id}
-                      onClick={() => setTacticalCall(opt.id)}
+                      onClick={() => selectLiveBattingCall(opt.id)}
                     >
                       {opt.label}
                     </ComicButton>

@@ -28,7 +28,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 2px solid #192735;
@@ -72,7 +72,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 2px 9px;
   border-radius: 999px;
   border: 2px solid #192735;
@@ -285,6 +285,40 @@
   opacity: 0.65;
   cursor: default;
 }
+.is-play-locked {
+  position: relative;
+  overflow: hidden;
+  opacity: 0.82 !important;
+  cursor: progress !important;
+  box-shadow: inset 0 0 0 2px #193d37;
+}
+.is-play-locked::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent 0%, #193d37 45%, #e63946 55%, transparent 100%);
+  background-size: 200% 100%;
+  animation: play-lock-sweep 0.9s linear infinite;
+}
+@keyframes play-lock-sweep {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+[data-reduced-motion="true"] .is-play-locked::after {
+  animation: none;
+  background: #193d37;
+  opacity: 0.45;
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-play-locked::after {
+    animation: none;
+    background: #193d37;
+    opacity: 0.45;
+  }
+}
 .rally-result { display: grid; grid-template-columns: 62px 1fr; gap: 8px 12px; align-items: center; }
 .rally-result img { width: 62px; height: 78px; object-fit: cover; border-radius: 5px; border: 2px solid #193d37; }
 .rally-result h3 { margin: 1px 0; }
@@ -479,6 +513,24 @@
   border: 2px solid #192735;
   font-size: 12px;
   font-weight: 800;
+}
+.atbat-mascot-cheer button {
+  min-height: 44px;
+  padding: 0 8px;
+  cursor: pointer;
+}
+.live-thumb-dock .atbat-catcher-call button {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 2px solid #193e37;
+  background: #fff3bf;
+  color: #193d37;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 .live-thumb-dock .atbat-choices button,
 .live-thumb-dock .live-context-chip button,

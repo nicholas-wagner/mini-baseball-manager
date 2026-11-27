@@ -498,7 +498,13 @@ export function FirstAtBat({
               onLockTiming={(grade) => onPitch(grade)}
             />
           ) : (
-            <button className="atbat-go" disabled={locked} onClick={() => onPitch()}>
+            <button
+              className={locked ? "atbat-go is-play-locked" : "atbat-go"}
+              disabled={locked}
+              aria-busy={locked ? "true" : undefined}
+              data-play-locked={locked ? "true" : undefined}
+              onClick={() => onPitch()}
+            >
               {powerArmed ? "⚡ " : ""}
               {action}
             </button>

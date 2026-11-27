@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { soundEngine } from '../../audio/soundEngine';
 import { createClub } from '../../engine/gm/rosterFactory';
 import { createSeededRng } from '../../engine/rng/seededRng';
 import { createGameSession } from '../../engine/simulation/baseballEngine';
@@ -11,6 +12,7 @@ import { useUserPreferencesStore } from '../../store/userPreferences';
 import { GameDayScreen } from '../screens/GameDayScreen';
 import { FirstAtBat } from './FirstAtBat';
 import { LiveActionBar } from './LiveActionBar';
+import { LiveGameCanvas } from './LiveGameCanvas';
 import { SettingsModal } from './SettingsModal';
 
 vi.mock('./BallparkCanvas', () => ({ BallparkCanvas: () => null }));
@@ -369,5 +371,232 @@ describe('Mobile Live Polish, 1-Tap Steal UX, Auto-Dismiss Tactics Sheet & 2-Str
     // Deciding PA outcome emitted with realistic pitch events in the play-by-play ticker!
     const tickerText = screen.getByTestId('play-by-play-ticker').textContent ?? '';
     expect(tickerText).toMatch(/mph/i);
+  });
+
+  it('gives locked primary buttons non-shifting aria-busy feedback and keeps >=44px tap targets on key mobile controls (TASK-107)', () => {
+    const { rerender } = render(
+      <FirstAtBat
+        session={makeSession(0)}
+        batting
+        target="attack_zone"
+        call="contact"
+        locked={false}
+        expanded={false}
+        powerArmed={false}
+        stealOptions={[STEAL_2B]}
+        armedStealPlay={null}
+        onToggleStealPlay={vi.fn()}
+        cue={BASE_CUE}
+        onTarget={vi.fn()}
+        onSwing={vi.fn()}
+        onPitch={vi.fn()}
+        onExpand={vi.fn()}
+        onSuggested={vi.fn()}
+      />,
+    );
+    const unlockedGo = screen.getByRole('button', { name: 'Swing' });
+    const unlockedLabel = unlockedGo.textContent;
+    expect(unlockedGo).not.toHaveAttribute('aria-busy', 'true');
+
+    rerender(
+      <FirstAtBat
+        session={makeSession(0)}
+        batting
+        target="attack_zone"
+        call="contact"
+        locked
+        expanded={false}
+        powerArmed={false}
+        stealOptions={[STEAL_2B]}
+        armedStealPlay={null}
+        onToggleStealPlay={vi.fn()}
+        cue={BASE_CUE}
+        onTarget={vi.fn()}
+        onSwing={vi.fn()}
+        onPitch={vi.fn()}
+        onExpand={vi.fn()}
+        onSuggested={vi.fn()}
+      />,
+    );
+    const lockedGo = screen.getByRole('button', { name: 'Swing' });
+    expect(lockedGo).toBeDisabled();
+    expect(lockedGo).toHaveAttribute('aria-busy', 'true');
+    expect(lockedGo).toHaveAttribute('data-play-locked', 'true');
+    expect(lockedGo.textContent).toBe(unlockedLabel);
+
+    // Full LiveActionBar also keeps non-shifting label + aria-busy="true" + data-play-locked="true"
+    const barView = render(
+      <LiveActionBar
+        density="full"
+        cue={BASE_CUE}
+        matchupLabel="Dash vs Ace"
+        basesLabel="Bases: 1B · ·"
+        latestEvent={null}
+        controlMode="simple"
+        pitchingMode="simple"
+        catcherCall={{
+          target: 'attack_zone',
+          targetLabel: 'Over Plate',
+          pitchType: 'four_seam',
+          pitchLabel: '4-Seam Fastball',
+          pitchShortLabel: '4-Seam',
+          reason: 'Attack zone',
+        }}
+        shakeOffTotal={3}
+        onShakeOff={vi.fn()}
+        watchMode="paused"
+        tacticalCall="normal"
+        isBatting={false}
+        gameCompleted={false}
+        locked
+        readyPowerLabel="Comet Ball"
+        onArmReadyPower={vi.fn()}
+        onePitchMode={false}
+        onToggleOnePitchMode={vi.fn()}
+        audioMuted={false}
+        onToggleAudio={vi.fn()}
+        onNextPitch={vi.fn()}
+        onToggleWatchMode={vi.fn()}
+        onSimAtBat={vi.fn()}
+        onSimHalfInning={vi.fn()}
+        onClutchSim={vi.fn()}
+        onSimToEnd={vi.fn()}
+        onSelectTacticalCall={vi.fn()}
+        onSuggestedAction={vi.fn()}
+        onToggleControlMode={vi.fn()}
+      />,
+    );
+    const liveBtn = screen.getByTestId('live-primary-pitch-btn');
+    expect(liveBtn).toBeDisabled();
+    expect(liveBtn).toHaveAttribute('aria-busy', 'true');
+    expect(liveBtn).toHaveAttribute('data-play-locked', 'true');
+    expect(liveBtn).toHaveTextContent('Throw Pitch');
+
+    // Audit >=44px tap target classes on Shake off, Hype, 1-Pitch, and Sound buttons
+    expect(screen.getByTestId('arcade-shake-off-btn').className).toMatch(/min-h-\[44px\]/);
+    expect(screen.getByTestId('arcade-unleash-power-btn').className).toMatch(/min-h-\[44px\]/);
+    expect(screen.getByTestId('arcade-one-pitch-toggle').className).toMatch(/min-h-\[44px\]/);
+    expect(screen.getByTestId('tactics-audio-toggle').className).toMatch(/min-h-\[44px\]/);
+    barView.unmount();
+  });
+
+  it('wires Full Live batting stance previews, pitcher shake-off hook, From the Stretch cue, and 1-tap live audio mute (TASK-107)', () => {
+    soundEngine.setMuted(false);
+
+    // 1. LiveGameCanvas exposes preview/shake-off hooks, From the Stretch cue ONLY when enabled, and 1-tap audio button
+    const away = createClub(createSeededRng(1071), {
+      id: 'away-107',
+      isHuman: false,
+      city: 'North',
+      name: 'Bears',
+      mascot: 'Bear',
+      colors: { primary: '#E63946', secondary: '#1D3557', accent: '#FFC300', monogram: 'NB' },
+      leagueTier: 'aa',
+    });
+    const home = createClub(createSeededRng(1072), {
+      id: 'home-107',
+      isHuman: true,
+      city: 'Sandlot',
+      name: 'Comets',
+      mascot: 'Rocket Dog',
+      colors: { primary: '#1D63B8', secondary: '#0F2B46', accent: '#FFD166', monogram: 'SC' },
+      leagueTier: 'aa',
+    });
+    const session = createGameSession(away, home, 1073, 'regular', 5);
+    const onToggleAudio = vi.fn();
+    const canvasView = render(
+      <LiveGameCanvas
+        awayClub={away}
+        homeClub={home}
+        session={session}
+        preview="bunt"
+        shakeOffSignal={2}
+        showStretchCue={false}
+        audioMuted={false}
+        onToggleAudio={onToggleAudio}
+      />,
+    );
+    const stage = screen.getByTestId('live-game-3d-canvas');
+    expect(stage).toHaveAttribute('data-preview', 'bunt');
+    expect(stage).toHaveAttribute('data-shake-off-signal', '2');
+    expect(screen.queryByTestId('from-the-stretch-cue')).toBeNull();
+
+    const audioBtn = screen.getByTestId('live-audio-toggle');
+    expect(audioBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(audioBtn.className).toMatch(/min-h-\[44px\]/);
+    fireEvent.click(audioBtn);
+    expect(onToggleAudio).toHaveBeenCalledTimes(1);
+
+    canvasView.rerender(
+      <LiveGameCanvas
+        awayClub={away}
+        homeClub={home}
+        session={{ ...session, bases: [away.lineup[0].playerId, null, null] }}
+        preview="power"
+        shakeOffSignal={3}
+        showStretchCue
+        audioMuted
+        onToggleAudio={onToggleAudio}
+      />,
+    );
+    expect(screen.getByTestId('from-the-stretch-cue')).toHaveTextContent(/From the Stretch/i);
+    expect(screen.getByTestId('live-audio-toggle')).toHaveAttribute('aria-pressed', 'true');
+    canvasView.unmount();
+
+    // 2. Full Live GameDayScreen: Shake off increments shakeOffSignal, 1-tap live audio mutes soundEngine,
+    //    and Full Live batting approach buttons drive LiveGameCanvas preview ("balanced" / "power" / "bunt" / "contact")!
+    vi.useFakeTimers();
+    try {
+      render(<GameDayScreen />);
+      fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
+      fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+
+      // Pitching in TOP 1: Shake off increments shakeOffSignal on LiveGameCanvas!
+      const liveStage = screen.getByTestId('live-game-3d-canvas');
+      expect(liveStage).toHaveAttribute('data-shake-off-signal', '0');
+      fireEvent.click(screen.getByTestId('arcade-shake-off-btn'));
+      expect(liveStage).toHaveAttribute('data-shake-off-signal', '1');
+
+      // 1-tap live audio toggle & Tactics audio toggle mute/unmute soundEngine directly!
+      const liveMuteBtn = screen.getByTestId('live-audio-toggle');
+      fireEvent.click(liveMuteBtn);
+      expect(soundEngine.getState().muted).toBe(true);
+      expect(screen.getByTestId('tactics-audio-toggle')).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByTestId('tactics-audio-toggle'));
+      expect(soundEngine.getState().muted).toBe(false);
+      expect(liveMuteBtn).toHaveAttribute('aria-pressed', 'false');
+
+      // Sim TOP 1 and let half-inning transition settle -> BOT 1 human batting stance previews!
+      fireEvent.click(screen.getByTestId('fast-sim-toggle'));
+      fireEvent.click(screen.getByRole('button', { name: /sim half-inn/i }));
+      act(() => {
+        vi.advanceTimersByTime(12_000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(12_000);
+      });
+
+      expect(screen.getByTestId('arcade-bunt-btn')).toBeVisible();
+      expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute('data-preview', 'balanced');
+      fireEvent.click(screen.getByTestId('arcade-bunt-btn'));
+      expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute('data-preview', 'bunt');
+      fireEvent.click(screen.getByRole('button', { name: /Swing Big/i }));
+      expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute('data-preview', 'power');
+      fireEvent.click(screen.getByRole('button', { name: /Contact/i }));
+      expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute('data-preview', 'contact');
+      fireEvent.click(screen.getByRole('button', { name: /Balanced/i }));
+      expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute('data-preview', 'balanced');
+
+      // Clicking Swing locks primary button with aria-busy & data-play-locked without shifting label!
+      const swingBtn = screen.getByTestId('live-primary-pitch-btn');
+      const beforeText = swingBtn.textContent;
+      fireEvent.click(swingBtn);
+      expect(swingBtn).toBeDisabled();
+      expect(swingBtn).toHaveAttribute('aria-busy', 'true');
+      expect(swingBtn).toHaveAttribute('data-play-locked', 'true');
+      expect(swingBtn.textContent).toBe(beforeText);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
