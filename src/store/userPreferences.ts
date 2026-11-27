@@ -23,6 +23,7 @@ export interface UserPreferences {
   frontOfficeMode: FrontOfficeMode;
   hasCustomizedUniform: boolean;
   arcadeTimingEnabled: boolean;
+  onePitchMode: boolean;
 }
 
 const PREFS_STORAGE_KEY = 'mbm.user.prefs.v1';
@@ -41,6 +42,7 @@ const DEFAULT_PREFS: UserPreferences = {
   frontOfficeMode: 'auto',
   hasCustomizedUniform: false,
   arcadeTimingEnabled: false,
+  onePitchMode: false,
 };
 
 function parsePitchingMode(raw: unknown): PitchingMode {
@@ -84,6 +86,7 @@ function readSavedPrefs(): UserPreferences {
       frontOfficeMode: parseFrontOfficeMode(parsed.frontOfficeMode),
       hasCustomizedUniform: parsed.hasCustomizedUniform ?? DEFAULT_PREFS.hasCustomizedUniform,
       arcadeTimingEnabled: parsed.arcadeTimingEnabled ?? DEFAULT_PREFS.arcadeTimingEnabled,
+      onePitchMode: parsed.onePitchMode ?? DEFAULT_PREFS.onePitchMode,
     };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -130,6 +133,8 @@ interface UserPreferencesStore extends UserPreferences {
   markUniformCustomized: () => void;
   setArcadeTimingEnabled: (enabled: boolean) => void;
   toggleArcadeTiming: () => void;
+  setOnePitchMode: (enabled: boolean) => void;
+  toggleOnePitchMode: () => void;
   resetDefaults: () => void;
 }
 
@@ -151,6 +156,7 @@ function extractPrefs(state: UserPreferencesStore): UserPreferences {
     frontOfficeMode: state.frontOfficeMode,
     hasCustomizedUniform: state.hasCustomizedUniform,
     arcadeTimingEnabled: state.arcadeTimingEnabled,
+    onePitchMode: state.onePitchMode,
   };
 }
 
@@ -199,6 +205,8 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
     markUniformCustomized: () => applyPatch({ hasCustomizedUniform: true }),
     setArcadeTimingEnabled: (enabled) => applyPatch({ arcadeTimingEnabled: enabled }),
     toggleArcadeTiming: () => applyPatch({ arcadeTimingEnabled: !get().arcadeTimingEnabled }),
+    setOnePitchMode: (enabled) => applyPatch({ onePitchMode: enabled }),
+    toggleOnePitchMode: () => applyPatch({ onePitchMode: !get().onePitchMode }),
     resetDefaults: () => applyPatch({ ...DEFAULT_PREFS }),
   };
 });

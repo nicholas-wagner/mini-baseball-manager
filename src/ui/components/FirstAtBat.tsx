@@ -48,6 +48,7 @@ export function FirstAtBat({
   powerArmed,
   readyPowerName = null,
   arcadeTimingEnabled = false,
+  onePitchMode = false,
   pitchingMode = "simple",
   bullpenMode = "semi_auto",
   bullpenSuggestion = null,
@@ -71,6 +72,7 @@ export function FirstAtBat({
   onDismissBullpenSuggestion,
   onArmPower,
   onToggleArcadeTiming,
+  onToggleOnePitchMode,
   onExpand,
   onSuggested,
   mascotName = null,
@@ -85,6 +87,7 @@ export function FirstAtBat({
   powerArmed: boolean;
   readyPowerName?: string | null;
   arcadeTimingEnabled?: boolean;
+  onePitchMode?: boolean;
   pitchingMode?: PitchingMode;
   bullpenMode?: BullpenMode;
   bullpenSuggestion?: BullpenRecommendation | null;
@@ -109,6 +112,7 @@ export function FirstAtBat({
   onDismissBullpenSuggestion?: (snoozeKey: string) => void;
   onArmPower?: () => void;
   onToggleArcadeTiming?: () => void;
+  onToggleOnePitchMode?: () => void;
   onExpand: () => void;
   onSuggested: () => void;
   mascotName?: string | null;
@@ -142,11 +146,17 @@ export function FirstAtBat({
         ? "Steal & Swing (2K)"
         : "Send Runner"
       : call === "bunt"
-        ? "Lay down bunt"
-        : "Swing"
-    : pitchingMode === "simple"
-      ? "Throw Pitch"
-      : activePitch.actionLabel;
+        ? onePitchMode
+          ? "Lay down bunt · 1-Pitch"
+          : "Lay down bunt"
+        : onePitchMode
+          ? "Swing · 1-Pitch"
+          : "Swing"
+    : onePitchMode
+      ? "Throw · 1-Pitch"
+      : pitchingMode === "simple"
+        ? "Throw Pitch"
+        : activePitch.actionLabel;
   const tradeoffText = batting
     ? armedStealPlay
       ? twoStrikeSteal
@@ -167,7 +177,8 @@ export function FirstAtBat({
   const showOptionsMenu =
     !expanded &&
     Boolean(
-      (tip && !powerArmed) ||
+      onToggleOnePitchMode ||
+        (tip && !powerArmed) ||
         (!batting && (onSelectPitchingMode || onSelectBullpenMode)),
     );
   const showGuidedBullpenCall =
@@ -237,6 +248,16 @@ export function FirstAtBat({
                   details.querySelector("summary")?.focus();
                 }}
               >
+                {onToggleOnePitchMode && (
+                  <button
+                    type="button"
+                    data-testid="guided-one-pitch-toggle"
+                    aria-pressed={onePitchMode}
+                    onClick={onToggleOnePitchMode}
+                  >
+                    {onePitchMode ? "⚡ 1-Pitch Mode: ON" : "⚡ 1-Pitch Mode: OFF"}
+                  </button>
+                )}
                 {!batting &&
                   onSelectPitchingMode &&
                   PITCHING_MODE_OPTIONS.map((opt) => (

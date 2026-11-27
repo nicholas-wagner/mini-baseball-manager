@@ -117,6 +117,8 @@ interface LiveActionBarProps {
   onCycleSpeed?: () => void;
   arcadeTimingEnabled?: boolean;
   onToggleArcadeTiming?: () => void;
+  onePitchMode?: boolean;
+  onToggleOnePitchMode?: () => void;
   quickStealOption?: { label: string; runnerName: string; successPct: number; call: TacticalCall } | null;
   stealOptions?: readonly StealOptionPreview[];
   armedStealPlay?: StealPlayType | null;
@@ -217,6 +219,8 @@ export function LiveActionBar({
   onCycleSpeed,
   arcadeTimingEnabled = false,
   onToggleArcadeTiming,
+  onePitchMode = false,
+  onToggleOnePitchMode,
   quickStealOption = null,
   stealOptions = [],
   armedStealPlay = null,
@@ -339,9 +343,13 @@ export function LiveActionBar({
         ? 'Hit & Run'
         : 'Send Runner'
     : tacticalCall === 'bunt'
-      ? 'Lay down bunt'
-      : 'Swing';
-  const pitchAction = isBatting ? battingAction : 'Throw Pitch';
+      ? onePitchMode
+        ? 'Lay down bunt · 1-Pitch'
+        : 'Lay down bunt'
+      : onePitchMode
+        ? 'Swing · 1-Pitch'
+        : 'Swing';
+  const pitchAction = isBatting ? battingAction : onePitchMode ? 'Throw · 1-Pitch' : 'Throw Pitch';
   const primaryLabel = gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)';
   const controlsLocked = gameCompleted || locked;
   const toggleStealOption = (opt: (typeof resolvedStealOptions)[number]) => {
@@ -1029,6 +1037,20 @@ export function LiveActionBar({
               className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
             >
               {defensiveShift === 'standard' ? 'Shift ▾' : `${activeShiftShort} ▾`}
+            </ComicButton>
+          ) : null}
+
+          {onToggleOnePitchMode ? (
+            <ComicButton
+              size="sm"
+              variant={onePitchMode ? 'gold' : 'cream'}
+              data-testid="arcade-one-pitch-toggle"
+              aria-pressed={onePitchMode}
+              disabled={gameCompleted}
+              onClick={onToggleOnePitchMode}
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
+            >
+              {onePitchMode ? '⚡ 1-Pitch ON' : '⚡ 1-Pitch'}
             </ComicButton>
           ) : null}
 

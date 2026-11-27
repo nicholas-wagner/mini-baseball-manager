@@ -13,6 +13,7 @@ import {
   simUntilClutchOrEnd,
   stepAtBat,
   stepHalfInning,
+  stepOnePitchAtBat,
   stepPitch,
 } from './baseballEngine';
 import {
@@ -739,5 +740,65 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
     }
     expect(hitAndRunFirstToThird).toBeGreaterThan(5);
     expect(hitAndRunDps).toBeLessThan(stationaryDps);
+  });
+
+  it('steps an entire plate appearance to its deciding pitch in stepOnePitchAtBat while preserving pitch counts, fatigue, preDecidingSession, and 1-pitch steal control (TASK-111)', () => {
+    const { away, home } = makeMatchupClubs('R', 'R', 9111);
+
+    // 1. Multi-pitch PA preserves exact realistic pitchesThrown, endurance drain, balls/strikes, and preDecidingSession!
+    let sawMultiPitchPa = false;
+    for (let s = 0; s < 40; s += 1) {
+      const start = createGameSession(away, home, 21100 + s);
+      const pitcherId = start.home.activePitcherId;
+      const resA = stepOnePitchAtBat(start, 'contact');
+      const resB = stepOnePitchAtBat(start, 'contact');
+      expect(resA).toEqual(resB);
+
+      expect(resA.pitchesInAtBat).toBeGreaterThanOrEqual(1);
+      expect(resA.decidingEvent).not.toBeNull();
+      const endPitcher = resA.nextSession.boxScore.homePitchers[pitcherId];
+      const prePitcher = resA.preDecidingSession.boxScore.homePitchers[pitcherId];
+      expect(endPitcher.pitchesThrown).toBe(resA.pitchesInAtBat);
+      expect(prePitcher.pitchesThrown).toBe(resA.pitchesInAtBat - 1);
+      expect(resA.nextSession.home.pitcherFatigue).toBeGreaterThan(start.home.pitcherFatigue);
+      // PA concluded (batter advanced, half swapped, or game ended)
+      const concluded =
+        resA.nextSession.status === 'completed' ||
+        resA.nextSession.half !== start.half ||
+        resA.nextSession.away.lineupIndex !== start.away.lineupIndex;
+      expect(concluded).toBe(true);
+
+      if (resA.pitchesInAtBat >= 4) {
+        sawMultiPitchPa = true;
+        expect(resA.preDecidingSession.balls + resA.preDecidingSession.strikes).toBeGreaterThan(0);
+      }
+    }
+    expect(sawMultiPitchPa).toBe(true);
+
+    // 2. Active steal executes ONLY 1 steal pitch immediately so manager never loses control of a steal!
+    const runnerId = away.lineup[1].playerId;
+    const stealSpot: GameSessionState = {
+      ...createGameSession(away, home, 21900),
+      outs: 0,
+      balls: 0,
+      strikes: 0,
+      bases: [runnerId, null, null],
+    };
+    const stealByOpt = stepOnePitchAtBat(stealSpot, 'contact', { stealPlay: 'steal_2b' });
+    expect(stealByOpt.pitchesInAtBat).toBe(1);
+    expect(stealByOpt.preDecidingSession).toEqual(stealSpot);
+    expect(stealByOpt.nextSession.boxScore.homePitchers[stealSpot.home.activePitcherId].pitchesThrown).toBe(1);
+    expect(stealByOpt.decidingEvent?.type).toBe('stolen_base_attempt');
+
+    const stealByCall = stepOnePitchAtBat(stealSpot, 'steal');
+    expect(stealByCall.pitchesInAtBat).toBe(1);
+    expect(stealByCall.preDecidingSession).toEqual(stealSpot);
+
+    // 3. Completed game returns no-op safely
+    const done = { ...stealSpot, status: 'completed' as const };
+    const noop = stepOnePitchAtBat(done);
+    expect(noop.pitchesInAtBat).toBe(0);
+    expect(noop.events).toEqual([]);
+    expect(noop.decidingEvent).toBeNull();
   });
 });

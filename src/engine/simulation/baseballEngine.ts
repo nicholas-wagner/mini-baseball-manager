@@ -1296,6 +1296,85 @@ export function stepAtBat(
   return { nextSession: current, events };
 }
 
+export interface OnePitchAtBatResult {
+  nextSession: GameSessionState;
+  preDecidingSession: GameSessionState;
+  events: PlayEvent[];
+  decidingEvent: PlayEvent | null;
+  pitchesInAtBat: number;
+}
+
+function findDecidingPlayEvent(events: readonly PlayEvent[]): PlayEvent | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    if (events[i].outcome || events[i].type === 'stolen_base_attempt') {
+      return events[i];
+    }
+  }
+  return events.at(-1) ?? null;
+}
+
+function hasActiveStealRequest(call: TacticalCall, options: StepPitchOptions): boolean {
+  return Boolean(options.stealPlay) || STEAL_TACTICAL_CALLS.has(call);
+}
+
+/**
+ * Simulates a plate appearance pitch-by-pitch to its deciding pitch while preserving
+ * full realistic pitch counts, fatigue, and box score; executes just 1 pitch if a steal is active.
+ */
+export function stepOnePitchAtBat(
+  session: GameSessionState,
+  tacticalCall: TacticalCall = 'normal',
+  options: StepPitchOptions = {},
+): OnePitchAtBatResult {
+  if (session.status === 'completed') {
+    return {
+      nextSession: session,
+      preDecidingSession: session,
+      events: [],
+      decidingEvent: null,
+      pitchesInAtBat: 0,
+    };
+  }
+
+  if (hasActiveStealRequest(tacticalCall, options)) {
+    const step = stepPitch(session, tacticalCall, options);
+    return {
+      nextSession: step.nextSession,
+      preDecidingSession: session,
+      events: step.events,
+      decidingEvent: findDecidingPlayEvent(step.events),
+      pitchesInAtBat: 1,
+    };
+  }
+
+  const startHalf = session.half;
+  const startInning = session.inning;
+  const startBatterIdx = getBattingSide(session).lineupIndex;
+  const events: PlayEvent[] = [];
+  let current = session;
+  let preDecidingSession = session;
+  let lastStepEvents: PlayEvent[] = [];
+  let pitchesInAtBat = 0;
+
+  for (let i = 0; i < 24; i += 1) {
+    preDecidingSession = current;
+    const step = stepPitch(current, tacticalCall, options);
+    current = step.nextSession;
+    lastStepEvents = step.events;
+    events.push(...step.events);
+    pitchesInAtBat += 1;
+    if (isPlateAppearanceResolved(current, startHalf, startInning, startBatterIdx)) break;
+  }
+
+  return {
+    nextSession: current,
+    preDecidingSession,
+    events,
+    decidingEvent: findDecidingPlayEvent(lastStepEvents),
+    pitchesInAtBat,
+  };
+}
+
 /** Advances the simulation until the active half-inning ends or the game finishes (ideal for short bursts!). */
 export function stepHalfInning(
   session: GameSessionState,

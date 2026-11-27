@@ -11,6 +11,7 @@ import { useUserPreferencesStore } from '../../store/userPreferences';
 import { GameDayScreen } from '../screens/GameDayScreen';
 import { FirstAtBat } from './FirstAtBat';
 import { LiveActionBar } from './LiveActionBar';
+import { SettingsModal } from './SettingsModal';
 
 vi.mock('./BallparkCanvas', () => ({ BallparkCanvas: () => null }));
 
@@ -293,5 +294,80 @@ describe('Mobile Live Polish, 1-Tap Steal UX, Auto-Dismiss Tactics Sheet & 2-Str
         value: origMatchMedia,
       });
     }
+  });
+
+  it('exposes 1-Pitch At-Bat Mode toggles in Guided Options, LiveActionBar Tactics, and SettingsModal with primary button cues and deciding-pitch resolution (TASK-111)', () => {
+    // 1. SettingsModal toggle persists onePitchMode
+    const settingsView = render(<SettingsModal open onClose={vi.fn()} />);
+    const settingsToggle = screen.getByTestId('settings-one-pitch-toggle');
+    expect(settingsToggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(settingsToggle);
+    expect(useUserPreferencesStore.getState().onePitchMode).toBe(true);
+    expect(settingsToggle).toHaveAttribute('aria-pressed', 'true');
+    settingsView.unmount();
+
+    // 2. Guided FirstAtBat Options toggle + primary button cues ("Swing · 1-Pitch" / "Throw · 1-Pitch")
+    const onToggleOnePitch = vi.fn();
+    const guidedView = render(
+      <FirstAtBat
+        session={makeSession(0)}
+        batting
+        target="attack_zone"
+        call="contact"
+        locked={false}
+        expanded={false}
+        powerArmed={false}
+        onePitchMode
+        onToggleOnePitchMode={onToggleOnePitch}
+        cue={BASE_CUE}
+        onTarget={vi.fn()}
+        onSwing={vi.fn()}
+        onPitch={vi.fn()}
+        onExpand={vi.fn()}
+        onSuggested={vi.fn()}
+      />,
+    );
+    const guidedToggle = screen.getByTestId('guided-one-pitch-toggle');
+    expect(guidedToggle).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(guidedToggle);
+    expect(onToggleOnePitch).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Swing · 1-Pitch' })).toBeVisible();
+
+    guidedView.rerender(
+      <FirstAtBat
+        session={makeSession(0)}
+        batting={false}
+        target="attack_zone"
+        call="normal"
+        locked={false}
+        expanded={false}
+        powerArmed={false}
+        onePitchMode
+        onToggleOnePitchMode={onToggleOnePitch}
+        cue={BASE_CUE}
+        onTarget={vi.fn()}
+        onSwing={vi.fn()}
+        onPitch={vi.fn()}
+        onExpand={vi.fn()}
+        onSuggested={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Throw · 1-Pitch' })).toBeVisible();
+    guidedView.unmount();
+
+    // 3. Full Live GameDayScreen with onePitchMode ON resolves full PA in one tap via stepOnePitchAtBat
+    useUserPreferencesStore.getState().setOnePitchMode(true);
+    render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
+    fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+
+    expect(screen.getByTestId('arcade-one-pitch-toggle')).toHaveAttribute('aria-pressed', 'true');
+    const primaryBtn = screen.getByTestId('live-primary-pitch-btn');
+    expect(primaryBtn).toHaveTextContent(/Throw · 1-Pitch/i);
+
+    fireEvent.click(primaryBtn);
+    // Deciding PA outcome emitted with realistic pitch events in the play-by-play ticker!
+    const tickerText = screen.getByTestId('play-by-play-ticker').textContent ?? '';
+    expect(tickerText).toMatch(/mph/i);
   });
 });
