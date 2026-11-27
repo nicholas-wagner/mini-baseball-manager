@@ -35,6 +35,7 @@ import { evaluatePreGameLineupCheck, summarizeLineupChange } from '../../engine/
 import {
   buildFirstPitchCoachTip,
   buildMatchupScoutLine,
+  buildTeammateDugoutCheer,
   evaluateWelcomeChecklist,
   selectBetweenGameSpotlight,
   selectClubSpotlightTrio,
@@ -174,8 +175,10 @@ import type { PlayerEntranceCue } from '../../scene/playback/firstAtBatPresentat
 import { decisionDelayMs, scoringDetail, playReadout } from '../../scene/playback/playReadout';
 import { BroadcastHud } from '../components/BroadcastHud';
 import { ClubMascotBuddy } from '../components/ClubMascotBuddy';
+import { DugoutCheerBubble } from '../components/DugoutCheerBubble';
 import { FoilPackModal } from '../components/FoilPackModal';
 import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
+import { StrikeZoneOverlay } from '../components/StrikeZoneOverlay';
 import { TrophyCaseModal } from '../components/TrophyCaseModal';
 import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBottomSheet, useWideStudio } from '../components/LiveBottomSheet';
@@ -2538,6 +2541,38 @@ export function GameDayScreen({
         : humanScoreNow < oppScoreNow
           ? 'determined'
           : 'happy';
+  const cheerEvent = !playing && playbackEvent ? playbackEvent : null;
+  const cheerMatchesHuman = (() => {
+    if (!cheerEvent) return false;
+    const eventBattingHuman = (cheerEvent.half === 'BOT') === liveSession.home.isHuman;
+    if (cheerEvent.specialPowerTriggered) {
+      return humanClub.roster.some(
+        (p) => p.id === cheerEvent.batterId || p.id === cheerEvent.pitcherId,
+      );
+    }
+    if (
+      cheerEvent.type === 'stolen_base_attempt' ||
+      cheerEvent.outcome === 'home_run' ||
+      cheerEvent.outcome === 'triple' ||
+      cheerEvent.outcome === 'double' ||
+      cheerEvent.outcome === 'single' ||
+      cheerEvent.outcome === 'walk' ||
+      cheerEvent.outcome === 'bunt_single' ||
+      cheerEvent.outcome === 'bunt_out' ||
+      cheerEvent.outcome === 'sac_fly'
+    ) {
+      return eventBattingHuman;
+    }
+    return !eventBattingHuman;
+  })();
+  const liveDugoutCheer = cheerMatchesHuman
+    ? buildTeammateDugoutCheer(
+        cheerEvent,
+        humanClub.roster,
+        favoritePlayerIds,
+        worldSeed + seasonNumber * 97,
+      )
+    : null;
   const rawBullpenRec =
     !humanIsBatting && bullpenMode === 'semi_auto' && !playing && !handoff
       ? evaluateBullpenCall(liveSession, humanSideKey)
@@ -2656,6 +2691,7 @@ export function GameDayScreen({
       arrivalMs={film.durationMs * film.freezeAt! / film.play!.duration} onResolve={resolve}>
       {scoreboard}
       <LiveGameCanvas guided awayClub={liveAwayClub} homeClub={liveHomeClub} session={liveSession}
+        weather={gameWeather}
         choreo={film} lastEvent={event} cameraMode={cameraMode} onChangeCameraMode={changeCamera} />
     </ThirdBaseDecision>;
   }
@@ -2731,6 +2767,7 @@ export function GameDayScreen({
               preview={guiding && !showMore && !lastChoreo ? (humanIsBatting ? (tacticalCall === 'power' || tacticalCall === 'bunt' ? tacticalCall : 'contact') : pitchingMode === 'simple' ? (guidedCatcherCall?.target ?? 'attack_zone') : pitchTarget) : null}
               awayClub={liveAwayClub}
               homeClub={liveHomeClub}
+              weather={gameWeather}
               session={!pitchingChange && prePlaySession && lastChoreo && !showNextMatchup ? prePlaySession : liveSession}
               choreo={showNextMatchup ? null : lastChoreo}
               lastEvent={showNextMatchup ? null : playbackEvent}
@@ -2739,6 +2776,16 @@ export function GameDayScreen({
               entrance={<>
                 {leagueBoard && !pendingDecision ? <div className="field-wire"><LeagueWire game={leagueBoard} club={humanClub} venueTier={liveHomeClub.leagueTier}/></div>
                   : caption && !playing && !entranceCue ? <div className="field-wire"><GazetteCall key={caption} caption={caption} onCrowd={playGazetteCrowd}/></div> : null}
+                {liveDugoutCheer && !entranceCue && !handoff ? (
+                  <div className="pointer-events-none absolute bottom-2 left-2 right-14 z-20 flex justify-start">
+                    <DugoutCheerBubble
+                      cheer={liveDugoutCheer}
+                      primaryColor={humanClub.colors.primary}
+                      accentColor={humanClub.colors.accent}
+                      className="pointer-events-auto"
+                    />
+                  </div>
+                ) : null}
                 {guiding ? entranceCue && !showMore &&
                 <BatterEntrance guided key={entranceCue.role === 'pitcher' ? picturedPitcher.id : picturedBatter.id}
                   player={entranceCue.role === 'pitcher' ? picturedPitcher : picturedBatter} pitching={entranceCue.role === 'pitcher'} />
@@ -3226,6 +3273,12 @@ export function GameDayScreen({
               Boolean(weatherImpact && weatherImpact.hrCarryMultiplier !== 1);
             return (
               <div className="space-y-2">
+                <StrikeZoneOverlay
+                  events={atBatEvents}
+                  batterHand={currentBatter.bats}
+                  countLabel={`${liveSession.balls}-${liveSession.strikes}`}
+                  initialMode={wideStudio ? 'expanded' : 'compact'}
+                />
                 <div
                   data-testid="game-weather-banner"
                   className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2 text-xs"
