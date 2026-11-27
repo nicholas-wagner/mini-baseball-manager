@@ -1,3 +1,7 @@
+import { stories as stories0751 } from './hobbyStories/0751-1500';
+import { stories as stories1501 } from './hobbyStories/1501-2250';
+import { stories as stories2251 } from './hobbyStories/2251-end';
+
 interface PlayerHobbyStory {
   id: string;
   clue: string;
@@ -5,6 +9,9 @@ interface PlayerHobbyStory {
 }
 
 export const playerHobbyStories: Readonly<Partial<Record<string, PlayerHobbyStory>>> = {
+  ...stories0751,
+  ...stories1501,
+  ...stories2251,
   'showcase-manny': {
     id: 'camping',
     clue: 'Ever seen a boat you could swallow in one bite?',
