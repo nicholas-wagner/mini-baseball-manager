@@ -106,9 +106,9 @@ it("mirrors catcher targets and holds each distinct stance until the pitch, with
   expect(rehearsalPose("contact", 0.1, false)).not.toEqual(
     rehearsalPose("power", 0.1, false),
   );
-  for (const choice of ["contact", "power"] as const) {
-    expect(rehearsalPose(choice, 3, false)).toEqual(rehearsalPose(choice, 7, false));
-    expect(rehearsalPose(choice, 3, false)).toEqual(rehearsalPose(choice, 0, true));
+  for (const choice of ["balanced", "contact", "power", "bunt"] as const) {
+    expect(rehearsalPose(choice, 7, false).time).toBeGreaterThan(rehearsalPose(choice, 3, false).time);
+    expect(rehearsalPose(choice, 3, true)).toEqual(rehearsalPose(choice, 0, true));
   }
   expect(rehearsalPose("power", 3, true)).toEqual(
     rehearsalPose("power", 0, true),
@@ -135,7 +135,7 @@ it.each(['L','R'] as const)('keeps the selected corner across the catcher set an
 
 it('holds the square-to-bunt cel from either side before the pitch', () => {
   expect(rehearsalPose('bunt', 2, false)).toMatchObject({clip:'bat_bunt'});
-  expect(rehearsalPose('bunt', 0, true)).toEqual(rehearsalPose('bunt', 2, false));
+  expect(rehearsalPose('bunt', 0, true)).toEqual(rehearsalPose('bunt', 2, true));
   for (const hand of ['L','R'] as const) expect(previewShot('bunt', hand)).toEqual(previewShot('contact', hand));
 });
 

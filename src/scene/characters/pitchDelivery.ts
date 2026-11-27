@@ -22,6 +22,21 @@ const motion: Record<PitchingMotion, readonly Beat[]> = {
     [.77, 5, .24, .28], [.845, 5, .16, .25], recover],
 };
 
+// The stretch sheet pairs front/rear views of the set and short slide for each kit.
+const stretchSet = 12, slideStep = 13;
+function stretchBeats(slot: PitchingMotion): readonly Beat[] {
+  const release = motion[slot].filter(([phase]) => phase >= .48 && phase < .97);
+  return [[0, stretchSet, .12, 0], [.19, stretchSet, .12, 0], [.31, slideStep, .08, .018],
+    [.42, 2, -.15, .08], ...release, [.99, stretchSet, .12, 0]];
+}
+const stretchMotion = { overhand: stretchBeats('overhand'), sidearm: stretchBeats('sidearm'), underhand: stretchBeats('underhand') };
+const kitRow = { pants: 0, shorts: 4, skirt: 8 };
+function deliveryFrame(cel: number, bottoms: UniformBottoms, rear: boolean) {
+  return cel >= stretchSet
+    ? { sheet: 'stretch' as const, cel: kitRow[bottoms] + (cel-stretchSet)*2 + Number(rear) }
+    : { sheet: `delivery-${rear ? 'rear' : 'front'}-${bottoms}` as const, cel };
+}
+
 const segments = 48;
 const metresPerPixel = .0047;
 
@@ -40,14 +55,14 @@ export function createPitchDelivery() {
   let wasFlexed = false;
 
   function gripAt(bottoms: UniformBottoms, beat: Beat, target: Vector3) {
-    const front = anchors[`delivery-front-${bottoms}`][beat[1]];
-    const rear = anchors[`delivery-rear-${bottoms}`][beat[1]];
+    const a = deliveryFrame(beat[1], bottoms, false), b = deliveryFrame(beat[1], bottoms, true);
+    const front = anchors[a.sheet][a.cel], rear = anchors[b.sheet][b.cel];
     target.set((front[2] - rear[2]) * .5 * metresPerPixel,
       (249 - (front[3] + rear[3]) * .5) * metresPerPixel, beat[2]);
   }
 
-  function pose(phase: number, slot: PitchingMotion, bottoms: UniformBottoms) {
-    const beats = motion[slot];
+  function pose(phase: number, slot: PitchingMotion, bottoms: UniformBottoms, fromStretch: boolean, rear: boolean) {
+    const beats = fromStretch ? stretchMotion[slot] : motion[slot];
     let next = 1;
     while (next < beats.length - 1 && phase > beats[next][0]) next++;
     const a = beats[next - 1], b = beats[next];
@@ -68,7 +83,7 @@ export function createPitchDelivery() {
     const stride = root.scale.y * (a[3] + (b[3] - a[3]) * blend);
     root.position.x = Math.sin(root.rotation.y) * stride;
     root.position.z = Math.cos(root.rotation.y) * stride;
-    return t < .5 ? a[1] : b[1];
+    return deliveryFrame(t < .5 ? a[1] : b[1], bottoms, rear);
   }
 
   // The same connected triangles carry the sleeve, elbow, hand and leather.

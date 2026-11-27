@@ -59,13 +59,16 @@ describe('buildPlayAudioSchedule', () => {
     },
   );
 
-  it('clanks a foul at the barrel and does not wait for the end of the play', () => {
+  it('clanks a foul at the barrel and pops only on the fresh-ball return to the mound', () => {
     const play = diamondPlay('foul_back');
     const schedule = buildPlayAudioSchedule(play);
     const pitch = pitchOf(play);
+    const back = play.legs.find((leg) => leg.from === 'C' && leg.to === 'P');
+    expect(back).toBeDefined();
     expect(one(schedule, 'foul_clank').at).toBeCloseTo(pitch.end);
     expect(schedule.some((item) => item.cue === 'foul_clank' && item.at > pitch.end)).toBe(false);
-    expect(schedule.some((item) => item.cue === 'bat_crack' || item.cue === 'glove_pop')).toBe(false);
+    expect(schedule.some((item) => item.cue === 'bat_crack')).toBe(false);
+    expect(times(schedule, 'glove_pop').map((item) => item.at)).toEqual([back!.end]);
   });
 
   it('calls strike three only after the mitt pop, never at or before the plate', () => {

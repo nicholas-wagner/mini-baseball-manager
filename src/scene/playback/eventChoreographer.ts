@@ -1,4 +1,5 @@
 import { sacrificeAdvances } from '../../engine/simulation/sacrificeAdvances';
+import { plateBatterPose } from './firstAtBatPresentation';
 import { finishPlay } from './teamReactions';
 import { closeKindFor, stealFrom } from './plateAndSteals';
 import { BASE_PATH_VERTICES, CATCHER_HOME, OUTFIELD_STARTS, PITCHING_RUBBER } from './diamondLayout';
@@ -9,7 +10,7 @@ import type { FieldPosition } from '../../engine/handedness/types';
 import type { AtBatOutcome, PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { BallVfxStyle } from '../../engine/vfx/types';
 import type { CameraPresetId, Vec3 } from '../camera/cameraRig';
-import type { CharacterAnimClip } from '../characters/animationState';
+import { deliveryClip, type CharacterAnimClip } from '../characters/animationState';
 
 export type DiamondDefenderPos = 'P' | 'C' | '1B' | '2B' | '3B' | 'SS' | 'LF' | 'CF' | 'RF';
 
@@ -260,10 +261,13 @@ export function choreographPlayEvent(
 ): ChoreographedStep {
   const divisor = SPEED_DIVISOR[speed];
 
+  const fromStretch = basesBefore?.some(Boolean) ?? event.type === 'stolen_base_attempt';
+  const buildPlay = (kind: DiamondPlayKind, fielder?: FieldPosition, base?: 1 | 2 | 3) =>
+    diamondPlay(kind, fielder, event, base, event.pitchThrown, fromStretch);
   const closeKind = closeKindFor(event);
   const fromBase = basesBefore && stealFrom(basesBefore, event.basesAfter);
   const close = closeKind && (event.type !== 'stolen_base_attempt' || fromBase)
-    ? diamondPlay(closeKind, undefined, event, fromBase) : undefined;
+    ? buildPlay(closeKind, undefined, fromBase) : undefined;
 
   if (event.type === 'stolen_base_attempt') {
     if (close) finishPlay(close,event.outsAfter===3,Boolean(context.walkoff),undefined);
@@ -271,8 +275,8 @@ export function choreographPlayEvent(
     return {
       play:close, close, basesBefore,
       cameraPreset: 'broadcast_diamond',
-      pitcherClip: 'pitch_windup',
-      batterClip: 'bat_stance',
+      pitcherClip: deliveryClip(fromStretch),
+      batterClip: close ? plateBatterPose(close,close.legs[0].end).clip : 'bat_stance',
       fielderClip: stoleBase ? 'field_run' : 'field_dive',
       highlightFielderPos: 'C',
       ballStyle: null,
@@ -289,10 +293,10 @@ export function choreographPlayEvent(
     const isBunt = isBuntEvent(event);
     const infield = selectDiamondPlay(event.outcome, event.battedBallType, event.fieldingHighlight?.fielderPos);
     const kind = selectOutfieldKind(event);
-    const outfield = kind ? diamondPlay(kind, undefined, event) : undefined;
+    const outfield = kind ? buildPlay(kind) : undefined;
     const cover = infield==='ground_out' && event.fieldingHighlight?.fielderPos==='1B' &&
       (event.seq % 2 === 0 || (event.ballFlight && event.ballFlight.landingX < 8));
-    const timed = close ?? outfield ?? (infield ? diamondPlay(cover?'cover_first':infield, event.fieldingHighlight?.fielderPos,event) : undefined);
+    const timed = close ?? outfield ?? (infield ? buildPlay(cover?'cover_first':infield, event.fieldingHighlight?.fielderPos) : undefined);
     if (timed) {
       timed.power = event.specialPowerTriggered;
       if (context.humanBatting) timed.batterView = true;
@@ -325,16 +329,8 @@ export function choreographPlayEvent(
       cameraPreset: (context.humanBatting || event.isClutchMoment) && preset.cameraPreset === 'over_shoulder_pitcher'
         ? 'over_shoulder_batter'
         : preset.cameraPreset,
-      pitcherClip: close ? 'pitch_windup' : preset.pitcherClip,
-      batterClip: close
-        ? close.kind === 'swinging_third' || close.kind === 'foul_back' || close.kind === 'missed_pitch'
-          ? isBunt
-            ? 'bat_bunt'
-            : 'bat_swing'
-          : 'bat_stance'
-        : isBunt
-          ? 'bat_bunt'
-          : preset.batterClip,
+      pitcherClip: timed || fromStretch ? deliveryClip(fromStretch) : preset.pitcherClip,
+      batterClip: close ? plateBatterPose(close,close.legs[0].end).clip : isBunt ? 'bat_bunt' : preset.batterClip,
       fielderClip: event.fieldingHighlight?.anim ?? preset.fielderClip,
       highlightFielderPos: event.fieldingHighlight?.fielderPos,
       ballStyle: event.ballFlight?.style ?? preset.ballStyle,

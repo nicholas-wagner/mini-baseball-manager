@@ -1,8 +1,8 @@
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { getCameraPresetPose, type CameraPose, type Vec3 } from '../camera/cameraRig';
-import { CLIP_DURATIONS, type CharacterAnimClip } from '../characters/animationState';
-import { targetOffset } from './firstAtBatPresentation';
+import { CLIP_DURATIONS, deliveryClip, type CharacterAnimClip } from '../characters/animationState';
+import { plateBatterPose, targetOffset } from './firstAtBatPresentation';
 import { BASE_PATH_VERTICES as bags, CATCHER_HOME, batterBox, headingToward } from './diamondLayout';
 import type { Actor, DiamondPlay, Leg } from './diamondPlay';
 import { runBases } from './outfieldPlay';
@@ -15,6 +15,7 @@ export interface CloseAction {
   kind: CloseKind;
   fromBase: Base;
   steal: boolean;
+  swing: boolean;
   decisionAt: number;
 }
 export function isCloseKind(kind: string): kind is CloseKind {
@@ -40,7 +41,7 @@ const fraction = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
 function mix(a: Vec3, b: Vec3, u: number): Vec3 {
   return { x: a.x + (b.x-a.x)*u, y: a.y + (b.y-a.y)*u, z: a.z + (b.z-a.z)*u };
 }
-export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1, buntAttempt = false): DiamondPlay {
+export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1, buntAttempt = false, outcome?: string): DiamondPlay {
   const steal = kind === 'steal_safe' || kind === 'steal_out';
   const fieldAt = bags[fromBase + 1];
   const pickup = steal ? (['2B', '3B', 'C'] as const)[fromBase - 1] : 'C';
@@ -48,7 +49,7 @@ export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1, 
   const legs: Leg[] = [{ ...pitch, to: kind === 'foul_back' ? 'BAT' : 'C' }];
   if (kind === 'foul_back') legs.push({ from: 'BAT', to: 'BAT', start: plate, end: plate + .67,
     kind: 'flight', apex: 3.35, endPoint: { x: 1.5, y: 2.55, z: 5.6 } });
-  const returns = kind.endsWith('_pitch');
+  const returns = kind.endsWith('_pitch') || kind === 'foul_back';
   if (returns) legs.push({from:'C',to:'P',kind:'throw',start:plate+.72,end:plate+1.46});
   const tagAt = plate + 1.84;
   const receiveAt = steal && pickup !== 'C' ? tagAt - .36 : plate;
@@ -57,7 +58,9 @@ export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1, 
   const finish = steal ? tagAt : plate;
   const batterArrival = plate + 2.85;
   const duration = kind === 'ball_four' ? batterArrival + .45 : steal ? tagAt + 1.38 : returns ? plate+1.94 : plate+1.45;
-  return { kind, close: { kind, fromBase, steal, decisionAt: finish }, legs, pickup, fieldAt, pickupAt: plate,
+  // The steal replay can carry a simultaneous swinging strike from the pitch event.
+  const swing = steal && (outcome === 'swinging_strike' || outcome === 'strikeout_swinging');
+  return { kind, close: { kind, fromBase, steal, swing, decisionAt: finish }, legs, pickup, fieldAt, pickupAt: plate,
     receiveAt, finish, leadArrival, batterArrival, duration, unassisted: false, buntAttempt: buntAttempt || undefined };
 }
 export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor, time: number, bats: EffectiveBatSide, start: Vec3): Pose {
@@ -70,20 +73,28 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
       since >= .24 && since < .24 + CLIP_DURATIONS.pitch_fist_pump) {
     return pose('pitch_fist_pump', since - .24);
   }
-  if (actor === 'P' && play.legs.some(l=>l.to==='P') && since>.75) return pose('field_receive',.28);
-  if (actor === 'P') return time < CLIP_DURATIONS.pitch_windup ? pose('pitch_windup') : pose('field_ready');
+  if (actor === 'P') {
+    const delivery = deliveryClip(play.fromStretch);
+    const upright = CLIP_DURATIONS[delivery];
+    if (time < upright) return pose(delivery);
+    const back = play.legs.find(leg => leg.from === 'C' && leg.to === 'P');
+    if (!back) return pose('field_ready', time-upright);
+    const catchTime = time-back.end;
+    const approach = fraction(time,upright,back.end-.16);
+    const tuck = fraction(catchTime,.08,.46);
+    const offset = .24 * approach * (1-tuck*tuck*(3-2*tuck));
+    const feet = { ...start, z: start.z+offset };
+    if (catchTime < -.16) return pose('field_ready',time-upright,feet);
+    if (catchTime < .30) return pose('field_receive',catchTime+.16,feet);
+    return pose(play.fromStretch ? 'pitch_stretch_set' : 'pitch_set',catchTime-.30,feet);
+  }
   if (actor === 'BAT') {
-    const swing = close.kind === 'foul_back' || close.kind === 'swinging_third' || close.kind === 'missed_pitch';
-    const swingClip: CharacterAnimClip = play.buntAttempt ? 'bat_bunt' : 'bat_swing';
-    const swingTime = since + CLIP_DURATIONS[swingClip] * .48 + (!play.buntAttempt && play.legs[0].pitch?.pitchType === 'changeup' ? .19 : 0);
-    if (swing && swingTime >= 0 && swingTime < CLIP_DURATIONS[swingClip])
-      return pose(swingClip, swingTime, box.position, box.yaw);
     if (close.kind === 'ball_four' && since >= .48) {
       const stride = runBases(box.position, 0, 1, time, plate+.48, play.batterArrival);
       stride.local *= .73;
       return stride;
     }
-    return pose('bat_stance', time, box.position, box.yaw);
+    return {pos:box.position, yaw:box.yaw, ...plateBatterPose(play,time)};
   }
   if (actor === 'RUN' && !close.steal) {
     return runBases(bags[1], 1, close.kind === 'ball_four' ? 2 : 1, time, plate+.60, play.batterArrival);
@@ -112,9 +123,12 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
     catcher.z = CATCHER_HOME.z;
   }
   if (actor === 'C' && (!close.steal || play.pickup !== 'C' || since < .3)) {
-    if ((close.kind === 'called_pitch' || close.kind === 'called_third') && since >= .06 && since < .39)
+    if ((close.kind === 'called_pitch' || close.kind === 'called_third') && since >= .06 && since < .42)
       return pose('catch_frame', since-.06, catcher, Math.PI);
-    if (close.kind.endsWith('_pitch') && since >= .39) return pose('catch_throw',Math.min(.62,since-.39),catcher,Math.PI);
+    if ((close.kind.endsWith('_pitch') || close.kind === 'foul_back') && since >= .42) {
+      if (since < 1.02) return pose('catch_throw',since-.42,catcher,Math.PI);
+      return pose('catch_target',since-1.02,catcher,Math.PI);
+    }
     if (close.kind.endsWith('third') && since > .46) return pose('catch_point',since-.46,catcher,Math.PI);
     if (close.steal && play.pickup !== 'C' && since >= .22) {
       return pose('catch_throw', Math.min(.61, since-.22), catcher, Math.PI);

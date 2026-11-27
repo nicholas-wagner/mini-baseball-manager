@@ -1,3 +1,4 @@
+import { plateBatterPose, type BattingPreviewPose } from './firstAtBatPresentation';
 import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
 import { pitchSeconds, shapePitch, type PitchFlight } from './pitchFlight';
 import { reactionCamera, reactionPose, bullpenPlay } from './teamReactions';
@@ -7,7 +8,7 @@ import { buildOutfieldPlay, isOutfieldKind, outfieldDefenderAt, runBases, type O
 import type { AtBatOutcome, PlayEvent } from '../../engine/models/playEvent';
 import type { BattedBallType } from '../../engine/models/player';
 import { getCameraPresetPose, type CameraPose, type Vec3 } from '../camera/cameraRig';
-import { CLIP_DURATIONS, PITCH_RELEASE_PHASE, type CharacterAnimClip } from '../characters/animationState';
+import { CLIP_DURATIONS, deliveryClip, PITCH_RELEASE_PHASE, type CharacterAnimClip } from '../characters/animationState';
 import type { EffectiveBatSide, FieldPosition, ThrowsHand } from '../../engine/handedness/types';
 
 type InfieldKind = 'ground_out' | 'double_play' | 'pop_up' | 'bunt_out' | 'bunt_single' | 'fielding_error' | 'infield_liner';
@@ -15,7 +16,7 @@ export type DiamondPlayKind = InfieldKind | OutfieldKind | CloseKind | 'cover_fi
 export type Actor = 'LF' | 'CF' | 'RF' | 'P' | 'BAT' | 'SS' | '2B' | '1B' | '3B' | 'RUN' | 'C';
 export type Leg = { from: Actor; to: Actor; start: number; end: number; kind: 'pitch' | 'ground' | 'pop' | 'throw' | 'flight' | 'bounce' | 'handoff'; startPoint?: Vec3; endPoint?: Vec3; apex?: number; pitch?: PitchFlight };
 const [home, first, second] = BASE_PATH_VERTICES;
-const release = CLIP_DURATIONS.pitch_windup * PITCH_RELEASE_PHASE;
+export type ActorPose = { pos: Vec3; yaw: number; local: number; clip: CharacterAnimClip };
 
 const starts: Record<Actor, Vec3> = {
   ...OUTFIELD_STARTS,
@@ -40,6 +41,8 @@ export function isBuntEvent(event?: PlayEvent): boolean {
 
 export interface DiamondPlay {
   kind: DiamondPlayKind;
+  fromStretch?: boolean;
+  battingPreview?: BattingPreviewPose;
   legs: Leg[];
   pickup: Actor;
   fieldAt: Vec3;
@@ -68,13 +71,14 @@ export interface DiamondPlay {
     call: string; callColor: string; caught: boolean; wall: boolean;
   };
 }
-export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, event?: PlayEvent, stealBase?: 1 | 2 | 3, pitchInfo: PitchFlight | undefined = event?.pitchThrown): DiamondPlay {
+export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, event?: PlayEvent, stealBase?: 1 | 2 | 3, pitchInfo: PitchFlight | undefined = event?.pitchThrown, fromStretch = kind === 'steal_safe' || kind === 'steal_out'): DiamondPlay {
   if (kind === 'bullpen') return bullpenPlay();
+  const release = CLIP_DURATIONS[deliveryClip(fromStretch)] * PITCH_RELEASE_PHASE;
   const plate = release + (pitchInfo ? pitchSeconds(pitchInfo.mph) : .56);
   const pitch: Leg = {from:'P', to:'BAT', start:release, end:plate, kind:'pitch', pitch:pitchInfo};
   const buntAttempt = kind === 'bunt_out' || kind === 'bunt_single' || isBuntEvent(event);
-  if (isCloseKind(kind)) return buildClosePlay(kind, pitch, stealBase, buntAttempt);
-  if (isOutfieldKind(kind)) return buildOutfieldPlay(kind, pitch, event);
+  if (isCloseKind(kind)) return { ...buildClosePlay(kind, pitch, stealBase, buntAttempt, event?.outcome), fromStretch };
+  if (isOutfieldKind(kind)) return { ...buildOutfieldPlay(kind, pitch, event), fromStretch };
   const pop = kind === 'pop_up';
   const bunt = kind === 'bunt_out' || kind === 'bunt_single';
   const liner = kind === 'infield_liner';
@@ -112,7 +116,7 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
     legs.push({ from:pickup,to:pickup,start:pickupAt,end:pickupAt+.44,kind:'bounce',endPoint:loose },
       { from:pickup,to:pickup,start:pickupAt+.44,end:finish,kind:'ground',startPoint:loose });
   }
-  return { kind, legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
+  return { kind, fromStretch, legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
     buntAttempt: buntAttempt || undefined,
     duration: finish + (error ? 1.75 : 1.05),
     batterArrival: kind === 'bunt_single' ? finish-.34 : finish + 0.37, leadArrival: receiveAt + 0.28 };
@@ -173,7 +177,7 @@ export function buntRunnerPose(play: DiamondPlay, from: number, time: number) {
   return runBases(start, from, from + 1, time, contact, play.leadArrival);
 }
 
-function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: EffectiveBatSide) {
+function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: EffectiveBatSide): ActorPose {
   const plate = play.legs[0].end;
   let pos = starts[actor];
   const leadBase = play.scorerBase ?? play.runnerToThird;
@@ -241,15 +245,16 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     return runBases(BASE_PATH_VERTICES[3],3,4,time,play.pickupAt+.08,play.leadArrival);
   }
   if (actor === 'P') {
+    const delivery = deliveryClip(play.fromStretch);
     if (play.pickup === 'P') {
-      const startAt = Math.max(CLIP_DURATIONS.pitch_windup, plate + 0.06);
+      const startAt = Math.max(CLIP_DURATIONS[delivery], plate + 0.06);
       const arrive = play.pickupAt - 0.34;
       const receive = play.legs.find((leg) => leg.to === 'P');
       if (time < startAt) {
         return {
           pos,
           yaw: 0,
-          clip: time < CLIP_DURATIONS.pitch_windup ? 'pitch_windup' as const : 'field_ready' as const,
+          clip: time < CLIP_DURATIONS[delivery] ? delivery : 'field_ready' as const,
           local: time,
         };
       }
@@ -271,7 +276,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
       return {pos:between(pos,target,u),yaw:u<1 ? headingToward(pos,target) : headingToward(target,play.fieldAt),
         clip:u<1 ? 'field_run' as const : 'field_receive' as const,local:time-plate-.12};
     }
-    clip = time < CLIP_DURATIONS.pitch_windup ? 'pitch_windup' : 'field_ready';
+    clip = time < CLIP_DURATIONS[delivery] ? delivery : 'field_ready';
   } else if (actor === 'BAT' || actor === 'RUN') {
     const lead = actor === 'RUN';
     const box = batterBox(bats);
@@ -279,14 +284,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     const arrival = lead ? play.leadArrival : play.batterArrival;
     const go = plate + (lead ? 0.04 : 0.20);
     if (!lead && time < go) {
-      const swing: CharacterAnimClip = (play.kind === 'bunt_out' || play.kind === 'bunt_single' || play.buntAttempt) ? 'bat_bunt' : play.kind === 'home_run' ? 'bat_bomb' : 'bat_swing';
-      local = time - plate + CLIP_DURATIONS[swing] * 0.45;
-      if (time > plate && swing !== 'bat_bunt') {
-        local = CLIP_DURATIONS[swing] * (.45 + .53 * progress(time,plate,go));
-      }
-      clip = local < 0 ? 'bat_stance' : swing;
-      pos = start;
-      yaw = box.yaw;
+      return { pos:start, yaw:box.yaw, ...plateBatterPose(play,time) };
     } else {
       if (!lead && (play.kind === 'bunt_single' || play.kind === 'fielding_error')) {
         return runBases(start,0,1,time,go,arrival);
@@ -354,7 +352,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
   return { pos, yaw, clip, local: Math.max(0, local) };
 }
 
-export function actorAt(play: DiamondPlay, actor: Actor, time: number, bats: EffectiveBatSide): {pos:Vec3; yaw:number; local:number; clip:CharacterAnimClip} {
+export function actorAt(play: DiamondPlay, actor: Actor, time: number, bats: EffectiveBatSide): ActorPose {
   let base = baseActorAt(play,actor,time,bats);
   if (actor==='BAT' && !play.close && play.kind!=='bullpen') {
     const go=play.legs[0].end+.20;

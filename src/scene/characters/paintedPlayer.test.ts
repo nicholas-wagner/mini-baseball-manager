@@ -24,6 +24,7 @@ describe('shared painted minis', () => {
       used.add(bottom);
       used.add('rear-' + bottom);
     }
+    used.add('stretch');
     used.add('receivers');
     used.add('strides');
     expect([...used].sort()).toEqual(Object.keys(files).map(path => path.split('/').at(-1)!.slice(0,-4)).sort());
@@ -234,4 +235,45 @@ it('offers the bullpen ball toward the new pitcher from either camera side', () 
     }
     catcher.dispose();
   }
+});
+
+it('keeps the loaded batter breathing and waggling after the preview settles', () => {
+  const rig = createPaintedPlayerRig({team:SAMPLE_TEAM_PALETTES[0],jerseyNumber:3,role:'batter',traits:PLAYER_CATALOG[0].traits});
+  const head = rig.root.getObjectByName('painted head')!, bat = rig.root.getObjectByName('bat barrel')!;
+  try {
+    for (const clip of ['bat_stance','bat_power_set','bat_contact_set','bat_bunt'] as const) {
+      rig.updatePose(clip,1.03);
+      const high = head.getWorldPosition(new Vector3()).y, angle = bat.rotation.z;
+      rig.updatePose(clip,1.51);
+      expect(Math.abs(head.getWorldPosition(new Vector3()).y-high),clip).toBeGreaterThan(.001);
+      if (clip !== 'bat_bunt') expect(Math.abs(bat.rotation.z-angle),clip).toBeGreaterThan(.006);
+    }
+  } finally { rig.dispose(); }
+});
+
+it('drops the catcher back to target height without a last-frame jump', () => {
+  const rig=createPaintedPlayerRig({team:SAMPLE_TEAM_PALETTES[0],jerseyNumber:2,role:'catcher',traits:PLAYER_CATALOG[0].traits});
+  try {
+    const height = (clip:'catch_throw'|'catch_target',t:number) => {
+      rig.updatePose(clip,t);
+      return rig.root.getObjectByName('painted head')!.getWorldPosition(new Vector3()).y;
+    };
+    const raised = height('catch_throw',.31), sinking = height('catch_throw',.49);
+    expect(raised-sinking).toBeGreaterThan(.035);
+    expect(Math.abs(height('catch_throw',.599)-height('catch_target',0))).toBeLessThan(.04);
+  } finally {rig.dispose();}
+});
+
+it.each(['L','R'] as const)('raises the power barrel above the balanced barrel for a %s hitter', batSide => {
+  const rig=createPaintedPlayerRig({team:SAMPLE_TEAM_PALETTES[0],jerseyNumber:3,role:'batter',batSide,traits:PLAYER_CATALOG[0].traits});
+  try {
+    const bat=rig.root.getObjectByName('bat barrel')!;
+    for (const z of [-5,5]) {
+      const barrelHeight = (clip:'bat_power_set'|'bat_stance') => {
+        rig.updatePose(clip,.65,undefined,new Vector3(0,2,z));
+        return bat.localToWorld(new Vector3(0,.94,0)).y;
+      };
+      expect(barrelHeight('bat_power_set')-barrelHeight('bat_stance')).toBeGreaterThan(.10);
+    }
+  } finally {rig.dispose();}
 });

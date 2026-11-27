@@ -6,6 +6,9 @@ export type CharacterAnimClip =
   | 'glove_tap'
   | 'catch_frame'
   | 'pitch_set'
+  | 'pitch_stretch_set'
+  | 'pitch_stretch'
+  | 'pitch_shake_off'
   | 'pitch_windup'
   | 'pitch_super'
   | 'bat_contact_set'
@@ -15,6 +18,12 @@ export type CharacterAnimClip =
   | 'bat_stance'
   | 'bat_swing'
   | 'bat_bunt'
+  | 'bat_recover'
+  | 'bat_take'
+  | 'bat_slump'
+  | 'bat_square'
+  | 'bat_bunt_tap'
+  | 'bat_bunt_pullback'
   | 'bat_bomb'
   | 'catch_receive'
   | 'field_ready'
@@ -40,6 +49,7 @@ export type CharacterAnimClip =
   | 'celebrate_hr';
 
 // Release on an exact pose in the standee's 16-frame animation cycle.
+export const deliveryClip = (fromStretch = false) => fromStretch ? 'pitch_stretch' : 'pitch_windup';
 export const PITCH_RELEASE_PHASE = 9 / 16;
 export const GLOVE_CONTACT_PHASE = { field_dive: 8 / 16, field_high_jump: 10 / 16 } as const;
 
@@ -49,6 +59,9 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   glove_tap: 1.4,
   catch_frame: .36,
   pitch_set: 3.2,
+  pitch_stretch_set: 3.4,
+  pitch_stretch: .89,
+  pitch_shake_off: .72,
   pitch_salute: .66,
   pitch_fist_pump: .52,
   pitch_windup: 1.35,
@@ -61,6 +74,12 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   bat_swing: 0.95,
   bat_bunt: 0.9,
   bat_bomb: 1.55,
+  bat_recover: .30,
+  bat_take: .34,
+  bat_slump: .55,
+  bat_square: .22,
+  bat_bunt_tap: .14,
+  bat_bunt_pullback: .29,
   field_ready: 1.6,
   catch_receive: 0.42,
   field_scoop: 0.7,

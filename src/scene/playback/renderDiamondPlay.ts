@@ -3,15 +3,16 @@ import { BASE_PATH_VERTICES } from './diamondLayout';
 import { railReaction, welcomePose } from './teamReactions';
 import { fitFieldOfView, type CameraPose } from '../camera/cameraRig';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
-import type { PerspectiveCamera } from 'three';
+import { Vector3, type PerspectiveCamera } from 'three';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import type { PaintedPlayerRig } from '../characters/paintedPlayer';
 import { BALL_TRAJECTORY_PRESETS } from '../vfx/ballTrajectory';
-import type { BallparkVfxSystem } from '../vfx/vfxSystem';
+import { inSwingArcWindow, type BallparkVfxSystem } from '../vfx/vfxSystem';
 import { actorAt, buntFollowBase, diamondCamera, forceAtFirst, sampleLeg, type Actor, type DiamondPlay } from './diamondPlay';
 import { collectPlayAudioCues, type PlayAudioFrame } from './playAudioTimeline';
 
 export type DiamondCast = Record<Actor, PaintedPlayerRig>;
+const up = new Vector3(0,1,0);
 const actors: Actor[] = ['C', 'P', 'BAT', 'SS', '2B', '1B', '3B', 'LF', 'CF', 'RF', 'RUN'];
 
 export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: EffectiveBatSide,
@@ -70,6 +71,13 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     vfx.ball.sizeForCamera(camera, heightPx);
   }
   const pitch = play.legs[0];
+  const sincePlate = t-pitch.end;
+  let barrel = null;
+  if (!vfx.reducedMotion && pitch.kind === 'pitch' && inSwingArcWindow(sincePlate)) {
+    const batter = actorAt(play,'BAT',pitch.end,side);
+    if (batter.clip === 'bat_swing' || batter.clip === 'bat_bomb') barrel = contact('BAT',pitch.end);
+  }
+  vfx.drawSwingArc(barrel,side,sincePlate);
   const power = play.power;
   if (power) {
     const actor = power.actor === 'fielder' ? play.pickup : power.actor === 'pitcher' ? 'P' : 'BAT';
@@ -128,7 +136,8 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   vfx.droppedBat.visible=false;
   if ((!play.close && play.kind!=='bullpen' || play.kind==='ball_four') && t>=dropAt) {
       const state=stateAt('BAT',dropAt-.001);
-      const grip=cast.BAT.batGripAt(state.clip,state.local,state.pos,camera.position);
+      const eye = (fixedShot ?? diamondCamera(play,dropAt-.001,side,throws)).position;
+      const grip=cast.BAT.batGripAt(state.clip,state.local,state.pos,eye);
       const u = Math.min(1,(t-dropAt)/.38);
       const dir = side === 'R' ? -1 : 1;
       const bat = vfx.droppedBat;
@@ -136,7 +145,12 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       bat.position.set(grip.x+dir*.35*u, .11+(grip.y-.11)*(1-u*u), grip.z+.35*u);
       const flip = play.kind === 'home_run' && !vfx.reducedMotion;
       if (flip) bat.position.y += .76 * Math.sin(Math.PI*u);
-      bat.rotation.set(.13*u,dir*.52,dir*(.47+u*1.12+(flip ? Math.PI*2*u : 0)));
+      if (state.clip === 'bat_bunt_tap') {
+        const axis = cast.BAT.contactAt(state.clip,state.local,state.pos,eye).sub(grip).normalize();
+        axis.y *= 1-u;
+        bat.quaternion.setFromUnitVectors(up,axis.normalize());
+        bat.rotateOnWorldAxis(up,dir*.36*u);
+      } else bat.rotation.set(.13*u,dir*.52,dir*(.47+u*1.12+(flip ? Math.PI*2*u : 0)));
     }
   if (play.close) {
     const {kind,decisionAt}=play.close;
@@ -180,6 +194,10 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     rig.logicalYaw = state.yaw;
     rig.root.position.copy(state.pos);
     const grin = play.kind === 'double_play' && actor === '1B' && t > play.finish + .20;
-    rig.updatePose(state.clip, state.local, grin ? 'happy' : undefined, camera.position, !flying && !received?.endPoint && (received?.to === actor || (!received && play.kind==='bullpen' && actor==='C')));
+    // On a foul into the stands the catcher sends a fresh ball back to the mound.
+    const freshBall = actor === 'C' && play.kind === 'foul_back' && state.clip === 'catch_throw';
+    const ready = state.clip === 'bat_stance' || state.clip === 'pitch_set' || state.clip === 'pitch_stretch_set' || state.clip === 'catch_target';
+    const local = state.local + (ready && !vfx.reducedMotion ? seconds-t : 0);
+    rig.updatePose(state.clip, local, grin ? 'happy' : undefined, camera.position, !flying && (freshBall || (!received?.endPoint && (received?.to === actor || (!received && play.kind==='bullpen' && actor==='C')))));
   }
 }
