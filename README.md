@@ -131,7 +131,7 @@ npm run test:e2e
 
 Live PWA: **https://nicholas-wagner.github.io/mini-baseball-manager/**
 
-Pushing to `main` builds the offline service worker and publishes the game to GitHub Pages. The app precaches about 6.1 MiB, including all hobby stories. Manga portrait PNGs and hobby postcard WebPs are cached as you view them. Open the live site in Android Chrome and tap **Install App** to play fullscreen offline. [Deployment workflow](./.github/workflows/deploy-pages.yml)
+Pushing to `main` builds the offline service worker and publishes the game to GitHub Pages. The app precaches about 6.1 MiB, including all hobby stories. Manga portrait WebPs and hobby postcard WebPs are cached as you view them. Open the live site in Android Chrome and tap **Install App** to play fullscreen offline. [Deployment workflow](./.github/workflows/deploy-pages.yml)
 
 ---
 
@@ -151,7 +151,7 @@ This repository is structured so both **human contributors** and **AI coding age
 ## Tech Stack
 
 - **Frontend**: Vite 6, React 19, TypeScript (strict), Tailwind CSS v4, Zustand
-- **3D & Art**: Imperative Three.js (`src/scene/`) + illustrated PNG player cards, SVG flags and shared painted 2.5D rigs (`src/art/`)
+- **3D & Art**: Imperative Three.js (`src/scene/`) + illustrated WebP player cards, SVG flags and shared painted 2.5D rigs (`src/art/`)
 - **Audio**: Procedural Web Audio API (`src/audio/`)
 - **Testing (Strict TDD)**: Vitest, React Testing Library, jsdom, Playwright (Desktop & Android Pixel 7)
 - **Offline & Mobile**: `vite-plugin-pwa` (Workbox Service Worker + Android adaptive/maskable icons) + local-only IndexedDB persistence
