@@ -11,10 +11,18 @@ import {
   type UniformCustomization,
 } from '../engine/customization/uniformDesigner';
 import {
+  extendPlayerContract,
+  hostClubhouseFeast,
+  purchaseFoilPack,
+  schedulePromoNight,
+} from '../engine/economy/clubLedgerSettlement';
+import {
   buildDistrictBuilding,
   evaluateDistrictBonuses,
   type DistrictBuildingId,
 } from '../engine/economy/districtBuilder';
+import type { PromoNightId } from '../engine/economy/ledger';
+import type { FoilPackTierId } from '../engine/events/foilPacks';
 import {
   signParodySponsor,
   signTvContract,
@@ -86,6 +94,7 @@ import {
 import type { ThrowsHand } from '../engine/handedness/types';
 import { hireRetiredLegendCoachForClub } from '../engine/league/playoffBracket';
 import type { RetiredLegendCoachCandidate } from '../engine/rpg/lifecycle';
+import { useFoilPackStore } from './foilPackStore';
 import { useGameStore } from './gameStore';
 import { useUserPreferencesStore } from './userPreferences';
 
@@ -217,6 +226,49 @@ export function signHumanTvContract(
   if (!res.signed) return { signed: false, reason: res.reason };
   useGameStore.setState({ leagues: replaceHumanClub(state.leagues, res.club) });
   return { signed: true };
+}
+
+function commitHumanClub(club: Club): void {
+  const state = useGameStore.getState();
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, club) });
+}
+
+export function scheduleHumanPromoNight(promoId: PromoNightId): { booked: boolean; reason?: string } {
+  const club = useGameStore.getState().getHumanClub();
+  if (!club) return { booked: false, reason: 'No active club.' };
+  const res = schedulePromoNight(club, promoId);
+  if (!res.booked) return { booked: false, reason: res.reason };
+  commitHumanClub(res.club);
+  return { booked: true };
+}
+
+export function hostHumanClubhouseFeast(): { hosted: boolean; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { hosted: false, reason: 'No active club.' };
+  const res = hostClubhouseFeast(club, state.currentSeriesIndex);
+  if (!res.hosted) return { hosted: false, reason: res.reason };
+  commitHumanClub(res.club);
+  return { hosted: true };
+}
+
+export function buyHumanFoilPack(tier: FoilPackTierId): { bought: boolean; reason?: string } {
+  const club = useGameStore.getState().getHumanClub();
+  if (!club) return { bought: false, reason: 'No active club.' };
+  const res = purchaseFoilPack(club, tier);
+  if (!res.bought || !res.tier) return { bought: false, reason: res.reason };
+  commitHumanClub(res.club);
+  useFoilPackStore.getState().awardPack(res.tier, '1994 Foil Pack Cash Shop');
+  return { bought: true };
+}
+
+export function extendHumanPlayerContract(playerId: string): { extended: boolean; reason?: string } {
+  const club = useGameStore.getState().getHumanClub();
+  if (!club) return { extended: false, reason: 'No active club.' };
+  const res = extendPlayerContract(club, playerId);
+  if (!res.extended) return { extended: false, reason: res.reason };
+  commitHumanClub(res.club);
+  return { extended: true };
 }
 
 export function buildHumanDistrictTile(

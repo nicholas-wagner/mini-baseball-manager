@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_ACTIVE_ROSTER_SIZE, MIN_ACTIVE_ROSTER_SIZE } from '../models/club';
+import {
+  LEAGUE_TIER_ORDER,
+  MAX_ACTIVE_ROSTER_SIZE,
+  MIN_ACTIVE_ROSTER_SIZE,
+  type LeagueTierId,
+} from '../models/club';
 import { createSeededRng } from '../rng/seededRng';
 import { createClub, createPlayer } from './rosterFactory';
 import {
@@ -100,5 +105,51 @@ describe('TASK-054 — Active Roster Cap (20) & 6 Player Market Tiers', () => {
     const poolB = generateMarketPool(createSeededRng(999), 'rookie', 12);
     expect(poolA).toEqual(poolB);
     expect(poolA).toHaveLength(12);
+  });
+});
+
+function sampleAges(tier: LeagueTierId, count: number): number[] {
+  return Array.from({ length: count }, (_, index) =>
+    createPlayer(createSeededRng(8_000 + LEAGUE_TIER_ORDER.indexOf(tier) * 1_000 + index), {
+      position: index % 2 === 0 ? 'CF' : 'SP',
+      tier,
+    }).age,
+  );
+}
+
+function mean(values: readonly number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) return (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted[mid];
+}
+
+describe('TASK-110 league-tier age curves', () => {
+  it('keeps Rookie players mostly 18–19 and Majors players mostly 25–35', () => {
+    const rookieAges = sampleAges('rookie', 360);
+    const majorAges = sampleAges('majors', 360);
+    const rookieMedian = median(rookieAges);
+    const over25 = rookieAges.filter((age) => age > 25).length / rookieAges.length;
+    const peak = majorAges.filter((age) => age >= 25 && age <= 35).length / majorAges.length;
+    const prodigies = majorAges.filter((age) => age <= 19).length / majorAges.length;
+    const legends = majorAges.filter((age) => age >= 40).length / majorAges.length;
+
+    expect(rookieMedian).toBeGreaterThanOrEqual(18);
+    expect(rookieMedian).toBeLessThanOrEqual(19);
+    expect(over25).toBeLessThan(0.05);
+    expect(peak).toBeGreaterThanOrEqual(0.7);
+    expect(prodigies).toBeLessThan(0.04);
+    expect(legends).toBeLessThan(0.04);
+  });
+
+  it('climbs mean age from Rookie through Low-A, High-A, AA, AAA, and Majors', () => {
+    const means = LEAGUE_TIER_ORDER.map((tier) => mean(sampleAges(tier, 360)));
+    for (let index = 1; index < means.length; index += 1) {
+      expect(means[index]).toBeGreaterThan(means[index - 1]);
+    }
   });
 });

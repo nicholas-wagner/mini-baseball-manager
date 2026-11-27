@@ -20,6 +20,7 @@ import {
 import type { Club } from '../../engine/models/club';
 import {
   buildHumanDistrictTile,
+  scheduleHumanPromoNight,
   signHumanParodySponsor,
   signHumanTvContract,
   updateHumanEconomyPricing,
@@ -39,7 +40,8 @@ const MOOD_EMOJI = {
 } as const;
 
 export function BallparkEconomyPanel({ club, onNotice }: BallparkEconomyPanelProps) {
-  const [selectedPromoId, setSelectedPromoId] = useState<PromoNightId | null>(null);
+  const bookedPromoId = (club.economy.scheduledPromoId ?? null) as PromoNightId | null;
+  const [selectedPromoId, setSelectedPromoId] = useState<PromoNightId | null>(bookedPromoId);
   const [selectedSlotId, setSelectedSlotId] = useState<string>(
     club.stadium.districtTiles[0]?.slotId ?? 'north-1',
   );
@@ -227,6 +229,29 @@ export function BallparkEconomyPanel({ club, onNotice }: BallparkEconomyPanelPro
                 </ComicButton>
               ))}
             </div>
+            {bookedPromoId ? (
+              <div data-testid="ballpark-promo-booked" className="text-xs font-extrabold text-[#1B4332]">
+                Booked for Next Home Game!
+              </div>
+            ) : null}
+            <ComicButton
+              size="sm"
+              variant="gold"
+              disabled={!selectedPromoId || selectedPromoId === bookedPromoId}
+              onClick={() => {
+                if (!selectedPromoId) return;
+                const res = scheduleHumanPromoNight(selectedPromoId);
+                const promo = PROMO_NIGHT_CATALOG.find((item) => item.id === selectedPromoId);
+                onNotice(
+                  res.booked
+                    ? `${promo?.name ?? 'Promo'} booked for the next home game!`
+                    : (res.reason ?? 'Promo unavailable.'),
+                );
+                soundEngine.play(res.booked ? 'cash_chime' : 'ui_pop');
+              }}
+            >
+              Book for Next Home Game
+            </ComicButton>
           </div>
         </div>
       </div>

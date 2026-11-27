@@ -55,6 +55,7 @@ import {
 } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
 import { BallparkEconomyPanel } from '../components/BallparkEconomyPanel';
+import { ClubTreasuryPanel, type TreasuryJumpTarget } from '../components/ClubTreasuryPanel';
 import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
 import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
@@ -65,9 +66,10 @@ import { ComicCard } from '../design-system/ComicCard';
 
 type HubRoomId = 'ballpark_room' | 'gear_room' | 'staff_room' | 'events_room';
 
-type HubSubTab =
+export type HubSubTab =
   | 'stadiums'
   | 'economy'
+  | 'treasury'
   | 'uniforms'
   | 'relics'
   | 'staff'
@@ -83,7 +85,7 @@ const ROOM_TO_DEFAULT_SUBTAB: Readonly<Record<HubRoomId, HubSubTab>> = {
 };
 
 function getRoomForSubTab(tab: HubSubTab): HubRoomId {
-  if (tab === 'stadiums' || tab === 'economy') return 'ballpark_room';
+  if (tab === 'stadiums' || tab === 'economy' || tab === 'treasury') return 'ballpark_room';
   if (tab === 'uniforms' || tab === 'relics') return 'gear_room';
   if (tab === 'staff' || tab === 'practice' || tab === 'frontoffice') return 'staff_room';
   return 'events_room';
@@ -91,14 +93,16 @@ function getRoomForSubTab(tab: HubSubTab): HubRoomId {
 
 export interface ClubHubScreenProps {
   initialSubTab?: HubSubTab;
+  onOpenRoster?: () => void;
 }
 
-export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps = {}) {
+export function ClubHubScreen({ initialSubTab = 'stadiums', onOpenRoster }: ClubHubScreenProps = {}) {
   const club = useGameStore((s) => s.getHumanClub());
   const leagues = useGameStore((s) => s.leagues);
   const worldSeed = useGameStore((s) => s.worldSeed);
   const seasonNumber = useGameStore((s) => s.seasonNumber);
   const individualDrillsRemaining = useGameStore((s) => s.individualDrillsRemaining);
+  const seriesIndex = useGameStore((s) => s.currentSeriesIndex);
 
   const [subTab, setSubTab] = useState<HubSubTab>(initialSubTab);
   useEffect(() => {
@@ -226,6 +230,15 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
                   onClick={() => setSubTab('stadiums')}
                 >
                   Ballparks ({BALLPARK_CATALOG.length})
+                </ComicButton>
+                <ComicButton
+                  size="sm"
+                  variant={subTab === 'treasury' ? 'sky' : 'cream'}
+                  active={subTab === 'treasury'}
+                  icon={<Coins className="w-3.5 h-3.5" />}
+                  onClick={() => setSubTab('treasury')}
+                >
+                  Treasury
                 </ComicButton>
                 <ComicButton
                   size="sm"
@@ -473,6 +486,19 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
           </div>
         ) : null}
 
+        {subTab === 'treasury' ? (
+          <ClubTreasuryPanel
+            club={club}
+            seriesIndex={seriesIndex}
+            onNotice={setNotice}
+            onJump={(target: TreasuryJumpTarget) => {
+              if (target === 'stadiums') setSubTab('stadiums');
+              if (target === 'district') setSubTab('economy');
+              if (target === 'staff') setSubTab('staff');
+              if (target === 'free_agency') onOpenRoster?.();
+            }}
+          />
+        ) : null}
         {subTab === 'economy' ? (
           <BallparkEconomyPanel club={club} onNotice={setNotice} />
         ) : null}

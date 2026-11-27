@@ -26,6 +26,30 @@ export const TIER_SALARY_CAPS: Readonly<Record<LeagueTierId, number>> = {
   majors: 240_000,
 };
 
+/** In-season signings and extensions may spend up to 15% past the hard cap. */
+export const SOFT_CAP_MULTIPLIER = 1.15;
+
+export interface ClubLedgerLine {
+  label: string;
+  amount: number;
+  kind: 'income' | 'expense';
+}
+
+export interface ClubLedgerEntry {
+  id: string;
+  season: number;
+  gameLabel: string;
+  revenueTotal: number;
+  expenseTotal: number;
+  netDelta: number;
+  lines: ClubLedgerLine[];
+  luxuryTaxPaid: number;
+  promoConsumedId: string | null;
+  bailoutTriggered: boolean;
+  bailoutAmount: number;
+  endingCash: number;
+}
+
 export type AiArchetype =
   | 'mashers'
   | 'speed_demons'
@@ -110,6 +134,12 @@ export interface ClubEconomy {
   scoutingBudget: number;
   tvContractId: string | null;
   activeSponsorIds: string[];
+  /** Promo night already paid for and waiting on the next home game. */
+  scheduledPromoId?: string | null;
+  /** Newest-first itemized P&L receipts. Capped at 12. */
+  recentLedgerEntries?: ClubLedgerEntry[];
+  /** Series index that already used the clubhouse recovery feast. */
+  spaUsedInSeriesIndex?: number;
 }
 
 export const MAX_ACTIVE_ROSTER_SIZE = 20;
@@ -287,5 +317,7 @@ export function createInitialEconomy(tier: LeagueTierId): ClubEconomy {
     scoutingBudget: defaults.scoutingBudget,
     tvContractId: null,
     activeSponsorIds: [],
+    scheduledPromoId: null,
+    recentLedgerEntries: [],
   };
 }

@@ -17,6 +17,7 @@ import { playerIllustration } from '../../art/portraits/illustratedPlayerPool';
 import pendingPortrait from '../../art/portraits/illustrations/portrait-pending.svg';
 import { soundEngine } from '../../audio/soundEngine';
 import type { FieldPosition } from '../../engine/handedness/types';
+import { evaluateSalaryCapStatus } from '../../engine/economy/clubLedgerSettlement';
 import {
   computeClubPayroll,
   TIER_SALARY_CAPS,
@@ -50,6 +51,7 @@ import {
   getEligiblePositions,
 } from '../../engine/rpg/specialistsAndPositions';
 import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises';
+import { extendHumanPlayerContract } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
 import { RosterPrintGallery } from '../components/GameDayPrints';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
@@ -251,6 +253,8 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
     : HITTER_CROSS_TRAIN_POSITIONS;
   const clubPayroll = computeClubPayroll(humanClub.roster);
   const salaryCap = TIER_SALARY_CAPS[humanClub.leagueTier];
+  const capStatus = evaluateSalaryCapStatus(humanClub);
+  const expiringContracts = humanClub.roster.filter((player) => player.contract.yearsRemaining <= 1);
   const coEdSynergy = evaluateCoEdClubhouseSynergy(humanClub.roster);
 
   const openCardModalFor = (playerId: string) => {
@@ -314,6 +318,56 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
         club={humanClub}
         onApplied={(msg) => setRosterMessage(msg)}
       />
+
+      <div data-testid="roster-salary-cap-meter" className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-extrabold text-[#181B2C]">
+          <span>
+            Salary Cap {capStatus.pctOfCap}% · {capStatus.status === 'luxury_tax' ? `Luxury tax $${capStatus.luxuryTaxPerSeries.toLocaleString()}/series` : capStatus.status === 'over_max' ? 'Over 115% soft cap' : 'Soft cap 115%'}
+          </span>
+          <span className="font-mono-tabular">
+            ${capStatus.payroll.toLocaleString()} / ${capStatus.softCapMax.toLocaleString()}
+          </span>
+        </div>
+        <div className="h-3 rounded-full bg-white border border-[#181B2C] overflow-hidden">
+          <div
+            className="h-full"
+            style={{
+              width: `${Math.min(100, capStatus.pctOfCap)}%`,
+              backgroundColor:
+                capStatus.status === 'over_max'
+                  ? '#E63946'
+                  : capStatus.status === 'luxury_tax'
+                    ? '#E85D04'
+                    : capStatus.status === 'tight'
+                      ? '#FFB703'
+                      : '#2D6A4F',
+            }}
+          />
+        </div>
+        {expiringContracts.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {expiringContracts.map((player) => (
+              <ComicButton
+                key={player.id}
+                size="sm"
+                variant="gold"
+                data-testid={`extend-contract-${player.id}`}
+                onClick={() => {
+                  const res = extendHumanPlayerContract(player.id);
+                  setRosterMessage(
+                    res.extended
+                      ? `${player.name} extended +2 years.`
+                      : (res.reason ?? 'Extension unavailable.'),
+                  );
+                  soundEngine.play(res.extended ? 'cash_chime' : 'ui_pop');
+                }}
+              >
+                Extend {player.name.split(' ')[0]} (+2 yr)
+              </ComicButton>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
       <ComicCard
         title={`${humanClub.city} ${humanClub.name} Roster`}
@@ -877,7 +931,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                 {freeAgents.slice(0, 6).map((fa) => {
                   const full = humanClub.roster.length >= MAX_ACTIVE_ROSTER_SIZE;
                   const canAfford = humanClub.economy.cash >= fa.contract.signingBonus;
-                  const fitsCap = validateSalaryCapRoom(humanClub, fa.contract.salaryPerSeason).allowed;
+                  const fitsCap = validateSalaryCapRoom(humanClub, fa.contract.salaryPerSeason, 0, 'soft').allowed;
                   return (
                     <div
                       key={fa.id}

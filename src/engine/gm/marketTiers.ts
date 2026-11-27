@@ -98,22 +98,103 @@ const TIER_ORDER: readonly PlayerMarketTier[] = [
   'below_average',
 ];
 
-function rollWeightedMarketTier(rng: SeededRng, useFaWeights: boolean): PlayerMarketTier {
-  const total = TIER_ORDER.reduce(
-    (sum, t) => sum + (useFaWeights ? MARKET_TIER_SPECS[t].faWeight : MARKET_TIER_SPECS[t].clubWeight),
-    0,
-  );
+interface AgeBand {
+  readonly min: number;
+  readonly max: number;
+  readonly weight: number;
+}
+
+const LEAGUE_AGE_BANDS: Readonly<Record<LeagueTierId, readonly AgeBand[]>> = {
+  rookie: [
+    { min: 18, max: 19, weight: 62 },
+    { min: 20, max: 22, weight: 28 },
+    { min: 23, max: 25, weight: 8 },
+    { min: 26, max: 29, weight: 2 },
+  ],
+  low_a: [
+    { min: 18, max: 18, weight: 5 },
+    { min: 19, max: 21, weight: 60 },
+    { min: 22, max: 24, weight: 30 },
+    { min: 25, max: 28, weight: 5 },
+  ],
+  high_a: [
+    { min: 19, max: 19, weight: 5 },
+    { min: 20, max: 23, weight: 62 },
+    { min: 24, max: 26, weight: 26 },
+    { min: 27, max: 30, weight: 7 },
+  ],
+  aa: [
+    { min: 20, max: 21, weight: 7 },
+    { min: 22, max: 25, weight: 60 },
+    { min: 26, max: 29, weight: 26 },
+    { min: 30, max: 33, weight: 7 },
+  ],
+  aaa: [
+    { min: 21, max: 23, weight: 9 },
+    { min: 24, max: 28, weight: 55 },
+    { min: 29, max: 33, weight: 28 },
+    { min: 34, max: 37, weight: 8 },
+  ],
+  majors: [
+    { min: 18, max: 19, weight: 1 },
+    { min: 22, max: 24, weight: 11 },
+    { min: 25, max: 35, weight: 80 },
+    { min: 36, max: 39, weight: 7 },
+    { min: 40, max: 41, weight: 1 },
+  ],
+};
+
+function rollFromWeights(rng: SeededRng, weightOf: (tier: PlayerMarketTier) => number): PlayerMarketTier {
+  const total = TIER_ORDER.reduce((sum, tier) => sum + weightOf(tier), 0);
   const roll = rng.next() * total;
   let cursor = 0;
   for (const tier of TIER_ORDER) {
-    cursor += useFaWeights ? MARKET_TIER_SPECS[tier].faWeight : MARKET_TIER_SPECS[tier].clubWeight;
+    cursor += weightOf(tier);
     if (roll < cursor) return tier;
   }
   return 'average';
 }
 
-export function rollClubStarterMarketTier(rng: SeededRng): PlayerMarketTier {
+function rollWeightedMarketTier(rng: SeededRng, useFaWeights: boolean): PlayerMarketTier {
+  return rollFromWeights(rng, (tier) =>
+    useFaWeights ? MARKET_TIER_SPECS[tier].faWeight : MARKET_TIER_SPECS[tier].clubWeight,
+  );
+}
+
+/** One rng.next() picks the band and the age inside it, matching the old single age draw. */
+function rollWeightedAge(rng: SeededRng, bands: readonly AgeBand[]): number {
+  const total = bands.reduce((sum, band) => sum + band.weight, 0);
+  let ticket = rng.next() * total;
+  for (const band of bands) {
+    if (ticket < band.weight) {
+      const width = band.max - band.min + 1;
+      const offset = Math.min(width - 1, Math.floor((ticket / band.weight) * width));
+      return band.min + offset;
+    }
+    ticket -= band.weight;
+  }
+  const last = bands[bands.length - 1];
+  return last.max;
+}
+
+/** Optional leagueTier is accepted for call-site clarity. Club weights stay global so Rookie OVR parity holds. */
+export function rollClubStarterMarketTier(rng: SeededRng, leagueTier?: LeagueTierId): PlayerMarketTier {
+  void leagueTier;
   return rollWeightedMarketTier(rng, false);
+}
+
+/** League pyramid ages. Forced market presets keep MARKET_TIER_SPECS.ageRange. */
+export function rollLeagueTierAge(
+  rng: SeededRng,
+  leagueTier: LeagueTierId,
+  marketTier: PlayerMarketTier,
+  forcedMarketTier = false,
+): number {
+  if (forcedMarketTier) {
+    const [min, max] = MARKET_TIER_SPECS[marketTier].ageRange;
+    return rng.int(min, max);
+  }
+  return rollWeightedAge(rng, LEAGUE_AGE_BANDS[leagueTier]);
 }
 
 export function rollFreeAgentMarketTier(rng: SeededRng): PlayerMarketTier {
@@ -200,6 +281,7 @@ export function generateMarketPool(
       identity: drawIdentity?.(position),
       tier: leagueTier,
       marketTier: rollFreeAgentMarketTier(rng),
+      ageMode: 'league',
       idPrefix: 'fa',
     });
   });
