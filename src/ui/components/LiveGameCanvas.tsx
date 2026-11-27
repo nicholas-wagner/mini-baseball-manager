@@ -227,9 +227,7 @@ export function LiveGameCanvas({
       {broadcastSlip ? (
         <div
           data-testid="live-broadcast-slip-slot"
-          className={`pointer-events-none select-none absolute left-2 right-14 z-[15] flex justify-start ${
-            showStretchCue ? 'bottom-8' : 'bottom-2'
-          }`}
+          className="pointer-events-none select-none absolute bottom-1.5 left-2 right-14 z-[15] flex justify-start"
         >
           {broadcastSlip}
         </div>
@@ -238,7 +236,7 @@ export function LiveGameCanvas({
       {showStretchCue ? (
         <span
           data-testid="from-the-stretch-cue"
-          className="pointer-events-none absolute bottom-1.5 left-2 z-20 px-2 py-0.5 rounded-full border border-[#F2CB75] bg-[#132c36]/90 text-[#FFF7E4] text-[10px] font-extrabold tracking-wide shadow-sm"
+          className="pointer-events-none absolute top-2 right-14 z-20 px-2 py-0.5 rounded-full border border-[#F2CB75] bg-[#132c36]/90 text-[#FFF7E4] text-[10px] font-extrabold tracking-wide shadow-sm"
         >
           ⚾ From the Stretch
         </span>

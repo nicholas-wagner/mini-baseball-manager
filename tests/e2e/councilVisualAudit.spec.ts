@@ -80,10 +80,13 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
 
     // Confirm Swing button locks with non-shifting label + aria-busy until the play completes
     const swingBtn = page
-      .getByRole('button', { name: /^(Swing|Throw Pitch|Lay down bunt|Send Runner|Steal & Swing \(2K\))$/i })
+      .getByRole('button', {
+        name: /^(Swing|Throw Pitch|Throw|Lay down bunt|Send Runner|Steal & Swing \(2K\))(\s*·\s*1-Pitch)?$/i,
+      })
       .first();
     await expectMinTapTarget(swingBtn, 44);
     const unlockedLabel = await swingBtn.innerText();
+    expect(unlockedLabel).toMatch(/1-Pitch/i);
     await swingBtn.click();
     await expect(swingBtn).toBeDisabled();
     await expect(swingBtn).toHaveAttribute('aria-busy', 'true');
@@ -144,12 +147,15 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expectNoHorizontalOverflow(page, 390);
     await page.screenshot({ path: 'test-results/audit-390x844-05-tactics-drawer.png' });
 
-    // Toggle 1-Pitch Mode ON inside Tactics and fire deciding pitch -> sheet immediately auto-dismisses!
+    // Verify 1-Pitch Mode defaults ON in Simple Mode, toggles cleanly, and fires deciding pitch -> sheet immediately auto-dismisses!
     const onePitchToggle = tacticsSheet.getByTestId('arcade-one-pitch-toggle');
-    await onePitchToggle.click();
     await expect(onePitchToggle).toHaveAttribute('aria-pressed', 'true');
     const sheetPrimary = tacticsSheet.getByTestId('live-primary-pitch-btn');
     await expect(sheetPrimary).toContainText(/1-Pitch/i);
+    await onePitchToggle.click();
+    await expect(onePitchToggle).toHaveAttribute('aria-pressed', 'false');
+    await onePitchToggle.click();
+    await expect(onePitchToggle).toHaveAttribute('aria-pressed', 'true');
     await sheetPrimary.click();
     await expect(tacticsSheet).toHaveCount(0);
 
@@ -180,15 +186,27 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expectNoHorizontalOverflow(page, 390);
     await page.screenshot({ path: 'test-results/audit-390x844-08-postgame-boxscore.png' });
 
-    // 7. Tap persistent mobile Cash Pill -> Club Treasury & Finances (TASK-108)
+    // 7. Tap persistent mobile Cash Pill -> Club Treasury & Power-Up Camp (TASK-108, TASK-115)
     await recap.getByRole('button', { name: /close/i }).first().click();
     const mobileCashPill = page.getByTestId('club-cash-pill-mobile');
     await expect(mobileCashPill).toBeVisible({ timeout: 10_000 });
     await expectMinTapTarget(mobileCashPill, 44);
     await mobileCashPill.click();
     await expect(page.getByTestId('club-treasury-panel')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('power-up-camp')).toBeVisible();
     await expectNoHorizontalOverflow(page, 390);
     await page.screenshot({ path: 'test-results/audit-390x844-11-club-treasury.png' });
+
+    // 8. Check Skill Trees (Career Talent Cap + Build Identity, TASK-114) & League Boss Badge (TASK-120)
+    await page.getByRole('button', { name: /skill tree/i }).first().click();
+    await expect(page.getByTestId('career-talent-budget')).toBeVisible({ timeout: 10_000 });
+    await expectNoHorizontalOverflow(page, 390);
+    await page.screenshot({ path: 'test-results/audit-390x844-13-skill-trees.png' });
+
+    await page.getByRole('button', { name: /league/i }).first().click();
+    await expect(page.getByTestId('standings-boss-badge').first()).toBeVisible({ timeout: 10_000 });
+    await expectNoHorizontalOverflow(page, 390);
+    await page.screenshot({ path: 'test-results/audit-390x844-14-league-boss.png' });
   });
 
   test('844x390 phone landscape: Live Landscape 2-column ballpark and action layout', async ({
@@ -206,7 +224,9 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
 
     const field = page.getByTestId('live-game-3d-canvas');
     const primaryAction = page
-      .getByRole('button', { name: /^(Swing|Throw Pitch|Lay down bunt)$/i })
+      .getByRole('button', {
+        name: /^(Swing|Throw Pitch|Throw|Lay down bunt)(\s*·\s*1-Pitch)?$/i,
+      })
       .or(page.getByRole('button', { name: /next pitch/i }))
       .first();
     await expect(field).toBeInViewport({ ratio: 1 });
@@ -254,12 +274,19 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expectNoHorizontalOverflow(page, 1280);
     await page.screenshot({ path: 'test-results/audit-1280x800-10-desktop-broadcast.png' });
 
-    // Open Club Treasury directly via persistent Desktop Cash Pill (TASK-108)
+    // Open Club Treasury directly via persistent Desktop Cash Pill (TASK-108, TASK-115)
     const desktopCashPill = page.getByTestId('club-cash-pill-desktop');
     await expect(desktopCashPill).toBeVisible();
     await desktopCashPill.click();
     await expect(page.getByTestId('club-treasury-panel')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('power-up-camp')).toBeVisible();
     await expectNoHorizontalOverflow(page, 1280);
     await page.screenshot({ path: 'test-results/audit-1280x800-12-desktop-treasury.png' });
+
+    // Open Skill Trees on Desktop to inspect Career Talent Budget & Manager Legacy (TASK-114)
+    await page.getByRole('button', { name: /skill tree/i }).first().click();
+    await expect(page.getByTestId('career-talent-budget')).toBeVisible({ timeout: 10_000 });
+    await expectNoHorizontalOverflow(page, 1280);
+    await page.screenshot({ path: 'test-results/audit-1280x800-15-desktop-skills.png' });
   });
 });
