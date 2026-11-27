@@ -1,4 +1,4 @@
-import ballparkPanorama from './illustrations/ballpark.png';
+import ballparkPanorama from './illustrations/ballpark.webp';
 import { mangaUniform, type CardPose } from './mangaUniform';
 import { CARD_EXPRESSIONS, cardExpression, mangaFace, mangaFringe, visorSpikes } from './mangaFace';
 import { pinkSportsShades } from './faceDetails';

@@ -14,7 +14,7 @@ import {
   BALLPARK_CATALOG,
   getBallparkPreset,
 } from '../../engine/ballparks/stadiumCatalog';
-import ballparkArt from '../../art/portraits/illustrations/ballpark.png';
+import ballparkArt from '../../art/portraits/illustrations/ballpark.webp';
 import {
   buildStadiumUpgradeCards,
   getStadiumTierProfile,

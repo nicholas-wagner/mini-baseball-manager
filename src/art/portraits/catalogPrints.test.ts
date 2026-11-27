@@ -24,8 +24,8 @@ it('gives every fixed catalog player a distinct portrait, including the showcase
 });
 
 it('ties every shipped batch print to an existing player', () => {
-  const paths = Object.keys(import.meta.glob('./illustrations/batch-*/*.png'));
-  const ids = paths.map(path => path.slice(path.lastIndexOf('/') + 1, -4));
+  const paths = Object.keys(import.meta.glob('./illustrations/batch-*/*.webp'));
+  const ids = paths.map(path => path.slice(path.lastIndexOf('/') + 1, -5));
   expect(new Set(ids).size).toBe(ids.length);
   expect(ids.every(id => PLAYER_CATALOG_BY_ID.has(id))).toBe(true);
 });

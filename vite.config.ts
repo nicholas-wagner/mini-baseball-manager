@@ -55,9 +55,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache core app shell & PWA icons only; cache large player portrait PNGs on-demand via CacheFirst
+        // Precache core app shell & PWA icons only; cache large player portrait WebPs on-demand via CacheFirst
         globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}', 'icons/*.png'],
-        globIgnores: ['**/assets/mbm-*.png', '**/assets/felix-*.png', '**/assets/manny-*.png'],
+        globIgnores: ['**/assets/mbm-*.{png,webp}', '**/assets/felix-*.{png,webp}', '**/assets/manny-*.{png,webp}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {

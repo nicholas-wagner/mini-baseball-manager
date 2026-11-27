@@ -1,19 +1,19 @@
 import { PLAYER_CATALOG_BY_ID } from '../../engine/catalog/playerCatalog';
 import type { BaseballCardPlayer } from '../../ui/components/FlipBaseballCard';
 import type { AthleteAppearance } from './athleteAppearance';
-import rico from './illustrations/rico.png';
-import kiko from './illustrations/kiko.png';
-import manny from './illustrations/manny.png';
-import finn from './illustrations/finn.png';
-import ana from './illustrations/ana.png';
-import isaiah from './illustrations/isaiah.png';
-import jae from './illustrations/jae.png';
-import luca from './illustrations/luca.png';
-import mara from './illustrations/mara.png';
-import wade from './illustrations/wade.png';
-import felix from './illustrations/felix.png';
-import bento from './illustrations/bento.png';
-import yuTing from './illustrations/yu-ting.png';
+import rico from './illustrations/rico.webp';
+import kiko from './illustrations/kiko.webp';
+import manny from './illustrations/manny.webp';
+import finn from './illustrations/finn.webp';
+import ana from './illustrations/ana.webp';
+import isaiah from './illustrations/isaiah.webp';
+import jae from './illustrations/jae.webp';
+import luca from './illustrations/luca.webp';
+import mara from './illustrations/mara.webp';
+import wade from './illustrations/wade.webp';
+import felix from './illustrations/felix.webp';
+import bento from './illustrations/bento.webp';
+import yuTing from './illustrations/yu-ting.webp';
 
 type IllustratedPlayer = BaseballCardPlayer & { illustration: string; traits: AthleteAppearance };
 
@@ -147,13 +147,13 @@ export const ILLUSTRATED_PLAYER_POOL: readonly IllustratedPlayer[] = [
 
 const illustrationsByPlayer = new Map(ILLUSTRATED_PLAYER_POOL.map(player => [player.id, player.illustration]));
 
-const catalogPrints = import.meta.glob<string>('./illustrations/batch-*/*.png', {
+const catalogPrints = import.meta.glob<string>('./illustrations/batch-*/*.webp', {
   eager: true,
   import: 'default',
   query: '?url',
 });
 for (const [path, url] of Object.entries(catalogPrints)) {
-  const id = path.slice(path.lastIndexOf('/') + 1, -4);
+  const id = path.slice(path.lastIndexOf('/') + 1, -5);
   illustrationsByPlayer.set(id, url);
 }
 
