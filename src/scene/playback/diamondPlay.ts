@@ -55,6 +55,8 @@ export interface DiamondPlay {
   holdForceCall?: boolean;
   pitchTarget?: PitchTargetIntent;
   reliefStrikeout?: boolean;
+  power?: PlayEvent['specialPowerTriggered'];
+  mascotCannon?: boolean;
   plateDecision?: 'out' | 'safe' | 'held';
   runnerToThird?: 1 | 2;
   scorerBase?: 1 | 2 | 3;
@@ -278,6 +280,9 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     if (!lead && time < go) {
       const swing: CharacterAnimClip = (play.kind === 'bunt_out' || play.kind === 'bunt_single' || play.buntAttempt) ? 'bat_bunt' : play.kind === 'home_run' ? 'bat_bomb' : 'bat_swing';
       local = time - plate + CLIP_DURATIONS[swing] * 0.45;
+      if (time > plate && swing !== 'bat_bunt') {
+        local = CLIP_DURATIONS[swing] * (.45 + .53 * progress(time,plate,go));
+      }
       clip = local < 0 ? 'bat_stance' : swing;
       pos = start;
       yaw = box.yaw;
@@ -417,6 +422,10 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
       return {lookAt: {...runner, y:.83}, position:{x:runner.x-2.7, y:3.15, z:runner.z+5.3}, fov:41};
     }
     if (play.scorerBase && t >= play.leadArrival-.55) return {position:{x:3.3,y:2.2,z:4.4},lookAt:{x:-.4,y:.85,z:-.2},fov:40};
+    if (play.kind === 'home_run' && t >= play.pickupAt - .12 && t < play.pickupAt + 1.32) {
+      // Hold the wall, lamp banks and cannon in one broadcast shot through the burst.
+      return { position: { x: 2, y: 7, z: -7 }, lookAt: { x: -3, y: 6, z: -43 }, fov: 46 };
+    }
     if (runnerFinish && t > leg.end+.12 && leg === play.legs.at(-1)) {
       const runner = actorAt(play,play.kind === 'sac_fly' ? 'RUN' : 'BAT',t,bats).pos;
       return { lookAt:{...runner,y:.85},position:{x:runner.x+3.2,y:3.8,z:runner.z+6},fov:39 };

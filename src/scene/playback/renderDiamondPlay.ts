@@ -59,9 +59,20 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       secondaryColor: homer ? '#FF9056' : flying.kind === 'ground' || flying.kind === 'bounce' ? '#CE8852' : '#7DB5CD' };
     const progress = (t - flying.start) / durationSec;
     const scale = flying.kind === 'pitch' ? pitchFlightScale(progress, .55) : flying.kind==='handoff' ? pitchFlightScale(0,.55) : .55;
-    vfx.ball.draw(spec, progress, homer ? '#FFD166' : '#FFF1C9', scale,
+    const powerFlight = play.power && ((play.power.actor === 'pitcher' && flying.kind === 'pitch') ||
+      (play.power.actor !== 'pitcher' && flying === play.legs[1]));
+    vfx.ball.draw(spec, progress, powerFlight ? play.power!.vfxColor : homer ? '#FFD166' : '#FFF1C9', scale,
       (_, u) => sampleLeg(flying, a, b, u, throws), play.close && flying.from === 'C' && flying.to === 'P' ? .23 : 1);
     vfx.ball.sizeForCamera(camera, heightPx);
+  }
+  const pitch = play.legs[0];
+  const power = play.power;
+  if (power) {
+    const actor = power.actor === 'fielder' ? play.pickup : power.actor === 'pitcher' ? 'P' : 'BAT';
+    const unleashAt = actor === 'P' ? pitch.start : actor === 'BAT' ? pitch.end : play.pickupAt;
+    if (previous < unleashAt && seconds >= unleashAt) {
+      vfx.celebration.unleash(contact(actor,unleashAt),power.vfxColor);
+    }
   }
   const force = forceAtFirst(play);
   if (force && previous < play.batterArrival && seconds >= play.batterArrival) {
@@ -76,6 +87,8 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     if (previous >= leg.end || seconds < leg.end) continue;
     const at = leg.endPoint ?? contact(leg.to, leg.end);
     if (play.close && leg.from === 'C' && leg.to === 'P') continue;
+    if (leg === pitch && leg.to === 'BAT') vfx.celebration.barrel(at);
+    if (leg === play.legs[1] && play.kind === 'home_run') vfx.celebration.homer(Boolean(play.mascotCannon));
     vfx.impact(at, (leg.to === 'BAT' || (force && leg.end === play.finish)) ? '#FFE499' : '#A9EDDC');
     if (play.close || play.kind==='bullpen') continue;
     if (play.outfield) {
@@ -117,7 +130,9 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       const bat = vfx.droppedBat;
       bat.visible = true;
       bat.position.set(grip.x+dir*.35*u, .11+(grip.y-.11)*(1-u*u), grip.z+.35*u);
-      bat.rotation.set(.13*u,dir*.52,dir*(.47+u*1.12));
+      const flip = play.kind === 'home_run' && !vfx.reducedMotion;
+      if (flip) bat.position.y += .76 * Math.sin(Math.PI*u);
+      bat.rotation.set(.13*u,dir*.52,dir*(.47+u*1.12+(flip ? Math.PI*2*u : 0)));
     }
   if (play.close) {
     const {kind,decisionAt}=play.close;
@@ -125,7 +140,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       const call = { foul_back:'FOUL!', called_third:'STRIKE THREE!', swinging_third:'SWING AND MISS!',
         called_pitch:'STRIKE!', missed_pitch:'SWING AND MISS!', ball_pitch:'BALL!', ball_four:'BALL FOUR!', steal_safe:'SAFE!', steal_out:'OUT!' }[kind];
       const at = play.close.steal ? contact(play.pickup,decisionAt) : contact(play.legs[0].to,decisionAt);
-      vfx.spawnComicCallout(readout?.label.toUpperCase() ?? call, {...at,y:at.y+.55},
+      vfx.spawnComicCallout(readout?.label.toUpperCase() ?? call, at,
         kind === 'steal_out' ? '#C1394C' : '#167457', 'contact');
     }
   }

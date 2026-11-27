@@ -1,5 +1,6 @@
 export type CharacterAnimClip =
   | 'idle'
+  | 'pitch_fist_pump'
   | 'pitch_salute'
   | 'pitch_gather'
   | 'glove_tap'
@@ -49,6 +50,7 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   catch_frame: .36,
   pitch_set: 3.2,
   pitch_salute: .66,
+  pitch_fist_pump: .52,
   pitch_windup: 1.35,
   pitch_super: 1.65,
   bat_contact_set: 1,

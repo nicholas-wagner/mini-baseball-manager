@@ -1,11 +1,15 @@
+import type { GameDayWeather } from '../../engine/simulation/weather';
+import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
+import { parkLight } from '../ballpark/parkWeather';
+import { barrelReplayTime, crowdReaction, decayExcitement } from './impactTiming';
 import { FORCE_HOLD_SECONDS, forceReplayTime, isSwingPreview, previewShot, rehearsalPose, targetOffset, type AtBatPreview, type PlayerEntranceCue } from './firstAtBatPresentation';
 import { playReadout } from './playReadout';
 import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
-import { batterBox, headingToward } from './diamondLayout';
+import { batterBox, headingToward, CATCHER_HOME } from './diamondLayout';
 import { createDelivery, sampleDeliveryFlight, type ShowcaseDelivery } from '../vfx/showcaseDelivery';
 import { runBases } from './outfieldPlay';
-import { buntRunnerPose, diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
+import { buntRunnerPose, diamondCamera, diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import * as THREE from 'three';
@@ -79,8 +83,17 @@ export class GameSceneController {
   private lastTimestamp = 0;
   private elapsedSec = 0;
   private trauma = 0;
+  private weather: GameDayWeather | null = null;
+  private sky = new THREE.Color();
+  private fog = new THREE.Fog(0xffffff,48,115);
+  private ambient = new THREE.HemisphereLight();
+  private sun = new THREE.DirectionalLight();
+  private crowdExcitement = .2;
+  private queuedTarget: PitchTargetIntent | null = null;
+  private calledTarget: PitchTargetIntent | null = null;
+  private targetPlaced = false;
 
-  private replay: { play: DiamondPlay; cast: DiamondCast; start: number; rate: number; freezeAt?: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
+  private replay: { play: DiamondPlay; cheer: ReturnType<typeof crowdReaction>; cast: DiamondCast; start: number; rate: number; freezeAt?: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
   private targetRing = new THREE.Mesh(new THREE.RingGeometry(.19, .23, 40),
     new THREE.MeshBasicMaterial({ color: 0xffdc66, transparent: true, depthTest: false, depthWrite: false }));
@@ -132,6 +145,8 @@ export class GameSceneController {
   }
   public setPreview(intent: AtBatPreview | null) {
     if (intent === this.preview) return;
+    if (this.preview && !isSwingPreview(this.preview) && intent === null) this.queuedTarget = this.preview;
+    if (intent) this.queuedTarget = null;
     this.preview = intent;
     this.previewStart = this.elapsedSec;
   }
@@ -147,12 +162,13 @@ export class GameSceneController {
   constructor(container: HTMLElement) {
     this.container = container;
     this.scene = new THREE.Scene();
+    this.targetRing.name = 'called pitch target';
     this.targetRing.visible = false;
     this.targetRing.renderOrder = 5;
     this.scene.add(this.targetRing);
     this.welcome=new WalkoffTeammates(this.scene);
-    this.scene.background = new THREE.Color(0x63caff);
-    this.scene.fog = new THREE.Fog(0x88dbff, 48, 115);
+    this.scene.background = this.sky;
+    this.scene.fog = this.fog;
 
     const width = Math.max(1, container.clientWidth);
     const height = Math.max(1, container.clientHeight);
@@ -168,13 +184,11 @@ export class GameSceneController {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
-    this.scene.add(new THREE.HemisphereLight(0xfffbe6, 0x2fb356, 1.15));
-    const sun = new THREE.DirectionalLight(0xfff7dd, 1.35);
-    sun.position.set(16, 28, 18);
-    this.scene.add(sun);
+    this.scene.add(this.ambient, this.sun);
 
     this.ballpark = createMiniBallpark();
     this.scene.add(this.ballpark.group);
+    this.setWeather(null);
 
     this.vfx = createBallparkVfxSystem();
     this.scene.add(this.vfx.group);
@@ -189,6 +203,7 @@ export class GameSceneController {
       rig.root.position.set(coord.x, coord.y, coord.z);
       rig.logicalYaw = coord.yaw;
       rig.root.scale.y = 1;
+      rig.root.name = role === 'fielder' ? coord.pos : role;
       this.defenders.set(coord.pos, rig);
       this.scene.add(rig.root);
     }
@@ -219,8 +234,25 @@ export class GameSceneController {
     this.startLoop();
   }
 
+  public setWeather(weather: GameDayWeather | null): void {
+    this.weather = weather;
+    const light = parkLight(weather);
+    this.sky.set(light.sky);
+    this.fog.color.setHex(light.fog);
+    this.fog.far = weather?.condition === 'drizzle' ? 86 : 115;
+    this.ambient.color.setHex(light.ambient);
+    this.ambient.groundColor.setHex(light.ground);
+    this.ambient.intensity = light.night ? .82 : 1.15;
+    this.sun.color.setHex(light.sun);
+    this.sun.intensity = light.intensity;
+    this.sun.position.set(16,weather?.condition === 'golden_sunset' ? 9 : 28,18);
+    this.ballpark.setWeather(weather,this.steadyCamera);
+  }
+
   public setCameraOverride(preset: CameraPresetId | null, steady = false): void {
     this.steadyCamera = steady;
+    this.ballpark.setWeather(this.weather,steady);
+    this.vfx.setReducedMotion(steady);
     this.cameraOverride = preset;
   }
 
@@ -334,6 +366,11 @@ export class GameSceneController {
       }
     });
 
+    const selected = this.preview && !isSwingPreview(this.preview) ? this.preview : this.queuedTarget;
+    this.calledTarget = choreo ? choreo.play?.pitchTarget ?? selected : null;
+    this.queuedTarget = null;
+    this.targetPlaced = false;
+    this.defenders.get('C')!.setCatchHeight(this.calledTarget ? targetOffset(this.calledTarget,this.bats).y : 0);
     this.replay = null;
     this.pitch = null;
     this.vfx.clear();
@@ -347,7 +384,9 @@ export class GameSceneController {
     }
     const play = choreo?.play ?? choreo?.close ?? choreo?.outfield ?? (choreo?.infield ? diamondPlay(choreo.infield, choreo.highlightFielderPos) : undefined);
     if (play && choreo) {
-      if (play.pitchTarget && !play.close?.steal) this.defenders.get('C')!.root.scale.y = 1 + targetOffset(play.pitchTarget, this.bats).y;
+      const calledTarget = this.calledTarget ?? play.pitchTarget;
+      if (play.close?.steal || play.kind === 'bullpen') this.calledTarget = null;
+      else this.calledTarget = calledTarget ?? (play.close ? 'attack_zone' : null);
       if (play.outfield && (play.scorerBase || play.runnerToThird) && play.ending?.kind !== 'walkoff') {
         const candidates = battingClub.roster.filter(p => p.id !== batter.id && !bases.includes(p.id));
         const buddy = candidates.find(p => p.personality === 'showboat' || p.personality === 'prankster') ?? candidates[0];
@@ -362,7 +401,8 @@ export class GameSceneController {
       const reliefStrikeout = pitcher.position === 'RP' && event?.outcome === 'strikeout'
         && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
       const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
-      this.replay = { freezeAt:choreo.freezeAt, play: reliefStrikeout ? {...play,reliefStrikeout:true} : play, readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
+      this.replay = { freezeAt:choreo.freezeAt, play: { ...play, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon },
+        cheer: crowdReaction(play), readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
         BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.runnerToThird ? play.runnerToThird-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
         runnerDestinations: (play.outfield || play.close || play.kind === 'bunt_single' || play.kind === 'fielding_error') && event ? bases.map((id, i) => {
@@ -409,11 +449,28 @@ export class GameSceneController {
     this.replay.start = this.elapsedSec - duration / rate;
   }
 
+  private showCalledTarget(time: number, plate: number, cameraPosition: THREE.Vector3Like) {
+    this.targetRing.visible = Boolean(this.calledTarget && time < plate + .32);
+    if (!this.targetRing.visible || !this.calledTarget) return;
+    if (!this.targetPlaced) {
+      const offset = targetOffset(this.calledTarget,this.bats);
+      const origin = { ...CATCHER_HOME, x:CATCHER_HOME.x + offset.x };
+      const catcher = this.defenders.get('C')!;
+      catcher.setCatchHeight(offset.y);
+      this.targetRing.position.copy(catcher.contactAt('catch_target',0,origin,cameraPosition));
+      this.targetPlaced = true;
+    }
+    this.targetRing.material.opacity = .46 * (1 - THREE.MathUtils.smoothstep(time,plate+.16,plate+.32));
+  }
+
   private drawPitch(pitch: NonNullable<GameSceneController['pitch']>) {
     const { play } = pitch;
     const time = (this.elapsedSec - pitch.start) * pitch.rate;
     const pitcher = this.defenders.get('P')!;
     const catcher = this.defenders.get('C')!;
+    this.showCalledTarget(time,play.plateAt,this.camera.position);
+    this.targetRing.quaternion.copy(this.camera.quaternion);
+    if (this.calledTarget) catcher.root.position.x = CATCHER_HOME.x + targetOffset(this.calledTarget,this.bats).x;
     if (!pitch.initialized && time >= play.releaseAt) {
       // Launch from the throwing fingertips in mound coordinates.
       play.pitch.start = pitcher.contactAt(play.pitcherClip, play.releaseAt, pitcher.root.position, this.camera.position);
@@ -455,7 +512,10 @@ export class GameSceneController {
       const dt = Math.min(.05, elapsed);
       this.lastTimestamp = now;
       this.elapsedSec += elapsed;
+      this.crowdExcitement = decayExcitement(this.crowdExcitement,elapsed);
       this.updateScene(dt, elapsed);
+      this.ballpark.update(this.elapsedSec,this.crowdExcitement);
+      this.vfx.update(dt,this.camera,this.container.clientHeight);
       this.renderer.render(this.scene, this.camera);
       this.rafId = requestAnimationFrame(tick);
     };
@@ -469,10 +529,27 @@ export class GameSceneController {
       const limit = this.replay.freezeAt ?? Infinity;
       const clock = Math.min(raw, limit);
       const previous = Math.min(raw - elapsed * rate, limit);
-      const t = play.holdForceCall ? forceReplayTime(clock, play.finish) : clock;
+      const sample = (value: number) => {
+        const held = play.holdForceCall ? forceReplayTime(value,play.finish) : value;
+        return this.steadyCamera ? held : barrelReplayTime(play,held,rate);
+      };
+      const t = sample(clock), prior = sample(previous);
+      const cheer = this.replay.cheer;
+      if (cheer && prior < cheer.at && t >= cheer.at) {
+        this.crowdExcitement = Math.max(this.crowdExcitement,cheer.level);
+        if (cheer.stand) this.ballpark.cheerBehindHome(this.elapsedSec);
+      }
+      if (cheer?.stand && play.ending?.kind === 'walkoff' && prior < play.pickupAt && t >= play.pickupAt) {
+        this.crowdExcitement = Math.max(this.crowdExcitement,.72);
+        this.ballpark.cheerBehindHome(this.elapsedSec);
+      }
       const fixedShot = this.cameraOverride
         ? getCameraPresetPose(this.cameraOverride,this.elapsedSec,0,this.throws,this.bats) : undefined;
-      renderDiamondPlay(play, cast, this.bats, t, play.holdForceCall ? forceReplayTime(previous, play.finish) : previous, this.camera, this.container.clientHeight,
+      if (this.calledTarget && (this.targetRing.visible || !this.targetPlaced)) {
+        const eye = this.targetPlaced ? this.camera.position : (fixedShot ?? diamondCamera(play,0,this.bats,this.throws)).position;
+        this.showCalledTarget(t,play.legs[0].end,eye);
+      }
+      renderDiamondPlay(play, cast, this.bats, t, prior, this.camera, this.container.clientHeight,
         this.vfx, this.throws, fixedShot, this.welcome.rigs, this.replay.readout);
       this.runnerRigs.forEach((runner, i) => {
         if (!runner.root.visible || ((play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
@@ -492,8 +569,7 @@ export class GameSceneController {
         runner.updatePose(state.clip, state.local, undefined, this.camera.position);
         if (destination === 4 && t > arrival + .28) runner.root.visible = false;
       });
-      this.vfx.update(dt, this.camera);
-      this.ballpark.update(dt, 0.57);
+      this.targetRing.quaternion.copy(this.camera.quaternion);
       return;
     }
     const swing = isSwingPreview(this.preview) ? this.preview : null;
@@ -547,9 +623,9 @@ export class GameSceneController {
         const home = DIAMOND_DEFENDER_COORDS.find(coord => coord.pos === 'C')!;
         const offset = targetOffset(this.preview ?? 'attack_zone', this.bats);
         rig.root.position.x = THREE.MathUtils.damp(rig.root.position.x, home.x+offset.x, 14, dt);
-        // Keep both cleats planted as the catcher sets a high or low target.
-        rig.root.scale.y = THREE.MathUtils.damp(rig.root.scale.y, 1+offset.y, 14, dt);
+        rig.setCatchHeight(offset.y);
         if (this.targetRing.visible) {
+          this.targetRing.material.opacity = .76;
           this.targetRing.position.copy(rig.contactAt('catch_target', this.elapsedSec, rig.root.position, this.camera.position));
           this.targetRing.quaternion.copy(this.camera.quaternion);
         } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
@@ -570,8 +646,7 @@ export class GameSceneController {
       }
     }
 
-    this.vfx.update(dt, this.camera);
-    this.ballpark.update(dt, 0.35);
+
   }
 
   public dispose(): void {

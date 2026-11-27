@@ -52,6 +52,7 @@ export function createHorizon(): THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBa
     new THREE.CylinderGeometry(90, 90, 66, 64, 1, true),
     new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide, fog: false }),
   );
+  sky.name = 'painted horizon';
   sky.position.y = 26;
   return sky;
 }
@@ -79,7 +80,7 @@ export function createClayTexture(): THREE.CanvasTexture {
 }
 
 // One painted lamp bank per tower keeps individual bulbs visible on phones.
-export function createFloodlights(): THREE.Group {
+export function createFloodlights() {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 96;
@@ -110,6 +111,13 @@ export function createFloodlights(): THREE.Group {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const face = new THREE.MeshBasicMaterial({ map: texture });
+  const haloMaterial = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: 'varying vec2 at; void main(){at=2.*uv-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: 'varying vec2 at; void main(){float glow=pow(max(0.,1.-length(at)),2.);gl_FragColor=vec4(1.,.91,.66,glow*.65);}',
+  });
+  const haloGeometry = new THREE.PlaneGeometry(6.1, 3.8);
+  const halos: THREE.Mesh[] = [];
   const steel = new THREE.MeshStandardMaterial({ color: 0x485663, roughness: 0.82 });
   const pole = new THREE.CylinderGeometry(0.12, 0.24, 10, 8);
   const housing = new THREE.BoxGeometry(3.4, 1.35, 0.38);
@@ -126,10 +134,18 @@ export function createFloodlights(): THREE.Group {
     box.position.y = 10;
     const lights = new THREE.Mesh(lens, face);
     lights.position.z = 0.2;
-    box.add(lights);
+    const halo = new THREE.Mesh(haloGeometry, haloMaterial);
+    halo.name = 'lamp halo';
+    halo.position.z = .23;
+    halo.visible = false;
+    halos.push(halo);
+    box.add(lights, halo);
     box.rotation.x = 0.16;
     tower.add(mast, box);
     group.add(tower);
   }
-  return group;
+  return { group, setNight(night: boolean) {
+    face.color.setHex(night ? 0xffffff : 0xc7c4a9);
+    for (const halo of halos) halo.visible = night;
+  }};
 }

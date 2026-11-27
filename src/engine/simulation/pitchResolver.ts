@@ -177,7 +177,7 @@ function buildHeritagePowerTrigger(
   return {
     actor,
     powerId: heritage.id,
-    calloutText: `${heritage.calloutText} (${heritage.name})`,
+    calloutText: heritage.calloutText,
     vfxColor: heritage.vfxColor,
   };
 }

@@ -294,6 +294,7 @@ export function choreographPlayEvent(
       (event.seq % 2 === 0 || (event.ballFlight && event.ballFlight.landingX < 8));
     const timed = close ?? outfield ?? (infield ? diamondPlay(cover?'cover_first':infield, event.fieldingHighlight?.fielderPos,event) : undefined);
     if (timed) {
+      timed.power = event.specialPowerTriggered;
       const advances = sacrificeAdvances(event, basesBefore, context.runsScored);
       if (advances) {
         timed.buntAdvances = advances;

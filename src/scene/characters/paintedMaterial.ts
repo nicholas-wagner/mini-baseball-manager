@@ -67,6 +67,7 @@ export function paintedMaterial(isHead: boolean) {
       maskHelmet: { value: 0 },
       nearLimb: { value: 0 },
       sleeve: { value: new THREE.Vector2() },
+      mittLift: { value: 0 },
       pocket: { value: new THREE.Vector3() },
       rows: { value: 3 },
       stanceWidth: { value: 0 },
@@ -81,7 +82,7 @@ export function paintedMaterial(isHead: boolean) {
       uniform float head,maskHelmet,nearLimb,showDetails;
       uniform vec2 collar, sleeve;
       uniform vec3 pocket;
-      uniform float rows, stanceWidth;
+      uniform float rows, stanceWidth, mittLift;
       varying vec2 at;
       vec3 fabric(vec3 base,float v){return mix(base*.24,base,clamp(v/.81,0.,1.))+max(v-.81,0.)*.95;}
       void main(){
@@ -89,6 +90,11 @@ export function paintedMaterial(isHead: boolean) {
         // The cuff bunches toward the chest while the neck, grip and bat stay registered.
         float cuff=1.-smoothstep(.012,.085,distance(at,vec2(sleeve.y,.50)));
         vec2 paintAt=at-vec2(.033*sleeve.x,.019*abs(sleeve.x))*cuff;
+        // Move the painted pocket with its registered ball. Feather the wrist into the
+        // sleeve and leave the mask, knees and cleats at their original scale.
+        vec2 fromPocket = at - pocket.xy;
+        fromPocket.y -= clamp(fromPocket.y, min(0.,mittLift), max(0.,mittLift));
+        paintAt.y -= mittLift * (1.-smoothstep(.068,.21,length(fromPocket)));
         // Widen the planted cleats below the hips without stretching the neck or grip.
         paintAt.x=.5+(paintAt.x-.5)/(1.+stanceWidth*(1.-smoothstep(.12,.42,at.y)));
         vec2 tile=(cell+clamp(paintAt,vec2(.002),vec2(.998)))/vec2(4.,rows);

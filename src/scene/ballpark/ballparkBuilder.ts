@@ -1,3 +1,5 @@
+import type { GameDayWeather } from '../../engine/simulation/weather';
+import { createDrizzle, parkLight } from './parkWeather';
 import { DUGOUT_RAIL } from '../playback/teamReactions';
 import * as THREE from 'three';
 import { BATTERS_BOX, INFIELD_DIRT, OUTFIELD_WALL, batterBox } from '../playback/diamondLayout';
@@ -8,6 +10,8 @@ import type { LiveStadiumScoreboardSnapshot } from './liveScoreboardData';
 export interface BallparkEnvironment {
   group: THREE.Group;
   update: (timeSec: number, crowdExcitement: number) => void;
+  setWeather: (weather: GameDayWeather | null, reducedMotion: boolean) => void;
+  cheerBehindHome: (timeSec: number) => void;
   updateScoreboard: (snapshot: LiveStadiumScoreboardSnapshot) => void;
   dispose: () => void;
 }
@@ -290,7 +294,20 @@ export function createMiniBallpark(): BallparkEnvironment {
   const group = new THREE.Group();
 
   const horizon = createHorizon();
-  group.add(horizon, createFloodlights());
+  const floodlights = createFloodlights();
+  const rain = createDrizzle();
+  group.add(horizon, floodlights.group, rain);
+  let weather: GameDayWeather | null = null;
+  let steady = false;
+  let standAt = -Infinity;
+  function setWeather(next: GameDayWeather | null, reducedMotion: boolean) {
+    weather = next;
+    steady = reducedMotion;
+    const light = parkLight(next);
+    horizon.material.color.setHex(light.horizon);
+    floodlights.setNight(light.night);
+    rain.visible = next?.condition === 'drizzle' && !steady;
+  }
   // Lush mowed turf field
   const turfTex = createMowedTurfTexture();
   const field = new THREE.Mesh(
@@ -595,13 +612,17 @@ export function createMiniBallpark(): BallparkEnvironment {
   flag.lineTo(0, -0.75);
   flag.closePath();
   const pennant = new THREE.ShapeGeometry(flag);
-  for (const x of [-4.8, 4.8]) {
-    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 2.2, 8), postMat);
-    staff.position.set(x, 8.0, 14.1);
+  const banners: THREE.Mesh[] = [];
+  for (const [x,y,z] of [[-4.8,9.05,14.1],[4.8,9.05,14.1],[-8,7.7,-42],[8,7.7,-42]]) {
+    const length = z < 0 ? y : 2.2;
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(.065, .065, length, 8), postMat);
+    staff.position.set(x, y - length / 2, z);
     group.add(staff);
     const fabric = new THREE.MeshBasicMaterial({ color: x < 0 ? 0xf24c56 : 0xffcc52, side: THREE.DoubleSide });
     const banner = new THREE.Mesh(pennant, fabric);
-    banner.position.set(x, 9.05, 14.1);
+    banner.name = z < 0 ? 'outfield pennant' : 'press box pennant';
+    banner.position.set(x, y, z);
+    banners.push(banner);
     group.add(banner);
   }
 
@@ -693,6 +714,7 @@ export function createMiniBallpark(): BallparkEnvironment {
       puff.position.set(ox, oy, oz);
       c.add(puff);
     });
+    c.name = 'drifting cloud';
     c.position.set(cx, cy, cz);
     clouds.push(c);
     group.add(c);
@@ -700,11 +722,15 @@ export function createMiniBallpark(): BallparkEnvironment {
 
   const update = (timeSec: number, crowdExcitement: number) => {
     const bounceAmp = 0.08 + crowdExcitement * 0.42;
-    const bounceSpeed = 4.2 + crowdExcitement * 7.5;
+    // Keep phase continuous when an event changes the amplitude.
+    const bounceSpeed = 5.4;
 
     for (let i = 0; i < crowdSlots.length; i += 1) {
       const s = crowdSlots[i];
-      const hop = Math.abs(Math.sin(timeSec * bounceSpeed + s.phase)) * bounceAmp;
+      const beat = timeSec - standAt - Math.max(0, s.x + 7) * .012;
+      const stand = s.z >= 9 && !steady
+        ? THREE.MathUtils.smoothstep(beat,0,.14) * (1 - THREE.MathUtils.smoothstep(beat,.60,1.12)) : 0;
+      const hop = steady ? 0 : Math.abs(Math.sin(timeSec * bounceSpeed + s.phase)) * bounceAmp + stand * .58;
       const y = s.y + hop - 0.23;
       dummy.position.set(s.x, y, s.z);
       dummy.scale.set(0.34, 0.36, 0.25);
@@ -725,9 +751,19 @@ export function createMiniBallpark(): BallparkEnvironment {
     caps.instanceMatrix.needsUpdate = true;
 
     clouds.forEach((cloud, idx) => {
-      cloud.position.x += 0.008 * (idx % 2 === 0 ? 1 : 0.7);
-      if (cloud.position.x > 46) cloud.position.x = -46;
+      const origin = cloudCoords[idx][0];
+      cloud.position.x = steady ? origin : (origin + 46 + timeSec * (idx % 2 === 0 ? .48 : .336)) % 92 - 46;
     });
+    const direction = weather?.windDirection ?? 'calm';
+    const wind = Math.min(1, (weather?.windMph ?? 0) / 18);
+    const bearing = { blowing_in:-1.23, blowing_out:1.91, crosswind:0, calm:.14 }[direction];
+    banners.forEach((banner, i) => {
+      const flutter = steady ? 0 : Math.sin(timeSec*(2+wind*7)+i) * (.018+wind*.14);
+      banner.rotation.set(0,bearing+flutter, -.42*(1-wind)+flutter*.4);
+      banner.scale.x = .76 + .32*wind;
+    });
+    if (rain.visible) rain.material.uniforms.time.value = timeSec;
+
   };
 
   const dispose = () => {
@@ -750,6 +786,8 @@ export function createMiniBallpark(): BallparkEnvironment {
   return {
     group,
     update,
+    setWeather,
+    cheerBehindHome(timeSec) { standAt = timeSec; },
     updateScoreboard: scoreboardDisplay.updateScoreboard,
     dispose,
   };
