@@ -60,15 +60,15 @@ export function getCameraPresetPose(
     }
 
     case 'over_shoulder_batter': {
-      // RHB stands in 3rd-base box (-X); LHB stands in 1st-base box (+X)!
+      // Behind the catcher looking toward the mound; RHB stands in 3rd-base box (-X), LHB in 1st-base box (+X).
       const boxSide = batterSide === 'R' ? -0.76 : 0.76;
       return {
         position: {
           x: boxSide + Math.sin(elapsedSec * 0.65) * 0.07,
-          y: 2.65 + Math.cos(elapsedSec * 0.85) * 0.04,
-          z: 5.35,
+          y: 2.35 + Math.cos(elapsedSec * 0.85) * 0.04,
+          z: 5.5,
         },
-        lookAt: { x: 0, y: 0.9, z: -10.2 },
+        lookAt: { x: 0, y: 0.92, z: -10.2 },
         fov: 45,
       };
     }

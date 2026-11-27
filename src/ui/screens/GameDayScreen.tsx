@@ -306,6 +306,7 @@ export function GameDayScreen({
   } | null>(null);
   const gameLog = useRef<PlayEvent[]>([]);
   const guidedPitchEvents = useRef(new Set<number>());
+  const playLockedRef = useRef(false);
   const fullSeasonSectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -488,6 +489,22 @@ export function GameDayScreen({
     return () => window.clearTimeout(timer);
   }, [lastChoreo, finishedPlay]);
 
+  const isPlayAnimating = Boolean(lastChoreo && finishedPlay !== lastChoreo);
+  const isDeferredDefensiveSwap = Boolean(
+    liveSession &&
+      playbackEvent?.type === 'pitching_change' &&
+      playbackEvent.pitcherId &&
+      playbackEvent.pitcherId !== getCurrentPitcher(liveSession).id,
+  );
+  const playLocked = Boolean(
+    liveSession &&
+      liveSession.status !== 'completed' &&
+      ((isPlayAnimating && !isDeferredDefensiveSwap) || pendingRelief || thirdDecision),
+  );
+  useEffect(() => {
+    playLockedRef.current = playLocked;
+  }, [playLocked]);
+
   useEffect(() => {
     safeScrollTop();
   }, [hasLiveSession]);
@@ -582,6 +599,7 @@ export function GameDayScreen({
     setArgueUsed(false);
     setManagerEjected(false);
     setLastChoreo(null);
+    playLockedRef.current = false;
     guidedPitchEvents.current.clear();
     gameLog.current = [];
     setTacticalCall('normal');
@@ -644,6 +662,7 @@ export function GameDayScreen({
     setArgueUsed(false);
     setManagerEjected(false);
     setLastChoreo(null);
+    playLockedRef.current = false;
     setPlaybackEvent(null);
     setSelectedPitchType(null);
     setDefensiveShift('standard');
@@ -724,7 +743,8 @@ export function GameDayScreen({
         const beforeHome=before?.homeScore ?? liveSession?.home.score ?? 0;
         const beforeAway=before?.awayScore ?? liveSession?.away.score ?? 0;
         const runsScored=lastEvent.half==='BOT' ? lastEvent.homeScore-beforeHome : lastEvent.awayScore-beforeAway;
-        const choreo = choreographPlayEvent(lastEvent, speed, basesBefore, {walkoff,runsScored,
+        const humanBatting = (lastEvent.half === 'BOT') === nextSession.home.isHuman;
+        const choreo = choreographPlayEvent(lastEvent, speed, basesBefore, {walkoff,runsScored,humanBatting,
           winningRunIndex:walkoff ? Math.max(0,lastEvent.awayScore-beforeHome) : 0});
         if (resumeAt && choreo.play) {
           choreo.startAt = resumeAt;
@@ -758,6 +778,8 @@ export function GameDayScreen({
             return [...(sameBatter ? prev : []), ...pitchEvs].slice(-10);
           });
         }
+      } else {
+        playLockedRef.current = false;
       }
       finalizeSessionIfComplete(nextSession, gameLog.current, oppId,summaryDelay);
     },
@@ -821,17 +843,25 @@ export function GameDayScreen({
     ],
   );
 
-  const handleNextPitch = useCallback((call = tacticalCall, timingGrade?: ArcadeTimingGrade) => {
+  const handleNextPitch = useCallback((
+    call = tacticalCall,
+    timingGrade?: ArcadeTimingGrade,
+    opts?: { fromAutoWatch?: boolean },
+  ) => {
     if (!liveSession || liveSession.status === 'completed') return;
-    const isolated = resolveLiveStepInputs(liveSession, call, timingGrade);
     if (thirdDecision) return;
+    if (!opts?.fromAutoWatch && (playLockedRef.current || playLocked)) return;
+    playLockedRef.current = true;
+    const isolated = resolveLiveStepInputs(liveSession, call, timingGrade);
     const managed = watchMode === 'paused' && getBattingSide(liveSession).isHuman;
     const options = { ...isolated.options, thirdBaseCall:managed ? 'hold' as const : 'coach' as const };
     const result = stepPitch(liveSession, isolated.tacticalCall, options);
     const {nextSession, events} = result;
     const choice = managed && events.find(e => e.thirdBase?.close);
     if (choice) {
-      const film = choreographPlayEvent(choice, speed, liveSession.bases);
+      const film = choreographPlayEvent(choice, speed, liveSession.bases, {
+        humanBatting: (choice.half === 'BOT') === liveSession.home.isHuman,
+      });
       film.freezeAt = film.play!.pickupAt;
       setThirdDecision({event:choice,film,call:isolated.tacticalCall,options,hold:result});
       return;
@@ -852,7 +882,7 @@ export function GameDayScreen({
     ) {
       setTacticalCall('normal');
     }
-  }, [activeOpponentId, applyStepResult, guiding, liveSession, resolveLiveStepInputs, showMore, tacticalCall, thirdDecision, watchMode, speed]);
+  }, [activeOpponentId, applyStepResult, guiding, liveSession, playLocked, resolveLiveStepInputs, showMore, tacticalCall, thirdDecision, watchMode, speed]);
 
   const handleSimAtBat = () => {
     if (!liveSession || liveSession.status === 'completed') return;
@@ -887,6 +917,8 @@ export function GameDayScreen({
   const handleSimToEnd = () => {
     if (!humanClub || !activeOpponent || liveSession?.status==='completed') return;
     setPendingRelief(null);
+    setLastChoreo(null);
+    playLockedRef.current = false;
     if (liveSession) {
       const full = simRemainingGame(liveSession);
       setLiveSession(full.finalState);
@@ -994,7 +1026,7 @@ export function GameDayScreen({
         ? Math.min(lastChoreo?.durationMs ?? Math.round(580 / speed), Math.round(580 / speed))
         : (lastChoreo?.durationMs ?? Math.round(900 / speed));
     const timer = window.setTimeout(() => {
-      handleNextPitch();
+      handleNextPitch(undefined, undefined, { fromAutoWatch: true });
     }, delayMs);
     return () => window.clearTimeout(timer);
   }, [
@@ -2608,17 +2640,21 @@ export function GameDayScreen({
     soundEngine.play('ui_pop');
   };
   const handleShakeOffCatcher = () => {
+    if (playLocked || playLockedRef.current) return;
     setEntranceCue(null);
     setLastChoreo(null);
+    playLockedRef.current = false;
     setPlaybackEvent(null);
     setShakeOffCount((c) => c + 1);
     soundEngine.play('ui_pop');
   };
   const sign = !humanIsBatting && pitchingMode !== 'simple' ? catcherSign(liveSession) : null;
-  const acceptSign = sign && <button className="catcher-sign" onClick={()=>{
+  const acceptSign = sign && <button className="catcher-sign" disabled={playLocked} onClick={()=>{
+    if (playLocked || playLockedRef.current) return;
     if (pitchingMode === 'advanced') setSelectedPitchType(sign.pitch);
     setPitchTarget(sign.target);
     setLastChoreo(null);
+    playLockedRef.current = false;
     setPlaybackEvent(null);
     setEntranceCue(null);
   }}>Catcher’s sign · {sign.text}</button>;
@@ -2719,7 +2755,7 @@ export function GameDayScreen({
       });
       return;
     }
-    if (playing || handoff || pendingDecision || thirdDecision) return;
+    if (playing || playLocked || playLockedRef.current || handoff || pendingDecision || thirdDecision) return;
     if (event.key === ' ') {
       if (tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY') return;
       event.preventDefault();
@@ -2800,7 +2836,7 @@ export function GameDayScreen({
                   <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border-2 border-[#172C29] bg-[#FFF7E4] px-3 py-1.5 text-sm font-bold text-[#172C29] shadow-sm">
                     <span role="status">{bullpenMessage}</span>
                     {(!playing || nextDefensivePitcher) && watchMode === 'paused' && (
-                      <button type="button" className="pointer-events-auto min-h-11 rounded-lg bg-[#FFCC49] px-3 font-display cursor-pointer"
+                      <button type="button" disabled={playLocked} className="pointer-events-auto min-h-11 rounded-lg bg-[#FFCC49] px-3 font-display cursor-pointer disabled:opacity-60"
                         onClick={() => handleNextPitch(tacticalCall)}>
                         {humanIsBatting ? 'Face next pitch' : 'Throw next pitch'}
                       </button>
@@ -2916,10 +2952,11 @@ export function GameDayScreen({
                   setEntranceCue(!changedSides && !stole && liveSession.status !== 'completed' && guidedBatting
                     ? {role:'batter', outgoingId:playbackEvent.outsAfter > playbackEvent.outsBefore && !playbackEvent.basesAfter.includes(playbackEvent.batterId ?? '') ? playbackEvent.batterId : undefined} : null);
                   setLastChoreo(null);
+                  playLockedRef.current = false;
                   setPlaybackEvent(null);
                   if (delayedSummary) { setModalSummary(delayedSummary.summary); setDelayedSummary(null); }
                 }} /> : guiding && <FirstAtBat session={shown} batting={guidedBatting} target={pitchTarget} call={tacticalCall}
-              locked={playing} expanded={showMore} powerArmed={Boolean(armedPowerId)}
+              locked={playLocked} expanded={showMore} powerArmed={Boolean(armedPowerId)}
               readyPowerName={readyPowerOption?.name ?? null}
               arcadeTimingEnabled={arcadeTimingEnabled}
               pitchingMode={pitchingMode}
@@ -3047,6 +3084,7 @@ export function GameDayScreen({
               pitchTarget={pitchTarget}
               isBatting={humanIsBatting}
               gameCompleted={liveSession.status === 'completed'}
+              locked={playLocked}
               humanHype={humanHypeNow}
               hypeCost={SPECIAL_ABILITY_HYPE_COST}
               readyPowerLabel={readyPowerOption?.name ?? null}
@@ -3203,6 +3241,7 @@ export function GameDayScreen({
               pitchTarget={pitchTarget}
               isBatting={humanIsBatting}
               gameCompleted={liveSession.status === 'completed'}
+              locked={playLocked}
               humanHype={humanHypeNow}
               hypeCost={SPECIAL_ABILITY_HYPE_COST}
               readyPowerLabel={readyPowerOption?.name ?? null}

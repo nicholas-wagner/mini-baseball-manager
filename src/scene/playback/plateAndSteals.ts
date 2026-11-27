@@ -143,6 +143,13 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
 export function closeCamera(play: DiamondPlay, close: CloseAction, t: number, bats: EffectiveBatSide, throws: ThrowsHand): CameraPose {
   const plate = play.legs[0].end;
   const sign = bats === 'R' ? 1 : -1;
+  if (play.batterView && !close.steal) {
+    if (close.kind === 'ball_four' && t > plate+.85) {
+      const p = closeActorAt(play,close,'BAT',t,bats,bags[0]).pos;
+      return { position:{x:p.x+2.6,y:2.9,z:p.z+5},lookAt:{x:p.x,y:.91,z:p.z},fov:39 };
+    }
+    return getCameraPresetPose('over_shoulder_batter', 0, 0, throws, bats);
+  }
   const atPlate = { position: { x: sign*3.75, y: 1.83, z: -3.95 }, lookAt: { x: -sign*.17, y: 1.06, z: .35 }, fov: 36 };
   if (close.kind.endsWith('_pitch') || close.kind.endsWith('_third')) {
     // Keep both endpoints visible while the viewer follows the small moving ball.

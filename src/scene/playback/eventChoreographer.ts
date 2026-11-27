@@ -256,7 +256,7 @@ export function choreographPlayEvent(
   event: PlayEvent,
   speed: 1 | 2 | 4,
   basesBefore?: PlayEvent['basesAfter'],
-  context: {walkoff?:boolean; winningRunIndex?:number; runsScored?:number} = {},
+  context: {walkoff?:boolean; winningRunIndex?:number; runsScored?:number; humanBatting?:boolean} = {},
 ): ChoreographedStep {
   const divisor = SPEED_DIVISOR[speed];
 
@@ -295,6 +295,7 @@ export function choreographPlayEvent(
     const timed = close ?? outfield ?? (infield ? diamondPlay(cover?'cover_first':infield, event.fieldingHighlight?.fielderPos,event) : undefined);
     if (timed) {
       timed.power = event.specialPowerTriggered;
+      if (context.humanBatting) timed.batterView = true;
       const advances = sacrificeAdvances(event, basesBefore, context.runsScored);
       if (advances) {
         timed.buntAdvances = advances;
@@ -321,7 +322,7 @@ export function choreographPlayEvent(
     }
     return {
       play:timed, infield, outfield, close, basesBefore,
-      cameraPreset: event.isClutchMoment && preset.cameraPreset === 'over_shoulder_pitcher'
+      cameraPreset: (context.humanBatting || event.isClutchMoment) && preset.cameraPreset === 'over_shoulder_pitcher'
         ? 'over_shoulder_batter'
         : preset.cameraPreset,
       pitcherClip: close ? 'pitch_windup' : preset.pitcherClip,

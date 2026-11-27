@@ -1,6 +1,9 @@
 import { expect, it } from "vitest";
 import { Vector3, PerspectiveCamera } from "three";
+import { CATCHER_HOME } from "./diamondLayout";
 import { actorAt, diamondCamera, diamondPlay } from "./diamondPlay";
+import { choreographPlayEvent } from "./eventChoreographer";
+import { defaultMatchupCameraPreset } from "./gameSceneController";
 import {
   previewShot,
   rehearsalPose,
@@ -134,4 +137,47 @@ it('holds the square-to-bunt cel from either side before the pitch', () => {
   expect(rehearsalPose('bunt', 2, false)).toMatchObject({clip:'bat_bunt'});
   expect(rehearsalPose('bunt', 0, true)).toEqual(rehearsalPose('bunt', 2, false));
   for (const hand of ['L','R'] as const) expect(previewShot('bunt', hand)).toEqual(previewShot('contact', hand));
+});
+
+it('positions the default batting preview and pitch view behind the catcher looking toward the mound', () => {
+  expect(defaultMatchupCameraPreset(true)).toBe('over_shoulder_batter');
+  expect(defaultMatchupCameraPreset(false)).toBe('over_shoulder_pitcher');
+
+  for (const side of ['L', 'R'] as const) {
+    for (const intent of ['contact', 'power', 'bunt'] as const) {
+      const shot = previewShot(intent, side);
+      expect(shot.position.z).toBeGreaterThan(CATCHER_HOME.z + 2);
+      expect(shot.lookAt.z).toBeLessThan(-8);
+    }
+    for (const kind of ['called_pitch', 'missed_pitch', 'ball_pitch', 'called_third', 'swinging_third', 'foul_back', 'single'] as const) {
+      const play = { ...diamondPlay(kind), batterView: true };
+      const shot = diamondCamera(play, play.legs[0].start + 0.12, side);
+      expect(shot.position.z).toBeGreaterThan(CATCHER_HOME.z + 2);
+      expect(shot.lookAt.z).toBeLessThan(-8);
+    }
+  }
+
+  const battingStep = choreographPlayEvent(
+    {
+      seq: 1,
+      type: 'pitch_thrown',
+      inning: 1,
+      half: 'BOT',
+      outsBefore: 0,
+      outsAfter: 0,
+      balls: 0,
+      strikes: 1,
+      awayScore: 0,
+      homeScore: 0,
+      basesAfter: [null, null, null],
+      isClutchMoment: false,
+      commentary: 'Called strike',
+      outcome: 'called_strike',
+    },
+    1,
+    [null, null, null],
+    { humanBatting: true },
+  );
+  expect(battingStep.play?.batterView).toBe(true);
+  expect(battingStep.cameraPreset).toBe('over_shoulder_batter');
 });

@@ -1,5 +1,6 @@
 import type { EffectiveBatSide } from "../../engine/handedness/types";
 import type { PitchTargetIntent } from "../../engine/simulation/pitchMindGames";
+import { getCameraPresetPose } from "../camera/cameraRig";
 import {
   type CharacterAnimClip,
 } from "../characters/animationState";
@@ -15,14 +16,10 @@ export function isSwingPreview(intent: AtBatPreview | null): intent is SwingPrev
   return intent === 'contact' || intent === 'power' || intent === 'bunt';
 }
 export function previewShot(intent: AtBatPreview, side: EffectiveBatSide) {
-  const sign = side === "R" ? 1 : -1;
   if (isSwingPreview(intent)) {
-    return {
-      position: { x: sign * 1.75, y: 1.75, z: -3.8 },
-      lookAt: { x: -sign * 0.78, y: 0.99, z: 0.12 },
-      fov: 39,
-    };
+    return getCameraPresetPose("over_shoulder_batter", 0, 0, "R", side);
   }
+  const sign = side === "R" ? 1 : -1;
   return {
     position: { x: sign * 1.9, y: 1.92, z: -4.4 },
     lookAt: { x: 0, y: 0.9, z: 0.82 },

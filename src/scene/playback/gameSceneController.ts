@@ -60,6 +60,11 @@ function toTeamColors(club: Club): PortraitTeamColors {
   };
 }
 
+/** Default matchup camera: behind the catcher when batting, behind the pitcher when pitching. */
+export function defaultMatchupCameraPreset(isHumanBatting: boolean): CameraPresetId {
+  return isHumanBatting ? 'over_shoulder_batter' : 'over_shoulder_pitcher';
+}
+
 /**
  * Imperative Three.js controller rendering all 9 live defenders, active batter,
  * occupied 1B/2B/3B baserunners, VFX trails, and OTS/Broadcast camera motion.
@@ -376,7 +381,7 @@ export class GameSceneController {
     this.vfx.clear();
     this.welcome.hide();
     if (!choreo) {
-      this.cameraPreset = 'over_shoulder_pitcher';
+      this.cameraPreset = defaultMatchupCameraPreset(battingSide.isHuman);
       this.pitcherClip = 'pitch_set';
       this.batterClip = 'bat_stance';
       this.fielderClip = 'field_ready';
@@ -401,7 +406,7 @@ export class GameSceneController {
       const reliefStrikeout = pitcher.position === 'RP' && event?.outcome === 'strikeout'
         && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
       const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
-      this.replay = { freezeAt:choreo.freezeAt, play: { ...play, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon },
+      this.replay = { freezeAt:choreo.freezeAt, play: { ...play, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon },
         cheer: crowdReaction(play), readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
         BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.runnerToThird ? play.runnerToThird-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
@@ -415,7 +420,10 @@ export class GameSceneController {
       return;
     }
     if (choreo) {
-      this.cameraPreset = choreo.cameraPreset;
+      this.cameraPreset =
+        battingSide.isHuman && choreo.cameraPreset === 'over_shoulder_pitcher'
+          ? 'over_shoulder_batter'
+          : choreo.cameraPreset;
       this.pitcherClip = choreo.pitcherClip;
       this.batterClip = choreo.batterClip;
       this.fielderClip = choreo.fielderClip;

@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function seedOpeningDay(page: Page, seed = 2089): Promise<void> {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript((s: number) => {
     const random = crypto.getRandomValues.bind(crypto);
     crypto.getRandomValues = (array) =>
@@ -55,12 +54,18 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expectNoHorizontalOverflow(page, 360);
     await page.screenshot({ path: 'test-results/audit-360x640-01-opening-cover.png' });
 
-    // 2. Live Guided At-Bat
+    // 2. Live Guided At-Bat (wait for entrance to settle into behind-the-catcher batting view)
     await startBtn.click();
     await expect(page.getByTestId('live-game-3d-canvas')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('region', { name: 'First at-bat' })).toBeVisible();
+    await expect(page.getByTestId('player-entrance')).toHaveCount(0, { timeout: 5_000 });
     await expectNoHorizontalOverflow(page, 360);
     await page.screenshot({ path: 'test-results/audit-360x640-02-live-guided-atbat.png' });
+
+    // Confirm Swing button locks until the play completes
+    const swingBtn = page.getByRole('button', { name: /^(Swing|Throw Pitch|Lay down bunt)$/i }).first();
+    await swingBtn.click();
+    await expect(swingBtn).toBeDisabled();
 
     // 3. 1994 Foil Pack Modal (prize-first + thumb-reach Reveal All on 360x640)
     const dugoutBtn = page.getByRole('button', { name: 'Dugout', exact: true });
@@ -142,6 +147,7 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
 
     await page.goto('/');
     await page.getByRole('button', { name: /^(Bat|Pitch) with / }).click();
+    await expect(page.getByTestId('player-entrance')).toHaveCount(0, { timeout: 5_000 });
 
     const field = page.getByTestId('live-game-3d-canvas');
     const primaryAction = page
@@ -165,6 +171,8 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
 
     await page.goto('/');
     await page.getByRole('button', { name: /^(Bat|Pitch) with / }).click();
+    await expect(page.getByTestId('live-game-3d-canvas')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('player-entrance')).toHaveCount(0, { timeout: 5_000 });
     await openLiveTacticsOrMore(page);
 
     await expect(page.getByTestId('sticky-live-scoreboard')).toBeVisible();

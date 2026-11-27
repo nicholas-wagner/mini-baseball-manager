@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameStore } from '../../store/gameStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
@@ -79,6 +79,73 @@ describe('TASK-099 live cockpit', () => {
     tactics.focus();
     fireEvent.keyDown(tactics, { key: ' ' });
     expect(screen.getByTestId('play-by-play-ticker').textContent).toBe(before);
+  });
+
+  it('locks Throw Pitch and Space until the current pitch or play completes', () => {
+    vi.useFakeTimers();
+    try {
+      installMatchMedia(true);
+      render(<GameDayScreen />);
+      fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
+      fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+
+      const pitchBtn = screen.getByTestId('live-primary-pitch-btn');
+      expect(pitchBtn).not.toBeDisabled();
+
+      // First click fires pitch #1 and immediately locks the button
+      fireEvent.click(pitchBtn);
+      const afterFirst = screen.getAllByTestId('play-by-play-ticker')[0].querySelectorAll('li').length;
+      expect(afterFirst).toBeGreaterThanOrEqual(1);
+      expect(screen.getByTestId('live-primary-pitch-btn')).toBeDisabled();
+
+      // Rapid clicks and Space key presses while animating must NOT fire another pitch
+      fireEvent.click(screen.getByTestId('live-primary-pitch-btn'));
+      fireEvent.keyDown(window, { key: ' ' });
+      expect(screen.getAllByTestId('play-by-play-ticker')[0].querySelectorAll('li').length).toBe(afterFirst);
+
+      // Once the pitch/play finishes, Throw Pitch unlocks and fires the next pitch cleanly
+      act(() => vi.advanceTimersByTime(10000));
+      expect(screen.getByTestId('live-primary-pitch-btn')).not.toBeDisabled();
+      fireEvent.click(screen.getByTestId('live-primary-pitch-btn'));
+      expect(screen.getAllByTestId('play-by-play-ticker')[0].querySelectorAll('li').length).toBeGreaterThan(afterFirst);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('blocks rapid double-taps on Swing during guided Opening Day until the play completes', () => {
+    vi.useFakeTimers();
+    try {
+      installMatchMedia(false);
+      useGameStore.getState().startNewCareer({
+        city: 'Sandlot',
+        clubName: 'Comets',
+        mascot: 'Rocket Dog',
+        monogram: 'SC',
+        primaryColor: '#E63946',
+        secondaryColor: '#1D3557',
+        accentColor: '#FFD166',
+        managerName: 'Coach Skip',
+        seed: 2089,
+        startingPreset: 'balanced',
+      });
+      render(<GameDayScreen />);
+      fireEvent.click(screen.getByRole('button', { name: /Bat with / }));
+
+      const swingBtn = screen.getByRole('button', { name: 'Swing' });
+      expect(swingBtn).not.toBeDisabled();
+
+      // Clicking Swing locks immediately and a second click before play completion is ignored
+      fireEvent.click(swingBtn);
+      expect(swingBtn).toBeDisabled();
+      fireEvent.click(swingBtn);
+
+      // Play completes and shows Play result for the first swing only
+      act(() => vi.advanceTimersByTime(15000));
+      expect(screen.getByRole('region', { name: 'Play result' })).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

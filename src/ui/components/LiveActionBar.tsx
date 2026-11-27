@@ -102,6 +102,7 @@ interface LiveActionBarProps {
   pitchTarget?: PitchTargetIntent;
   isBatting: boolean;
   gameCompleted: boolean;
+  locked?: boolean;
   humanHype?: number;
   hypeCost?: number;
   readyPowerLabel?: string | null;
@@ -196,6 +197,7 @@ export function LiveActionBar({
   pitchTarget = 'attack_zone',
   isBatting,
   gameCompleted,
+  locked = false,
   humanHype = 25,
   hypeCost = 60,
   readyPowerLabel = null,
@@ -281,6 +283,7 @@ export function LiveActionBar({
 
   const battingAction = tacticalCall.includes('steal') ? 'Send runners' : tacticalCall === 'bunt' ? 'Lay down bunt' : 'Swing';
   const pitchAction = isBatting ? battingAction : 'Throw Pitch';
+  const controlsLocked = gameCompleted || locked;
   const enduranceFillClass =
     pitcherEnduranceTier === 'gassed'
       ? 'bg-[#FF4D6D]'
@@ -329,7 +332,7 @@ export function LiveActionBar({
             <button
               type="button"
               data-testid="bullpen-accept-btn"
-              disabled={gameCompleted}
+              disabled={controlsLocked}
               onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
             >
               Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
@@ -341,7 +344,7 @@ export function LiveActionBar({
               type="button"
               data-testid="arcade-steal-btn"
               aria-pressed={tacticalCall === quickStealOption.call}
-              disabled={gameCompleted}
+              disabled={controlsLocked}
               onClick={() =>
                 onSelectTacticalCall(
                   tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
@@ -357,7 +360,7 @@ export function LiveActionBar({
               type="button"
               data-testid="arcade-unleash-power-btn"
               aria-pressed={powerArmed}
-              disabled={gameCompleted}
+              disabled={controlsLocked}
               onClick={onArmReadyPower}
             >
               {powerArmed ? 'ARMED!' : readyPowerLabel}
@@ -371,7 +374,7 @@ export function LiveActionBar({
                 key={opt.id}
                 type="button"
                 aria-pressed={tacticalCall === opt.id}
-                disabled={gameCompleted}
+                disabled={controlsLocked}
                 onClick={() => onSelectTacticalCall(opt.id)}
               >
                 {opt.shortLabel}
@@ -381,7 +384,7 @@ export function LiveActionBar({
               type="button"
               data-testid="arcade-bunt-btn"
               aria-pressed={tacticalCall === 'bunt'}
-              disabled={gameCompleted}
+              disabled={controlsLocked}
               onClick={() => onSelectTacticalCall(tacticalCall === 'bunt' ? 'normal' : 'bunt')}
             >
               🏏 Bunt
@@ -394,7 +397,7 @@ export function LiveActionBar({
               {catcherCall ? `${catcherCall.targetLabel} · ${catcherCall.pitchShortLabel}` : 'Over Plate · 4-Seam'}
             </strong>
             {onShakeOff && shakeOffTotal > 1 ? (
-              <button type="button" data-testid="arcade-shake-off-btn" disabled={gameCompleted} onClick={onShakeOff}>
+              <button type="button" data-testid="arcade-shake-off-btn" disabled={controlsLocked} onClick={onShakeOff}>
                 Shake off
               </button>
             ) : null}
@@ -406,7 +409,7 @@ export function LiveActionBar({
                 key={opt.id}
                 type="button"
                 aria-pressed={pitchTarget === opt.id}
-                disabled={gameCompleted}
+                disabled={controlsLocked}
                 onClick={() => onSelectPitchTarget?.(opt.id)}
               >
                 {opt.shortLabel}
@@ -420,7 +423,8 @@ export function LiveActionBar({
               size="sm"
               data-testid="live-primary-pitch-btn"
               variant={powerArmed ? 'coral' : 'gold'}
-              disabled={gameCompleted}
+              disabled={controlsLocked}
+              aria-busy={locked || undefined}
               icon={<Play className="w-3.5 h-3.5" />}
               onClick={() => onNextPitch()}
               className="thumb-go flex-1 min-w-0"
@@ -430,7 +434,7 @@ export function LiveActionBar({
           ) : (
             <ArcadeTimingMeter
               isBatting={isBatting}
-              disabled={gameCompleted}
+              disabled={controlsLocked}
               actionLabel={`${pitchAction}!`}
               powerArmed={powerArmed}
               onLockTiming={(grade) => onNextPitch(grade)}
@@ -512,7 +516,7 @@ export function LiveActionBar({
                       type="button"
                       title={opt.tradeoff}
                       aria-pressed={tacticalCall === opt.id}
-                      disabled={gameCompleted}
+                      disabled={controlsLocked}
                       onClick={() => onSelectTacticalCall(opt.id)}
                       className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
                         tacticalCall === opt.id
@@ -528,7 +532,7 @@ export function LiveActionBar({
                     data-testid="arcade-bunt-btn"
                     title={buntPreviewLine ?? 'Lay down a sacrifice or drag bunt for a hit'}
                     aria-pressed={tacticalCall === 'bunt'}
-                    disabled={gameCompleted}
+                    disabled={controlsLocked}
                     onClick={() =>
                       onSelectTacticalCall(tacticalCall === 'bunt' ? 'normal' : 'bunt')
                     }
@@ -559,7 +563,7 @@ export function LiveActionBar({
                     <button
                       type="button"
                       data-testid="arcade-shake-off-btn"
-                      disabled={gameCompleted}
+                      disabled={controlsLocked}
                       onClick={onShakeOff}
                       className="px-2.5 py-1 min-h-[38px] rounded-lg border-2 border-[#193E37] bg-[#FFF3BF] hover:bg-[#FFCC49] text-[#193D37] font-heading font-extrabold text-[11px] shrink-0 whitespace-nowrap cursor-pointer transition"
                     >
@@ -579,7 +583,7 @@ export function LiveActionBar({
                       type="button"
                       title={opt.tradeoff}
                       aria-pressed={pitchTarget === opt.id}
-                      disabled={gameCompleted}
+                      disabled={controlsLocked}
                       onClick={() => onSelectPitchTarget?.(opt.id)}
                       className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
                         pitchTarget === opt.id
@@ -599,7 +603,7 @@ export function LiveActionBar({
                     type="button"
                     data-testid="arcade-steal-btn"
                     aria-pressed={tacticalCall === quickStealOption.call}
-                    disabled={gameCompleted}
+                    disabled={controlsLocked}
                     onClick={() =>
                       onSelectTacticalCall(
                         tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
@@ -630,7 +634,7 @@ export function LiveActionBar({
                   <button
                     type="button"
                     aria-pressed={selectedPitchType === null}
-                    disabled={gameCompleted}
+                    disabled={controlsLocked}
                     onClick={() => onSelectPitchType(null)}
                     className={`px-2 py-0.5 min-h-[30px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] shrink-0 whitespace-nowrap cursor-pointer transition ${
                       selectedPitchType === null
@@ -649,7 +653,7 @@ export function LiveActionBar({
                         key={slot.pitchType}
                         type="button"
                         aria-pressed={active}
-                        disabled={gameCompleted}
+                        disabled={controlsLocked}
                         onClick={() => onSelectPitchType(active ? null : slot.pitchType)}
                         className={`px-2 py-0.5 min-h-[30px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] shrink-0 whitespace-nowrap cursor-pointer transition ${
                           active
@@ -727,7 +731,7 @@ export function LiveActionBar({
               <button
                 type="button"
                 data-testid="arcade-unleash-power-btn"
-                disabled={gameCompleted}
+                disabled={controlsLocked}
                 onClick={onArmReadyPower}
                 className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[40px] max-w-[60%] sm:max-w-none rounded-lg border-2 border-[#192735] font-display text-[10px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#192735] shrink-0 transition ${
                   powerArmed
@@ -768,6 +772,7 @@ export function LiveActionBar({
                 size="sm"
                 variant="turf"
                 data-testid="bullpen-accept-btn"
+                disabled={controlsLocked}
                 onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
                 className="flex-1 sm:flex-none min-h-[42px] text-[11px] sm:text-xs"
               >
@@ -810,7 +815,8 @@ export function LiveActionBar({
               size="sm"
               data-testid="live-primary-pitch-btn"
               variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'gold'}
-              disabled={gameCompleted}
+              disabled={controlsLocked}
+              aria-busy={locked || undefined}
               icon={<Play className="w-3.5 h-3.5" />}
               aria-label={gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)'}
               onClick={() => onNextPitch()}
@@ -832,7 +838,7 @@ export function LiveActionBar({
         {arcadeTimingEnabled && !gameCompleted ? (
           <ArcadeTimingMeter
             isBatting={isBatting}
-            disabled={gameCompleted}
+            disabled={controlsLocked}
             actionLabel={pitchAction + '!'}
             powerArmed={powerArmed}
             onLockTiming={(grade) => onNextPitch(grade)}
