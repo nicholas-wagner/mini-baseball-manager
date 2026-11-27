@@ -974,6 +974,7 @@ export function GameDayScreen({
     const warmup = evaluateBullpenWarmup(relieverId, warmupCounts[relieverId] ?? 0);
     const swapped = manualSwapPitcher(liveSession, sideKey, relieverId);
     if (swapped.event) {
+      setSheetOpen(false);
       setSelectedPitchType(null);
       setShakeOffCount(0);
       setDismissedBullpenKey(null);
@@ -2732,10 +2733,7 @@ export function GameDayScreen({
     </ThirdBaseDecision>;
   }
   const showFullHud = !guiding || showMore;
-  const closeTactics = () => {
-    setSheetOpen(false);
-    if (!wideStudio) setShowMore(false);
-  };
+  const closeTactics = () => setSheetOpen(false);
   liveKeysRef.current = (event: KeyboardEvent) => {
     if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
     const target = event.target as HTMLElement | null;
@@ -2994,14 +2992,10 @@ export function GameDayScreen({
                   : undefined
               }
               cue={liveCue} onExpand={() => {
-                setShowMore((open) => {
-                  const next = !open;
-                  if (!wideStudio) setSheetOpen(next);
-                  else if (!next) setSheetOpen(false);
-                  return next;
-                });
+                setShowMore(!showMore);
+                setSheetOpen(false);
               }}
-              mascotName={(!guiding || showMore) && (wideStudio || sheetOpen) ? null : humanClub.mascot}
+              mascotName={showFullHud ? null : humanClub.mascot}
               mascotColors={humanClub.colors}
               mascotMood={liveMascotMood}
               onTarget={target=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setPitchTarget(target);}}
@@ -3017,7 +3011,7 @@ export function GameDayScreen({
               </aside>}
             {(!guiding || showMore) && replayable && lastChoreo && <button className="atbat-tip"
               onClick={replayFromPitch}>Watch again · {playReadout(playbackEvent)?.label}</button>}
-            {showFullHud && !sheetOpen && (wideStudio || !guiding) && <LiveActionBar
+            {showFullHud && !sheetOpen && <LiveActionBar
               density={wideStudio ? 'full' : 'dock'}
               onOpenTactics={() => {
                 setSheetOpen(true);
@@ -3179,7 +3173,7 @@ export function GameDayScreen({
             onClose={closeTactics}
           >
             {showFullHud && (sheetOpen || !wideStudio) && <LiveActionBar
-              defaultTacticsOpen={sheetOpen}
+              density="sheet"
               watchSettings={<WatchSettings open={watchMode === 'smart'} side={{...humanClub,lineup:[...liveSession[humanSideKey].lineup]}} value={watchChoice} onChange={v=>{lastStop.current=null; setWatchChoice(v)}}/>}
               catcherSuggestion={acceptSign}
               cue={liveCue}

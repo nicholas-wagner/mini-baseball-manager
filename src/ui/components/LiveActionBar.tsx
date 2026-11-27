@@ -130,8 +130,7 @@ interface LiveActionBarProps {
   onInspectPitcher?: () => void;
   onInspectPlayers?: () => void;
   onOpenBoxScore?: () => void;
-  density?: 'full' | 'dock';
-  defaultTacticsOpen?: boolean;
+  density?: 'full' | 'dock' | 'sheet';
   onOpenTactics?: () => void;
 }
 
@@ -226,11 +225,10 @@ export function LiveActionBar({
   onInspectPlayers,
   onOpenBoxScore,
   density = 'full',
-  defaultTacticsOpen = false,
   onOpenTactics,
 }: LiveActionBarProps) {
   const [bullpenOpen, setBullpenOpen] = useState(false);
-  const [tacticsOpen, setTacticsOpen] = useState(defaultTacticsOpen);
+  const [tacticsOpen, setTacticsOpen] = useState(false);
   const tacticsId = useId();
   const [fastSimOpen, setFastSimOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
@@ -283,6 +281,7 @@ export function LiveActionBar({
 
   const battingAction = tacticalCall.includes('steal') ? 'Send runners' : tacticalCall === 'bunt' ? 'Lay down bunt' : 'Swing';
   const pitchAction = isBatting ? battingAction : 'Throw Pitch';
+  const primaryLabel = gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)';
   const controlsLocked = gameCompleted || locked;
   const enduranceFillClass =
     pitcherEnduranceTier === 'gassed'
@@ -427,6 +426,7 @@ export function LiveActionBar({
               aria-busy={locked || undefined}
               icon={<Play className="w-3.5 h-3.5" />}
               onClick={() => onNextPitch()}
+              aria-label={primaryLabel}
               className="thumb-go flex-1 min-w-0"
             >
               {gameCompleted ? cue.primaryButtonLabel : pitchAction}
@@ -818,7 +818,7 @@ export function LiveActionBar({
               disabled={controlsLocked}
               aria-busy={locked || undefined}
               icon={<Play className="w-3.5 h-3.5" />}
-              aria-label={gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)'}
+              aria-label={primaryLabel}
               onClick={() => onNextPitch()}
               className="flex-1 min-w-0 px-2.5 text-xs whitespace-nowrap"
             >
@@ -826,10 +826,12 @@ export function LiveActionBar({
             </ComicButton>
           ) : null}
 
-          <button type="button" className="tactics-toggle shrink-0" aria-expanded={tacticsOpen} aria-controls={tacticsId}
-            onClick={() => setTacticsOpen(!tacticsOpen)}>
-            {!isBatting && isPitcherTired && bullpenMode === 'manual' && hasBullpenPicker ? 'Tactics • Pen!' : 'Tactics'}
-          </button>
+          {density !== 'sheet' && (
+            <button type="button" className="tactics-toggle shrink-0" aria-expanded={tacticsOpen} aria-controls={tacticsId}
+              onClick={() => setTacticsOpen(!tacticsOpen)}>
+              {!isBatting && isPitcherTired && bullpenMode === 'manual' && hasBullpenPicker ? 'Tactics • Pen!' : 'Tactics'}
+            </button>
+          )}
           {mascotButton}
         </div>
 
@@ -845,7 +847,7 @@ export function LiveActionBar({
           />
         ) : null}
 
-        <div id={tacticsId} className="tactics-panel" data-open={tacticsOpen}>
+        <div id={tacticsId} className="tactics-panel" data-open={density === 'sheet' || tacticsOpen}>
           {watchSettings}
           <div className="tactics-buttons">
           {onToggleSmartWatch ? (

@@ -16,15 +16,15 @@ test('a new pitcher takes the field and can deliver the next pitch from the diam
   await page.getByTestId('arcade-bullpen-toggle').click();
   const bringIn = page.getByTestId('arcade-bullpen-bring-in').first();
   const name = (await bringIn.innerText()).match(/Bring In (.+?) \(/)![1];
+  const ticker = page.getByTestId('play-by-play-ticker');
   await bringIn.click();
+  await expect(page.getByRole('dialog', { name: 'Tactics' })).toHaveCount(0);
   const overlay = page.getByTestId('live-canvas-overlay');
   await expect(overlay.getByRole('status')).toHaveText(`Pitching change · ${name} takes the mound.`);
   await expect(overlay.getByRole('status')).toHaveText(`${name} is ready to pitch.`, { timeout: 10000 });
-  const ticker = page.getByTestId('play-by-play-ticker');
-  const beforePitch = await ticker.innerText();
   await overlay.getByRole('button', { name: 'Throw next pitch' }).click();
-  await expect(ticker).not.toHaveText(beforePitch);
-  await expect(ticker).toContainText(/mph/i);
+  if (await tactics.isVisible()) await tactics.click();
+  await expect(ticker.getByRole('listitem').first()).toContainText(/mph/i);
   await expect(overlay.getByRole('button', { name: 'Throw next pitch' })).toHaveCount(0);
 });
 

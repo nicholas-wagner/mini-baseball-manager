@@ -573,6 +573,13 @@
     max-height: 100%;
     overflow-y: auto;
   }
+  .guided-game .live-dock {
+    display: flex;
+    flex-direction: column;
+  }
+  .guided-game .live-dock > .atbat-guide:not(.is-expanded) {
+    margin-top: auto;
+  }
   .live-game.studio-layout > :not(.live-studio) {
     grid-column: 1 / -1;
     grid-row: 1 / -1;

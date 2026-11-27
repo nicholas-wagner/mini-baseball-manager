@@ -19,16 +19,22 @@ beforeEach(() => {
   });
 });
 
-it('finishes a bullpen visit in the live matchup and delivers a pitch on request', () => {
+it.each(['desktop', 'phone'])('returns to the diamond after a bullpen visit and delivers a pitch on %s', (screenSize) => {
+  const phone = screenSize === 'phone';
+  if (phone) vi.stubGlobal('matchMedia', vi.fn(() => ({
+    matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  })));
   vi.useFakeTimers();
   try {
     render(<GameDayScreen />);
     fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
     fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+    if (phone) fireEvent.click(screen.getByRole('button', { name: 'Tactics' }));
     fireEvent.click(screen.getByTestId('arcade-bullpen-toggle'));
     const choice = screen.getAllByTestId('arcade-bullpen-bring-in')[0];
     const name = choice.textContent!.match(/Bring In (.+?) \(/)![1];
     fireEvent.click(choice);
+    expect(screen.queryByRole('dialog', { name: 'Tactics' })).toBeNull();
     const field = screen.getByTestId('field');
     expect(field).toHaveAttribute('data-play','bullpen');
     expect(field).toHaveTextContent(name);
@@ -38,9 +44,13 @@ it('finishes a bullpen visit in the live matchup and delivers a pitch on request
     expect(screen.queryByRole('button',{name:/Watch again/})).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Throw next pitch' }));
     act(() => vi.advanceTimersByTime(15000));
+    if (phone) fireEvent.click(screen.getByRole('button', { name: 'Tactics' }));
     expect(screen.getByTestId('play-by-play-ticker').textContent).toMatch(/mph/i);
     expect(screen.queryByRole('button', { name: 'Throw next pitch' })).toBeNull();
-  } finally { vi.useRealTimers(); }
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  }
 });
 
 it('carries an automatic change into the bottom of the third and resumes Auto Play', () => {

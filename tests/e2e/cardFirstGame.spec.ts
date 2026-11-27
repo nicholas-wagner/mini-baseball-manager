@@ -32,8 +32,13 @@ test('Opening Day print, live matchup and final rematch work on the first screen
   await again.click();
   await expect(recap).toHaveCount(0);
   await expect(page.getByTestId('live-game-3d-canvas')).toBeVisible();
-  await page.getByRole('button', { name: 'Dugout', exact:true }).click();
-  await page.getByRole('dialog', { name: 'Dugout', exact:true }).getByRole('button', {name:'Roster', exact:true}).click();
+  const roster = page.getByRole('navigation', { name: 'Primary Navigation' }).getByRole('button', { name: 'Roster' });
+  if (await roster.isVisible()) {
+    await roster.click();
+  } else {
+    await page.getByRole('button', { name: 'Dugout', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Dugout' }).getByRole('button', { name: 'Roster', exact: true }).click();
+  }
   await page.getByTestId('roster-view-cards-btn').click();
   await page.getByTestId('roster-view-gallery-btn').click();
   const gallery = page.getByRole('region', { name: 'Roster print gallery' });
@@ -173,17 +178,24 @@ test('a compact phone keeps the chosen call, primary action and field together a
   const tactics = page.getByRole('button',{name:'Tactics'});
   await tactics.click();
   await expect(page.getByTestId('arcade-speed-toggle')).toBeVisible();
-  await tactics.click();
+  const sheet = page.getByRole('dialog', { name: 'Tactics' });
+  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
   await page.setViewportSize({width:360,height:740});
+  await tactics.click();
   // Switch to Normal (3-location grid) and Advanced (locations + scrollable pitch strip) and verify mobile touch targets!
   const modeSwitcher = page.getByTestId('pitching-mode-switcher');
   await modeSwitcher.getByRole('button', { name: 'Normal', exact: true }).click();
+  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByTestId('arcade-call-bar').getByRole('button', { pressed: true })).toBeInViewport({ ratio: 1 });
+  await tactics.click();
   await modeSwitcher.getByRole('button', { name: 'Adv', exact: true }).click();
-  for (const sign of await page.getByTestId('arcade-pitch-sign-bar').getByRole('button').all()) {
+  const pitchSigns = page.getByTestId('arcade-pitch-sign-bar').getByRole('button');
+  await expect(pitchSigns.first()).toBeVisible();
+  for (const sign of await pitchSigns.all()) {
     const rect = (await sign.boundingBox())!;
     expect(Math.min(rect.width,rect.height)).toBeGreaterThanOrEqual(48);
   }
+  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button',{name:'Dugout',exact:true}).click();
   await page.getByRole('dialog',{name:'Dugout'}).getByRole('button',{name:'Roster'}).click();
   await page.setViewportSize({width:360,height:640});
