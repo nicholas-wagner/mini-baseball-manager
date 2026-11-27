@@ -62,6 +62,7 @@ import {
   type TeamPracticeFocusId,
 } from '../../engine/gm/managerActionInbox';
 import { evaluatePlatoonMatchup } from '../../engine/handedness/handedness';
+import { matchBossClubProfile } from '../../engine/league/bossClubs';
 import {
   buildRivalryShowdownPreview,
   createCrosstownStarterRivalry,
@@ -153,6 +154,7 @@ import {
   type GameSessionResult,
   type GameSessionState,
 } from '../../engine/simulation/gameState';
+import { buildBroadcastStatSlip } from '../../engine/simulation/broadcastSlips';
 import {
   DEFENSIVE_SHIFTS,
   estimateHomeWinProbability,
@@ -180,6 +182,7 @@ import { PlayerPrint, BatterEntrance, MatchupPrints, OpeningDayPrint } from '../
 import type { PlayerEntranceCue } from '../../scene/playback/firstAtBatPresentation';
 import { decisionDelayMs, scoringDetail, playReadout } from '../../scene/playback/playReadout';
 import { BroadcastHud } from '../components/BroadcastHud';
+import { BroadcastStatSlip } from '../components/BroadcastStatSlip';
 import { ClubMascotBuddy } from '../components/ClubMascotBuddy';
 import { DugoutCheerBubble } from '../components/DugoutCheerBubble';
 import { FoilPackModal } from '../components/FoilPackModal';
@@ -1266,6 +1269,7 @@ export function GameDayScreen({
     const probableMatchup = scheduledOpponent
       ? buildPreGameProbableMatchup(humanClub, scheduledOpponent)
       : null;
+    const scheduledBoss = scheduledOpponent ? matchBossClubProfile(scheduledOpponent) : null;
     const lineupCheck = probableMatchup
       ? evaluatePreGameLineupCheck(humanClub, probableMatchup.opponentStarter)
       : null;
@@ -1663,6 +1667,24 @@ export function GameDayScreen({
                     {pendingLivePlayoff.gameNumber} ({pendingLivePlayoff.pressureLevel.toUpperCase()} Stakes)
                   </span>
                   <span>Tap “Start Live 3D Game” to take the field!</span>
+                </div>
+              ) : null}
+
+              {scheduledBoss ? (
+                <div
+                  data-testid="pregame-boss-showdown-badge"
+                  className="px-3 py-2 rounded-xl border-2 border-[#181B2C] bg-[#181B2C] text-[#FFFDF7] flex flex-wrap items-center justify-between gap-1.5 shadow-[2px_2px_0_#FFC300]"
+                  style={{ borderLeftWidth: '5px', borderLeftColor: scheduledBoss.accentHex }}
+                >
+                  <div className="min-w-0 flex items-center gap-1.5">
+                    <span className="font-display text-[11px] sm:text-xs text-[#FFD166] truncate">
+                      👑 BOSS SHOWDOWN · {scheduledBoss.bossTitle} · Win for +$
+                      {scheduledBoss.bountyCash.toLocaleString()} Bounty
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-[#DCE7F5] truncate">
+                    {scheduledBoss.badgeEmoji} {scheduledBoss.signatureStyle}
+                  </span>
                 </div>
               ) : null}
 
@@ -2922,6 +2944,7 @@ export function GameDayScreen({
       {scoreboard}
       <LiveGameCanvas onAudioCue={playTimelineCue} guided awayClub={liveAwayClub} homeClub={liveHomeClub} session={baseSession}
         weather={gameWeather}
+        defensiveShift={defensiveShift}
         audioMuted={audioMuted} onToggleAudio={handleToggleLiveAudio}
         choreo={film} lastEvent={event} cameraMode={cameraMode} onChangeCameraMode={changeCamera} />
     </ThirdBaseDecision>;
@@ -3022,6 +3045,16 @@ export function GameDayScreen({
       !entranceCue &&
       !liveDugoutCheer,
   );
+  const broadcastSlipEvent = pendingDecision || showNextMatchup ? null : playbackEvent;
+  const liveBroadcastSlip =
+    !entranceCue && !liveDugoutCheer && !leagueBoard
+      ? buildBroadcastStatSlip({
+          session: liveSession,
+          lastEvent: broadcastSlipEvent,
+          awayClub: liveAwayClub,
+          homeClub: liveHomeClub,
+        })
+      : null;
   return (
     <div className={`live-game studio-layout${guiding && !showMore ? ' guided-game' : ''}${sheetOpen ? ' tactics-open' : ''}`}>
       <div className="live-studio">
@@ -3033,6 +3066,8 @@ export function GameDayScreen({
               onEntranceEnd={finishEntrance}
               entranceCue={guiding && !showMore ? entranceCue : null}
               preview={liveIdlePreview}
+              defensiveShift={defensiveShift}
+              broadcastSlip={liveBroadcastSlip ? <BroadcastStatSlip slip={liveBroadcastSlip} /> : null}
               shakeOffSignal={shakeOffTrigger}
               showStretchCue={showStretchCue}
               audioMuted={audioMuted}

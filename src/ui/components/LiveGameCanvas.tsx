@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Club } from '../../engine/models/club';
 import type { PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { GameSessionState } from '../../engine/simulation/gameState';
+import type { DefensiveShiftId } from '../../engine/simulation/winProbability';
 import type { CameraPresetId } from '../../scene/camera/cameraRig';
 import type { ChoreographedStep } from '../../scene/playback/eventChoreographer';
 import { GameSceneController } from '../../scene/playback/gameSceneController';
@@ -32,7 +33,9 @@ interface LiveGameCanvasProps {
   onChangeCameraMode?: (mode: LiveCameraMode) => void;
   celebrateConfetti?: boolean;
   overlay?: ReactNode;
+  broadcastSlip?: ReactNode;
   entrance?: ReactNode;
+  defensiveShift?: DefensiveShiftId;
   guided?: boolean;
   playFinished?: boolean;
   entranceCue?: PlayerEntranceCue | null;
@@ -74,7 +77,9 @@ export function LiveGameCanvas({
   onChangeCameraMode,
   celebrateConfetti = false,
   overlay = null,
+  broadcastSlip = null,
   entrance,
+  defensiveShift,
   guided = false,
   playFinished = false,
   entranceCue = null,
@@ -114,6 +119,14 @@ export function LiveGameCanvas({
   }, []);
 
   useEffect(() => { controllerRef.current?.setWeather(weather); }, [weather]);
+
+  useEffect(() => {
+    if (!defensiveShift) return;
+    const ctrl = controllerRef.current as (GameSceneController & {
+      setDefensiveShift?: (s: DefensiveShiftId) => void;
+    }) | null;
+    ctrl?.setDefensiveShift?.(defensiveShift);
+  }, [defensiveShift]);
 
   useEffect(() => { controllerRef.current?.setIdlePreview(preview); }, [preview]);
 
@@ -159,6 +172,7 @@ export function LiveGameCanvas({
         className="w-full h-full"
         data-testid="live-game-3d-canvas"
         data-preview={preview ?? ''}
+        data-defensive-shift={defensiveShift ?? ''}
         data-shake-off-signal={String(shakeOffSignal)}
       />
 
@@ -208,6 +222,17 @@ export function LiveGameCanvas({
         >
           {audioMuted ? <VolumeX size={19} aria-hidden="true" /> : <Volume2 size={19} aria-hidden="true" />}
         </button>
+      ) : null}
+
+      {broadcastSlip ? (
+        <div
+          data-testid="live-broadcast-slip-slot"
+          className={`pointer-events-none select-none absolute left-2 right-14 z-[15] flex justify-start ${
+            showStretchCue ? 'bottom-8' : 'bottom-2'
+          }`}
+        >
+          {broadcastSlip}
+        </div>
       ) : null}
 
       {showStretchCue ? (

@@ -436,6 +436,29 @@ export function PostGameSummaryModal({
                     💬 {mvpQuote}
                   </div>
 
+                  {summary.bossShowdown ? (
+                    <div
+                      data-testid="postgame-boss-bounty-banner"
+                      className={`px-3 py-2 rounded-xl border-2 border-[#181B2C] text-xs font-extrabold flex items-center justify-between gap-2 ${
+                        summary.bossShowdown.bountyAwarded > 0
+                          ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
+                          : 'bg-[#F3ECE0] text-[#4A5068]'
+                      }`}
+                    >
+                      <span className="truncate">
+                        👑{' '}
+                        {summary.bossShowdown.bountyAwarded > 0
+                          ? `BOSS BOUNTY CLAIMED! Defeated ${summary.bossShowdown.bossTitle}`
+                          : `Boss Showdown: ${summary.bossShowdown.bossTitle} held the crown`}
+                      </span>
+                      {summary.bossShowdown.bountyAwarded > 0 ? (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-mono-tabular text-[11px]">
+                          +${summary.bossShowdown.bountyAwarded.toLocaleString()}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7]">
                       <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase text-[#4A5068]">
