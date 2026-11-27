@@ -61,6 +61,7 @@ export interface DiamondPlay {
   reliefStrikeout?: boolean;
   power?: PlayEvent['specialPowerTriggered'];
   mascotCannon?: boolean;
+  splashHit?: boolean;
   plateDecision?: 'out' | 'safe' | 'held';
   runnerToThird?: 1 | 2;
   scorerBase?: 1 | 2 | 3;
@@ -424,6 +425,9 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
     }
     if (play.scorerBase && t >= play.leadArrival-.55) return {position:{x:3.3,y:2.2,z:4.4},lookAt:{x:-.4,y:.85,z:-.2},fov:40};
     if (play.kind === 'home_run' && t >= play.pickupAt - .12 && t < play.pickupAt + 1.32) {
+      const splash = play.splashHit && play.legs[1].endPoint;
+      if (splash) return { position: { x: splash.x - 7, y: 8, z: splash.z - 13 },
+        lookAt: { x: splash.x, y: splash.y + 2.6, z: splash.z }, fov: 43 };
       // Hold the wall, lamp banks and cannon in one broadcast shot through the burst.
       return { position: { x: 2, y: 7, z: -7 }, lookAt: { x: -3, y: 6, z: -43 }, fov: 46 };
     }

@@ -11,6 +11,7 @@ export interface BallparkEnvironment {
   group: THREE.Group;
   update: (timeSec: number, crowdExcitement: number) => void;
   setWeather: (weather: GameDayWeather | null, reducedMotion: boolean) => void;
+  setVenueMarquee: (name: string, architecture: string, wallColor: string) => void;
   cheerBehindHome: (timeSec: number) => void;
   updateScoreboard: (snapshot: LiveStadiumScoreboardSnapshot) => void;
   dispose: () => void;
@@ -71,8 +72,8 @@ function createBillboardTexture(
     ctx.lineWidth = 9;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.strokeText(title, 256, 86);
-    ctx.fillText(title, 256, 86);
+    ctx.strokeText(title, 256, 86, 458);
+    ctx.fillText(title, 256, 86, 458);
 
     ctx.font = '800 22px Fredoka, sans-serif';
     ctx.fillStyle = accent;
@@ -787,6 +788,10 @@ export function createMiniBallpark(): BallparkEnvironment {
     group,
     update,
     setWeather,
+    setVenueMarquee(name, architecture, wallColor) {
+      sign.material.map?.dispose();
+      sign.material.map = createBillboardTexture(name, architecture.toUpperCase(), wallColor, '#ffd166');
+    },
     cheerBehindHome(timeSec) { standAt = timeSec; },
     updateScoreboard: scoreboardDisplay.updateScoreboard,
     dispose,

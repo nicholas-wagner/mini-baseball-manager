@@ -56,7 +56,7 @@ export function buildLiveStadiumScoreboardSnapshot(
   homeClub: Club,
   session: GameSessionState,
 ): LiveStadiumScoreboardSnapshot {
-  const park = getBallparkPreset(session.ballparkId);
+  const park = getBallparkPreset(session.ballparkId ?? homeClub.stadium.ballparkId);
   const stadiumName = park.name.toUpperCase();
   const awayAbbr = awayClub.colors.monogram.toUpperCase().slice(0, 3);
   const homeAbbr = homeClub.colors.monogram.toUpperCase().slice(0, 3);

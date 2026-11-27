@@ -14,6 +14,7 @@ export const PITCHING_RUBBER = { x: 0, y: .24, z: -10.2 } as const;
 
 export const INFIELD_DIRT = { radius: 15.2, centerZ: -10.5 } as const;
 export const OUTFIELD_WALL = { radius: 40, centerZ: -3 } as const;
+export const SPLASH_COVE = { waterY: .14, rightCenterX: 6 } as const;
 export const OUTFIELD_STARTS = {
   LF: { x: -15, y: .04, z: -27 },
   CF: { x: 0, y: .04, z: -32 },

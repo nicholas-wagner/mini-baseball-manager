@@ -81,6 +81,8 @@ On a close single with a runner rounding third, the field holds at the bag. Read
 
 Open **Park scouting** before first pitch to see the fence distances and move a hitter up the order. Flip a player’s card for their stance habit. Hitters also carry their last six recorded batted-ball locations between games. During an at-bat, the catcher can suggest the next pitch and location from the sequence just thrown.
 
+At Brickyard Classic, the manual scoreboard sits in the 37-foot Emerald Wall in left. At Bayfront Cove, a home run into the water beyond right field earns a **SPLASH HIT!** call among the sailboats. Each of the ten parks also displays a miniature of its landmark on the press box, in view over the pitcher’s shoulder.
+
 In **Tactics**, choose when **Smart Watch** should pause for you, including a particular hitter, the tying run reaching base, or a tiring starter. The **Sandlot Gazette** calls selected career matchups. Between innings, the out-of-town board posts a final from another scheduled game in your tier.
 
 ### Behind-the-catcher batting, stretch pitching, frame-locked audio, 1-pitch mode & living club treasury

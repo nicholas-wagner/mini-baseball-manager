@@ -108,6 +108,11 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     if (play.close || play.kind==='bullpen') continue;
     if (play.outfield) {
       if (leg === play.legs[1]) {
+        if (play.splashHit) {
+          vfx.celebration.splashDown(at);
+          vfx.spawnComicCallout('SPLASH HIT!', at, '#00B4D8', true);
+          continue;
+        }
         const firstCall = play.kind === 'sac_fly' ? 'CAUGHT!' : play.outfield.wall ? 'OFF THE WALL!'
           : play.kind === 'double' ? 'IN THE GAP!' : play.outfield.call;
         vfx.spawnComicCallout(firstCall, at, play.outfield.callColor, true);

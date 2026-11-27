@@ -13,6 +13,17 @@ import {
 import { PARODY_SPONSORS_CATALOG } from '../../engine/economy/sponsorsTv';
 import type { LeagueTierId, StadiumState } from '../../engine/models/club';
 import { createToonMaterial } from '../core/toonMaterials';
+import { buildStadiumLandmarks } from './stadiumLandmarks';
+
+export type StadiumLandmarkKind = 'sandlot_pines' | 'emerald_monster' | 'brick_ivy' | 'cornfield_barn'
+  | 'harbor_cranes' | 'splash_cove' | 'desert_mesas' | 'sakura_blossoms' | 'mountain_peaks' | 'neon_dome';
+
+const landmarks: Record<BallparkPresetId, StadiumLandmarkKind> = {
+  sandlot_commons: 'sandlot_pines', brickyard_classic: 'emerald_monster', grand_cathedral: 'brick_ivy',
+  cornfield_twilight: 'cornfield_barn', harbor_shipyard: 'harbor_cranes', bayfront_cove: 'splash_cove',
+  sunbelt_cactus: 'desert_mesas', sakura_garden: 'sakura_blossoms', high_altitude_mesa: 'mountain_peaks',
+  neon_metro_dome: 'neon_dome',
+};
 
 export interface StadiumBillboardSpec {
   id: string;
@@ -24,6 +35,9 @@ export interface StadiumBillboardSpec {
 export interface StadiumVisualSpec {
   tier: LeagueTierId;
   ballparkId: BallparkPresetId;
+  landmarkKind: StadiumLandmarkKind;
+  hasSplashCove: boolean;
+  leftWallHeightScale: number;
   architectureLabel: string;
   fenceStyle: StadiumFenceStyle;
   scoreboardStyle: StadiumScoreboardStyle;
@@ -76,6 +90,9 @@ export function computeStadiumVisualSpec(
   return {
     tier,
     ballparkId: preset.id,
+    landmarkKind: landmarks[preset.id],
+    hasSplashCove: preset.id === 'bayfront_cove',
+    leftWallHeightScale: preset.factors.leftWallHeightFt / 10,
     architectureLabel: profile.label,
     fenceStyle: profile.fenceStyle,
     scoreboardStyle: stadium.hasJumbotron ? 'hd_cathedral' : profile.scoreboardStyle,
@@ -171,7 +188,7 @@ function buildSkylineWallPlaquesAndPennants(spec: StadiumVisualSpec, parent: THR
     const towerMat = createToonMaterial(0x2b3a67);
     const count = Math.min(8, spec.skylineCount);
     for (let i = 0; i < count; i += 1) {
-      const x = -32 + i * 9.5;
+      const x = spec.hasSplashCove ? -6 - i * 4.9 : -32 + i * 9.5;
       const h = 10 + (i % 3) * 5;
       const building = new THREE.Mesh(new THREE.BoxGeometry(5.2, h, 4.8), towerMat);
       building.position.set(x, h / 2, -56 - (i % 2) * 4);
@@ -207,6 +224,7 @@ function buildSkylineWallPlaquesAndPennants(spec: StadiumVisualSpec, parent: THR
 export interface StadiumEvolutionOverlay {
   group: THREE.Group;
   spec: StadiumVisualSpec;
+  update?: (timeSec: number, reducedMotion: boolean) => void;
   dispose: () => void;
 }
 
@@ -259,18 +277,27 @@ export function createStadiumEvolutionOverlay(
   buildLuxurySuitesAndDome(spec, group);
   buildJumbotronAndCannon(spec, group);
   buildSkylineWallPlaquesAndPennants(spec, group);
+  const update = buildStadiumLandmarks(spec, group, dimensions.rightWallFt);
 
   const dispose = () => {
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    const textures = new Set<THREE.Texture>();
     group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
-        obj.geometry.dispose();
-        for (const mat of [obj.material].flat()) {
-          if (mat.map instanceof THREE.Texture) mat.map.dispose();
-          mat.dispose();
-        }
+        geometries.add(obj.geometry);
+        for (const mat of [obj.material].flat()) materials.add(mat);
+        if (obj instanceof THREE.InstancedMesh) obj.dispose();
       }
     });
+    geometries.forEach(geometry => geometry.dispose());
+    materials.forEach(material => {
+      if ('map' in material && material.map instanceof THREE.Texture) textures.add(material.map);
+      material.dispose();
+    });
+    textures.forEach(texture => texture.dispose());
+    group.clear();
   };
 
-  return { group, spec, dispose };
+  return { group, spec, update, dispose };
 }

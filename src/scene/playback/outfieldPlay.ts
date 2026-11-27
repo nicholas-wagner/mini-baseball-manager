@@ -1,7 +1,7 @@
 import type { PlayEvent } from '../../engine/models/playEvent';
 import type { Vec3 } from '../camera/cameraRig';
 import { CLIP_DURATIONS, GLOVE_CONTACT_PHASE, type CharacterAnimClip } from '../characters/animationState';
-import { BASE_PATH_VERTICES, INFIELD_DIRT, OUTFIELD_WALL, headingToward } from './diamondLayout';
+import { BASE_PATH_VERTICES, SPLASH_COVE, INFIELD_DIRT, OUTFIELD_WALL, headingToward } from './diamondLayout';
 import type { Actor, DiamondPlay, Leg } from './diamondPlay';
 
 export type OutfieldKind = 'single' | 'double' | 'triple' | 'home_run' | 'fly_out' | 'line_out' | 'sac_fly';
@@ -18,6 +18,18 @@ const presets = {
 
 export function isOutfieldKind(kind: string): kind is OutfieldKind {
   return Object.hasOwn(presets, kind);
+}
+
+export function shouldTriggerSplashHit(hasSplashCove: boolean, landingX: number) {
+  return hasSplashCove && landingX > SPLASH_COVE.rightCenterX;
+}
+
+export function stageSplashHit(play: DiamondPlay, hasSplashCove: boolean): DiamondPlay {
+  const flight = play.legs[1];
+  const landing = flight?.endPoint;
+  if (play.kind !== 'home_run' || !landing || !shouldTriggerSplashHit(hasSplashCove, landing.x)) return play;
+  const legs = play.legs.map(leg => leg === flight ? { ...leg, endPoint: { ...landing, y: SPLASH_COVE.waterY } } : leg);
+  return { ...play, legs, splashHit: true };
 }
 
 function isOutfielder(pos?: string): pos is Outfielder {

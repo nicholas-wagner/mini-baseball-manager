@@ -47,9 +47,50 @@ function createBurst(cannon: boolean) {
   };
 }
 
+function createSplashFountain() {
+  const count = 48;
+  const geometry = new THREE.OctahedronGeometry(.22);
+  const material = new THREE.MeshBasicMaterial();
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.name = 'splash fountain';
+  mesh.frustumCulled = false;
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const droplet = new THREE.Object3D();
+  const colors = ['#ffffff', '#72eaff', '#b9f8ff'];
+  const jets = Array.from({ length: count }, (_, i) => {
+    mesh.setColorAt(i, new THREE.Color(colors[i % colors.length]));
+    const angle = i * 2.39996;
+    const spread = 1.2 + i % 5 * .42;
+    return { x: spread * Math.cos(angle), z: spread * Math.sin(angle), up: 8 + (i * 7 % 13) * .55 };
+  });
+  let age = 0;
+  function update(dt: number) {
+    if (!mesh.visible) return;
+    age += dt;
+    let airborne = false;
+    jets.forEach((jet, i) => {
+      const height = age * (jet.up - 7.8 * age);
+      airborne ||= height >= 0;
+      droplet.position.set(jet.x * age, Math.max(0, height), jet.z * age);
+      const size = height < 0 ? 0 : .75 + (i % 3) * .16;
+      droplet.scale.set(size, size * 1.8, size);
+      droplet.updateMatrix();
+      mesh.setMatrixAt(i, droplet.matrix);
+    });
+    mesh.visible = airborne;
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+  return {
+    mesh, update,
+    start(at: Vec3) { mesh.position.copy(at); age = 0; mesh.visible = true; update(0); },
+    dispose() { mesh.dispose(); geometry.dispose(); material.dispose(); },
+  };
+}
+
 export function createStadiumCelebration() {
   const group = new THREE.Group();
   const fireworks = createBurst(false), confetti = createBurst(true);
+  let fountain: ReturnType<typeof createSplashFountain> | undefined;
   const ring = (name: string, inner: number, outer: number) => {
     const mesh = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 48), new THREE.MeshBasicMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
@@ -87,6 +128,14 @@ export function createStadiumCelebration() {
       fireworks.start();
       if (cannon) confetti.start();
     },
+    splashDown(at: Vec3) {
+      if (steady) return;
+      if (!fountain) {
+        fountain = createSplashFountain();
+        group.add(fountain.mesh);
+      }
+      fountain.start(at);
+    },
     update(dt: number, camera?: THREE.PerspectiveCamera) {
       if (wave.visible) {
         waveAge += dt;
@@ -107,11 +156,14 @@ export function createStadiumCelebration() {
       }
       fireworks.update(dt);
       confetti.update(dt);
+      fountain?.update(dt);
     },
     dispose() {
       for (const mesh of [wave, aura]) { mesh.geometry.dispose(); mesh.material.dispose(); }
       fireworks.dispose();
       confetti.dispose();
+      fountain?.dispose();
+      group.clear();
     },
   };
 }

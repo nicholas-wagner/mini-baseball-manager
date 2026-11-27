@@ -8,7 +8,7 @@ import { WalkoffTeammates } from '../characters/walkoffTeammates';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import { batterBox, headingToward, CATCHER_HOME } from './diamondLayout';
 import { createDelivery, sampleDeliveryFlight, type ShowcaseDelivery } from '../vfx/showcaseDelivery';
-import { runBases } from './outfieldPlay';
+import { runBases, stageSplashHit } from './outfieldPlay';
 import { buntRunnerPose, diamondCamera, diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
 import { buildPlayAudioSchedule, initialAudioCursor, type ScheduledAudioCue } from './playAudioTimeline';
@@ -294,11 +294,11 @@ export class GameSceneController {
     const fieldingClub = half === 'TOP' ? homeClub : awayClub;
     const battingClub = half === 'TOP' ? awayClub : homeClub;
 
-    this.ballpark.updateScoreboard(
-      buildLiveStadiumScoreboardSnapshot(awayClub, homeClub, session),
-    );
+    const scoreboard = buildLiveStadiumScoreboardSnapshot(awayClub, homeClub, session);
+    this.ballpark.updateScoreboard(scoreboard);
 
-    const nextSig = `${homeClub.leagueTier}:${homeClub.stadium.ballparkId ?? 'sandlot'}:${homeClub.stadium.seatingTier}:${Number(homeClub.stadium.hasJumbotron)}:${Number(homeClub.stadium.hasNightLights)}:${Number(homeClub.stadium.hasMascotCannon)}:${homeClub.stadium.retiredNumbers.length}:${homeClub.stadium.championshipPennants.length}`;
+    const ballparkId = session.ballparkId ?? homeClub.stadium.ballparkId;
+    const nextSig = `${homeClub.leagueTier}:${ballparkId}:${homeClub.stadium.seatingTier}:${Number(homeClub.stadium.hasJumbotron)}:${Number(homeClub.stadium.hasNightLights)}:${Number(homeClub.stadium.hasMascotCannon)}:${homeClub.stadium.retiredNumbers.length}:${homeClub.stadium.championshipPennants.length}`;
     if (nextSig !== this.stadiumSignature) {
       this.stadiumSignature = nextSig;
       if (this.stadiumOverlay) {
@@ -307,10 +307,12 @@ export class GameSceneController {
       }
       this.stadiumOverlay = createStadiumEvolutionOverlay(
         homeClub.leagueTier,
-        homeClub.stadium,
+        { ...homeClub.stadium, ballparkId },
         homeClub.economy.activeSponsorIds,
       );
       this.scene.add(this.stadiumOverlay.group);
+      const { architectureLabel, wallColorHex } = this.stadiumOverlay.spec;
+      this.ballpark.setVenueMarquee(scoreboard.stadiumName, architectureLabel, wallColorHex);
     }
     const fieldingSide = half === 'TOP' ? session.home : session.away;
     const battingSide = half === 'TOP' ? session.away : session.home;
@@ -431,7 +433,8 @@ export class GameSceneController {
       const reliefStrikeout = pitcher.position === 'RP' && event?.outcome === 'strikeout'
         && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
       const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
-      const filmed = { ...play, battingPreview, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon };
+      const venuePlay = stageSplashHit(play, this.stadiumOverlay?.spec.hasSplashCove ?? false);
+      const filmed = { ...venuePlay, battingPreview, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon };
       this.replay = { freezeAt:choreo.freezeAt, play: filmed,
         cheer: crowdReaction(play), readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
@@ -568,6 +571,7 @@ export class GameSceneController {
       this.crowdExcitement = decayExcitement(this.crowdExcitement,elapsed);
       this.updateScene(dt, elapsed);
       this.ballpark.update(this.elapsedSec,this.crowdExcitement);
+      this.stadiumOverlay?.update?.(this.elapsedSec, this.vfx.reducedMotion);
       this.vfx.update(dt,this.camera,this.container.clientHeight);
       this.renderer.render(this.scene, this.camera);
       this.rafId = requestAnimationFrame(tick);
