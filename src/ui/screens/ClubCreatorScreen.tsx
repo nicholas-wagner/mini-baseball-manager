@@ -289,7 +289,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
     setEditing(false);
   };
   return (
-    <div className="max-w-4xl mx-auto">
+    <div data-testid="club-creator-screen" className="w-full max-w-6xl mx-auto min-w-0 overflow-x-clip">
       <ComicCard
         title="⚾ FOUND YOUR 90s SANDLOT CLUB — PICK YOUR TEAM!"
         subtitle="Jump onto the 3D Sandlot diamond in 5 seconds • Collect 90s manga cards & chase the Mini Majors!"
@@ -310,7 +310,7 @@ export function ClubCreatorScreen({ onCreated }: ClubCreatorScreenProps) {
       >
         <form onSubmit={handleSubmit} className="club-customizer space-y-3">
           {/* 1. Above-the-Fold 5-Second Toy Box Hero (Quick Club + Cute Mascot + Fanned Manga Cards + BIG PLAY BUTTON!) */}
-          <div className="p-2.5 sm:p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_270px] gap-2.5 sm:gap-4 items-center">
+          <div data-testid="creator-hero" className="p-2.5 sm:p-3.5 rounded-2xl border-[3px] border-[#181B2C] bg-gradient-to-br from-[#FFF8E7] via-[#FFFDF7] to-[#E0FBFC] shadow-[4px_4px_0_#181B2C] grid grid-cols-1 md:grid-cols-[1fr_270px] xl:grid-cols-[minmax(0,1fr)_360px] gap-2.5 sm:gap-4 xl:gap-6 items-center min-w-0">
             <div className="space-y-2.5">
               <div data-testid="quick-club-presets" className="space-y-1">
                 <div className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#181B2C]">

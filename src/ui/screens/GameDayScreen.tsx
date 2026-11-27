@@ -2685,6 +2685,7 @@ export function GameDayScreen({
     }
     if (playing || handoff || pendingDecision || thirdDecision) return;
     if (event.key === ' ') {
+      if (tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY') return;
       event.preventDefault();
       handleNextPitch(tacticalCall);
       return;

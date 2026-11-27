@@ -198,7 +198,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
   const offseasonCap = TIER_SALARY_CAPS[offseasonHumanClub.leagueTier];
 
   return (
-    <div className="space-y-4">
+    <div data-testid="league-screen" className="space-y-4 min-w-0 overflow-x-clip">
       <ComicCard
         title={`6-TIER BASEBALL PYRAMID • SEASON ${seasonNumber}`}
         subtitle={`Series ${Math.min(7, currentSeriesIndex)} / 7 (21-Game Season) • Your Club: ${LEAGUE_TIER_LABELS[humanClub.leagueTier]}`}
@@ -595,7 +595,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
           </div>
 
           {/* Standings Table */}
-          <div className="overflow-x-auto rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7]">
+          <div data-testid="league-standings-scroll" className="max-w-full min-w-0 overflow-x-auto rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7]">
             <table className="w-full text-left text-xs font-bold text-[#181B2C]">
               <thead className="bg-[#181B2C] text-[#FFD166] font-display text-[10.5px] sm:text-[11px]">
                 <tr>
@@ -639,7 +639,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                           });
                           soundEngine.play('card_flip');
                         }}
-                        className="w-full min-h-[40px] py-1 flex items-center gap-1.5 text-left hover:text-[#E63946] hover:underline cursor-pointer min-w-0 max-w-full"
+                        className="w-full min-h-[44px] py-1 flex items-center gap-1.5 text-left hover:text-[#E63946] hover:underline cursor-pointer min-w-0 max-w-full"
                       >
                         <span
                           aria-hidden="true"
@@ -722,7 +722,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                         soundEngine.play('card_flip');
                       }
                     }}
-                    className="w-full min-h-[40px] py-1 flex items-center justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
+                    className="w-full min-h-[44px] py-1 flex items-center justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
                   >
                     <span className="truncate">🃏 {entry.playerName}</span>
                     <span className="font-mono-tabular text-[#1B4332]">{entry.value} HR</span>
@@ -756,7 +756,7 @@ export function LeagueScreen({ onPlayLivePlayoffGame }: LeagueScreenProps = {}) 
                         soundEngine.play('card_flip');
                       }
                     }}
-                    className="w-full min-h-[40px] py-1 flex items-center justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
+                    className="w-full min-h-[44px] py-1 flex items-center justify-between text-xs font-bold hover:text-[#1D3557] hover:underline cursor-pointer text-left"
                   >
                     <span className="truncate">🃏 {entry.playerName}</span>
                     <span className="font-mono-tabular text-[#1D3557]">{entry.value} K</span>

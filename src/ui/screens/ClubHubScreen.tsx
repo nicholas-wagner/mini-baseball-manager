@@ -160,7 +160,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
   const activeRoom = getRoomForSubTab(subTab);
 
   return (
-    <div className="space-y-4">
+    <div data-testid="club-hub-screen" className="space-y-4 min-w-0 overflow-x-clip">
       <ComicCard
         title={`${club.city.toUpperCase()} ${club.name.toUpperCase()} — CLUBHOUSE HQ`}
         subtitle={`Uniforms, Relics, Ballpark, Trades & Gazette • Cash $${club.economy.cash.toLocaleString()} • Home: ${activePark.name} • Staff ${activeStaff.length}/${staffSlotCap}`}
@@ -168,7 +168,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
         badge={
           <div
             data-testid="hub-room-tabs"
-            className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 w-full sm:w-auto"
+            className="grid grid-cols-2 min-w-0 gap-1.5 w-full sm:flex sm:flex-wrap xl:grid xl:grid-cols-4"
           >
             <ComicButton
               size="sm"
@@ -176,7 +176,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               active={activeRoom === 'ballpark_room'}
               icon={<Building2 className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.ballpark_room)}
-              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
+              className="w-full sm:w-auto min-w-0 px-2 text-[11px] sm:text-xs whitespace-normal leading-tight text-center"
             >
               Ballpark &amp; Economy
             </ComicButton>
@@ -186,7 +186,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               active={activeRoom === 'gear_room'}
               icon={<Palette className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.gear_room)}
-              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
+              className="w-full sm:w-auto min-w-0 px-2 text-[11px] sm:text-xs whitespace-normal leading-tight text-center"
             >
               Uniforms &amp; Gear
             </ComicButton>
@@ -196,7 +196,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               active={activeRoom === 'staff_room'}
               icon={<Users className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.staff_room)}
-              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
+              className="w-full sm:w-auto min-w-0 px-2 text-[11px] sm:text-xs whitespace-normal leading-tight text-center"
             >
               Staff &amp; Front Office
             </ComicButton>
@@ -206,7 +206,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums' }: ClubHubScreenProps
               active={activeRoom === 'events_room'}
               icon={<Trophy className="w-3.5 h-3.5" />}
               onClick={() => setSubTab(ROOM_TO_DEFAULT_SUBTAB.events_room)}
-              className="w-full sm:w-auto px-2 text-[11px] sm:text-xs"
+              className="w-full sm:w-auto min-w-0 px-2 text-[11px] sm:text-xs whitespace-normal leading-tight text-center"
             >
               Events &amp; Duels
             </ComicButton>

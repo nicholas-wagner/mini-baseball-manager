@@ -67,4 +67,18 @@ describe('TASK-099 live cockpit', () => {
     expect(within(sheet).getByTestId('broadcast-hud')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'First at-bat' }).querySelector('h3')).toBeNull();
   });
+
+  it('lets Space activate a focused button instead of throwing a pitch', () => {
+    installMatchMedia(true);
+    render(<GameDayScreen />);
+    fireEvent.click(screen.getByTestId('opening-day-more-toggle'));
+    fireEvent.click(screen.getByRole('button', { name: /start live 3d game/i }));
+
+    const before = screen.getByTestId('play-by-play-ticker').textContent;
+    const tactics = screen.getByRole('button', { name: /^Tactics/ });
+    tactics.focus();
+    fireEvent.keyDown(tactics, { key: ' ' });
+    expect(screen.getByTestId('play-by-play-ticker').textContent).toBe(before);
+  });
 });
+
