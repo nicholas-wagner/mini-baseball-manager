@@ -462,7 +462,7 @@ export function GameDayScreen({
   useEffect(() => {
     if (!lastChoreo || revealedPlay === lastChoreo) return;
     const decisionMs = decisionDelayMs(lastChoreo);
-    const webglDrivesAudio = isLiveWebglAvailable();
+    const webglDrivesAudio = isLiveWebglAvailable() && Boolean(lastChoreo.play);
     const timer = window.setTimeout(() => {
       setRevealedPlay(lastChoreo);
       if (!webglDrivesAudio) {
