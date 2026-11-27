@@ -5,6 +5,7 @@ import batch1576 from './batch-1576.json';
 import batch1601 from './batch-1601.json';
 import batch1626 from './batch-1626.json';
 import batch1651 from './batch-1651.json';
+import batch1676 from './batch-1676.json';
 
 export const stories = {
   ...batch1501,
@@ -14,4 +15,5 @@ export const stories = {
   ...batch1601,
   ...batch1626,
   ...batch1651,
+  ...batch1676,
 };
