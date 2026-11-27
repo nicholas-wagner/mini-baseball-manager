@@ -26,7 +26,7 @@ Choose **Contact** or **Power** to set the batter’s stance, then tap **Swing**
 
 On defense, pitching defaults to **Simple mode**: your catcher calls the pitch and spot (including elevated **High Heat** fastballs in two-strike counts), with an optional **Shake off** pill to cycle signs while watching the 3D catcher shift behind the plate. Switch anytime to **Normal mode** (**Over Plate**, **Corner**, or **Low Chase** with automatic location-matched pitch selection) or **Advanced mode** (location + every pitch in your pitcher’s arsenal). **Matchup** opens scouting, and **Options** holds pitching mode, timing and signature powers. On a phone, **More controls** opens the Tactics sheet for speed, timing, simulation and defensive adjustments. Close it to keep the pitch or swing controls beside the field. Tap **Tactics** to reopen it. Bringing in a reliever returns you to the diamond for their first pitch. Rotate for the field on the left and the calls on the right. Open the roster through **Dugout** on a phone or **Roster** in the desktop sidebar. **Play Ball** returns to the same game.
 
-| Pitching on a compact phone | Tactics in landscape |
+| Pitching on a compact phone | Calling a pitch in landscape |
 | --- | --- |
 | ![Jasper aims at the corner with the field, count and pitch button visible on a 360 by 640 phone](./docs/screenshots/compact-pitch.webp) | ![The complete field, pitch call and Tactics button side by side at 844 by 390](./docs/screenshots/phone-landscape-pitch.webp) |
 
@@ -129,7 +129,7 @@ npm run test:e2e
 
 Live PWA: **https://nicholas-wagner.github.io/mini-baseball-manager/**
 
-Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml), building the offline Workbox Service Worker (`~4.6 MB` core precache with `CacheFirst` runtime caching for manga portrait PNGs) and publishing to GitHub Pages. Open the live HTTPS URL in Android Chrome and tap **Install App** to play fullscreen offline!
+Pushing to `main` builds the offline service worker and publishes the game to GitHub Pages. The app precaches about 6.1 MiB, including all hobby stories. Manga portrait PNGs and hobby postcard WebPs are cached as you view them. Open the live site in Android Chrome and tap **Install App** to play fullscreen offline. [Deployment workflow](./.github/workflows/deploy-pages.yml)
 
 ---
 
@@ -137,9 +137,9 @@ Pushing to `main` automatically runs [`.github/workflows/deploy-pages.yml`](./.g
 
 This repository is structured so both **human contributors** and **AI coding agents** can immediately understand the architecture, invariants, and exact next TDD ticket:
 
-- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-102.
+- **[PLAN.md](./PLAN.md)** — 10X Master Roadmap (`M0`–`M10`, 73 completed roadmap tasks) and Game Day follow-ups through TASK-103.
 - **[docs/SIMULATION_MATH.md](./docs/SIMULATION_MATH.md)** — Full pitch-by-pitch seeded dice-roll formulas, all 15 attribute effects, National/Capstone powers, Weather, Shifts, Mind Games & Nemesis math.
-- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-102**.
+- **[docs/TASKS.md](./docs/TASKS.md)** — Atomic, dependency-ordered TDD task queue through **TASK-103**.
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — Canonical TypeScript interfaces, `PlayEvent` stream contracts, and 3D ballpark coordinates.
 - **[docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md)** — Exact 90s color tokens, typography, touch targets, and chibi scale units.
 - **[AGENTS.md](./AGENTS.md)** — AI Agent onboarding guide, hard architectural invariants, and Definition of Done.
