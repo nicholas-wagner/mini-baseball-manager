@@ -58,8 +58,11 @@ describe('Celebration Sticker Die-Cut Artwork Wiring (TASK-101)', () => {
     expect(screen.getByTestId('celebration-sticker-toast')).toHaveTextContent('🔥');
     unmount();
 
-    // Without artwork, emoji renders cleanly by default
+    // Without overrides, bundled WebP sticker artwork renders by default and still falls back cleanly on error
     render(<CelebrationStickerToast unlock={unlock} club={club} onDismiss={vi.fn()} />);
+    const defaultImg = screen.getByTestId('celebration-sticker-artwork') as HTMLImageElement;
+    expect(defaultImg.src).toContain('first_strikeout.webp');
+    fireEvent.error(defaultImg);
     expect(screen.queryByTestId('celebration-sticker-artwork')).not.toBeInTheDocument();
     expect(screen.getByTestId('celebration-sticker-toast')).toHaveTextContent('🔥 Filthy K!');
   });
