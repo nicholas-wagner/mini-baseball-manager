@@ -64,6 +64,7 @@ TASK-088 keeps the Opening Day Customize button at the 44-pixel touch minimum on
 - [x] TASK-110 calibrates initial and free-agent player ages to the 6-tier baseball pyramid (`Rookie Sandlot` predominantly `18–19` with rare `26+` up to `Mini Major League` predominantly `25–35` with very rare `18–19` prodigies and `40+` farewell legends) while preserving intentional `Veterans` preset identity.
 - [x] TASK-111 adds **One-Pitch At-Bat Mode** (`stepOnePitchAtBat` + persisted `onePitchMode` toggle) simulating realistic multi-pitch counts and pitcher endurance underneath while playing the complete 3D deciding pitch (including Third-Base Coach decisions and immediate steal handling).
 - [x] TASK-112 converts all 3,001 manga player portraits and the ballpark panorama print from PNG to crisp WebP (`851.1 MB` → `385.3 MB`, saving **`465.8 MB` / 54.7%**) while keeping lossless PNG 3D sprite atlases and PWA icons.
+- [x] TASK-116 gives all eight pitches distinct movement into the mitt. Live play and Design Lab previews share handed break, pitch-family trail colors and reduced-motion styling.
 
 ## The 10X Vision — What Makes This a Cult Classic
 

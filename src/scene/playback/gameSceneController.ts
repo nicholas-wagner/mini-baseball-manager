@@ -461,7 +461,10 @@ export class GameSceneController {
           : (choreo.highlightFielderPos ?? null);
 
       if (event?.type === 'pitch_thrown' && choreo.ballStyle) {
-        const play = createDelivery(choreo.ballStyle, this.throws, this.bats, choreo.pitcherClip, choreo.batterClip);
+        const power = event.specialPowerTriggered;
+        const play = createDelivery(choreo.ballStyle, this.throws, this.bats, choreo.pitcherClip, choreo.batterClip,
+          undefined, power?.actor === 'pitcher' ? undefined : event.pitchThrown);
+        if (power?.actor === 'pitcher') play.pitch.trailColor = power.vfxColor;
         // The Design Lab showcase defaults to a full windup. Match standalone live
         // cues to the same occupied-base clock as a complete diamond replay.
         if (choreo.pitcherClip === 'pitch_stretch') {
@@ -541,9 +544,9 @@ export class GameSceneController {
       ? this.batterRig.contactAt(this.batterClip,play.plateAt-play.swingAt,this.batterRig.root.position,this.camera.position) : null;
     this.vfx.drawSwingArc(barrel,this.bats,receive);
     this.batterRig.updatePose(active ? this.batterClip : 'bat_stance', active ? swing : 0, undefined, this.camera.position);
-    const flight = sampleDeliveryFlight(play,time);
+    const flight = sampleDeliveryFlight(play, time, this.vfx.reducedMotion);
     if (flight && receive < 0) {
-      this.vfx.ball.draw(flight.spec, flight.progress, undefined, pitchFlightScale(flight.progress, .46));
+      this.vfx.ball.draw(flight.spec, flight.progress, flight.visual, pitchFlightScale(flight.progress, .46));
       this.vfx.ball.sizeForCamera(this.camera, this.container.clientHeight);
     } else this.vfx.ball.group.visible = false;
   }

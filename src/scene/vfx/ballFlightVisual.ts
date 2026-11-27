@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { attachComicOutline } from '../core/toonMaterials';
+import type { PitchTrailVisual } from '../playback/pitchFlight';
 import { sampleBallTrajectory, type BallTrajectorySpec } from './ballTrajectory';
 
 export const HELD_BALL_RADIUS = .047;
@@ -84,7 +85,13 @@ export function createBallFlightVisual() {
   let lastPrimary = '';
   let lastAccent = '';
 
-  function draw(spec: BallTrajectorySpec, progress: number, primary = spec.trailColor, scale = 1, sample = sampleBallTrajectory, trailStrength = 1) {
+  function draw(spec: BallTrajectorySpec, progress: number, color: string | PitchTrailVisual = spec.trailColor,
+    scale = 1, sample = sampleBallTrajectory, trailStrength = 1,
+    trailLengthScale = typeof color === 'string' ? 1 : color.trailLengthScale) {
+    const visual = typeof color === 'string' ? undefined : color;
+    const primary = typeof color === 'string' ? color : color.primaryColor;
+    const secondary = visual?.secondaryColor ?? spec.secondaryColor;
+    const strength = trailStrength * (visual?.trailStrength ?? 1);
     ballScale = scale;
     ball.scale.setScalar(scale);
     group.visible = true;
@@ -97,12 +104,14 @@ export function createBallFlightVisual() {
       groundShadow.scale.setScalar(.82 + lift * .65);
       groundShadow.material.opacity = .46 - lift * .31;
     }
-    ball.rotation.set(progress * 16, progress * 10, 0.5);
-    const repaint = lastPrimary !== primary || lastAccent !== spec.secondaryColor;
+    const spin = progress * (visual?.spinRate ?? 1);
+    ball.rotation.set(spin * 16, spin * 10, 0.5);
+    const repaint = lastPrimary !== primary || lastAccent !== secondary;
     const main = repaint ? new THREE.Color(primary) : null;
-    const accent = repaint ? new THREE.Color(spec.secondaryColor) : null;
-    trail.material.opacity = .86 * trailStrength;
-    const trailLength = trailStrength * Math.min(progress, 0.22, 0.095 / spec.durationSec);
+    const accent = repaint ? new THREE.Color(secondary) : null;
+    trail.material.opacity = .86 * strength;
+    const tailWindow = trailLengthScale * Math.min(0.22, 0.095 / spec.durationSec);
+    const trailLength = strength * Math.min(progress, tailWindow);
     for (let r = 0; r < rings; r++) {
       const u = r / (rings - 1);
       const point = sample(spec, progress - u * trailLength);
@@ -120,7 +129,7 @@ export function createBallFlightVisual() {
     positions.needsUpdate = true;
     if (repaint) colors.needsUpdate = true;
     lastPrimary = primary;
-    lastAccent = spec.secondaryColor;
+    lastAccent = secondary;
   }
 
   function sizeForCamera(camera: THREE.PerspectiveCamera, heightPx: number) {

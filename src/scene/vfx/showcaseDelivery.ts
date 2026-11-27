@@ -1,5 +1,6 @@
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import { CLIP_DURATIONS, PITCH_RELEASE_PHASE, type CharacterAnimClip } from '../characters/animationState';
+import { getPitchTrailVisual, pitchSeconds, type PitchFlight } from '../playback/pitchFlight';
 import { BALL_TRAJECTORY_PRESETS, type BallTrajectorySpec, type BallVfxStyle } from './ballTrajectory';
 
 export interface ShowcaseDelivery {
@@ -19,6 +20,7 @@ export function createDelivery(
   style: BallVfxStyle, throws: ThrowsHand, bats: EffectiveBatSide,
   selectedPitcherClip: CharacterAnimClip, batterClip: CharacterAnimClip,
   stature = { pitcher: 1, batter: 1, catcher: 1 },
+  pitchInfo?: PitchFlight,
 ): ShowcaseDelivery {
   const pitcherClip = selectedPitcherClip === 'pitch_super' || selectedPitcherClip === 'practice_bullpen'
     ? selectedPitcherClip : 'pitch_windup';
@@ -30,6 +32,8 @@ export function createDelivery(
   const incoming = hit ? BALL_TRAJECTORY_PRESETS.fastball : preset;
   const pitch = {
     ...incoming,
+    pitchFlight: pitchInfo && { ...pitchInfo, throws },
+    durationSec: pitchInfo ? pitchSeconds(pitchInfo.mph) : incoming.durationSec,
     start: { x: throws === 'R' ? -0.36 : 0.36, y: handHeight(1.04, stature.pitcher, 0.24), z: -10.05 },
     end: hit?.start ?? { x: -0.31, y: handHeight(0.54, stature.catcher, 0.04), z: 1.1 },
   };
@@ -39,10 +43,12 @@ export function createDelivery(
   return { pitcherClip, pitch, hit, releaseAt, swingAt, plateAt };
 }
 
-export function sampleDeliveryFlight(play: ShowcaseDelivery, time: number) {
+export function sampleDeliveryFlight(play: ShowcaseDelivery, time: number, reducedMotion = false) {
   if (time < play.releaseAt) return null;
   if (time < play.plateAt) {
-    return { spec: play.pitch, progress: (time - play.releaseAt) / play.pitch.durationSec };
+    const pitch = play.pitch.pitchFlight;
+    return { spec: play.pitch, progress: (time - play.releaseAt) / play.pitch.durationSec,
+      visual: pitch && getPitchTrailVisual(pitch.pitchType, reducedMotion) };
   }
   if (play.hit && time < play.plateAt + play.hit.durationSec) {
     return { spec: play.hit, progress: (time - play.plateAt) / play.hit.durationSec };

@@ -3,6 +3,7 @@ import { WalkoffTeammates } from './characters/walkoffTeammates';
 import { pitchFlightScale } from './vfx/ballFlightVisual';
 import { batterBox } from './playback/diamondLayout';
 import type { DiamondPlay, DiamondPlayKind } from './playback/diamondPlay';
+import type { PitchFlight } from './playback/pitchFlight';
 import { renderDiamondPlay, type DiamondCast } from './playback/renderDiamondPlay';
 import * as THREE from 'three';
 import type { PortraitMood, PortraitTeamColors, PortraitTraits } from '../art/portraits/types';
@@ -273,7 +274,8 @@ export class DesignLabSceneController {
       this.playStartedAt = this.elapsedSec;
       this.vfx.clear();
       const style = (this.delivery.hit ?? this.delivery.pitch).style;
-      this.delivery = createDelivery(style, pitcherThrows, batterSide, this.pitcherClip, this.batterClip, this.stature);
+      this.delivery = createDelivery(style, pitcherThrows, batterSide, this.pitcherClip, this.batterClip,
+        this.stature, this.delivery.pitch.pitchFlight);
     }
     if (this.fieldTeam !== team && this.replayFielders) {
       this.endDiamondReplay();
@@ -332,6 +334,7 @@ export class DesignLabSceneController {
     callout?: { text: string; color: string; y?: number; z?: number },
     onAccent?: (kind?: DiamondPlayKind) => void,
     kind?: LabSequence,
+    pitchInfo?: PitchFlight,
   ): void {
     this.endDiamondReplay();
     this.vfx.clear();
@@ -347,8 +350,10 @@ export class DesignLabSceneController {
     this.playStartedAt = this.elapsedSec;
     this.playAccent = onAccent;
     this.callout = callout;
+    const practicePitch = ballStyle === 'fastball' && this.pitcherClip === 'practice_bullpen';
     this.delivery = ballStyle
-      ? createDelivery(ballStyle, this.pitcherThrows, this.batterSide, this.pitcherClip, this.batterClip, this.stature)
+      ? createDelivery(ballStyle, this.pitcherThrows, this.batterSide, this.pitcherClip, this.batterClip,
+        this.stature, pitchInfo ?? (practicePitch ? { pitchType: 'four_seam', mph: 92 } : undefined))
       : null;
     this.trauma = 0;
     if (this.delivery) {
@@ -415,7 +420,7 @@ export class DesignLabSceneController {
         this.vfx.spawnComicCallout('SNAG!', hit.end, '#FFD166', true);
       }
     }
-    const flight = sampleDeliveryFlight(play, t);
+    const flight = sampleDeliveryFlight(play, t, this.vfx.reducedMotion);
     if (flight) {
       const chasing = fieldClip && flight.spec === hit;
       const progress = chasing ? 1 - Math.pow(1 - flight.progress, 1.35) : flight.progress;
@@ -423,7 +428,7 @@ export class DesignLabSceneController {
         ? pitchFlightScale(progress, this.cameraPreset === 'mound_portrait' ? .27 : .55)
         : chasing ? 1 - .64 * progress : this.cameraPreset === 'mound_portrait' ? .27 : 1;
       this.vfx.ball.draw(flight.spec, progress,
-        play.hit && flight.spec === play.pitch ? undefined : this.callout?.color,
+        flight.visual ?? (play.hit && flight.spec === play.pitch ? undefined : this.callout?.color),
         scale);
       if (flight.spec.style === 'moonshot_hr' &&
         (this.cameraPreset === 'over_shoulder_batter' || this.cameraPreset === 'broadcast_diamond')) {

@@ -3,6 +3,7 @@ import { BASE_PATH_VERTICES } from './diamondLayout';
 import { railReaction, welcomePose } from './teamReactions';
 import { fitFieldOfView, type CameraPose } from '../camera/cameraRig';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
+import { getPitchTrailVisual } from './pitchFlight';
 import { Vector3, type PerspectiveCamera } from 'three';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import type { PaintedPlayerRig } from '../characters/paintedPlayer';
@@ -53,6 +54,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     return rig.contactAt(state.clip, state.local, state.pos, camera.position);
   }
   const flying = play.legs.find(leg => t >= leg.start && t < leg.end);
+  const power = play.power;
   vfx.ball.group.visible = false;
   if (flying) {
     const a = flying.startPoint ?? contact(flying.from, flying.start);
@@ -64,9 +66,11 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
       secondaryColor: homer ? '#FF9056' : flying.kind === 'ground' || flying.kind === 'bounce' ? '#CE8852' : '#7DB5CD' };
     const progress = (t - flying.start) / durationSec;
     const scale = flying.kind === 'pitch' ? pitchFlightScale(progress, .55) : flying.kind==='handoff' ? pitchFlightScale(0,.55) : .55;
-    const powerFlight = play.power && ((play.power.actor === 'pitcher' && flying.kind === 'pitch') ||
-      (play.power.actor !== 'pitcher' && flying === play.legs[1]));
-    vfx.ball.draw(spec, progress, powerFlight ? play.power!.vfxColor : homer ? '#FFD166' : '#FFF1C9', scale,
+    const powerFlight = power && (power.actor === 'pitcher' ? flying.kind === 'pitch' : flying === play.legs[1]);
+    const trail = powerFlight ? power.vfxColor
+      : flying.kind === 'pitch' && flying.pitch ? getPitchTrailVisual(flying.pitch.pitchType, vfx.reducedMotion)
+      : homer ? '#FFD166' : '#FFF1C9';
+    vfx.ball.draw(spec, progress, trail, scale,
       (_, u) => sampleLeg(flying, a, b, u, throws), play.close && flying.from === 'C' && flying.to === 'P' ? .23 : 1);
     vfx.ball.sizeForCamera(camera, heightPx);
   }
@@ -78,7 +82,6 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     if (batter.clip === 'bat_swing' || batter.clip === 'bat_bomb') barrel = contact('BAT',pitch.end);
   }
   vfx.drawSwingArc(barrel,side,sincePlate);
-  const power = play.power;
   if (power) {
     const actor = power.actor === 'fielder' ? play.pickup : power.actor === 'pitcher' ? 'P' : 'BAT';
     const unleashAt = actor === 'P' ? pitch.start : actor === 'BAT' ? pitch.end : play.pickupAt;

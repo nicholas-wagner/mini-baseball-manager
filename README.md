@@ -26,6 +26,8 @@ Choose **Contact** or **Power** to set the batter’s stance, then tap **Swing**
 
 On defense, pitching defaults to **Simple mode**: your catcher calls the pitch and spot (including elevated **High Heat** fastballs in two-strike counts), with an optional **Shake off** pill to cycle signs while watching the 3D catcher shift behind the plate. Switch anytime to **Normal mode** (**Over Plate**, **Corner**, or **Low Chase** with automatic location-matched pitch selection) or **Advanced mode** (location + every pitch in your pitcher’s arsenal). **Matchup** opens scouting, and **Options** holds pitching mode, timing and signature powers. On a phone, **More controls** opens the Tactics sheet for speed, timing, simulation and defensive adjustments. Close it to keep the pitch or swing controls beside the field. Tap **Tactics** to reopen it. Bringing in a reliever returns you to the diamond for their first pitch. Rotate for the field on the left and the calls on the right. Open the roster through **Dugout** on a phone or **Roster** in the desktop sidebar. **Play Ball** returns to the same game.
 
+From either shoulder camera, watch a cyan slider sweep across the zone or a violet curve climb and drop into the mitt. Fastballs leave gold trails, the changeup and splitter leave teal trails, and the knuckleball flutters in lavender. Reduced Motion shortens the trails and softens their colors.
+
 | Pitching on a compact phone | Calling a pitch in landscape |
 | --- | --- |
 | ![Jasper aims at the corner with the field, count and pitch button visible on a 360 by 640 phone](./docs/screenshots/compact-pitch.webp) | ![The complete field, pitch call and Tactics button side by side at 844 by 390](./docs/screenshots/phone-landscape-pitch.webp) |

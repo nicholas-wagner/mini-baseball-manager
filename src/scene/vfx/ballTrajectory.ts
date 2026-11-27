@@ -1,10 +1,13 @@
 import type { BallVfxStyle } from '../../engine/vfx/types';
+import type { ThrowsHand } from '../../engine/handedness/types';
 import type { Vec3 } from '../camera/cameraRig';
+import { shapePitch, type PitchFlight } from '../playback/pitchFlight';
 
 export type { BallVfxStyle };
 
 export interface BallTrajectorySpec {
   style: BallVfxStyle;
+  pitchFlight?: PitchFlight & { throws: ThrowsHand };
   start: Vec3;
   end: Vec3;
   apexHeight: number;
@@ -101,9 +104,14 @@ export function sampleBallTrajectory(spec: BallTrajectorySpec, progress01: numbe
   if (t === 1) return { ...spec.end };
   let x = spec.start.x + (spec.end.x - spec.start.x) * t;
   const z = spec.start.z + (spec.end.z - spec.start.z) * t;
+  const linearY = spec.start.y + (spec.end.y - spec.start.y) * t;
+  if (spec.pitchFlight) {
+    const pos = { x, y: linearY, z };
+    shapePitch(pos, spec.pitchFlight, t, spec.pitchFlight.throws);
+    return pos;
+  }
 
   // Parabolic arc through apexHeight
-  const linearY = spec.start.y + (spec.end.y - spec.start.y) * t;
   const extraArch = Math.max(0, spec.apexHeight - (spec.start.y + spec.end.y) * 0.5);
   let y = linearY + 4 * extraArch * t * (1 - t);
 
