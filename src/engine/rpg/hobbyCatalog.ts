@@ -16,7 +16,7 @@ export const sharedHobbies = [
   hobby('beach-volleyball', 'Beach volleyball', 'I shook half the beach out of my bag.', 'Did you see that sand flying? My partner calls that my emergency landing.', 'We draw our court with a stick. High tide gets final say on the doubles schedule.'),
   hobby('park-chess', 'Park chess', 'My opponent brings tea for both of us.', 'She offered me a rook and I took it. That little smile should have been my warning.', 'My favorite table is missing a pawn. We use an acorn and protect it like royalty.'),
   hobby('sunbathing', 'Sunbathing', 'I saved the last sunny spot on my towel for a paperback.', 'If the book gets good, I stay until the umbrella shadow reaches my radio.', 'My idea of a perfect afternoon is a sea breeze and a whole cassette before I move.'),
-  hobby('crochet', 'Crocheting hats', 'The fruit bowl is looking unusually well dressed.', 'A cantaloupe sits still for a fitting. My little cousins could learn a thing or two.', 'I made my first pom-pom so big the hat keeps falling over my eyes. I like it that way.'),
+  hobby('crochet', 'Crocheting', 'The fruit bowl is looking unusually well dressed.', 'A cantaloupe sits still for a fitting. My little cousins could learn a thing or two.', 'I made my first pom-pom so big the hat keeps falling over my eyes. I like it that way.'),
   hobby('computer-programming', 'Computer programming', 'I needed a second screen for the tail.', 'The dragon finally stretches across both monitors. I drew every scale on graph paper first.', 'My homemade adventure game has one room so far. Everybody keeps trying to pet the rug.'),
   hobby('ham-radio', 'Ham radio', 'There is a postcard on my desk with six letters and numbers.', 'Someone across the ocean heard me on the antenna I built. Their confirmation card gets the good frame.', 'I heard my neighbor on the air for years before I recognized the voice in the grocery line.'),
   hobby('ballroom', 'Ballroom dancing', 'I count to three while I wait for the kettle.', 'My partner and I waltz between the kitchen chairs. For the final turn we have to open the fridge.', 'We saved up for satin and a proper night out. I still have the coat-check ticket.'),
@@ -72,7 +72,7 @@ export const womensHobbies = [
 ];
 
 export const localHobbies: Record<NationalityId, Hobby> = {
-  USA: hobby('quilting', 'Quilting bees', 'That little square used to be a work shirt.', 'Our quilting circle traded scraps. I can point to six neighbors on one blanket.'),
+  USA: hobby('quilting', 'Quilting', 'That little square used to be a work shirt.', 'Our quilting circle traded scraps. I can point to six neighbors on one blanket.'),
   CAN: hobby('curling', 'Curling', 'I have a broom you cannot borrow for the kitchen.', 'On Friday nights we curl with my aunt. She can call a shot all the way from the warming room.'),
   JPN: hobby('onsen', 'Onsen visits', 'My towel stayed dry even when it started to snow.', 'I tie up my hair and leave my towel on the stone. From the outdoor spring you can hear snow slide off the pines.'),
   KOR: hobby('baduk', 'Playing baduk', 'Listen to the click of this little stone.', 'Grandpa gave me his old baduk board. We replay one corner of our last game over breakfast.'),

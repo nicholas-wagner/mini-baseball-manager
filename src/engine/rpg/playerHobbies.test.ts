@@ -14,6 +14,15 @@ describe('Off the Clock', () => {
     });
   });
 
+  it('names the craft shared by personal projects in the album', () => {
+    const everth = PLAYER_CATALOG.find(player => player.id === 'mbm-0999')!;
+    const quilter = PLAYER_CATALOG.find(player => player.id === 'mbm-0003')!;
+    expect(getPlayerHobby(everth)).toMatchObject({
+      id: 'crochet', title: 'Crocheting', quote: expect.stringContaining('wool toaster'),
+    });
+    expect(getPlayerHobby(quilter)).toMatchObject({ id: 'quilting', title: 'Quilting' });
+  });
+
   it('assigns stable stories across the catalog, including fandom and exclusive figure modeling', () => {
     const hobbies = PLAYER_CATALOG.map(getPlayerHobby);
     const ids = hobbies.map(h => h.id);
@@ -27,6 +36,21 @@ describe('Off the Clock', () => {
     const pinned = ['beach-volleyball','park-chess','sunbathing','crochet','computer-programming','mecha-kits','fantasy-cards'];
     const players = ['showcase-kiko','catalog-yu-ting','catalog-mara','mbm-0030','showcase-ana','showcase-rico','showcase-finn'];
     expect(players.map(id => ids[PLAYER_CATALOG.findIndex(p => p.id === id)])).toEqual(pinned);
+  });
+
+  it('keeps first-edition seeded hobbies for players outside the fixed catalog', () => {
+    const examples = [
+      ['mbm-0095', 'quilting'],
+      ['mbm-0168', 'downhill-skiing'],
+      ['mbm-0518', 'figure-modeling'],
+    ];
+    for (const [id, expectedHobby] of examples) {
+      const player = PLAYER_CATALOG.find(member => member.id === id)!;
+      const legacy = { ...player, id: 'legacy-' + id };
+      const first = getPlayerHobby(legacy);
+      expect(first.id).toBe(expectedHobby);
+      expect(getPlayerHobby(legacy)).toEqual(first);
+    }
   });
 
   it('banks a choice after games one and three, including a bench player, and caps morale', () => {
