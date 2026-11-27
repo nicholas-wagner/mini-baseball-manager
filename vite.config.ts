@@ -85,6 +85,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
+          'hobby-stories': ['./src/engine/rpg/playerHobbyStories.ts'],
           three: ['three'],
           react: ['react', 'react-dom'],
           lucide: ['lucide-react'],
