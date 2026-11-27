@@ -77,6 +77,8 @@ const DEFENSIVE_CALLS: ReadonlySet<TacticalCall> = new Set([
   'pitchout',
   'hold_runner',
   'intentional_walk',
+  'pickoff_1b',
+  'pickoff_2b',
 ]);
 
 export function isOffensiveTacticalCall(call: TacticalCall): boolean {
@@ -322,7 +324,10 @@ function resolveHumanPitchingInputs(
   extra?: { weatherImpact?: WeatherSimulationImpact; nemesisBonus?: NemesisMatchupEvaluation },
 ): { tacticalCall: TacticalCall; options: StepPitchOptions } {
   const isPrePitchDefense =
-    human.tacticalCall === 'intentional_walk' || human.tacticalCall === 'pitchout';
+    human.tacticalCall === 'intentional_walk' ||
+    human.tacticalCall === 'pitchout' ||
+    human.tacticalCall === 'pickoff_1b' ||
+    human.tacticalCall === 'pickoff_2b';
   const stealDefenseCall =
     human.tacticalCall === 'hold_runner' || human.tacticalCall === 'pitchout'
       ? human.tacticalCall

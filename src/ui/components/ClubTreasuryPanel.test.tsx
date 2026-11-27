@@ -1,11 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isPitcherPosition } from '../../engine/models/player';
+import { computeCoreRatingSum } from '../../engine/rpg/trainingCompromises';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
 import { AppShell } from '../design-system/AppShell';
 import { ClubTreasuryPanel } from './ClubTreasuryPanel';
 
-function TreasuryHarness() {
+function TreasuryHarness({ onNotice = () => undefined }: { onNotice?: (msg: string) => void }) {
   const club = useGameStore((state) => state.getHumanClub());
   const seriesIndex = useGameStore((state) => state.currentSeriesIndex);
   if (!club) return null;
@@ -13,7 +15,7 @@ function TreasuryHarness() {
     <ClubTreasuryPanel
       club={club}
       seriesIndex={seriesIndex}
-      onNotice={() => undefined}
+      onNotice={onNotice}
       onJump={() => undefined}
     />
   );
@@ -81,5 +83,67 @@ describe('TASK-108 Club Treasury', () => {
     fireEvent.click(screen.getByTestId('club-cash-pill-mobile'));
     expect(onOpenTreasury).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('club-cash-pill-mobile')).toHaveTextContent('$12.5k');
+  });
+
+  it('spends cash in Power-Up Camp for role-specific stats, shows budget-trim note, and updates live cash HUD (TASK-115)', () => {
+    const state = useGameStore.getState();
+    const club = state.getHumanClub()!;
+    const hitter = club.roster.find((p) => !isPitcherPosition(p.position))!;
+    const pitcher = club.roster.find((p) => isPitcherPosition(p.position))!;
+
+    // Set hitter with clean trainable power (65/88 -> $600) and budget full to verify 1-line note
+    const tunedRoster = club.roster.map((p) => {
+      if (p.id === hitter.id) {
+        const ratings = { ...p.ratings, power: 65 };
+        return {
+          ...p,
+          ratings,
+          statCaps: { ...p.statCaps, power: 88 },
+          totalRatingBudget: computeCoreRatingSum({ position: p.position, ratings }),
+        };
+      }
+      if (p.id === pitcher.id) {
+        return {
+          ...p,
+          ratings: { ...p.ratings, velocity: 72 },
+          statCaps: { ...p.statCaps, velocity: 90 },
+        };
+      }
+      return p;
+    });
+    const tunedClub = { ...club, roster: tunedRoster, economy: { ...club.economy, cash: 5_000 } };
+    useGameStore.setState({
+      leagues: {
+        ...state.leagues,
+        [club.leagueTier]: state.leagues[club.leagueTier].map((c) => (c.id === club.id ? tunedClub : c)),
+      },
+    });
+
+    const onNotice = vi.fn();
+    render(<TreasuryHarness onNotice={onNotice} />);
+
+    const camp = screen.getByTestId('power-up-camp');
+    const select = within(camp).getByTestId('power-up-player-select') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: hitter.id } });
+
+    expect(within(camp).getByTestId('power-up-budget-note')).toHaveTextContent(/budget full/i);
+    const powerBtn = within(camp).getByTestId('power-up-stat-power');
+    expect(powerBtn).toHaveTextContent(/65 \/ 88/);
+    expect(powerBtn).toHaveTextContent(/\$600/);
+    expect(within(camp).queryByTestId('power-up-stat-velocity')).toBeNull();
+
+    fireEvent.click(powerBtn);
+
+    const updatedClub = useGameStore.getState().getHumanClub()!;
+    const updatedHitter = updatedClub.roster.find((p) => p.id === hitter.id)!;
+    expect(updatedClub.economy.cash).toBe(4_400);
+    expect(updatedHitter.ratings.power).toBe(66);
+    expect(screen.getByTestId('treasury-cash')).toHaveTextContent('4,400');
+    expect(onNotice).toHaveBeenCalledWith(expect.stringMatching(/\+1 Power for .*-\$600/));
+
+    // Switching to pitcher swaps buttons to pitching stats (Velocity, Movement, Control, Stamina, Clutch)
+    fireEvent.change(select, { target: { value: pitcher.id } });
+    expect(within(camp).getByTestId('power-up-stat-velocity')).toHaveTextContent(/72 \/ 90/);
+    expect(within(camp).queryByTestId('power-up-stat-power')).toBeNull();
   });
 });

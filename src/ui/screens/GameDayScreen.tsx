@@ -186,7 +186,7 @@ import { FoilPackModal } from '../components/FoilPackModal';
 import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { StrikeZoneOverlay } from '../components/StrikeZoneOverlay';
 import { TrophyCaseModal } from '../components/TrophyCaseModal';
-import { LiveActionBar } from '../components/LiveActionBar';
+import { LiveActionBar, type PickoffQuickOption } from '../components/LiveActionBar';
 import { LiveBottomSheet, useWideStudio } from '../components/LiveBottomSheet';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
 import { isLiveWebglAvailable, LiveGameCanvas, type LiveCameraMode } from '../components/LiveGameCanvas';
@@ -219,6 +219,31 @@ const GAME_LENGTH_OPTIONS: readonly { innings: GameLengthInnings; label: string 
 
 function playGazetteCrowd() { soundEngine.play('crowd_cheer'); }
 function playTimelineCue(cue: Parameters<typeof soundEngine.play>[0]) { soundEngine.play(cue); }
+
+function resolvePickoffOption(
+  session: GameSessionState,
+  isHumanBatting: boolean,
+): PickoffQuickOption | null {
+  if (isHumanBatting || session.status !== 'in_progress') return null;
+  const batting = getBattingSide(session);
+  if (session.bases[0]) {
+    return {
+      base: 1,
+      call: 'pickoff_1b',
+      label: 'Pickoff 1B',
+      runnerName: batting.playersById[session.bases[0]]?.name,
+    };
+  }
+  if (session.bases[1]) {
+    return {
+      base: 2,
+      call: 'pickoff_2b',
+      label: 'Pickoff 2B',
+      runnerName: batting.playersById[session.bases[1]]?.name,
+    };
+  }
+  return null;
+}
 
 function safeScrollTop(): void {
   try {
@@ -769,7 +794,7 @@ export function GameDayScreen({
         setWarmupCounts((prev) => tickBullpenWarmups(prev, warmingRelieverIds));
       }
       // An inning-ending out can be followed by administrative events in the same step.
-      const lastEvent = emitted.slice().reverse().find(e => e.outcome || e.type === 'stolen_base_attempt')
+      const lastEvent = emitted.slice().reverse().find(e => e.outcome || e.type === 'stolen_base_attempt' || e.type === 'pickoff')
         ?? emitted.at(-1);
       setPendingRelief(null);
       let summaryDelay=0;
@@ -966,7 +991,9 @@ export function GameDayScreen({
       call === 'steal_home' ||
       call === 'pitchout' ||
       call === 'hold_runner' ||
-      call === 'intentional_walk'
+      call === 'intentional_walk' ||
+      call === 'pickoff_1b' ||
+      call === 'pickoff_2b'
     ) {
       setTacticalCall('normal');
     }
@@ -2051,6 +2078,7 @@ export function GameDayScreen({
                         size="sm"
                         variant={onePitchMode ? 'gold' : 'cream'}
                         active={onePitchMode}
+                        title="1-Pitch At-Bats (Default in Simple Mode; Pro Manager defaults to Pitch-by-Pitch)"
                         onClick={() => {
                           toggleOnePitchMode();
                           soundEngine.play('ui_pop');
@@ -2498,6 +2526,7 @@ export function GameDayScreen({
         getDefenderAtPosition(liveFieldingSide, 'C'),
         liveFieldingSide.pitcherFatigue,
         liveFieldingSide.catcherPopTimeBonus,
+        liveSession.pickoffHoldModifier ?? 0,
       )
     : [];
   const bestCandidate = quickStealCandidates.reduce<(typeof quickStealCandidates)[number] | undefined>(
@@ -2570,6 +2599,13 @@ export function GameDayScreen({
     setArmedStealPlay(play);
     if (!play) setHitAndRunArmed(false);
     soundEngine.play(play ? 'steal_burst' : 'ui_pop');
+  };
+
+  const livePickoffOption = resolvePickoffOption(liveSession, humanIsBatting);
+  const guidedPickoffOption = resolvePickoffOption(shown, guidedBatting);
+  const handlePickoffAttempt = (base: 1 | 2) => {
+    setSmartPauseReason(null);
+    handleNextPitch(base === 1 ? 'pickoff_1b' : 'pickoff_2b');
   };
 
   const handleToggleHitAndRun = () => {
@@ -3182,6 +3218,7 @@ export function GameDayScreen({
                       getDefenderAtPosition(getFieldingSide(shown), 'C'),
                       getFieldingSide(shown).pitcherFatigue,
                       getFieldingSide(shown).catcherPopTimeBonus,
+                      shown.pickoffHoldModifier ?? 0,
                     )
                   : []
               }
@@ -3191,6 +3228,8 @@ export function GameDayScreen({
                   : null
               }
               onToggleStealPlay={handleToggleStealPlay}
+              pickoffOption={guidedPickoffOption}
+              onPickoff={handlePickoffAttempt}
               onShakeOff={handleShakeOffCatcher}
               onSelectPitchType={(pt) => {
                 setSelectedPitchType(pt);
@@ -3332,6 +3371,8 @@ export function GameDayScreen({
               stealOptions={quickStealCandidates}
               armedStealPlay={effectiveArmedSteal}
               onToggleStealPlay={handleToggleStealPlay}
+              pickoffOption={livePickoffOption}
+              onPickoff={handlePickoffAttempt}
               hitAndRunArmed={hitAndRunArmed}
               onToggleHitAndRun={handleToggleHitAndRun}
               strikes={liveSession.strikes}
@@ -3507,6 +3548,8 @@ export function GameDayScreen({
               stealOptions={quickStealCandidates}
               armedStealPlay={effectiveArmedSteal}
               onToggleStealPlay={handleToggleStealPlay}
+              pickoffOption={livePickoffOption}
+              onPickoff={handlePickoffAttempt}
               hitAndRunArmed={hitAndRunArmed}
               onToggleHitAndRun={handleToggleHitAndRun}
               strikes={liveSession.strikes}

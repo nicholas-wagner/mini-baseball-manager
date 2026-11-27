@@ -81,6 +81,10 @@ import type { Club, LeagueTierId } from '../engine/models/club';
 import type { StaffMember } from '../engine/models/manager';
 import { createSeededRng } from '../engine/rng/seededRng';
 import {
+  applyPowerUpPurchase,
+  type PowerUpStatKey,
+} from '../engine/rpg/powerUpCamp';
+import {
   runPracticeComplexActivity,
   type PracticeComplexRequest,
 } from '../engine/rpg/practiceEngine';
@@ -269,6 +273,26 @@ export function extendHumanPlayerContract(playerId: string): { extended: boolean
   if (!res.extended) return { extended: false, reason: res.reason };
   commitHumanClub(res.club);
   return { extended: true };
+}
+
+export function purchaseHumanPowerUp(
+  playerId: string,
+  stat: PowerUpStatKey,
+): { purchased: boolean; reason?: string; cost: number; summary: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) {
+    return { purchased: false, reason: 'No active club.', cost: 0, summary: 'No active club.' };
+  }
+  const res = applyPowerUpPurchase(club, playerId, stat, {
+    seasonNumber: state.seasonNumber,
+    seriesIndex: state.currentSeriesIndex,
+  });
+  if (!res.purchased) {
+    return { purchased: false, reason: res.reason, cost: res.cost, summary: res.summary };
+  }
+  commitHumanClub(res.club);
+  return { purchased: true, cost: res.cost, summary: res.summary };
 }
 
 export function buildHumanDistrictTile(

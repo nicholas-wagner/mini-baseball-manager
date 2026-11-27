@@ -11,6 +11,7 @@ import {
 } from '../../engine/models/player';
 import { resolvePlayerCardBio } from '../../engine/models/playerBio';
 import { buildPlayerCardStatProfile } from '../../engine/models/playerCardStats';
+import { getPlayerBuildIdentity } from '../../engine/rpg/skillTrees';
 import type { BaseballCardPlayer } from '../components/FlipBaseballCard';
 
 /** Maps rolling player streak state onto retro portrait facial mood expressions. */
@@ -44,6 +45,7 @@ export function toBaseballCardPlayer(
       : [SPECIALIST_LABELS[player.specialistArchetype], MARKET_TIER_LABELS[player.marketTier], pitchPill];
 
   const cardProfile = buildPlayerCardStatProfile(player);
+  const identity = getPlayerBuildIdentity(player);
 
   return {
     id: player.id,
@@ -72,6 +74,16 @@ export function toBaseballCardPlayer(
     statLine: cardProfile.statLine,
     habit: HABIT_CAPTIONS[stanceHabit(player.traits.seed, isPitcherPosition(player.position), player.personality === 'quiet_assassin')],
     contactPoints: isPitcherPosition(player.position) ? undefined : player.recentContact ?? [],
+    buildIdentity:
+      identity.spentSp > 0
+        ? {
+            label: identity.label,
+            shortTag: identity.shortTag,
+            tone: identity.tone,
+            spentSp: identity.spentSp,
+            maxSp: identity.maxSp,
+          }
+        : undefined,
     bio: resolvePlayerCardBio(player),
   };
 }

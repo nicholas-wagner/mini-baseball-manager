@@ -16,7 +16,7 @@ import type {
   PitchTargetIntent,
 } from "../../engine/simulation/pitchMindGames";
 import { ArcadeTimingMeter } from "./ArcadeTimingMeter";
-import type { PitcherSignOption } from "./LiveActionBar";
+import type { PickoffQuickOption, PitcherSignOption } from "./LiveActionBar";
 import "./firstAtBat.css";
 
 const pitches = PITCH_CALL_GUIDE;
@@ -60,6 +60,8 @@ export function FirstAtBat({
   stealOptions = [],
   armedStealPlay = null,
   onToggleStealPlay,
+  pickoffOption = null,
+  onPickoff,
   cue,
   onTarget,
   onSwing,
@@ -99,6 +101,8 @@ export function FirstAtBat({
   stealOptions?: readonly StealOptionPreview[];
   armedStealPlay?: StealPlayType | null;
   onToggleStealPlay?: (play: StealPlayType | null) => void;
+  pickoffOption?: PickoffQuickOption | null;
+  onPickoff?: (base: 1 | 2) => void;
   expanded: boolean;
   cue: LiveActionCue;
   onTarget: (target: PitchTargetIntent) => void;
@@ -255,7 +259,9 @@ export function FirstAtBat({
                     aria-pressed={onePitchMode}
                     onClick={onToggleOnePitchMode}
                   >
-                    {onePitchMode ? "⚡ 1-Pitch Mode: ON" : "⚡ 1-Pitch Mode: OFF"}
+                    {onePitchMode
+                      ? "⚡ 1-Pitch Mode: ON (Default in Simple)"
+                      : "⚡ 1-Pitch Mode: OFF (Pitch-by-Pitch)"}
                   </button>
                 )}
                 {!batting &&
@@ -412,77 +418,94 @@ export function FirstAtBat({
                 ))}
               </div>
             </>
-          ) : pitchingMode === "simple" ? (
-            <div
-              className="atbat-catcher-call"
-              data-testid="guided-catcher-call"
-              aria-live="polite"
-            >
-              <div className="atbat-catcher-copy">
-                <strong>
-                  🧤 Catcher:{" "}
-                  {catcherCall
-                    ? `${catcherCall.targetLabel} · ${catcherCall.pitchShortLabel}`
-                    : "Over Plate · 4-Seam"}
-                </strong>
-              </div>
-              {onShakeOff && shakeOffTotal > 1 && (
-                <button
-                  type="button"
-                  className="atbat-shake-btn"
-                  data-testid="guided-shake-off-btn"
-                  disabled={locked}
-                  onClick={onShakeOff}
-                >
-                  Shake off
-                </button>
-              )}
-            </div>
           ) : (
             <>
-              <div className="atbat-choices" role="group" aria-label="Pitch target">
-                {pitches.map((p) => (
-                  <button
-                    key={p.id}
-                    disabled={locked}
-                    aria-pressed={p.id === target}
-                    onClick={() => onTarget(p.id)}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-              {pitchingMode === "advanced" && pitcherArsenal.length > 0 && onSelectPitchType && (
-                <div
-                  className="atbat-pitch-signs"
-                  data-testid="guided-pitch-sign-bar"
-                  role="group"
-                  aria-label="Pitch selection"
-                >
+              {pickoffOption && onPickoff ? (
+                <div className="atbat-steal-strip" role="group" aria-label="Pickoff throw">
                   <button
                     type="button"
+                    data-testid="guided-pickoff-btn"
+                    className="atbat-steal-chip"
                     disabled={locked}
-                    aria-pressed={selectedPitchType === null}
-                    onClick={() => onSelectPitchType(null)}
+                    onClick={() => onPickoff(pickoffOption.base)}
                   >
-                    Auto
+                    👀 {pickoffOption.label}
                   </button>
-                  {pitcherArsenal.map((slot) => {
-                    const active = selectedPitchType === slot.pitchType;
-                    return (
+                </div>
+              ) : null}
+              {pitchingMode === "simple" ? (
+                <div
+                  className="atbat-catcher-call"
+                  data-testid="guided-catcher-call"
+                  aria-live="polite"
+                >
+                  <div className="atbat-catcher-copy">
+                    <strong>
+                      🧤 Catcher:{" "}
+                      {catcherCall
+                        ? `${catcherCall.targetLabel} · ${catcherCall.pitchShortLabel}`
+                        : "Over Plate · 4-Seam"}
+                    </strong>
+                  </div>
+                  {onShakeOff && shakeOffTotal > 1 && (
+                    <button
+                      type="button"
+                      className="atbat-shake-btn"
+                      data-testid="guided-shake-off-btn"
+                      disabled={locked}
+                      onClick={onShakeOff}
+                    >
+                      Shake off
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="atbat-choices" role="group" aria-label="Pitch target">
+                    {pitches.map((p) => (
                       <button
-                        key={slot.pitchType}
+                        key={p.id}
+                        disabled={locked}
+                        aria-pressed={p.id === target}
+                        onClick={() => onTarget(p.id)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  {pitchingMode === "advanced" && pitcherArsenal.length > 0 && onSelectPitchType && (
+                    <div
+                      className="atbat-pitch-signs"
+                      data-testid="guided-pitch-sign-bar"
+                      role="group"
+                      aria-label="Pitch selection"
+                    >
+                      <button
                         type="button"
                         disabled={locked}
-                        aria-pressed={active}
-                        onClick={() => onSelectPitchType(active ? null : slot.pitchType)}
+                        aria-pressed={selectedPitchType === null}
+                        onClick={() => onSelectPitchType(null)}
                       >
-                        {slot.isFavorite ? "★ " : slot.isWeak ? "⚠ " : ""}
-                        {slot.label} {slot.mastery}
+                        Auto
                       </button>
-                    );
-                  })}
-                </div>
+                      {pitcherArsenal.map((slot) => {
+                        const active = selectedPitchType === slot.pitchType;
+                        return (
+                          <button
+                            key={slot.pitchType}
+                            type="button"
+                            disabled={locked}
+                            aria-pressed={active}
+                            onClick={() => onSelectPitchType(active ? null : slot.pitchType)}
+                          >
+                            {slot.isFavorite ? "★ " : slot.isWeak ? "⚠ " : ""}
+                            {slot.label} {slot.mastery}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

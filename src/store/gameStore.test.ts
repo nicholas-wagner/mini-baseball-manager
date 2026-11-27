@@ -217,7 +217,7 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
     );
   });
 
-  it('unlocks branching skill nodes, unlocks 3-tier Cultural Heritage powers, toggles powers, and respecs (TASK-019, TASK-020)', () => {
+  it('unlocks branching skill nodes, unlocks 3-tier Cultural Heritage powers, supports free undo, and enforces Offseason Retrain with ledger entry (TASK-019, TASK-020, TASK-114)', () => {
     const store = createGameStore(createSaveRepository());
     store.getState().startNewCareer({
       city: 'Sandlot',
@@ -240,6 +240,7 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
           c.id === club.id
             ? {
                 ...c,
+                economy: { ...c.economy, cash: 5_000 },
                 roster: c.roster.map((p) =>
                   p.id === target.id ? { ...p, skillPoints: 15 } : p,
                 ),
@@ -254,6 +255,16 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
     expect(store.getState().unlockPlayerSkill(target.id, 'cap_moonshot_bomb').unlocked).toBe(true);
     expect(store.getState().unlockPlayerHeritageTier(target.id).unlocked).toBe(true);
 
+    // Free instant session undo refunds SP & unequips capstone cleanly
+    const undoRes = store.getState().undoPlayerSkillUnlock(target.id, 'cap_moonshot_bomb');
+    expect(undoRes.undone).toBe(true);
+    expect(undoRes.refundedSp).toBe(3);
+    expect(
+      store.getState().getHumanClub()!.roster.find((p) => p.id === target.id)!.equippedPowerIds,
+    ).not.toContain('moonshot_bomb');
+
+    // Re-unlock capstone and test power toggle
+    expect(store.getState().unlockPlayerSkill(target.id, 'cap_moonshot_bomb').unlocked).toBe(true);
     const upgraded = store.getState().getHumanClub()!.roster.find((p) => p.id === target.id)!;
     expect(upgraded.equippedPowerIds).toContain('moonshot_bomb');
     expect(upgraded.heritageTierUnlocked).toBe(1);
@@ -263,9 +274,32 @@ describe('Career Zustand Store (Club Creator, Lineup & Exhibition Loop)', () => 
       store.getState().getHumanClub()!.roster.find((p) => p.id === target.id)!.equippedPowerIds,
     ).not.toContain('moonshot_bomb');
 
+    // Regular season retrain is blocked!
+    const blockedInSeason = store.getState().retrainPlayerSkills(target.id);
+    expect(blockedInSeason.refundedSp).toBe(0);
+    expect(blockedInSeason.reason).toMatch(/offseason/i);
+
+    // Activate Offseason HQ -> Offseason Retrain charges $2,000, records ledger receipt, and marks 1/career used
+    const offseason = store.getState().beginInteractiveOffseason(5);
+    expect(offseason).not.toBeNull();
+    const activeTarget = store.getState().getHumanClub()!.roster.find((p) => p.id === target.id)!;
     const cashBefore = store.getState().getHumanClub()!.economy.cash;
-    const respec = store.getState().respecPlayerSkillTree(target.id);
-    expect(respec.refundedSp).toBe(6);
-    expect(store.getState().getHumanClub()!.economy.cash).toBe(cashBefore - 250);
+    const retrain = store.getState().retrainPlayerSkills(activeTarget.id);
+    expect(retrain.refundedSp).toBe(6);
+
+    const postClub = store.getState().getHumanClub()!;
+    expect(postClub.economy.cash).toBe(cashBefore - 2_000);
+    expect(postClub.economy.recentLedgerEntries?.[0]).toMatchObject({
+      expenseTotal: 2_000,
+      netDelta: -2_000,
+      endingCash: cashBefore - 2_000,
+    });
+    expect(postClub.roster.find((p) => p.id === target.id)!.careerRetrainsUsed).toBe(1);
+
+    // 2nd career retrain is permanently blocked even in offseason
+    expect(store.getState().unlockPlayerSkill(target.id, 'b_con_1').unlocked).toBe(true);
+    const secondRetrain = store.getState().retrainPlayerSkills(target.id);
+    expect(secondRetrain.refundedSp).toBe(0);
+    expect(secondRetrain.reason).toMatch(/1 per player|already used/i);
   });
 });

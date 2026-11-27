@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { INITIAL_SHOWCASE_ROSTER } from '../../art/portraits/sampleRoster';
 import { SAMPLE_TEAM_PALETTES } from '../../art/themes/teamPalettes';
+import { createPlayer } from '../../engine/gm/rosterFactory';
+import { createSeededRng } from '../../engine/rng/seededRng';
+import { toBaseballCardPlayer } from '../utils/playerCardAdapter';
 import { FlipBaseballCard, type BaseballCardPlayer } from './FlipBaseballCard';
 
 const samplePlayer: BaseballCardPlayer = {
@@ -132,6 +135,23 @@ describe('FlipBaseballCard', () => {
     expect(screen.getByText(/AVG \.318/i)).toBeVisible();
     expect(screen.queryByText('Pitching')).toBeNull();
     expect(screen.queryByText('Velocity')).toBeNull();
+  });
+
+  it('displays compact Build Identity badge when player has spent skill points and hides it at 0 SP (TASK-114)', () => {
+    const rookie = createPlayer(createSeededRng(1140), { position: 'RF', tier: 'aa', marketTier: 'rookie' });
+    const { rerender } = render(
+      <FlipBaseballCard player={toBaseballCardPlayer(rookie)} team={SAMPLE_TEAM_PALETTES[0]} />,
+    );
+    expect(screen.queryByTestId('card-build-identity-badge')).toBeNull();
+
+    const specialized = {
+      ...rookie,
+      unlockedSkillIds: ['b_pwr_1', 'b_pwr_2', 'cap_moonshot_bomb'],
+    };
+    rerender(
+      <FlipBaseballCard player={toBaseballCardPlayer(specialized)} team={SAMPLE_TEAM_PALETTES[0]} />,
+    );
+    expect(screen.getByTestId('card-build-identity-badge')).toHaveTextContent(/Power/i);
   });
 });
 

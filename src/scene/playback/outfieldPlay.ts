@@ -67,7 +67,10 @@ export function buildOutfieldPlay(kind: OutfieldKind, pitch: Leg, event?: PlayEv
     const grassZ = INFIELD_DIRT.centerZ - Math.sqrt(Math.max(0, edge * edge - x * x));
     landing.z = Math.min(z, grassZ);
   }
-  const wallCatch = caught && event?.specialPowerTriggered?.powerId === 'sky_high_leap';
+  const wallCatch =
+    caught &&
+    (Boolean(event?.fieldingHighlight?.robbedHomeRun) ||
+      event?.specialPowerTriggered?.powerId === 'sky_high_leap');
   if (wall || homer || wallCatch) {
     const angle = Math.atan2(x, OUTFIELD_WALL.centerZ - z);
     const radius = Math.hypot(x, z - OUTFIELD_WALL.centerZ);

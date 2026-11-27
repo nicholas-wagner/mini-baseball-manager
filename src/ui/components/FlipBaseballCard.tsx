@@ -19,8 +19,17 @@ import {
 } from '../../engine/models/playerCardStats';
 import { getNationalityById } from '../../engine/nationalities/pickNationality';
 import type { NationalityId } from '../../engine/nationalities/types';
+import type { PlayerBuildTone } from '../../engine/rpg/skillTrees';
 import { getStatGrade } from '../design-system/statGrade';
 import { StatBadge } from '../design-system/StatBadge';
+
+export interface BaseballCardBuildIdentity {
+  label: string;
+  shortTag: string;
+  tone: PlayerBuildTone;
+  spentSp: number;
+  maxSp: number;
+}
 
 export interface BaseballCardPlayer {
   id: string;
@@ -52,6 +61,7 @@ export interface BaseballCardPlayer {
   bio: string;
   habit?: string;
   contactPoints?: readonly ContactPoint[];
+  buildIdentity?: BaseballCardBuildIdentity;
 }
 
 interface FlipBaseballCardProps {
@@ -204,6 +214,15 @@ export function FlipBaseballCard({
                     {power}
                   </span>
                 ))}
+                {player.buildIdentity && player.buildIdentity.spentSp > 0 ? (
+                  <span
+                    data-testid="card-build-identity-badge"
+                    title={`${player.buildIdentity.label} (${player.buildIdentity.spentSp}/${player.buildIdentity.maxSp} SP)`}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md border border-[#181B2C] bg-[#1D3557] text-[#FFD166] text-[10px] font-extrabold max-w-full truncate"
+                  >
+                    {player.buildIdentity.shortTag}
+                  </span>
+                ) : null}
               </div>
             </div>
 

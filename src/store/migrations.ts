@@ -111,6 +111,10 @@ function hydratePlayerDefaults(player: Player): Player {
     totalRatingBudget:
       player.totalRatingBudget ?? computeTotalRatingBudget(marketTier, player.position),
     xpGrowthMultiplier: player.xpGrowthMultiplier ?? 0.85,
+    careerRetrainsUsed:
+      typeof player.careerRetrainsUsed === 'number' && Number.isFinite(player.careerRetrainsUsed)
+        ? Math.max(0, Math.floor(player.careerRetrainsUsed))
+        : 0,
     seasonStats: hydrateStatsDefaults(player.seasonStats),
     careerStats: hydrateStatsDefaults(player.careerStats),
   };

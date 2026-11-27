@@ -24,6 +24,7 @@ export interface StealMatchupContext {
   pitcherFatigue?: number;
   catcherPopTimeBonus?: number;
   defenseCall?: StealDefenseCall;
+  pickoffHoldModifier?: number;
 }
 
 export interface StealOptionPreview {
@@ -126,6 +127,7 @@ export function computeStealSuccessProbability(ctx: StealMatchupContext): number
   const fatigueJump = Math.min(0.06, (ctx.pitcherFatigue ?? 0) * 0.0007);
   const veloPenalty = (ctx.pitcher.ratings.velocity - 65) * 0.0014;
   const defenseMod = DEFENSE_CALL_PENALTY[ctx.defenseCall ?? 'normal'];
+  const pickoffHoldPenalty = Math.max(0, Math.min(0.12, ctx.pickoffHoldModifier ?? 0));
 
   const raw =
     0.62 +
@@ -135,7 +137,8 @@ export function computeStealSuccessProbability(ctx: StealMatchupContext): number
     fatigueJump -
     veloPenalty +
     BASE_STEAL_DIFFICULTY[ctx.playType] +
-    defenseMod;
+    defenseMod -
+    pickoffHoldPenalty;
 
   const minFloor = ctx.playType === 'steal_home' ? 0.06 : 0.14;
   const maxCeil = ctx.playType === 'steal_home' ? 0.48 : 0.91;
@@ -156,6 +159,7 @@ function buildOption(
   catcher: Player,
   pitcherFatigue: number,
   catcherPopTimeBonus: number,
+  pickoffHoldModifier: number,
 ): StealOptionPreview {
   const prob = computeStealSuccessProbability({
     playType,
@@ -164,6 +168,7 @@ function buildOption(
     catcher,
     pitcherFatigue,
     catcherPopTimeBonus,
+    pickoffHoldModifier,
   });
   return {
     playType,
@@ -213,6 +218,7 @@ export function getEligibleStealPlays(
   catcher: Player,
   pitcherFatigue = 0,
   catcherPopTimeBonus = 0,
+  pickoffHoldModifier = 0,
 ): StealOptionPreview[] {
   return collectEligibleCandidates(bases, playersById).map((cand) =>
     buildOption(
@@ -223,6 +229,7 @@ export function getEligibleStealPlays(
       catcher,
       pitcherFatigue,
       catcherPopTimeBonus,
+      pickoffHoldModifier,
     ),
   );
 }
@@ -430,6 +437,7 @@ export function resolveBaseStealPlay(
     pitcherFatigue?: number;
     catcherPopTimeBonus?: number;
     defenseCall?: StealDefenseCall;
+    pickoffHoldModifier?: number;
   },
 ): StealPlayResolution | null {
   const leadId = getLeadRunnerId(playType, bases);
@@ -443,6 +451,7 @@ export function resolveBaseStealPlay(
     pitcherFatigue: opts?.pitcherFatigue,
     catcherPopTimeBonus: opts?.catcherPopTimeBonus,
     defenseCall: opts?.defenseCall,
+    pickoffHoldModifier: opts?.pickoffHoldModifier,
   });
   const success = rng.chance(prob);
   const outcome = buildStealOutcomeState(playType, bases, success, leadRunner, catcher);
@@ -503,4 +512,76 @@ export function computeStealSuccessRate(stolenBases: number, caughtStealing: num
   const attempts = stolenBases + caughtStealing;
   if (attempts <= 0) return 0;
   return Number(((stolenBases / attempts) * 100).toFixed(1));
+}
+
+export interface PickoffResolution {
+  base: 1 | 2;
+  out: boolean;
+  runnerId: string;
+  runnerName: string;
+  fielderPos: '1B' | '2B' | 'SS';
+  fielderId: string;
+  outProbability: number;
+  commentary: string;
+  soundCue: PlaySoundCue;
+}
+
+/**
+ * Computes realistic pickoff out probability:
+ * - 1B: 6%–14% (boosted for LHP via pickoffHoldBonus + pitcher control/fielding, lowered by runner speed/eye)
+ * - 2B: 4%–10%
+ */
+export function computePickoffOutProbability(
+  pitcher: Player,
+  runner: Player,
+  base: 1 | 2,
+): number {
+  const holdBonus = getPositionalHandednessBonus(pitcher.position, pitcher.throws).pickoffHoldBonus;
+  const pitcherMove = pitcher.ratings.control * 0.65 + pitcher.ratings.fielding * 0.35;
+  const runnerRead = runner.ratings.speed * 0.65 + runner.ratings.eye * 0.35;
+
+  if (base === 1) {
+    const raw =
+      0.082 +
+      holdBonus * 0.0045 +
+      (pitcherMove - 65) * 0.0007 -
+      (runnerRead - 65) * 0.0006;
+    return Number(clampProb(raw, 0.06, 0.14).toFixed(3));
+  }
+
+  const raw =
+    0.062 +
+    holdBonus * 0.0018 +
+    (pitcherMove - 65) * 0.0006 -
+    (runnerRead - 65) * 0.0005;
+  return Number(clampProb(raw, 0.04, 0.1).toFixed(3));
+}
+
+/** Resolves a deterministic seeded pickoff throw to 1B or 2B. */
+export function resolvePickoffAttempt(
+  rng: SeededRng,
+  ctx: {
+    base: 1 | 2;
+    pitcher: Player;
+    runner: Player;
+    fielder: Player;
+    fielderPos: '1B' | '2B' | 'SS';
+  },
+): PickoffResolution {
+  const outProbability = computePickoffOutProbability(ctx.pitcher, ctx.runner, ctx.base);
+  const out = rng.chance(outProbability);
+  const baseLabel = ctx.base === 1 ? 'first' : 'second';
+  return {
+    base: ctx.base,
+    out,
+    runnerId: ctx.runner.id,
+    runnerName: ctx.runner.name,
+    fielderPos: ctx.fielderPos,
+    fielderId: ctx.fielder.id,
+    outProbability,
+    commentary: out
+      ? `PICKED OFF! ${ctx.pitcher.name} snaps a laser to ${ctx.fielder.name} (${ctx.fielderPos}) to nab ${ctx.runner.name} off ${baseLabel}!`
+      : `Pickoff throw to ${baseLabel} — ${ctx.runner.name} dives back safely, keeping the lead tight.`,
+    soundCue: out ? 'double_play_snap' : 'dirt_slide',
+  };
 }

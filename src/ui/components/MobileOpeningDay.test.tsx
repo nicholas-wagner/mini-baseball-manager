@@ -56,7 +56,7 @@ it('identifies the runner at the destination when Marcus sacrifices both runners
     render(<GameDayScreen />);
     fireEvent.click(screen.getByRole('button',{name:'Bat with Marcus'}));
     fireEvent.click(screen.getByRole('button',{name:'🏏 Bunt'}));
-    fireEvent.click(screen.getByRole('button',{name:'Lay down bunt'}));
+    fireEvent.click(screen.getByRole('button',{name:/^Lay down bunt/}));
     act(() => vi.advanceTimersByTime(30000));
     expect(screen.getByRole('region',{name:'Play result'})).toHaveTextContent('Runners to second and third');
     expect(screen.getByRole('img',{name:/safe.*on third/i})).toBeVisible();

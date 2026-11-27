@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { createPlayer } from '../engine/gm/rosterFactory';
 import { createInitialEconomy } from '../engine/models/club';
+import { createSeededRng } from '../engine/rng/seededRng';
 import { migrateSavePayload } from '../store/migrations';
 import { migrateClubEconomy } from './migrations';
 
-describe('TASK-108 economy migrations', () => {
+describe('TASK-108 economy & TASK-114 skill-tree migrations', () => {
   it('fills promo, receipt, and feast defaults on legacy club economies', () => {
     const legacy = createInitialEconomy('rookie');
     delete legacy.scheduledPromoId;
@@ -17,10 +19,17 @@ describe('TASK-108 economy migrations', () => {
     expect(migrated.cash).toBe(legacy.cash);
   });
 
-  it('hydrates missing economy fields when a v1 save is loaded', () => {
+  it('hydrates missing economy fields and player careerRetrainsUsed defaults when a v1 save is loaded', () => {
     const clubEconomy = createInitialEconomy('low_a');
     delete clubEconomy.scheduledPromoId;
     delete clubEconomy.recentLedgerEntries;
+    const legacyPlayer = createPlayer(createSeededRng(114), { position: 'SS', tier: 'low_a' });
+    delete legacyPlayer.careerRetrainsUsed;
+    const retrainedPlayer = {
+      ...createPlayer(createSeededRng(115), { position: 'SP', tier: 'low_a' }),
+      careerRetrainsUsed: 1,
+    };
+
     const raw = {
       schemaVersion: 1,
       savedAtIso: '1994-06-01T00:00:00.000Z',
@@ -41,7 +50,7 @@ describe('TASK-108 economy migrations', () => {
             colors: { primary: '#E63946', secondary: '#1D3557', accent: '#FFD166', monogram: 'SC' },
             leagueTier: 'low_a',
             aiArchetype: 'moneyball',
-            roster: [],
+            roster: [legacyPlayer, retrainedPlayer],
             academyProspects: [],
             lineup: [],
             rotationIds: [],
@@ -66,5 +75,7 @@ describe('TASK-108 economy migrations', () => {
     const loaded = migrateSavePayload(raw);
     expect(loaded.leagues.low_a[0].economy.scheduledPromoId).toBeNull();
     expect(loaded.leagues.low_a[0].economy.recentLedgerEntries).toEqual([]);
+    expect(loaded.leagues.low_a[0].roster[0].careerRetrainsUsed).toBe(0);
+    expect(loaded.leagues.low_a[0].roster[1].careerRetrainsUsed).toBe(1);
   });
 });

@@ -15,9 +15,17 @@ import {
   STAFF_SALARY_BUDGET_BY_TIER,
 } from '../../engine/gm/coaches';
 import type { Club } from '../../engine/models/club';
+import { computePlayerOverall } from '../../engine/models/player';
+import {
+  evaluatePowerUpPurchase,
+  getPowerUpStatOptions,
+  POWER_UP_STAT_LABELS,
+  type PowerUpStatKey,
+} from '../../engine/rpg/powerUpCamp';
 import {
   buyHumanFoilPack,
   hostHumanClubhouseFeast,
+  purchaseHumanPowerUp,
   scheduleHumanPromoNight,
 } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
@@ -100,6 +108,19 @@ function Meter({
 export function ClubTreasuryPanel({ club, seriesIndex, onNotice, onJump }: ClubTreasuryPanelProps) {
   const freeAgents = useGameStore((state) => state.freeAgents);
   const [openReceipt, setOpenReceipt] = useState<string | null>(null);
+  const [selectedPowerUpPlayerId, setSelectedPowerUpPlayerId] = useState<string>(
+    () => club.roster[0]?.id ?? '',
+  );
+  const selectedPowerUpPlayer =
+    club.roster.find((player) => player.id === selectedPowerUpPlayerId) ?? club.roster[0] ?? null;
+  const powerUpStats = selectedPowerUpPlayer ? getPowerUpStatOptions(selectedPowerUpPlayer) : [];
+  const powerUpPreviews = selectedPowerUpPlayer
+    ? powerUpStats.map((stat) => ({
+        stat,
+        eval: evaluatePowerUpPurchase(club, selectedPowerUpPlayer.id, stat),
+      }))
+    : [];
+  const powerUpBudgetFull = powerUpPreviews.some((item) => item.eval.willTrimSecondary);
   const cap = evaluateSalaryCapStatus(club);
   const staffPayroll = computeClubStaffPayroll(club.coaches.activeStaff ?? []);
   const staffBudget = STAFF_SALARY_BUDGET_BY_TIER[club.leagueTier];
@@ -153,6 +174,13 @@ export function ClubTreasuryPanel({ club, seriesIndex, onNotice, onJump }: ClubT
     soundEngine.play(res.booked ? 'vendor_bell' : 'ui_pop');
   };
 
+  const buyPowerUp = (stat: PowerUpStatKey) => {
+    if (!selectedPowerUpPlayer) return;
+    const res = purchaseHumanPowerUp(selectedPowerUpPlayer.id, stat);
+    onNotice(res.summary);
+    soundEngine.play(res.purchased ? 'level_up' : 'ui_pop');
+  };
+
   return (
     <div data-testid="club-treasury-panel" className="space-y-3">
       <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-3">
@@ -187,6 +215,87 @@ export function ClubTreasuryPanel({ club, seriesIndex, onNotice, onJump }: ClubT
           max={staffBudget}
           tone="#4CC3FF"
         />
+      </div>
+
+      <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2.5" data-testid="power-up-camp">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-display text-sm text-[#181B2C]">💪 Power-Up Camp</div>
+            <p className="text-[11px] font-bold text-[#4A5068]">
+              Spend club cash for permanent +1 boosts inside stat caps.
+            </p>
+          </div>
+          {selectedPowerUpPlayer ? (
+            <select
+              data-testid="power-up-player-select"
+              aria-label="Select player for Power-Up Camp"
+              value={selectedPowerUpPlayer.id}
+              onChange={(event) => setSelectedPowerUpPlayerId(event.target.value)}
+              className="min-h-[44px] max-w-full px-2.5 py-1 rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] text-xs font-extrabold text-[#181B2C]"
+            >
+              {club.roster.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name} ({player.position} · OVR {computePlayerOverall(player)})
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+        {powerUpBudgetFull ? (
+          <p
+            data-testid="power-up-budget-note"
+            className="text-[11px] font-extrabold text-[#9D0208] bg-[#FFE5EC] border border-[#9D0208]/30 rounded-lg px-2 py-1"
+          >
+            Budget full: +1 trims -1 from a secondary skill
+          </p>
+        ) : null}
+        {selectedPowerUpPlayer ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+            {powerUpPreviews.map(({ stat, eval: preview }) => {
+              const maxed = preview.currentValue >= preview.capValue || preview.currentValue >= 99;
+              const affordable = !maxed && club.economy.cash >= preview.cost;
+              return (
+                <button
+                  key={stat}
+                  type="button"
+                  data-testid={`power-up-stat-${stat}`}
+                  disabled={!preview.allowed}
+                  onClick={() => buyPowerUp(stat)}
+                  className={`min-h-[44px] p-2 rounded-xl border-2 border-[#181B2C] text-left flex flex-col justify-between gap-1 transition ${
+                    preview.allowed
+                      ? 'bg-[#FFF3BF] hover:bg-[#FFD86B] cursor-pointer shadow-[2px_2px_0_#181B2C]'
+                      : 'bg-[#F3EFE6] opacity-70 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-display text-[11px] text-[#181B2C] truncate">
+                      {POWER_UP_STAT_LABELS[stat]}
+                    </span>
+                    <span className="font-mono-tabular text-[10.5px] font-extrabold text-[#1D3557] shrink-0">
+                      {preview.currentValue} / {preview.capValue}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                    <span className="font-mono-tabular text-[11px] font-extrabold text-[#181B2C]">
+                      {maxed ? 'MAX' : money(preview.cost)}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold border ${
+                        maxed
+                          ? 'bg-[#E5E7EB] text-[#374151] border-[#374151]/25'
+                          : affordable
+                            ? 'bg-[#D8F3DC] text-[#1B4332] border-[#1B4332]/25'
+                            : 'bg-[#FFE5EC] text-[#9D0208] border-[#9D0208]/25'
+                      }`}
+                    >
+                      {maxed ? 'Maxed' : affordable ? 'Affordable!' : 'Short'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2">

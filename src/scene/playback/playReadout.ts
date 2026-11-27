@@ -22,6 +22,8 @@ const labels: Record<AtBatOutcome, string> = {
   fielding_error: 'Fielding error',
   bunt_single: 'Bunt single',
   bunt_out: 'Bunt out',
+  pickoff_out: 'Picked off',
+  pickoff_safe: 'Back safely',
 };
 
 export function playReadout(event?: PlayEvent | null) {

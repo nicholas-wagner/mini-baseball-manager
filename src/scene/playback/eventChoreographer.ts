@@ -229,6 +229,24 @@ const OUTCOME_PRESETS: Readonly<Record<AtBatOutcome, OutcomePreset>> = {
     ballStyle: 'ninja_bunt',
     baseDurationMs: 1000,
   },
+  pickoff_out: {
+    cameraPreset: 'broadcast_diamond',
+    pitcherClip: 'pitch_stretch_set',
+    batterClip: 'bat_stance',
+    fielderClip: 'field_dive',
+    ballStyle: 'fastball',
+    baseDurationMs: 1050,
+    callout: { text: 'PICKED OFF!!', color: '#FF4D6D' },
+  },
+  pickoff_safe: {
+    cameraPreset: 'broadcast_diamond',
+    pitcherClip: 'pitch_stretch_set',
+    batterClip: 'bat_stance',
+    fielderClip: 'field_ready',
+    ballStyle: 'fastball',
+    baseDurationMs: 760,
+    callout: { text: 'BACK SAFELY!', color: '#FFC300' },
+  },
 };
 
 /** Linearly interpolates along diamond basepaths between consecutive bases. */

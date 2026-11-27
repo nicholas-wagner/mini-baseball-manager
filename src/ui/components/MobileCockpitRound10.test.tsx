@@ -54,7 +54,7 @@ describe('TASK-084 — Mobile One-Screen Live Cockpit, Guided Heat/Bunt, Arcade 
       expect(buntChoice).toHaveAttribute('aria-pressed', 'true');
       expect(guide.getByRole('button', { name: /bunt/i })).toBeInTheDocument();
     } else if (catcherCall) {
-      expect(guide.getByRole('button', { name: /throw pitch/i })).toBeInTheDocument();
+      expect(guide.getByRole('button', { name: /throw · 1-pitch|throw pitch/i })).toBeInTheDocument();
     }
 
     // Expanding More controls hides the duplicate h3 objective inside FirstAtBat

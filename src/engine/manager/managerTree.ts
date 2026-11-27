@@ -187,31 +187,125 @@ export const MANAGER_SKILL_NODES: readonly ManagerSkillNode[] = [
   },
 ];
 
-/** Unlocks a Manager RPG skill node if SP & prerequisites are satisfied. */
+export const MANAGER_SKILL_SP_CAP = 9;
+export const MANAGER_MAX_CAPSTONES = 1;
+
+export interface ManagerBuildIdentity {
+  label: string;
+  tone: 'skipper' | 'coach' | 'mogul' | 'balanced';
+  spentSp: number;
+  maxSp: number;
+  capstoneId: string | null;
+}
+
+const MANAGER_NODES_BY_ID: Readonly<Record<string, ManagerSkillNode>> = Object.fromEntries(
+  MANAGER_SKILL_NODES.map((node) => [node.id, node]),
+);
+
+const MANAGER_CAPSTONE_IDENTITIES: Readonly<
+  Record<string, { label: string; tone: 'skipper' | 'coach' | 'mogul' }>
+> = {
+  skipper_rally_cap: { label: 'Skipper Legend', tone: 'skipper' },
+  coach_rookie_whisperer: { label: 'Player-Dev Guru', tone: 'coach' },
+  mogul_dynasty_aura: { label: 'Cash Mogul', tone: 'mogul' },
+};
+
+function isManagerCapstoneNode(node: ManagerSkillNode): boolean {
+  return node.spCost >= 2;
+}
+
+function findUnlockedManagerCapstone(unlockedNodeIds: readonly string[]): ManagerSkillNode | null {
+  for (const id of new Set(unlockedNodeIds)) {
+    const node = MANAGER_NODES_BY_ID[id];
+    if (node && isManagerCapstoneNode(node)) return node;
+  }
+  return null;
+}
+
+/** Returns total Manager SP spent across unlocked Manager RPG nodes. */
+export function getManagerSpentSkillPoints(manager: Pick<ManagerProfile, 'unlockedNodeIds'>): number {
+  let spent = 0;
+  for (const id of new Set(manager.unlockedNodeIds)) {
+    spent += MANAGER_NODES_BY_ID[id]?.spCost ?? 0;
+  }
+  return spent;
+}
+
+/** Computes the Manager's RPG Build Identity and Legacy SP budget usage. */
+export function getManagerBuildIdentity(
+  manager: Pick<ManagerProfile, 'unlockedNodeIds'>,
+): ManagerBuildIdentity {
+  const spentSp = getManagerSpentSkillPoints(manager);
+  const capstone = findUnlockedManagerCapstone(manager.unlockedNodeIds);
+  const identity = capstone ? MANAGER_CAPSTONE_IDENTITIES[capstone.id] : undefined;
+
+  return {
+    label: identity?.label ?? 'Balanced GM',
+    tone: identity?.tone ?? 'balanced',
+    spentSp,
+    maxSp: MANAGER_SKILL_SP_CAP,
+    capstoneId: capstone?.id ?? null,
+  };
+}
+
+function checkManagerCapstoneAndBudget(
+  manager: ManagerProfile,
+  node: ManagerSkillNode,
+): { allowed: boolean; reason?: string } | null {
+  if (isManagerCapstoneNode(node)) {
+    const existingCapstone = findUnlockedManagerCapstone(manager.unlockedNodeIds);
+    if (existingCapstone) {
+      return {
+        allowed: false,
+        reason: `Capstone locked — specialized in ${existingCapstone.name} (max ${MANAGER_MAX_CAPSTONES} Manager Capstone).`,
+      };
+    }
+  }
+  const spentSp = getManagerSpentSkillPoints(manager);
+  if (spentSp + node.spCost > MANAGER_SKILL_SP_CAP) {
+    return {
+      allowed: false,
+      reason: `Manager Legacy cap reached (${spentSp}/${MANAGER_SKILL_SP_CAP} SP — need ${node.spCost} SP room).`,
+    };
+  }
+  return null;
+}
+
+/** Validates whether the human manager can unlock a given Manager RPG node under Legacy SP & capstone caps. */
+export function canUnlockManagerSkillNode(
+  manager: ManagerProfile,
+  nodeId: string,
+): { allowed: boolean; reason?: string } {
+  const node = MANAGER_NODES_BY_ID[nodeId];
+  if (!node) return { allowed: false, reason: 'Unknown manager skill node.' };
+  if (manager.unlockedNodeIds.includes(nodeId)) {
+    return { allowed: false, reason: `${node.name} is already unlocked.` };
+  }
+  const capBlock = checkManagerCapstoneAndBudget(manager, node);
+  if (capBlock) return capBlock;
+  if (node.prerequisiteId && !manager.unlockedNodeIds.includes(node.prerequisiteId)) {
+    const prereq = MANAGER_NODES_BY_ID[node.prerequisiteId];
+    return { allowed: false, reason: `Unlock ${prereq?.name ?? node.prerequisiteId} first.` };
+  }
+  if (manager.skillPoints < node.spCost) {
+    return {
+      allowed: false,
+      reason: `Need ${node.spCost} Manager SP (currently ${manager.skillPoints}).`,
+    };
+  }
+  return { allowed: true };
+}
+
+/** Unlocks a Manager RPG skill node if Legacy SP cap, capstone cap, SP & prerequisites are satisfied. */
 export function unlockManagerSkillNode(
   manager: ManagerProfile,
   nodeId: string,
 ): { unlocked: boolean; reason?: string; manager: ManagerProfile } {
-  const node = MANAGER_SKILL_NODES.find((n) => n.id === nodeId);
-  if (!node) return { unlocked: false, reason: 'Unknown manager skill node.', manager };
-  if (manager.unlockedNodeIds.includes(nodeId)) {
-    return { unlocked: false, reason: `${node.name} is already unlocked.`, manager };
+  const check = canUnlockManagerSkillNode(manager, nodeId);
+  if (!check.allowed) {
+    return { unlocked: false, reason: check.reason, manager };
   }
-  if (node.prerequisiteId && !manager.unlockedNodeIds.includes(node.prerequisiteId)) {
-    const prereq = MANAGER_SKILL_NODES.find((n) => n.id === node.prerequisiteId);
-    return {
-      unlocked: false,
-      reason: `Unlock ${prereq?.name ?? node.prerequisiteId} first.`,
-      manager,
-    };
-  }
-  if (manager.skillPoints < node.spCost) {
-    return {
-      unlocked: false,
-      reason: `Need ${node.spCost} Manager SP (currently ${manager.skillPoints}).`,
-      manager,
-    };
-  }
+  const node = MANAGER_NODES_BY_ID[nodeId];
 
   const activePowerIds =
     node.unlocksPowerId && !manager.activePowerIds.includes(node.unlocksPowerId)

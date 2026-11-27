@@ -59,6 +59,13 @@ export interface PitcherSignOption {
   isWeak: boolean;
 }
 
+export interface PickoffQuickOption {
+  base: 1 | 2;
+  call: 'pickoff_1b' | 'pickoff_2b';
+  label: string;
+  runnerName?: string;
+}
+
 interface LiveActionBarProps {
   watchSettings?: React.ReactNode;
   catcherSuggestion?: React.ReactNode;
@@ -125,6 +132,8 @@ interface LiveActionBarProps {
   stealOptions?: readonly StealOptionPreview[];
   armedStealPlay?: StealPlayType | null;
   onToggleStealPlay?: (play: StealPlayType | null) => void;
+  pickoffOption?: PickoffQuickOption | null;
+  onPickoff?: (base: 1 | 2) => void;
   hitAndRunArmed?: boolean;
   onToggleHitAndRun?: () => void;
   strikes?: number;
@@ -229,6 +238,8 @@ export function LiveActionBar({
   stealOptions = [],
   armedStealPlay = null,
   onToggleStealPlay,
+  pickoffOption = null,
+  onPickoff,
   hitAndRunArmed = false,
   onToggleHitAndRun,
   strikes = 0,
@@ -409,6 +420,7 @@ export function LiveActionBar({
       >
         {(showBullpenSuggestion && bullpenSuggestion) ||
         (isBatting && resolvedStealOptions.length > 0) ||
+        (!isBatting && Boolean(pickoffOption) && Boolean(onPickoff)) ||
         (readyPowerLabel && onArmReadyPower) ? (
           <div className="live-context-chip" data-testid="dock-context-chip">
             {showBullpenSuggestion && bullpenSuggestion ? (
@@ -419,6 +431,16 @@ export function LiveActionBar({
                 onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
               >
                 Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
+              </button>
+            ) : null}
+            {!isBatting && pickoffOption && onPickoff ? (
+              <button
+                type="button"
+                data-testid="arcade-pickoff-btn"
+                disabled={controlsLocked}
+                onClick={() => onPickoff(pickoffOption.base)}
+              >
+                👀 {pickoffOption.label}
               </button>
             ) : null}
             {isBatting &&
@@ -807,6 +829,21 @@ export function LiveActionBar({
             </div>
           ) : null}
 
+          {/* 1-Tap Pickoff 1B/2B chip when pitching with runner on 1B or 2B (Simple & Pro, Desktop & Sheet) */}
+          {!isBatting && pickoffOption && onPickoff ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                data-testid="arcade-pickoff-btn"
+                disabled={controlsLocked}
+                onClick={() => onPickoff(pickoffOption.base)}
+                className="px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] bg-[#E0FBFC] hover:bg-[#FFCC49] text-[#152F2E] font-heading font-extrabold text-[11px] cursor-pointer transition disabled:opacity-55 disabled:cursor-not-allowed"
+              >
+                👀 {pickoffOption.label}
+              </button>
+            </div>
+          ) : null}
+
           {/* High-Contrast ⚡ Special Power Hype Meter */}
           <div
             data-testid="arcade-hype-bar"
@@ -1052,6 +1089,7 @@ export function LiveActionBar({
               variant={onePitchMode ? 'gold' : 'cream'}
               data-testid="arcade-one-pitch-toggle"
               aria-pressed={onePitchMode}
+              title="1-Pitch At-Bats (Default in Simple Mode; Pro Manager defaults to Pitch-by-Pitch)"
               disabled={gameCompleted}
               onClick={onToggleOnePitchMode}
               className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
