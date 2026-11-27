@@ -1,3 +1,4 @@
+import { isDivingWebGem, ROBBERY_CALL, WEB_GEM_CALL } from './fieldingHighlights';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import type { Vec3 } from '../camera/cameraRig';
 import { CLIP_DURATIONS, GLOVE_CONTACT_PHASE, type CharacterAnimClip } from '../characters/animationState';
@@ -56,9 +57,6 @@ export function buildOutfieldPlay(kind: OutfieldKind, pitch: Leg, event?: PlayEv
   const caught = preset.bags === 0;
   const homer = kind === 'home_run';
   const wall = !homer && !caught && (event?.soundCue === 'wall_thud' || kind === 'triple');
-  const reach = event?.fieldingHighlight?.anim;
-  const catchClip = kind === 'line_out' || reach === 'field_dive' ? 'field_dive'
-    : reach === 'field_high_jump' ? 'field_high_jump' : 'field_pop';
   const landing = { x, y: .12, z };
   if (kind === 'single') {
     // Shallow singles in the simulation can fall inside the miniature clay cutout.
@@ -71,6 +69,11 @@ export function buildOutfieldPlay(kind: OutfieldKind, pitch: Leg, event?: PlayEv
     caught &&
     (Boolean(event?.fieldingHighlight?.robbedHomeRun) ||
       event?.specialPowerTriggered?.powerId === 'sky_high_leap');
+  const webGem = caught && !wallCatch && isDivingWebGem(event?.fieldingHighlight);
+  const reach = event?.fieldingHighlight?.anim;
+  const catchClip = wallCatch ? 'field_high_jump' : kind === 'line_out' || reach === 'field_dive' ? 'field_dive'
+    : reach === 'field_high_jump' ? 'field_high_jump' : 'field_pop';
+  const highlightCall = wallCatch ? ROBBERY_CALL : webGem ? WEB_GEM_CALL : undefined;
   if (wall || homer || wallCatch) {
     const angle = Math.atan2(x, OUTFIELD_WALL.centerZ - z);
     const radius = Math.hypot(x, z - OUTFIELD_WALL.centerZ);
@@ -108,11 +111,11 @@ export function buildOutfieldPlay(kind: OutfieldKind, pitch: Leg, event?: PlayEv
   const leadArrival = kind === 'sac_fly' ? receiveAt + 1.08 : batterArrival;
   const finish = Math.max(receiveAt, batterArrival, leadArrival);
   return {
-    kind, pickup, fieldAt, legs, pickupAt, receiveAt, batterArrival, leadArrival,
+    kind, webGem, pickup, fieldAt, legs, pickupAt, receiveAt, batterArrival, leadArrival,
     finish, duration: finish + .72, unassisted: false,
     outfield: {
-      bags: preset.bags, catchClip, call: event?.specialPowerTriggered?.calloutText ?? (tagOutDp ? 'OUT AT HOME!' : preset.call),
-      callColor: event?.specialPowerTriggered?.vfxColor ?? (tagOutDp ? '#C1394C' : caught ? '#167457' : '#E7A516'), caught, wall
+      bags: preset.bags, catchClip, robbedHomeRun: wallCatch, call: highlightCall?.text ?? event?.specialPowerTriggered?.calloutText ?? (tagOutDp ? 'OUT AT HOME!' : preset.call),
+      callColor: highlightCall?.color ?? event?.specialPowerTriggered?.vfxColor ?? (tagOutDp ? '#C1394C' : caught ? '#167457' : '#E7A516'), caught, wall
     }
   };
 }
@@ -125,11 +128,16 @@ export function outfieldDefenderAt(play: DiamondPlay, outfield: NonNullable<Diam
   let local = time;
   let stop = start;
   let arrive = pickupAt;
+  let adjustmentStep = false;
   const receiver = play.legs.find(leg => leg.kind === 'throw' && leg.to === actor);
   if (actor === pickup) {
     stop = fieldAt;
+    if (outfield.robbedHomeRun) arrive -= CLIP_DURATIONS.field_high_jump * GLOVE_CONTACT_PHASE.field_high_jump;
     // A routine fly sometimes lands exactly at the nominal defensive spot.
-    if (Math.hypot(start.x - stop.x, start.z - stop.z) < 1.6) start = { ...start, x: start.x + 2.8, z: start.z + 1.3 };
+    if (!play.webGem && Math.hypot(start.x - stop.x, start.z - stop.z) < 1.6) {
+      if (play.alignment) adjustmentStep = true;
+      else start = { ...start, x: start.x + 2.8, z: start.z + 1.3 };
+    }
   } else if (receiver) {
     stop = { x: fieldAt.x * .4, y: .04, z: fieldAt.z * .61 };
     arrive = pickupAt + .1;
@@ -148,6 +156,11 @@ export function outfieldDefenderAt(play: DiamondPlay, outfield: NonNullable<Diam
   const chase = Math.max(0, Math.min(1, (time - go) / (arrive - go)));
   const u = chase*chase*(3-2*chase);
   const pos = { x: start.x + (stop.x - start.x) * u, y: start.y, z: start.z + (stop.z - start.z) * u };
+  if (adjustmentStep && chase > 0 && chase < 1) {
+    const step = Math.sin(Math.PI * chase) ** 2;
+    pos.x += .8 * step;
+    pos.z -= .45 * step;
+  }
   let yaw = headingToward(pos, BASE_PATH_VERTICES[0]);
   if (time > go && time < arrive && start !== stop) {
     yaw = headingToward(start, stop);
@@ -159,6 +172,11 @@ export function outfieldDefenderAt(play: DiamondPlay, outfield: NonNullable<Diam
     const reach = action === 'field_dive' || action === 'field_high_jump'
       ? CLIP_DURATIONS[action] * GLOVE_CONTACT_PHASE[action] : .28;
     if (time >= pickupAt - reach && time < pickupAt + .42) {
+      if (outfield.robbedHomeRun) {
+        const offset = time - pickupAt;
+        const phase = offset / (offset < 0 ? reach : .42);
+        pos.y += 1.35 * (1 - phase * phase);
+      }
       clip = action;
       local = Math.min(time - pickupAt + reach, CLIP_DURATIONS[action] - .01);
       yaw = headingToward(pos, BASE_PATH_VERTICES[0]);

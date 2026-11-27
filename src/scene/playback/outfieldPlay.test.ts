@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { actorAt, diamondPlay, sampleLeg } from './diamondPlay';
-import { BASE_PATH_VERTICES } from './diamondLayout';
+import { actorAt, diamondCamera, diamondPlay, sampleLeg } from './diamondPlay';
+import { getShiftDefenderCoords } from './defensiveShiftCoords';
+import { crowdReaction } from './impactTiming';
+import { BASE_PATH_VERTICES, OUTFIELD_WALL } from './diamondLayout';
 import { choreographPlayEvent } from './eventChoreographer';
 import type { PlayEvent } from '../../engine/models/playEvent';
 
@@ -92,4 +94,50 @@ it('throws home from the outfield when a runner tagging up is doubled off', () =
   ).outfield!;
   expect(play.legs.at(-1)).toMatchObject({ kind: 'throw', from: 'RF', to: 'C' });
   expect(play.outfield?.call).toBe('OUT AT HOME!');
+});
+
+it.each(['event flag', 'sky high leap'])('climbs the warning-track wall on a robbery from %s', source => {
+  const event: PlayEvent = { ...fly,
+    fieldingHighlight: { fielderPos: 'LF', fielderId: '7', anim: 'field_run', robbedHomeRun: source === 'event flag' },
+    specialPowerTriggered: source === 'event flag' ? undefined :
+      { actor: 'fielder', powerId: 'sky_high_leap', calloutText: 'LEAP!', vfxColor: '#ffffff' },
+  };
+  const play = choreographPlayEvent(event, 1).play!;
+  const { fieldAt, pickupAt } = play;
+  expect(play.outfield).toMatchObject({ robbedHomeRun: true, call: 'ROBBED!!', callColor: '#FF4D6D' });
+  expect(Math.hypot(fieldAt.x, fieldAt.z - OUTFIELD_WALL.centerZ)).toBeCloseTo(OUTFIELD_WALL.radius - .85);
+  const at = (t: number) => actorAt(play, play.pickup, t, 'R');
+  expect(at(pickupAt).clip).toBe('field_high_jump');
+  expect(at(pickupAt).pos.y - fieldAt.y).toBeCloseTo(1.35);
+  for (const offset of [-.1, .1]) expect(at(pickupAt + offset).pos.y).toBeLessThan(at(pickupAt).pos.y);
+  expect(at(pickupAt + .42).pos.y).toBeCloseTo(fieldAt.y);
+  const shot = diamondCamera(play, pickupAt, 'R');
+  expect(shot.lookAt.y).toBeGreaterThan(at(pickupAt).pos.y);
+  expect(Math.hypot(shot.lookAt.x - fieldAt.x, shot.lookAt.z - fieldAt.z)).toBeLessThan(.5);
+  expect(crowdReaction(play)).toMatchObject({ at: pickupAt, stand: true });
+});
+
+it.each([
+  ['fly_out', 'LF'], ['line_out', 'SS'], ['ground_out', '3B'], ['ground_out', '1B'],
+] as const)('lunges horizontally into a diving %s by %s', (outcome, fielderPos) => {
+  const play = choreographPlayEvent({ ...fly, outcome, fieldingHighlight: {
+    anim: 'field_dive', webGem: true, fielderPos, fielderId: 'glover',
+  } }, 1).play!;
+  expect(play.webGem).toBe(true);
+  const before = actorAt(play, play.pickup, play.pickupAt - .28, 'R');
+  const catchPose = actorAt(play, play.pickup, play.pickupAt, 'R');
+  expect(catchPose.clip).toBe('field_dive');
+  expect(before.clip).toBe('field_dive');
+  expect(catchPose.pos).toEqual(play.fieldAt);
+  expect(Math.hypot(before.pos.x - catchPose.pos.x, before.pos.z - catchPose.pos.z)).toBeGreaterThan(.65);
+});
+
+it('starts a routine fly from the live alignment and adjusts under the ball on the way to the catch', () => {
+  const alignment = getShiftDefenderCoords('standard');
+  const play = { ...choreographPlayEvent(fly, 1).play!, alignment };
+  const start = actorAt(play, 'LF', 0, 'L').pos;
+  expect(start).toEqual(alignment.LF);
+  const midway = actorAt(play, 'LF', (play.legs[0].end + play.pickupAt) / 2, 'L').pos;
+  expect(Math.hypot(midway.x - start.x, midway.z - start.z)).toBeGreaterThan(.25);
+  expect(actorAt(play, 'LF', play.pickupAt, 'L').pos).toEqual(play.fieldAt);
 });

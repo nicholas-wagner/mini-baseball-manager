@@ -1,13 +1,13 @@
-import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
+import type { EffectiveBatSide, FieldPosition, ThrowsHand } from '../../engine/handedness/types';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { getCameraPresetPose, type CameraPose, type Vec3 } from '../camera/cameraRig';
 import { CLIP_DURATIONS, deliveryClip, type CharacterAnimClip } from '../characters/animationState';
 import { plateBatterPose, targetOffset } from './firstAtBatPresentation';
-import { BASE_PATH_VERTICES as bags, CATCHER_HOME, batterBox, headingToward } from './diamondLayout';
+import { BASE_PATH_VERTICES as bags, CATCHER_HOME, PITCHING_RUBBER, batterBox, headingToward } from './diamondLayout';
 import type { Actor, DiamondPlay, Leg } from './diamondPlay';
 import { runBases } from './outfieldPlay';
 
-export const PLATE_AND_STEALS = ['foul_back', 'called_third', 'swinging_third', 'ball_four', 'steal_safe', 'steal_out'] as const;
+export const PLATE_AND_STEALS = ['foul_back', 'called_third', 'swinging_third', 'ball_four', 'steal_safe', 'steal_out', 'pickoff_out', 'pickoff_safe'] as const;
 export type CloseKind = typeof PLATE_AND_STEALS[number] | 'called_pitch' | 'missed_pitch' | 'ball_pitch';
 type Base = 1 | 2 | 3;
 type Pose = { pos: Vec3; yaw: number; clip: CharacterAnimClip; local: number };
@@ -15,13 +15,25 @@ export interface CloseAction {
   kind: CloseKind;
   fromBase: Base;
   steal: boolean;
+  pickoff?: boolean;
   swing: boolean;
   decisionAt: number;
 }
+export const PICKOFF_CALLS = {
+  pickoff_out: { text: 'PICKED OFF!', color: '#C1394C' },
+  pickoff_safe: { text: 'SAFE BACK!', color: '#167457' },
+} as const;
+export const PICKOFF_DIVE_AT = .30;
+
+export function isPickoffKind(kind?: string): kind is keyof typeof PICKOFF_CALLS {
+  return kind === 'pickoff_out' || kind === 'pickoff_safe';
+}
+
 export function isCloseKind(kind: string): kind is CloseKind {
   return ['called_pitch','missed_pitch','ball_pitch'].includes(kind) || PLATE_AND_STEALS.some(value => value === kind);
 }
 export function closeKindFor(event: PlayEvent): CloseKind | undefined {
+  if (event.type === 'pickoff' && isPickoffKind(event.outcome)) return event.outcome;
   if (event.type === 'stolen_base_attempt') return event.outsAfter > event.outsBefore ? 'steal_out' : 'steal_safe';
   if (event.outcome === 'called_strike') return 'called_pitch';
   if (event.outcome === 'swinging_strike') return 'missed_pitch';
@@ -41,7 +53,17 @@ const fraction = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
 function mix(a: Vec3, b: Vec3, u: number): Vec3 {
   return { x: a.x + (b.x-a.x)*u, y: a.y + (b.y-a.y)*u, z: a.z + (b.z-a.z)*u };
 }
-export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1, buntAttempt = false, outcome?: string): DiamondPlay {
+export function buildClosePlay(kind: CloseKind, pitch: Leg, fromBase: Base = 1, buntAttempt = false, outcome?: string, fielder?: FieldPosition): DiamondPlay {
+  if (isPickoffKind(kind)) {
+    const base = fromBase === 2 ? 2 : 1;
+    const pickup = base === 1 ? '1B' : fielder === 'SS' ? 'SS' : '2B';
+    const snap: Leg = { from: 'P', to: pickup, kind: 'throw', start: .24, end: .62 };
+    const finish = snap.end + .18;
+    return { kind, close: { kind, fromBase: base, pickoff: true, steal: false, swing: false, decisionAt: finish },
+      legs: [snap], pickup, fieldAt: bags[base], pickupAt: snap.end, receiveAt: snap.end, finish,
+      leadArrival: finish + (kind === 'pickoff_safe' ? -.08 : .12), batterArrival: 0,
+      duration: finish + 1.05, unassisted: false };
+  }
   const steal = kind === 'steal_safe' || kind === 'steal_out';
   const fieldAt = bags[fromBase + 1];
   const pickup = steal ? (['2B', '3B', 'C'] as const)[fromBase - 1] : 'C';
@@ -69,6 +91,35 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
   const since = time - plate;
   const sign = bats === 'R' ? 1 : -1;
   const pose = (clip: CharacterAnimClip, local = time, pos = start, yaw = 0): Pose => ({ clip, local: Math.max(0, local), pos, yaw });
+  if (close.pickoff) {
+    const bag = play.fieldAt;
+    if (actor === 'P') {
+      const turn = fraction(time, 0, .22);
+      const yaw = headingToward(start, bag) * turn * turn * (3 - 2 * turn);
+      const load = play.legs[0].start - .19;
+      if (time < load) return pose('pitch_stretch_set', time, start, yaw);
+      return pose(time < load + CLIP_DURATIONS.field_throw ? 'field_throw' : 'field_ready', time - load, start, yaw);
+    }
+    if (actor === 'RUN') {
+      const lead = mix(bag, bags[close.fromBase + 1], .19);
+      if (time < PICKOFF_DIVE_AT) return pose('runner_lead', time, lead, headingToward(lead, PITCHING_RUBBER));
+      const u = fraction(time, PICKOFF_DIVE_AT, play.leadArrival);
+      const safe = close.kind === 'pickoff_safe' && time >= play.leadArrival;
+      return pose(safe ? 'slide_safe' : 'runner_slide', time - PICKOFF_DIVE_AT,
+        u === 1 ? bag : mix(lead, bag, u), headingToward(lead, bag));
+    }
+    if (actor === play.pickup) {
+      const cover = { ...bag, x: bag.x + .46, z: bag.z - .40 };
+      const pos = mix(start, cover, fraction(time, 0, play.receiveAt - .10));
+      const tagging = time > play.receiveAt;
+      const clip = tagging ? 'field_tag' : time >= play.receiveAt - .28 ? 'field_receive' : 'field_run';
+      const local = tagging ? Math.min(.47, time - play.receiveAt) : time - play.receiveAt + .28;
+      return pose(clip, clip === 'field_run' ? time : local, pos, headingToward(pos, tagging ? bag : PITCHING_RUBBER));
+    }
+    if (actor === 'BAT') return pose('bat_stance', time, box.position, box.yaw);
+    if (actor === 'C') return pose('catch_target', time, CATCHER_HOME, Math.PI);
+    return pose('field_ready');
+  }
   if (actor === 'P' && close.kind.endsWith('_third') && !play.reliefStrikeout &&
       since >= .24 && since < .24 + CLIP_DURATIONS.pitch_fist_pump) {
     return pose('pitch_fist_pump', since - .24);
@@ -157,6 +208,15 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
 export function closeCamera(play: DiamondPlay, close: CloseAction, t: number, bats: EffectiveBatSide, throws: ThrowsHand): CameraPose {
   const plate = play.legs[0].end;
   const sign = bats === 'R' ? 1 : -1;
+  if (close.pickoff) {
+    const u = fraction(t, play.legs[0].start - .10, play.receiveAt);
+    const zoom = u * u * (3 - 2 * u);
+    const bag = play.fieldAt;
+    const target = mix(PITCHING_RUBBER, bag, .28 + .72 * zoom);
+    return { lookAt: { ...target, y: 1.0 - .30 * zoom }, position: {
+      x: target.x + 3.8, y: 5.6 - 3.3 * zoom, z: target.z + 10.5 - 6.6 * zoom,
+    }, fov: 48 - 10 * zoom };
+  }
   if (play.batterView && !close.steal) {
     if (close.kind === 'ball_four' && t > plate+.85) {
       const p = closeActorAt(play,close,'BAT',t,bats,bags[0]).pos;

@@ -1,7 +1,8 @@
+import { ROBBERY_CALL, WEB_GEM_CALL } from './fieldingHighlights';
 import { sacrificeAdvances } from '../../engine/simulation/sacrificeAdvances';
 import { plateBatterPose } from './firstAtBatPresentation';
 import { finishPlay } from './teamReactions';
-import { closeKindFor, stealFrom } from './plateAndSteals';
+import { PICKOFF_CALLS, closeKindFor, isPickoffKind, stealFrom } from './plateAndSteals';
 import { BASE_PATH_VERTICES, CATCHER_HOME, OUTFIELD_STARTS, PITCHING_RUBBER } from './diamondLayout';
 export { BASE_PATH_VERTICES } from './diamondLayout';
 import { selectOutfieldKind } from './outfieldPlay';
@@ -233,19 +234,19 @@ const OUTCOME_PRESETS: Readonly<Record<AtBatOutcome, OutcomePreset>> = {
     cameraPreset: 'broadcast_diamond',
     pitcherClip: 'pitch_stretch_set',
     batterClip: 'bat_stance',
-    fielderClip: 'field_dive',
-    ballStyle: 'fastball',
+    fielderClip: 'field_tag',
+    ballStyle: null,
     baseDurationMs: 1050,
-    callout: { text: 'PICKED OFF!!', color: '#FF4D6D' },
+    callout: PICKOFF_CALLS.pickoff_out,
   },
   pickoff_safe: {
     cameraPreset: 'broadcast_diamond',
     pitcherClip: 'pitch_stretch_set',
     batterClip: 'bat_stance',
-    fielderClip: 'field_ready',
-    ballStyle: 'fastball',
+    fielderClip: 'field_tag',
+    ballStyle: null,
     baseDurationMs: 760,
-    callout: { text: 'BACK SAFELY!', color: '#FFC300' },
+    callout: PICKOFF_CALLS.pickoff_safe,
   },
 };
 
@@ -283,10 +284,16 @@ export function choreographPlayEvent(
   const buildPlay = (kind: DiamondPlayKind, fielder?: FieldPosition, base?: 1 | 2 | 3) =>
     diamondPlay(kind, fielder, event, base, event.pitchThrown, fromStretch);
   const closeKind = closeKindFor(event);
-  const fromBase = basesBefore && stealFrom(basesBefore, event.basesAfter);
+  const fromBase = event.type === 'pickoff' ? event.pickoffBase : basesBefore && stealFrom(basesBefore, event.basesAfter);
   const close = closeKind && (event.type !== 'stolen_base_attempt' || fromBase)
     ? buildPlay(closeKind, undefined, fromBase) : undefined;
 
+  if (close && isPickoffKind(close.kind)) {
+    finishPlay(close, event.outsAfter === 3, false);
+    return { ...OUTCOME_PRESETS[close.kind], play: close, close, basesBefore,
+      highlightFielderPos: close.pickup === '1B' || close.pickup === 'SS' ? close.pickup : '2B',
+      soundCue: event.soundCue ?? null, durationMs: Math.round(close.duration * 1000 / divisor) };
+  }
   if (event.type === 'stolen_base_attempt') {
     if (close) finishPlay(close,event.outsAfter===3,Boolean(context.walkoff),undefined);
     const stoleBase = event.outsAfter === event.outsBefore;
@@ -353,7 +360,7 @@ export function choreographPlayEvent(
       highlightFielderPos: event.fieldingHighlight?.fielderPos,
       ballStyle: event.ballFlight?.style ?? preset.ballStyle,
       soundCue: event.soundCue ?? null,
-      callout: event.specialPowerTriggered
+      callout: timed?.outfield?.robbedHomeRun ? ROBBERY_CALL : timed?.webGem ? WEB_GEM_CALL : event.specialPowerTriggered
         ? { text: event.specialPowerTriggered.calloutText, color: event.specialPowerTriggered.vfxColor }
         : preset.callout,
       durationMs: Math.round((timed ? timed.duration * 1000 : preset.baseDurationMs) / divisor),

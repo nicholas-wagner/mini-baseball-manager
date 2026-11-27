@@ -1,8 +1,9 @@
+import { divingCatchPose, isDivingWebGem } from './fieldingHighlights';
 import { plateBatterPose, type BattingPreviewPose } from './firstAtBatPresentation';
 import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
 import { pitchSeconds, shapePitch, type PitchFlight } from './pitchFlight';
 import { reactionCamera, reactionPose, bullpenPlay } from './teamReactions';
-import { buildClosePlay, closeActorAt, closeCamera, isCloseKind, type CloseAction, type CloseKind } from './plateAndSteals';
+import { buildClosePlay, closeActorAt, closeCamera, isCloseKind, isPickoffKind, type CloseAction, type CloseKind } from './plateAndSteals';
 import { BASE_PATH_VERTICES, OUTFIELD_STARTS, batterBox, headingToward } from './diamondLayout';
 import { buildOutfieldPlay, isOutfieldKind, outfieldDefenderAt, runBases, type OutfieldKind } from './outfieldPlay';
 import type { AtBatOutcome, PlayEvent } from '../../engine/models/playEvent';
@@ -41,6 +42,8 @@ export function isBuntEvent(event?: PlayEvent): boolean {
 
 export interface DiamondPlay {
   kind: DiamondPlayKind;
+  alignment?: Record<Exclude<Actor, 'BAT' | 'RUN' | 'P' | 'C'>, Vec3>;
+  webGem?: boolean;
   fromStretch?: boolean;
   battingPreview?: BattingPreviewPose;
   legs: Leg[];
@@ -69,7 +72,7 @@ export interface DiamondPlay {
   close?: CloseAction;
   outfield?: {
     bags: number; catchClip: 'field_pop' | 'field_high_jump' | 'field_dive';
-    call: string; callColor: string; caught: boolean; wall: boolean;
+    call: string; callColor: string; caught: boolean; wall: boolean; robbedHomeRun: boolean;
   };
 }
 export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, event?: PlayEvent, stealBase?: 1 | 2 | 3, pitchInfo: PitchFlight | undefined = event?.pitchThrown, fromStretch = kind === 'steal_safe' || kind === 'steal_out'): DiamondPlay {
@@ -78,7 +81,11 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
   const plate = release + (pitchInfo ? pitchSeconds(pitchInfo.mph) : .56);
   const pitch: Leg = {from:'P', to:'BAT', start:release, end:plate, kind:'pitch', pitch:pitchInfo};
   const buntAttempt = kind === 'bunt_out' || kind === 'bunt_single' || isBuntEvent(event);
-  if (isCloseKind(kind)) return { ...buildClosePlay(kind, pitch, stealBase, buntAttempt, event?.outcome), fromStretch };
+  if (isCloseKind(kind)) {
+    const close = buildClosePlay(kind, pitch, event?.pickoffBase ?? stealBase, buntAttempt,
+      event?.outcome, event?.fieldingHighlight?.fielderPos ?? highlight);
+    return { ...close, fromStretch: isPickoffKind(kind) || fromStretch };
+  }
   if (isOutfieldKind(kind)) return { ...buildOutfieldPlay(kind, pitch, event), fromStretch };
   const pop = kind === 'pop_up';
   const bunt = kind === 'bunt_out' || kind === 'bunt_single';
@@ -117,7 +124,7 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
     legs.push({ from:pickup,to:pickup,start:pickupAt,end:pickupAt+.44,kind:'bounce',endPoint:loose },
       { from:pickup,to:pickup,start:pickupAt+.44,end:finish,kind:'ground',startPoint:loose });
   }
-  return { kind, fromStretch, legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
+  return { kind, fromStretch, webGem: (liner || kind === 'ground_out' || kind === 'cover_first') && isDivingWebGem(event?.fieldingHighlight), legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
     buntAttempt: buntAttempt || undefined,
     duration: finish + (error ? 1.75 : 1.05),
     batterArrival: kind === 'bunt_single' ? finish-.34 : finish + 0.37, leadArrival: receiveAt + 0.28 };
@@ -180,7 +187,13 @@ export function buntRunnerPose(play: DiamondPlay, from: number, time: number) {
 
 function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: EffectiveBatSide): ActorPose {
   const plate = play.legs[0].end;
-  let pos = starts[actor];
+  const shiftable = actor !== 'P' && actor !== 'C' && actor !== 'BAT' && actor !== 'RUN';
+  const start = shiftable && play.alignment ? play.alignment[actor] : starts[actor];
+  let pos = start;
+  if (actor === play.pickup && play.webGem) {
+    const diving = divingCatchPose(play, start, time);
+    if (diving) return diving;
+  }
   const leadBase = play.scorerBase ?? play.runnerToThird;
   if (actor === 'RUN' && play.buntAdvances && play.scorerBase) return buntRunnerPose(play, play.scorerBase, time);
   if (actor === 'RUN' && play.plateDecision) {
@@ -328,7 +341,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     const arrive = isPickup ? play.pickupAt - 0.18 : play.receiveAt - 0.24;
     const u = progress(time, plate + 0.05, arrive);
     pos = between(pos, stop, u);
-    if (u > 0 && u < 1 && stop !== starts[actor]) clip = 'field_run';
+    if (u > 0 && u < 1 && stop !== start) clip = 'field_run';
     const receive = play.legs.find(leg => leg.to === actor);
     const toss = play.legs.find(leg => leg.from === actor);
     if (receive && time >= receive.end - 0.28) {
@@ -411,7 +424,9 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
   if (play.buntAdvances && t < play.finish - .36) {
     return { position: {x: 8, y: 11, z: 6}, lookAt: {x: 2, y: .5, z: -10.5}, fov: 44 };
   }
-  const leg = play.legs.find(part => t < part.end) ?? play.legs[play.legs.length - 1];
+  // Hold the wall through the landing, including when an inning-ending flip is queued.
+  const leg = play.outfield?.robbedHomeRun && t <= play.pickupAt + .42
+    ? play.legs[1] : play.legs.find(part => t < part.end) ?? play.legs[play.legs.length - 1];
   if (play.outfield) {
     const a = leg.startPoint ?? actorAt(play,leg.from,leg.start,bats).pos;
     const b = leg.endPoint ?? actorAt(play,leg.to,leg.end,bats).pos;
@@ -440,10 +455,20 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
     const atWall = fenceShot && (leg.kind === 'flight' || leg.kind === 'bounce');
     const zoom = leg.kind === 'flight' ? progress(u, .55, 1) : 1;
     const lookAt = { ...point, y: Math.max(.88, point.y * .83 + .23) };
-    return { lookAt, fov: 43, position: {
+    const follow = { lookAt, fov: 43, position: {
       x: point.x + 1.9, y: lookAt.y + (play.kind === 'home_run' ? 6 : atWall ? 4.2 : 3.0 - zoom),
       z: point.z + (atWall ? 10.4 : 9.5 - 4 * zoom),
     } };
+    if (play.outfield.robbedHomeRun && leg === play.legs[1]) {
+      const approach = progress(u, .42, .94);
+      const blend = approach * approach * (3 - 2 * approach);
+      const fielder = actorAt(play, play.pickup, t, bats).pos;
+      const focus = { ...play.fieldAt, y: fielder.y + 1.05 };
+      const eye = { x: focus.x * .88 + 1.6, y: 2.5, z: focus.z + 5.4 };
+      return { lookAt: between(follow.lookAt, focus, blend), position: between(follow.position, eye, blend),
+        fov: follow.fov - 8 * blend };
+    }
+    return follow;
   }
   const advancingRunner = buntFollowBase(play, t);
   if (advancingRunner) {

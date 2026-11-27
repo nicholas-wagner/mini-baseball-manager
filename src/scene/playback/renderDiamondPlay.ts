@@ -1,3 +1,5 @@
+import { ROBBERY_CALL, WEB_GEM_CALL } from './fieldingHighlights';
+import { PICKOFF_CALLS, isPickoffKind } from './plateAndSteals';
 import type { playReadout } from './playReadout';
 import { BASE_PATH_VERTICES } from './diamondLayout';
 import { railReaction, welcomePose } from './teamReactions';
@@ -17,7 +19,7 @@ const up = new Vector3(0,1,0);
 const actors: Actor[] = ['C', 'P', 'BAT', 'SS', '2B', '1B', '3B', 'LF', 'CF', 'RF', 'RUN'];
 
 export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: EffectiveBatSide,
-  seconds: number, previous: number, camera: PerspectiveCamera, heightPx: number, vfx: BallparkVfxSystem, throws: ThrowsHand = 'R', fixedShot?: CameraPose, teammates:readonly PaintedPlayerRig[] = [], readout?: ReturnType<typeof playReadout>, audio?: PlayAudioFrame) {
+  seconds: number, previous: number, camera: PerspectiveCamera, heightPx: number, vfx: BallparkVfxSystem, throws: ThrowsHand = 'R', fixedShot?: CameraPose, teammates:readonly PaintedPlayerRig[] = [], readout?: ReturnType<typeof playReadout>, audio?: PlayAudioFrame, idleFielders = false) {
   const t = Math.min(seconds, play.duration);
   if (audio) {
     for (const cue of collectPlayAudioCues(audio.schedule, audio.previousTime, t)) audio.onCue(cue);
@@ -32,8 +34,9 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   function stateAt(actor: Actor, at: number) {
     const state = actorAt(play, actor, at, side);
     const plateTag = play.plateDecision === 'out' && actor === 'C';
-    if (!plateTag && (!play.close?.steal || actor !== play.pickup)) return state;
-    const approach = actor === 'C' ? play.pickupAt+.3 : .48;
+    const pickoff = play.close?.pickoff;
+    if (!plateTag && !((play.close?.steal || pickoff) && actor === play.pickup)) return state;
+    const approach = pickoff ? play.legs[0].start : actor === 'C' ? play.pickupAt+.3 : .48;
     if (at < approach) return state;
     const receiver = cast[actor];
     const tag = actorAt(play, actor, play.finish, side);
@@ -41,7 +44,8 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const shotAtTag = fixedShot ?? diamondCamera(play, play.finish, side, throws);
     receiver.logicalYaw = tag.yaw;
     const glove = receiver.contactAt(tag.clip, tag.local, tag.pos, shotAtTag.position);
-    const u = Math.min(1, (at-approach) / Math.max(.5, play.receiveAt-approach));
+    const span = pickoff ? play.finish - approach : Math.max(.5, play.receiveAt-approach);
+    const u = Math.min(1, (at-approach) / span);
     const reach = .30;
     state.pos = { ...state.pos, x: state.pos.x + u*(runner.pos.x+Math.sin(runner.yaw)*reach-glove.x),
       z: state.pos.z + u*(runner.pos.z+Math.cos(runner.yaw)*reach-glove.z) };
@@ -104,6 +108,14 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     if (play.close && leg.from === 'C' && leg.to === 'P') continue;
     if (leg === pitch && leg.to === 'BAT') vfx.celebration.barrel(at);
     if (leg === play.legs[1] && play.kind === 'home_run') vfx.celebration.homer(Boolean(play.mascotCannon));
+    if (leg === play.legs[1] && (play.webGem || play.outfield?.robbedHomeRun)) {
+      const robbery = play.outfield?.robbedHomeRun;
+      const call = robbery ? ROBBERY_CALL : WEB_GEM_CALL;
+      vfx.impact(at, robbery ? '#FFD166' : call.color);
+      if (play.webGem) vfx.kickChalk(at);
+      vfx.spawnComicCallout(call.text, at, call.color, 'contact');
+      continue;
+    }
     vfx.impact(at, (leg.to === 'BAT' || (force && leg.end === play.finish)) ? '#FFE499' : '#A9EDDC');
     if (play.close || play.kind==='bullpen') continue;
     if (play.outfield) {
@@ -134,7 +146,8 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const arrival = tag ? play.leadArrival : play.batterArrival;
     if (previous < arrival && seconds >= arrival) {
       const base = actorAt(play, tag ? 'RUN' : 'BAT', arrival, side).pos;
-      vfx.spawnComicCallout(play.outfield.call, base, play.outfield.callColor, true);
+      const call = tag && (play.webGem || play.outfield.robbedHomeRun) ? 'SAC FLY!' : play.outfield.call;
+      vfx.spawnComicCallout(call, base, play.outfield.callColor, true);
     }
   }
   if (readout?.base && previous < play.batterArrival && seconds >= play.batterArrival) {
@@ -162,26 +175,29 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     }
   if (play.close) {
     const {kind,decisionAt}=play.close;
+    if (play.close.pickoff && previous < play.leadArrival && seconds >= play.leadArrival) vfx.kickChalk(play.fieldAt);
     if (previous < decisionAt && seconds >= decisionAt) {
-      const call = { foul_back:'FOUL!', called_third:'STRIKE THREE!', swinging_third:'SWING AND MISS!',
-        called_pitch:'STRIKE!', missed_pitch:'SWING AND MISS!', ball_pitch:'BALL!', ball_four:'BALL FOUR!', steal_safe:'SAFE!', steal_out:'OUT!' }[kind];
-      const at = play.close.steal ? contact(play.pickup,decisionAt) : contact(play.legs[0].to,decisionAt);
-      vfx.spawnComicCallout(readout?.label.toUpperCase() ?? call, at,
-        kind === 'steal_out' ? '#C1394C' : '#167457', 'contact');
+      const call = isPickoffKind(kind) ? PICKOFF_CALLS[kind] : {
+        text: readout?.label.toUpperCase() ?? { foul_back:'FOUL!', called_third:'STRIKE THREE!', swinging_third:'SWING AND MISS!',
+          called_pitch:'STRIKE!', missed_pitch:'SWING AND MISS!', ball_pitch:'BALL!', ball_four:'BALL FOUR!', steal_safe:'SAFE!', steal_out:'OUT!' }[kind],
+        color: kind === 'steal_out' ? '#C1394C' : '#167457',
+      };
+      const receiver = play.close.steal || play.close.pickoff ? play.pickup : pitch.to;
+      vfx.spawnComicCallout(call.text, contact(receiver, decisionAt), call.color, 'contact');
     }
   }
   const ump = vfx.umpire;
   const atHome = Boolean(play.plateDecision && play.plateDecision !== 'held' && t > play.finish-.5);
   const stealing = play.close?.steal && t > play.pickupAt + .62;
   const atFirst = force && t > play.finish - .30 && (fixedShot || !buntFollowBase(play, t));
-  ump.sprite.visible = Boolean((atHome || stealing || atFirst) && (!play.ending || t < play.ending.start));
+  ump.sprite.visible = Boolean((atHome || stealing || (play.close?.pickoff && t >= pitch.start) || atFirst) && (!play.ending || t < play.ending.start));
   if (ump.sprite.visible) {
     const bag=atHome ? BASE_PATH_VERTICES[0] : force ? BASE_PATH_VERTICES[1] : play.fieldAt;
     const dx=shot.position.x-bag.x,dz=shot.position.z-bag.z;
     const distance=Math.max(.01,Math.hypot(dx,dz));
     const sidestep = force ? 2.25 : -.76;
     ump.sprite.position.set(bag.x+(-1.5*dx+sidestep*dz)/distance,.045,bag.z+(-1.5*dz-sidestep*dx)/distance);
-    ump.signal(play.kind==='steal_safe' || play.plateDecision==='safe',t-play.finish);
+    ump.signal(play.kind==='steal_safe' || play.kind==='pickoff_safe' || play.plateDecision==='safe',t-play.finish);
   }
   teammates.forEach((member,index)=>{
     const ending=play.ending;
@@ -195,8 +211,9 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   });
   const received = play.legs.filter(l => t >= l.end).at(-1);
   for (const actor of actors) {
+    if (idleFielders && actor !== 'P' && actor !== 'C' && actor !== 'BAT' && actor !== 'RUN') continue;
     const rig = cast[actor];
-    const movingLead = play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal || play.kind === 'ball_four';
+    const movingLead = play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal || play.close?.pickoff || play.kind === 'ball_four';
     if (actor === 'RUN' && (!movingLead || !rig.root.visible)) continue;
     const state = stateAt(actor, t);
     rig.logicalYaw = state.yaw;
@@ -206,6 +223,10 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const freshBall = actor === 'C' && play.kind === 'foul_back' && state.clip === 'catch_throw';
     const ready = state.clip === 'bat_stance' || state.clip === 'pitch_set' || state.clip === 'pitch_stretch_set' || state.clip === 'catch_target';
     const local = state.local + (ready && !vfx.reducedMotion ? seconds-t : 0);
-    rig.updatePose(state.clip, local, grin ? 'happy' : undefined, camera.position, !flying && (freshBall || (!received?.endPoint && (received?.to === actor || (!received && play.kind==='bullpen' && actor==='C')))));
+    const loadingPickoff = play.close?.pickoff && actor === 'P' && t < pitch.start;
+    const holdsBall = !flying && (loadingPickoff || freshBall || (!received?.endPoint && received?.to === actor)
+      || (!received && play.kind === 'bullpen' && actor === 'C'));
+    rig.updatePose(state.clip, local, grin ? 'happy' : undefined, camera.position, holdsBall,
+      actor === 'RUN' && play.close?.pickoff && state.clip === 'runner_slide');
   }
 }

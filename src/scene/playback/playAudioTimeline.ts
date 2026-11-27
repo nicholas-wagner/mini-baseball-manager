@@ -1,4 +1,5 @@
 import type { PlayEvent, PlaySoundCue as SoundCue } from '../../engine/models/playEvent';
+import { PICKOFF_DIVE_AT } from './plateAndSteals';
 import type { DiamondPlay } from './diamondPlay';
 
 export interface ScheduledAudioCue {
@@ -93,10 +94,12 @@ function addFielding(out: ScheduledAudioCue[], play: DiamondPlay) {
     add(out, play.finish, 'double_play_snap');
     return;
   }
-  if (isCaughtOut(play.kind)) add(out, play.pickupAt, 'glove_pop');
+  if (play.webGem) add(out, play.pickupAt, 'dirt_slide');
+  if (play.outfield?.robbedHomeRun) add(out, play.pickupAt + .14, 'crowd_cheer');
+  if (isCaughtOut(play.kind) || play.webGem) add(out, play.pickupAt, 'glove_pop');
   if (isForceOut(play.kind)) {
     const force = [...play.legs].reverse().find((leg) => leg.kind === 'throw');
-    add(out, force?.end ?? play.pickupAt, 'glove_pop');
+    if (force || !play.webGem) add(out, force?.end ?? play.pickupAt, 'glove_pop');
   }
 }
 
@@ -141,6 +144,13 @@ export function buildPlayAudioSchedule(
   event?: PlayEvent | null,
   fallbackCue?: SoundCue | null,
 ): ScheduledAudioCue[] {
+  if (play.close?.pickoff) return [
+    { at: play.legs[0].start, cue: 'pitch_whoosh' },
+    { at: PICKOFF_DIVE_AT, cue: 'dirt_slide' },
+    { at: play.receiveAt, cue: 'glove_pop' },
+    { at: play.finish, cue: 'double_play_snap' },
+    { at: play.finish + .10, cue: play.kind === 'pickoff_safe' ? 'ump_safe_call' : 'crowd_cheer' },
+  ];
   const pitch = play.legs.find((leg) => leg.kind === 'pitch');
   if (!pitch) return [];
   const out: ScheduledAudioCue[] = [];

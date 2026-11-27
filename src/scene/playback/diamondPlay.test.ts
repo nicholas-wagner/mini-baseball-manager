@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { actorAt, diamondPlay, selectDiamondPlay, sampleLeg } from './diamondPlay';
+import { PerspectiveCamera } from 'three';
+import { createPortraitTraits } from '../../art/portraits/generatePortrait';
+import { createPaintedPlayerRig } from '../characters/paintedPlayer';
+import { createBallparkVfxSystem } from '../vfx/vfxSystem';
+import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
+import { describe, expect, it, vi } from 'vitest';
+import { actorAt, diamondPlay, diamondCamera, selectDiamondPlay, sampleLeg } from './diamondPlay';
+import type { PlayEvent } from '../../engine/models/playEvent';
+import { BASE_PATH_VERTICES } from './diamondLayout';
+import { choreographPlayEvent } from './eventChoreographer';
 
 describe('infield playback', () => {
   it('fields a chopper before throwing the batter out at first', () => {
@@ -130,4 +138,93 @@ it('keeps the batter in bat_bunt (not bat_swing) on a bunt whiff or bunt foul', 
   });
   expect(buntWhiff.buntAttempt).toBe(true);
   expect(actorAt(buntWhiff, 'BAT', buntWhiff.legs[0].end, 'R').clip).toBe('bat_bunt');
+});
+
+describe.each(['pickoff_out', 'pickoff_safe'] as const)('%s replay', outcome => {
+  it.each([1, 2] as const)('snaps the ball from the mound to bag %i', pickoffBase => {
+    const before: PlayEvent['basesAfter'] = ['first-runner', 'second-runner', null];
+    const event: PlayEvent = { type: 'pickoff', outcome, pickoffBase, seq: 1, inning: 1, half: 'TOP',
+      outsBefore: 0, outsAfter: Number(outcome === 'pickoff_out'), balls: 2, strikes: 1,
+      homeScore: 0, awayScore: 0, basesAfter: [...before], isClutchMoment: false, commentary: '' };
+    if (outcome === 'pickoff_out') event.basesAfter[pickoffBase - 1] = null;
+    const step = choreographPlayEvent(event, 1, before, { humanBatting: true });
+    const play = step.play!;
+    const bag = BASE_PATH_VERTICES[pickoffBase];
+    const cover = pickoffBase === 1 ? '1B' : '2B';
+    expect(step.ballStyle).toBeNull();
+    expect(step.callout?.text).toBe(outcome === 'pickoff_safe' ? 'SAFE BACK!' : 'PICKED OFF!');
+    expect(play.legs).toEqual([{ from: 'P', to: cover, start: .24, end: .62, kind: 'throw' }]);
+    const at = (time: number) => actorAt(play, 'RUN', time, 'L');
+    expect(actorAt(play, 'P', 0, 'L').clip).toBe('pitch_stretch_set');
+    expect(actorAt(play, 'P', .24, 'L').clip).toBe('field_throw');
+    expect(actorAt(play, 'P', .22, 'L').yaw).not.toBe(0);
+    expect(actorAt(play, cover, play.receiveAt, 'L').clip).toBe('field_receive');
+    expect(actorAt(play, cover, play.finish, 'L').clip).toBe('field_tag');
+    expect(at(0).pos).not.toEqual(bag);
+    expect(at(.5).clip).toBe('runner_slide');
+    expect(at(play.leadArrival + .01).pos).toEqual(bag);
+    expect(outcome === 'pickoff_safe' ? play.leadArrival < play.finish : play.leadArrival > play.finish).toBe(true);
+    if (outcome === 'pickoff_safe') expect(at(play.duration).clip).toBe('slide_safe');
+    const focus = diamondCamera(play, play.finish, 'L').lookAt;
+    expect(Math.hypot(focus.x - bag.x, focus.z - bag.z)).toBeLessThan(.6);
+    if (pickoffBase === 2) {
+      const short = choreographPlayEvent({ ...event, fieldingHighlight: {
+        fielderPos: 'SS', fielderId: 'short', anim: 'field_run',
+      } }, 1, before);
+      expect(short.play!.legs[0].to).toBe('SS');
+    }
+  });
+});
+
+it.each(['robbery', 'dive', 'pickoff_out', 'pickoff_safe'] as const)('renders the %s at the glove or bag', kind => {
+  const pickoff = kind === 'pickoff_out' || kind === 'pickoff_safe';
+  const event: PlayEvent = {
+    seq: 1, type: pickoff ? 'pickoff' : 'ball_in_play', outcome: pickoff ? kind : 'fly_out',
+    pickoffBase: pickoff ? 2 : undefined, inning: 2, half: 'TOP', outsBefore: 2,
+    outsAfter: kind === 'pickoff_safe' ? 2 : 3, balls: 0, strikes: 0, homeScore: 0, awayScore: 0,
+    basesAfter: [null, kind === 'pickoff_safe' ? 'runner' : null, null], isClutchMoment: false, commentary: '',
+    fieldingHighlight: pickoff ? undefined : { fielderPos: 'CF', fielderId: 'center', webGem: true,
+      robbedHomeRun: kind === 'robbery', anim: kind === 'robbery' ? 'field_high_jump' : 'field_dive' },
+  };
+  const play = choreographPlayEvent(event, 1, [null, 'runner', null]).play!;
+  const options = { traits: createPortraitTraits(117), team: { primary: '#123456', secondary: '#eeeeee', accent: '#ffdd55', monogram: 'W' }, jerseyNumber: 8 };
+  const cast = {} as DiamondCast;
+  for (const actor of ['P', 'C', 'BAT', 'RUN', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] as const) {
+    const role = actor === 'P' ? 'pitcher' : actor === 'C' ? 'catcher' : actor === 'BAT' ? 'batter' : 'fielder';
+    cast[actor] = createPaintedPlayerRig({ ...options, role }, 0, actor === 'RUN');
+  }
+  const camera = new PerspectiveCamera(40, 1.5, .2, 180);
+  const vfx = createBallparkVfxSystem();
+  const caption = vi.spyOn(vfx, 'spawnComicCallout');
+  const chalk = vi.spyOn(vfx, 'kickChalk');
+  const impact = vi.spyOn(vfx, 'impact');
+  const signal = vi.spyOn(vfx.umpire, 'signal');
+  try {
+    const when = pickoff ? play.finish : play.pickupAt;
+    renderDiamondPlay(play, cast, 'R', when, when - .01, camera, 240, vfx);
+    if (pickoff) {
+      expect(vfx.umpire.sprite.visible).toBe(true);
+      expect(signal).toHaveBeenCalledWith(kind === 'pickoff_safe', 0);
+      expect(caption).toHaveBeenCalledExactlyOnceWith(kind === 'pickoff_safe' ? 'SAFE BACK!' : 'PICKED OFF!',
+        expect.anything(), kind === 'pickoff_safe' ? '#167457' : '#C1394C', 'contact');
+      renderDiamondPlay(play, cast, 'R', play.leadArrival, play.leadArrival - .01, camera, 240, vfx);
+      expect(chalk).toHaveBeenCalledExactlyOnceWith(play.fieldAt);
+    } else if (kind === 'robbery') {
+      const [pocket] = impact.mock.calls[0];
+      expect(caption).toHaveBeenCalledExactlyOnceWith('ROBBED!!', pocket, '#FF4D6D', 'contact');
+      expect(impact).toHaveBeenCalledExactlyOnceWith(pocket, '#FFD166');
+      expect(chalk).not.toHaveBeenCalled();
+      expect(pocket.y).toBeGreaterThan(3.42); // Top of the yellow home-run rail.
+      const before = diamondCamera(play, when - .001, 'R');
+      const at = diamondCamera(play, when, 'R');
+      expect(Math.abs(at.position.z - before.position.z)).toBeLessThan(.05);
+    } else {
+      const [pocket] = impact.mock.calls[0];
+      expect(caption).toHaveBeenCalledExactlyOnceWith('WEB GEM!', pocket, '#00B4D8', 'contact');
+      expect(chalk).toHaveBeenCalledExactlyOnceWith(pocket);
+    }
+  } finally {
+    Object.values(cast).forEach(rig => rig.dispose());
+    vfx.dispose();
+  }
 });

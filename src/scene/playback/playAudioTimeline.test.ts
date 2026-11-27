@@ -351,3 +351,33 @@ describe('collectPlayAudioCues', () => {
     expect(hear()).toContain('bat_crack');
   });
 });
+
+it.each(['pickoff_out', 'pickoff_safe'] as const)('times the snap, dive, glove, tag and ruling on %s', kind => {
+  const play = diamondPlay(kind);
+  const cues = buildPlayAudioSchedule(play);
+  expect(cues.map(item => item.cue)).toEqual([
+    'pitch_whoosh', 'dirt_slide', 'glove_pop', 'double_play_snap', kind === 'pickoff_safe' ? 'ump_safe_call' : 'crowd_cheer',
+  ]);
+  expect(one(cues, 'pitch_whoosh').at).toBe(.24);
+  expect(one(cues, 'glove_pop').at).toBe(.62);
+  expect(one(cues, 'double_play_snap').at).toBe(play.finish);
+});
+
+it('pops the glove at the robbery apex and starts the cheer a beat later', () => {
+  const play = diamondPlay('fly_out', undefined, event({ fieldingHighlight: {
+    fielderId: 'center', fielderPos: 'CF', anim: 'field_high_jump', robbedHomeRun: true, webGem: true,
+  } }));
+  const cues = buildPlayAudioSchedule(play);
+  expect(one(cues, 'glove_pop').at).toBe(play.pickupAt);
+  expect(one(cues, 'crowd_cheer').at).toBeCloseTo(play.pickupAt + .14);
+  expect(times(cues, 'dirt_slide')).toHaveLength(0);
+});
+
+it.each(['fly_out', 'infield_liner', 'ground_out'] as const)('sounds one dive and catch on a %s web gem', kind => {
+  const play = diamondPlay(kind, 'SS', event({ fieldingHighlight: {
+    fielderId: 'diver', fielderPos: kind === 'fly_out' ? 'LF' : 'SS', anim: 'field_dive', webGem: true,
+  } }));
+  const cues = buildPlayAudioSchedule(play);
+  expect(one(cues, 'dirt_slide').at).toBe(play.pickupAt);
+  expect(times(cues, 'glove_pop').filter(item => item.at === play.pickupAt)).toHaveLength(1);
+});

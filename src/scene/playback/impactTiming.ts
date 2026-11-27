@@ -10,6 +10,7 @@ export function barrelReplayTime(play: DiamondPlay, time: number, rate: number) 
 }
 
 export function crowdReaction(play: DiamondPlay) {
+  if (play.outfield?.robbedHomeRun) return { at: play.pickupAt, level: 1, stand: true };
   const stand = ['single', 'double', 'triple', 'bunt_single', 'home_run'].includes(play.kind);
   if (play.ending?.kind === 'walkoff') return { at: play.ending.start, level: 1, stand };
   if (stand) return { at: play.outfield ? play.legs[1].end : play.finish, level: play.kind === 'home_run' ? .94 : .72, stand };

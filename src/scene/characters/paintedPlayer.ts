@@ -38,7 +38,7 @@ export interface PaintedPlayerOptions {
 export interface PaintedPlayerRig {
   root: THREE.Group;
   logicalYaw: number;
-  updatePose(clip: CharacterAnimClip, time: number, mood?: PortraitMood, camera?: THREE.Vector3Like, caught?: boolean): void;
+  updatePose(clip: CharacterAnimClip, time: number, mood?: PortraitMood, camera?: THREE.Vector3Like, caught?: boolean, headfirstSlide?: boolean): void;
   setCatchHeight(offset: number): void;
   preparePlayback():void;
   updateAppearance(options: PaintedPlayerOptions): void;
@@ -178,7 +178,6 @@ export function createPaintedPlayerRig(
       }
     setInks(headMat, a, opt.team);
     setInks(bodyMat, a, opt.team);
-    shadow.position.y = role === 'pitcher' ? 0.064 : 0.013;
     mark = '';
   }
   function drawNumber(text: string) {
@@ -201,6 +200,7 @@ export function createPaintedPlayerRig(
     mood?: PortraitMood,
     camera?: THREE.Vector3Like,
     caught = false,
+    headfirstSlide = false,
   ) {
     const running = (role === 'runner' || role === 'batter') && (clip === 'field_run' || clip === 'runner_glance');
     const sliding = clip === 'runner_slide' || clip === 'slide_safe';
@@ -381,7 +381,10 @@ export function createPaintedPlayerRig(
     // Looking directly down a basepath, a tiny camera sway must not reverse the face.
     const travelSide = Math.abs(acrossScreen) > .14 ? acrossScreen : Math.sin(rig.logicalYaw);
     const followsHeading = clip === 'catch_handoff' || motionRole === 'runner';
-    const actorFlip = followsHeading ? (travelSide < 0 ? -1 : 1) : (tagging || popping) && rear ? -flip : flip;
+    // The slide painting has a trailing bare hand opposite its extended cleat.
+    // On a pickoff, lead with that hand and roll the shoulder down toward the bag.
+    const travelFlip = (travelSide < 0 ? -1 : 1) * (headfirstSlide ? -1 : 1);
+    const actorFlip = followsHeading ? travelFlip : (tagging || popping) && rear ? -flip : flip;
     const unit = role === 'pitcher' || plantedRunner || clip === 'field_throw' ? 0.0047 : 0.0057;
     bat.barrel.visible = role === 'batter' && !running && !leading && !sliding && (frame.cel < 2 || brim);
     if (bat.barrel.visible) {
@@ -390,13 +393,17 @@ export function createPaintedPlayerRig(
     }
     const headUnit = 0.00455 * (a.headShape === 'chubby' ? 1.05 : 1);
     const rotationSign = rear ? -1 : 1;
-    billboard.position.set(0, floor + frame.hop * height, 0);
+    // The wall gives the climber a foothold above the track. Keep the shadow on the dirt.
+    const wallLift = clip === 'field_high_jump' ? Math.max(0, root.position.y - .04) : 0;
+    billboard.position.set(0, floor + frame.hop * height + .75 * wallLift, 0);
+    shadow.position.y = (role === 'pitcher' ? .064 : .013) - wallLift;
     if (pitching && delivery) billboard.position.copy(delivery.root.position);
     shadow.position.x = billboard.position.x * .6;
     shadow.position.z = billboard.position.z * .6;
     actor.position.x = actorFlip * rotationSign * frame.shift;
     actor.rotation.y = actorFlip * rotationSign * frame.bodyTurn;
     actor.rotation.z = actorFlip * rotationSign * frame.lean - (running ? .10 * acrossScreen : 0);
+    if (headfirstSlide) actor.rotation.z += actorFlip * .52;
     actor.scale.set(actorFlip * height * (1 + frame.squash * 0.45), height * (1 - frame.squash), 1);
     // At contact the illustrated barrel reaches across the plate in either camera.
     const swingMirror = role === 'batter' && !rear && !running && !leading && !sliding && !brim && frame.cel >= 2 ? -1 : 1;
