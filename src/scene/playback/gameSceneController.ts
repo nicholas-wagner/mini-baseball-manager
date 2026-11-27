@@ -11,13 +11,14 @@ import { createDelivery, sampleDeliveryFlight, type ShowcaseDelivery } from '../
 import { runBases } from './outfieldPlay';
 import { buntRunnerPose, diamondCamera, diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
+import { buildPlayAudioSchedule, initialAudioCursor, type ScheduledAudioCue } from './playAudioTimeline';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import * as THREE from 'three';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import type { PortraitTeamColors } from '../../art/portraits/types';
 import { resolveEffectiveBatSide } from '../../engine/handedness/handedness';
 import type { Club } from '../../engine/models/club';
-import type { PlayEvent } from '../../engine/models/playEvent';
+import type { PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { Player } from '../../engine/models/player';
 import type { GameSessionState } from '../../engine/simulation/gameState';
 import { createMiniBallpark } from '../ballpark/ballparkBuilder';
@@ -98,7 +99,8 @@ export class GameSceneController {
   private calledTarget: PitchTargetIntent | null = null;
   private targetPlaced = false;
 
-  private replay: { play: DiamondPlay; cheer: ReturnType<typeof crowdReaction>; cast: DiamondCast; start: number; rate: number; freezeAt?: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[] } | null = null;
+  private onAudioCue: ((cue: PlaySoundCue) => void) | null = null;
+  private replay: { play: DiamondPlay; cheer: ReturnType<typeof crowdReaction>; cast: DiamondCast; start: number; rate: number; freezeAt?: number; readout: ReturnType<typeof playReadout>; runnerDestinations?: number[]; audioSchedule: readonly ScheduledAudioCue[]; audioCursor: number } | null = null;
   private pitch: { play: ShowcaseDelivery; start: number; rate: number; initialized: boolean; callout?: ChoreographedStep['callout'] } | null = null;
   private targetRing = new THREE.Mesh(new THREE.RingGeometry(.19, .23, 40),
     new THREE.MeshBasicMaterial({ color: 0xffdc66, transparent: true, depthTest: false, depthWrite: false }));
@@ -254,6 +256,10 @@ export class GameSceneController {
     this.ballpark.setWeather(weather,this.steadyCamera);
   }
 
+  public setOnAudioCue(handler: ((cue: PlaySoundCue) => void) | null): void {
+    this.onAudioCue = handler;
+  }
+
   public setCameraOverride(preset: CameraPresetId | null, steady = false): void {
     this.steadyCamera = steady;
     this.ballpark.setWeather(this.weather,steady);
@@ -406,7 +412,8 @@ export class GameSceneController {
       const reliefStrikeout = pitcher.position === 'RP' && event?.outcome === 'strikeout'
         && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
       const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
-      this.replay = { freezeAt:choreo.freezeAt, play: { ...play, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon },
+      const filmed = { ...play, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon };
+      this.replay = { freezeAt:choreo.freezeAt, play: filmed,
         cheer: crowdReaction(play), readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
         BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.runnerToThird ? play.runnerToThird-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
@@ -416,6 +423,8 @@ export class GameSceneController {
           if (dest >= 0) return dest + 1;
           return play.outfield?.caught && play.kind !== 'sac_fly' ? i + 1 : 4;
         }) : undefined,
+        audioSchedule: buildPlayAudioSchedule(filmed, event, event?.soundCue),
+        audioCursor: initialAudioCursor(choreo.startAt),
         start: this.elapsedSec - (choreo.startAt ?? 0) / rate, rate };
       return;
     }
@@ -557,8 +566,11 @@ export class GameSceneController {
         const eye = this.targetPlaced ? this.camera.position : (fixedShot ?? diamondCamera(play,0,this.bats,this.throws)).position;
         this.showCalledTarget(t,play.legs[0].end,eye);
       }
+      const audioTime = Math.min(t, play.duration);
       renderDiamondPlay(play, cast, this.bats, t, prior, this.camera, this.container.clientHeight,
-        this.vfx, this.throws, fixedShot, this.welcome.rigs, this.replay.readout);
+        this.vfx, this.throws, fixedShot, this.welcome.rigs, this.replay.readout,
+        this.onAudioCue ? { schedule: this.replay.audioSchedule, previousTime: this.replay.audioCursor, onCue: this.onAudioCue } : undefined);
+      if (audioTime > this.replay.audioCursor) this.replay.audioCursor = audioTime;
       this.runnerRigs.forEach((runner, i) => {
         if (!runner.root.visible || ((play.scorerBase || play.runnerToThird || play.kind === 'double_play' || play.kind === 'sac_fly' || play.close?.steal) && runner === cast.RUN)) return;
         const advancing = play.buntAdvances?.some(from => from === i + 1);

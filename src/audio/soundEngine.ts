@@ -137,6 +137,21 @@ export class RetroSoundEngine {
     this.state.volume = Math.max(0, Math.min(1, volume));
   }
 
+  /** Resume AudioContext inside a user gesture. Idempotent in SSR, jsdom, and headless browsers. */
+  unlock(): boolean {
+    try {
+      if (!this.ctx) {
+        const Ctor = getAudioContextCtor();
+        if (!Ctor) return false;
+        this.ctx = new Ctor();
+      }
+      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private ensureContext(): AudioContext | null {
     if (this.state.muted || this.state.volume <= 0) return null;
     if (!this.ctx) {
@@ -675,3 +690,18 @@ export class RetroSoundEngine {
 }
 
 export const soundEngine = new RetroSoundEngine();
+
+const gestureTargets = new WeakSet<object>();
+
+/** One-shot pointer/key listener so a later RAF cue is allowed to make sound. */
+export function bindSoundGestureUnlock(target: EventTarget | null = typeof window === 'undefined' ? null : window): void {
+  if (!target || gestureTargets.has(target)) return;
+  gestureTargets.add(target);
+  const once = () => {
+    soundEngine.unlock();
+    target.removeEventListener('pointerdown', once);
+    target.removeEventListener('keydown', once);
+  };
+  target.addEventListener('pointerdown', once);
+  target.addEventListener('keydown', once);
+}

@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ALL_SOUNDBOARD_CUES,
+  bindSoundGestureUnlock,
   RetroSoundEngine,
+  soundEngine,
   type SoundCue,
 } from './soundEngine';
 
@@ -75,4 +77,48 @@ describe('RetroSoundEngine', () => {
       expect(engine.getState().lastCue).toBe(item.cue);
     }
   });
+
+  it('returns false from unlock when no AudioContext exists', () => {
+    expect(new RetroSoundEngine().unlock()).toBe(false);
+  });
+
+  it('creates and resumes a suspended AudioContext once inside a gesture', () => {
+    const previous = window.AudioContext;
+    const made: { state: string; resume: ReturnType<typeof vi.fn> }[] = [];
+    class FakeContext {
+      state = 'suspended';
+      resume = vi.fn(() => {
+        this.state = 'running';
+        return Promise.resolve();
+      });
+      constructor() {
+        made.push(this);
+      }
+    }
+    window.AudioContext = FakeContext as unknown as typeof AudioContext;
+    try {
+      const engine = new RetroSoundEngine();
+      expect(engine.unlock()).toBe(true);
+      expect(engine.unlock()).toBe(true);
+      expect(made).toHaveLength(1);
+      expect(made[0].resume).toHaveBeenCalledTimes(1);
+    } finally {
+      window.AudioContext = previous;
+    }
+  });
+
+  it('unlocks once from the first pointer or key gesture', () => {
+    const unlock = vi.spyOn(soundEngine, 'unlock').mockReturnValue(true);
+    const target = new EventTarget();
+    bindSoundGestureUnlock(target);
+    bindSoundGestureUnlock(target);
+    target.dispatchEvent(new Event('pointerdown'));
+    target.dispatchEvent(new Event('keydown'));
+    expect(unlock).toHaveBeenCalledTimes(1);
+    unlock.mockRestore();
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });

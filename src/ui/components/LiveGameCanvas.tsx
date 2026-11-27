@@ -3,7 +3,7 @@ import { useUserPreferencesStore } from '../../store/userPreferences';
 import { Camera } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Club } from '../../engine/models/club';
-import type { PlayEvent } from '../../engine/models/playEvent';
+import type { PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { GameSessionState } from '../../engine/simulation/gameState';
 import type { CameraPresetId } from '../../scene/camera/cameraRig';
 import type { ChoreographedStep } from '../../scene/playback/eventChoreographer';
@@ -37,6 +37,25 @@ interface LiveGameCanvasProps {
   playFinished?: boolean;
   entranceCue?: PlayerEntranceCue | null;
   onEntranceEnd?: () => void;
+  onAudioCue?: (cue: PlaySoundCue) => void;
+}
+
+let webglPlayback: boolean | undefined;
+
+/** True when this browser can host the WebGL playback clock that drives play audio. */
+export function isLiveWebglAvailable(): boolean {
+  if (webglPlayback !== undefined) return webglPlayback;
+  if (typeof document === 'undefined') {
+    webglPlayback = false;
+    return false;
+  }
+  try {
+    const canvas = document.createElement('canvas');
+    webglPlayback = Boolean(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
+  } catch {
+    webglPlayback = false;
+  }
+  return webglPlayback;
 }
 
 export function LiveGameCanvas({
@@ -54,13 +73,15 @@ export function LiveGameCanvas({
   entrance,
   guided = false,
   playFinished = false,
-  entranceCue = null, onEntranceEnd,
+  entranceCue = null, onEntranceEnd, onAudioCue,
 }: LiveGameCanvasProps) {
   const reducedMotion = useUserPreferencesStore(s => s.reducedMotion);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraButton = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<GameSceneController | null>(null);
+  const onAudioCueRef = useRef(onAudioCue);
+  onAudioCueRef.current = onAudioCue;
   const [webglUnavailable, setWebglUnavailable] = useState(false);
 
   useEffect(() => {
@@ -68,6 +89,7 @@ export function LiveGameCanvas({
     if (!container) return;
     try {
       const controller = new GameSceneController(container);
+      controller.setOnAudioCue((cue) => onAudioCueRef.current?.(cue));
       controllerRef.current = controller;
       setWebglUnavailable(false);
       return () => {

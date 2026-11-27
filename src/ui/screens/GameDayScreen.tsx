@@ -18,7 +18,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { bgmEngine } from '../../audio/bgmEngine';
-import { soundEngine } from '../../audio/soundEngine';
+import { bindSoundGestureUnlock, soundEngine } from '../../audio/soundEngine';
 import { getBallparkPreset } from '../../engine/ballparks/stadiumCatalog';
 import {
   detectTiredScheduledStarter,
@@ -183,7 +183,7 @@ import { TrophyCaseModal } from '../components/TrophyCaseModal';
 import { LiveActionBar } from '../components/LiveActionBar';
 import { LiveBottomSheet, useWideStudio } from '../components/LiveBottomSheet';
 import { LiveBoxScoreModal } from '../components/LiveBoxScoreModal';
-import { LiveGameCanvas, type LiveCameraMode } from '../components/LiveGameCanvas';
+import { isLiveWebglAvailable, LiveGameCanvas, type LiveCameraMode } from '../components/LiveGameCanvas';
 import { ManagerClipboardBanner } from '../components/ManagerClipboardBanner';
 import {
   PlayerCardModal,
@@ -212,6 +212,7 @@ const GAME_LENGTH_OPTIONS: readonly { innings: GameLengthInnings; label: string 
 ];
 
 function playGazetteCrowd() { soundEngine.play('crowd_cheer'); }
+function playTimelineCue(cue: Parameters<typeof soundEngine.play>[0]) { soundEngine.play(cue); }
 
 function safeScrollTop(): void {
   try {
@@ -457,12 +458,17 @@ export function GameDayScreen({
   const leagueBoard = changedSides && inRegularGame && final?.roundSeed === roundSeed && final.gameIndex === currentGameInSeries ? final : null;
   const hasLiveSession = liveSession !== null;
   useEffect(() => { onLiveChange?.(hasLiveSession); }, [hasLiveSession, onLiveChange]);
+  useEffect(() => { bindSoundGestureUnlock(); }, []);
   useEffect(() => {
     if (!lastChoreo || revealedPlay === lastChoreo) return;
     const decisionMs = decisionDelayMs(lastChoreo);
+    const webglDrivesAudio = isLiveWebglAvailable();
     const timer = window.setTimeout(() => {
       setRevealedPlay(lastChoreo);
-      if (lastChoreo.soundCue && !playbackEvent?.specialPowerTriggered) soundEngine.play(lastChoreo.soundCue);
+      if (!webglDrivesAudio) {
+        if (playbackEvent?.specialPowerTriggered) soundEngine.play('heritage_power_surge');
+        else if (lastChoreo.soundCue) soundEngine.play(lastChoreo.soundCue);
+      }
       if (useUserPreferencesStore.getState().hapticsEnabled) {
         const outcome = playbackEvent?.outcome;
         if (outcome === 'home_run' || outcome === 'strikeout') triggerHapticPulse(outcome);
@@ -762,9 +768,6 @@ export function GameDayScreen({
         if (relief) setPendingRelief({event: relief, delay: choreo.durationMs});
         choreo.leadRunnerId = basesBefore?.[0] ?? undefined;
         setLastChoreo(choreo);
-        if (lastEvent.specialPowerTriggered) {
-          soundEngine.play('heritage_power_surge');
-        }
         if (emitted.some((ev) => ev.soundCue === 'organ_seventh_stretch')) {
           soundEngine.play('organ_seventh_stretch');
         }
@@ -848,6 +851,7 @@ export function GameDayScreen({
     timingGrade?: ArcadeTimingGrade,
     opts?: { fromAutoWatch?: boolean },
   ) => {
+    soundEngine.unlock();
     if (!liveSession || liveSession.status === 'completed') return;
     if (thirdDecision) return;
     if (!opts?.fromAutoWatch && (playLockedRef.current || playLocked)) return;
@@ -2641,6 +2645,7 @@ export function GameDayScreen({
     soundEngine.play('ui_pop');
   };
   const handleShakeOffCatcher = () => {
+    soundEngine.unlock();
     if (playLocked || playLockedRef.current) return;
     setEntranceCue(null);
     setLastChoreo(null);
@@ -2709,6 +2714,7 @@ export function GameDayScreen({
     soundEngine.play('ui_pop');
   };
   const replayFromPitch = () => {
+    soundEngine.unlock();
     if (!lastChoreo) return;
     const { play, startAt, durationMs } = lastChoreo;
     setLastChoreo({...lastChoreo, startAt:undefined, durationMs:startAt && play ? Math.round(durationMs * play.duration / (play.duration-startAt)) : durationMs});
@@ -2718,6 +2724,7 @@ export function GameDayScreen({
     const choice = event.thirdBase!;
     const runner = getBattingSide(liveSession).playersById[choice.runnerId];
     const resolve = (send:boolean) => {
+      soundEngine.unlock();
       const result = send ? stepPitch(liveSession,call,{...options,thirdBaseCall:'send'}) : hold;
       if (guiding && !showMore) result.events.forEach(e=>guidedPitchEvents.current.add(e.seq));
       setThirdDecision(null);
@@ -2727,7 +2734,7 @@ export function GameDayScreen({
     return <ThirdBaseDecision key={event.seq} portrait={<PlayerPrint player={runner}/>} runner={runner.name} arm={choice.arm} position={choice.position}
       arrivalMs={film.durationMs * film.freezeAt! / film.play!.duration} onResolve={resolve}>
       {scoreboard}
-      <LiveGameCanvas guided awayClub={liveAwayClub} homeClub={liveHomeClub} session={liveSession}
+      <LiveGameCanvas onAudioCue={playTimelineCue} guided awayClub={liveAwayClub} homeClub={liveHomeClub} session={liveSession}
         weather={gameWeather}
         choreo={film} lastEvent={event} cameraMode={cameraMode} onChangeCameraMode={changeCamera} />
     </ThirdBaseDecision>;
@@ -2794,6 +2801,7 @@ export function GameDayScreen({
       <div className="live-studio">
         <div className="live-stage">
             <LiveGameCanvas
+              onAudioCue={playTimelineCue}
               playFinished={Boolean(lastChoreo && !playing)}
               guided={Boolean(guiding && !showMore)}
               onEntranceEnd={finishEntrance}

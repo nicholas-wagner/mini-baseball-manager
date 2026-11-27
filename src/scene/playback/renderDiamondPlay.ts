@@ -9,13 +9,17 @@ import type { PaintedPlayerRig } from '../characters/paintedPlayer';
 import { BALL_TRAJECTORY_PRESETS } from '../vfx/ballTrajectory';
 import type { BallparkVfxSystem } from '../vfx/vfxSystem';
 import { actorAt, buntFollowBase, diamondCamera, forceAtFirst, sampleLeg, type Actor, type DiamondPlay } from './diamondPlay';
+import { collectPlayAudioCues, type PlayAudioFrame } from './playAudioTimeline';
 
 export type DiamondCast = Record<Actor, PaintedPlayerRig>;
 const actors: Actor[] = ['C', 'P', 'BAT', 'SS', '2B', '1B', '3B', 'LF', 'CF', 'RF', 'RUN'];
 
 export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: EffectiveBatSide,
-  seconds: number, previous: number, camera: PerspectiveCamera, heightPx: number, vfx: BallparkVfxSystem, throws: ThrowsHand = 'R', fixedShot?: CameraPose, teammates:readonly PaintedPlayerRig[] = [], readout?: ReturnType<typeof playReadout>) {
+  seconds: number, previous: number, camera: PerspectiveCamera, heightPx: number, vfx: BallparkVfxSystem, throws: ThrowsHand = 'R', fixedShot?: CameraPose, teammates:readonly PaintedPlayerRig[] = [], readout?: ReturnType<typeof playReadout>, audio?: PlayAudioFrame) {
   const t = Math.min(seconds, play.duration);
+  if (audio) {
+    for (const cue of collectPlayAudioCues(audio.schedule, audio.previousTime, t)) audio.onCue(cue);
+  }
   const shot = fixedShot ?? diamondCamera(play, t, side, throws);
   camera.position.copy(shot.position);
   camera.lookAt(shot.lookAt.x, shot.lookAt.y, shot.lookAt.z);
