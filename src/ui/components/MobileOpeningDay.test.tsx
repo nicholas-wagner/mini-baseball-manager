@@ -24,34 +24,6 @@ it('marks the tying runner on first when two aboard could erase a two-run defici
   expect(screen.getByTestId('fast-sim-toggle')).toBeVisible();
 });
 
-it('keeps the phone action dock available between visits to Tactics', () => {
-  vi.stubGlobal('matchMedia', vi.fn(() => ({
-    matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(),
-  })));
-  try {
-    start();
-    render(<GameDayScreen />);
-    fireEvent.click(screen.getByRole('button', { name: 'Bat with Marcus' }));
-    fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
-
-    expect(screen.queryByRole('dialog', { name: 'Tactics' })).toBeNull();
-    const dock = screen.getByTestId('live-action-bar');
-    expect(within(dock).getByTestId('live-primary-pitch-btn')).toHaveAccessibleName(/next pitch/i);
-    fireEvent.click(within(dock).getByRole('button', { name: 'Tactics' }));
-
-    const sheet = screen.getByRole('dialog', { name: 'Tactics' });
-    expect(within(sheet).getByTestId('fast-sim-toggle')).toBeVisible();
-    expect(within(sheet).queryByRole('button', { name: 'Tactics' })).toBeNull();
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
-
-    expect(screen.queryByRole('dialog', { name: 'Tactics' })).toBeNull();
-    expect(screen.getByTestId('live-primary-pitch-btn')).toHaveAccessibleName(/next pitch/i);
-    expect(screen.getByRole('button', { name: 'Fewer controls' })).toBeVisible();
-  } finally {
-    vi.unstubAllGlobals();
-  }
-});
-
 it('puts each binder name ahead of its portrait and keeps secondary roster tools together', () => {
   start();
   render(<RosterLineupScreen onPlayBall={vi.fn()} />);

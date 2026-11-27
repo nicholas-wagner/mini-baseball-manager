@@ -2993,7 +2993,7 @@ export function GameDayScreen({
               }
               cue={liveCue} onExpand={() => {
                 setShowMore(!showMore);
-                setSheetOpen(false);
+                setSheetOpen(!wideStudio && !showMore);
               }}
               mascotName={showFullHud ? null : humanClub.mascot}
               mascotColors={humanClub.colors}

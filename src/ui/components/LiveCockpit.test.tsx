@@ -66,6 +66,15 @@ describe('TASK-099 live cockpit', () => {
     expect(within(sheet).getByTestId('game-weather-banner')).toBeInTheDocument();
     expect(within(sheet).getByTestId('broadcast-hud')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'First at-bat' }).querySelector('h3')).toBeNull();
+    expect(within(sheet).getByTestId('fast-sim-toggle')).toBeVisible();
+    expect(within(sheet).queryByRole('button', { name: 'Tactics' })).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog', { name: 'Tactics' })).toBeNull();
+    const dock = screen.getByTestId('live-action-bar');
+    expect(within(dock).getByTestId('live-primary-pitch-btn')).toHaveAccessibleName(/next pitch/i);
+    expect(screen.getByRole('button', { name: 'Fewer controls' })).toBeVisible();
+    fireEvent.click(within(dock).getByRole('button', { name: 'Tactics' }));
+    expect(screen.getByRole('dialog', { name: 'Tactics' })).toBeVisible();
   });
 
   it('lets Space activate a focused button instead of throwing a pitch', () => {

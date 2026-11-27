@@ -167,6 +167,8 @@ test('a compact phone keeps the chosen call, primary action and field together a
   await useClub.click();
   await page.getByRole('button',{name:'Pitch with Jasper'}).click();
   await page.getByRole('button',{name:'More controls'}).click();
+  const sheet = page.getByRole('dialog', { name: 'Tactics' });
+  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
   for (const size of [{width:360,height:640},{width:390,height:844},{width:844,height:390}]) {
     await page.setViewportSize(size);
     await expect(page.getByTestId('live-game-3d-canvas')).toBeInViewport({ratio:1});
@@ -178,7 +180,6 @@ test('a compact phone keeps the chosen call, primary action and field together a
   const tactics = page.getByRole('button',{name:'Tactics'});
   await tactics.click();
   await expect(page.getByTestId('arcade-speed-toggle')).toBeVisible();
-  const sheet = page.getByRole('dialog', { name: 'Tactics' });
   await sheet.getByRole('button', { name: 'Close', exact: true }).click();
   await page.setViewportSize({width:360,height:740});
   await tactics.click();
