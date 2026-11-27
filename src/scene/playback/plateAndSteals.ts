@@ -66,6 +66,10 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
   const since = time - plate;
   const sign = bats === 'R' ? 1 : -1;
   const pose = (clip: CharacterAnimClip, local = time, pos = start, yaw = 0): Pose => ({ clip, local: Math.max(0, local), pos, yaw });
+  if (actor === 'P' && close.kind.endsWith('_third') && !play.reliefStrikeout &&
+      since >= .24 && since < .24 + CLIP_DURATIONS.pitch_fist_pump) {
+    return pose('pitch_fist_pump', since - .24);
+  }
   if (actor === 'P' && play.legs.some(l=>l.to==='P') && since>.75) return pose('field_receive',.28);
   if (actor === 'P') return time < CLIP_DURATIONS.pitch_windup ? pose('pitch_windup') : pose('field_ready');
   if (actor === 'BAT') {

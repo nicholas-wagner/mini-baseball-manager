@@ -40,7 +40,7 @@ export function paintedMotion(
     }
   } else if (role === 'batter') {
     const swings = clip === 'bat_swing' || clip === 'bat_bomb' || clip === 'practice_cage';
-    cel = clip === 'bat_bunt' ? 3 : swings ? (phase < 0.22 ? 0 : phase < 0.42 ? 1 : phase < 0.86 ? 2 : 0) : 0;
+    cel = clip === 'bat_bunt' ? 3 : swings ? (phase < 0.22 ? 0 : phase < 0.42 ? 1 : 2) : 0;
     expression = 1;
     // Load onto the back hip, plant the front cleat, then turn through contact.
     const load = swings ? pulse(phase, 0.04, 0.42) : (1 + wave) * 0.13;
@@ -49,6 +49,12 @@ export function paintedMotion(
     lean = -0.045 * load + 0.059 * drive;
     tilt = 0.065 * load - 0.055 * drive;
     squash = 0.025 + 0.035 * load - 0.025 * drive;
+    if (swings) {
+      const finish = clamp((phase - .58) / .29);
+      lean += .085 * finish;
+      shift += .095 * finish;
+      tilt -= .12 * finish;
+    }
     if (clip === 'bat_power_set') {
       const load = clamp(seconds / .32);
       cel = Number(load > .45);

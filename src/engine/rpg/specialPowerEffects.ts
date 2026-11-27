@@ -618,7 +618,7 @@ function buildHeritageActiveSurge(
     ...template,
     powerId: ability.id,
     actor,
-    calloutText: `${ability.calloutText} (${ability.name})`,
+    calloutText: ability.calloutText,
     vfxColor: ability.vfxColor,
     ballStyle: ability.ballStyle,
     soundCue: 'heritage_power_surge',

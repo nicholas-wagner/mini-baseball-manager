@@ -372,3 +372,9 @@ describe('National Heritage Powers & Individual Capstone Special Powers — Real
     expect(hitsVsGoldDef).toBeLessThan(hitsVsWeakDef);
   });
 });
+
+it('uses the printed heritage callout once when a manager unleashes Eagle Soar', () => {
+  expect(evaluateActivePowerSurge('eagle_soar', 'batter', {
+    nationalityId: 'USA', heritageTierUnlocked: 1,
+  }).calloutText).toBe('EAGLE SOAR!');
+});

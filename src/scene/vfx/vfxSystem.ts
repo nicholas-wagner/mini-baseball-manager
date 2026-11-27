@@ -1,3 +1,4 @@
+import { createStadiumCelebration } from './stadiumCelebration';
 import { createBaseUmpire } from './baseUmpire';
 import { createPaintedBat } from '../characters/paintedBat';
 import * as THREE from 'three';
@@ -10,12 +11,15 @@ interface ActiveCallout {
   texture: THREE.CanvasTexture;
   elapsed: number;
   duration: number;
-  startY: number;
+  anchor: THREE.Vector3;
   inCorner: boolean | 'contact';
 }
 
 export interface BallparkVfxSystem {
   group: THREE.Group;
+  celebration: ReturnType<typeof createStadiumCelebration>;
+  reducedMotion: boolean;
+  setReducedMotion: (reduced: boolean) => void;
   droppedBat: THREE.Mesh;
   umpire: ReturnType<typeof createBaseUmpire>;
   setCalloutsVisible: (visible: boolean) => void;
@@ -25,7 +29,7 @@ export interface BallparkVfxSystem {
   impact: (position: Vec3, color: string) => void;
   clear: () => void;
   spawnComicCallout: (text: string, pos: Vec3, bgColor?: string, inCorner?: boolean | 'contact') => void;
-  update: (dtSec: number, camera?: THREE.PerspectiveCamera) => void;
+  update: (dtSec: number, camera?: THREE.PerspectiveCamera, heightPx?: number) => void;
   dispose: () => void;
 }
 
@@ -74,6 +78,9 @@ function createComicCalloutTexture(text: string, bgColor: string): THREE.CanvasT
 export function createBallparkVfxSystem(): BallparkVfxSystem {
   const group = new THREE.Group();
 
+  const celebration = createStadiumCelebration();
+  let reducedMotion = false;
+  group.add(celebration.group);
   const ball = createBallFlightVisual();
   const umpire=createBaseUmpire();
   group.add(umpire.sprite);
@@ -133,7 +140,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     sprite.scale.set(0.01, 0.01, 1);
     sprite.renderOrder = 20;
     group.add(sprite);
-    callouts.push({ sprite, texture, elapsed: 0, duration: 1.35, startY: pos.y, inCorner });
+    callouts.push({ sprite, texture, elapsed: 0, duration: 1.35, anchor: sprite.position.clone(), inCorner });
   };
 
   let immediate: { spec: BallTrajectorySpec; elapsed: number; color?: string } | null = null;
@@ -146,7 +153,9 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     return { cameraShake: spec.cameraShake };
   };
 
-  const update = (dtSec: number, camera?: THREE.PerspectiveCamera) => {
+  const projected = new THREE.Vector3();
+  const update = (dtSec: number, camera?: THREE.PerspectiveCamera, heightPx = 320) => {
+    celebration.update(dtSec, camera);
     if (immediate) {
       immediate.elapsed += dtSec;
       const progress = immediate.elapsed / immediate.spec.durationSec;
@@ -190,10 +199,22 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
         // Elastic comic pop-in + gentle upward drift
         const pop = t < 0.18 ? (t / 0.18) * 1.18 : 1.18 - Math.min(0.18, (t - 0.18) * 0.9);
         if (c.inCorner === 'contact' && camera) {
-          const depth = camera.position.distanceTo(c.sprite.position);
-          const width = Math.min(2, depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * .49);
-          c.sprite.scale.set(width * pop, width * pop * .375, 1);
-          c.sprite.position.y = c.startY + .26 * t;
+          camera.updateMatrixWorld();
+          projected.copy(c.anchor).project(camera);
+          const pxHeight = Math.max(1,heightPx);
+          const pxWidth = pxHeight * camera.aspect;
+          const depth = -c.sprite.position.copy(c.anchor).applyMatrix4(camera.matrixWorldInverse).z;
+          const worldPerPx = 2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov/2)) / pxHeight;
+          // 44px lettering on a 512px texture needs a 140px panel for a 12px font.
+          const width = Math.max(1,Math.min(pxWidth - 8, Math.max(144,pxHeight*.28) * Math.max(1,pop)));
+          const height = width*.375;
+          const edgeX = Math.max(0,1-(width+8)/pxWidth);
+          const edgeY = Math.max(0,1-(height+8)/pxHeight);
+          const offset = (height+16)/pxHeight;
+          projected.x = THREE.MathUtils.clamp(projected.x,-edgeX,edgeX);
+          projected.y = THREE.MathUtils.clamp(projected.y + (projected.y+offset>edgeY ? -offset : offset),-edgeY,edgeY);
+          c.sprite.position.copy(projected.unproject(camera));
+          c.sprite.scale.set(width*worldPerPx,height*worldPerPx,1);
         } else if (c.inCorner && camera) {
           // Keep the play name inside the frame and clear of the pitch lane.
           const depth = 3;
@@ -205,7 +226,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
             .applyQuaternion(camera.quaternion).add(camera.position);
         } else {
           c.sprite.scale.set(4.1 * pop, 1.55 * pop, 1);
-          c.sprite.position.y = c.startY + t * 1.35;
+          c.sprite.position.y = c.anchor.y + t * 1.35;
         }
         c.sprite.material.opacity = t > 0.72 ? (1 - t) / 0.28 : 1;
       }
@@ -213,6 +234,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
   };
 
   const clear = () => {
+    celebration.clear();
     immediate = null;
     umpire.sprite.visible=false;
     dust.visible = false;
@@ -228,6 +250,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
 
   const dispose = () => {
     clear();
+    celebration.dispose();
     ball.dispose();
     bat.dispose();
     umpire.dispose();
@@ -240,5 +263,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     captions = visible;
     for (const item of callouts) item.sprite.visible = visible;
   };
-  return { group, umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, kickChalk, clear, spawnComicCallout, update, dispose };
+  return { group, celebration, get reducedMotion() { return reducedMotion; },
+    setReducedMotion(value) { reducedMotion=value; celebration.setReducedMotion(value); },
+    umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, kickChalk, clear, spawnComicCallout, update, dispose };
 }

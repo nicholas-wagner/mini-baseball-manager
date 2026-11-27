@@ -1,3 +1,4 @@
+import type { GameDayWeather } from '../../engine/simulation/weather';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { Camera } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -20,6 +21,7 @@ const CAMERA_MODE_OPTIONS: readonly { id: LiveCameraMode; label: string; ariaLab
 ];
 
 interface LiveGameCanvasProps {
+  weather?: GameDayWeather | null;
   awayClub: Club;
   homeClub: Club;
   session: GameSessionState;
@@ -40,6 +42,7 @@ interface LiveGameCanvasProps {
 export function LiveGameCanvas({
   awayClub,
   homeClub,
+  weather = null,
   session,
   choreo = null,
   lastEvent = null,
@@ -76,6 +79,8 @@ export function LiveGameCanvas({
       return undefined;
     }
   }, []);
+
+  useEffect(() => { controllerRef.current?.setWeather(weather); }, [weather]);
 
   useEffect(() => { controllerRef.current?.setPreview(preview); }, [preview]);
 

@@ -48,6 +48,7 @@ export class DesignLabSceneController {
   private container: HTMLElement;
   private resizeObserver: ResizeObserver;
   private viewportHeight = 1;
+  private motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   private rafId: number | null = null;
   private lastTimestamp = 0;
   private elapsedSec = 0;
@@ -490,6 +491,12 @@ export class DesignLabSceneController {
     const previousPlayTime = this.elapsedSec - this.playStartedAt;
     this.elapsedSec += dt;
 
+    const steady = Boolean(this.motionPreference?.matches) || document.documentElement.dataset.reducedMotion === 'true';
+    if (this.vfx.reducedMotion !== steady) {
+      this.vfx.setReducedMotion(steady);
+      this.ballpark.setWeather(null, steady);
+    }
+
     // Decay shake & crowd excitement smoothly
     this.trauma = Math.max(0, this.trauma - dt * 1.45);
     this.crowdExcitement = Math.max(0.22, this.crowdExcitement - dt * 0.25);
@@ -512,7 +519,7 @@ export class DesignLabSceneController {
       if (previousPlayTime < accentAt && playTime >= accentAt) this.playAccent?.(play.kind);
       if (playTime>=play.duration && this.queue.length) this.startDiamond(this.queue.shift()!);
       this.ballpark.update(this.elapsedSec, 0.5);
-      this.vfx.update(dt, this.camera);
+      this.vfx.update(dt, this.camera, this.viewportHeight);
       this.renderer.render(this.scene, this.camera);
       return;
     }
@@ -540,7 +547,7 @@ export class DesignLabSceneController {
 
     // Update stadium crowd, clouds & VFX
     this.ballpark.update(this.elapsedSec, this.crowdExcitement);
-    this.vfx.update(dt, this.camera);
+    this.vfx.update(dt, this.camera, this.viewportHeight);
 
     this.renderer.render(this.scene, this.camera);
   };

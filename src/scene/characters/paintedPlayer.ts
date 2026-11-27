@@ -33,6 +33,7 @@ export interface PaintedPlayerRig {
   root: THREE.Group;
   logicalYaw: number;
   updatePose(clip: CharacterAnimClip, time: number, mood?: PortraitMood, camera?: THREE.Vector3Like, caught?: boolean): void;
+  setCatchHeight(offset: number): void;
   preparePlayback():void;
   updateAppearance(options: PaintedPlayerOptions): void;
   dispose(): void;
@@ -108,6 +109,7 @@ export function createPaintedPlayerRig(
   const shadow = new THREE.Mesh(quad, shadowMat);
   root.add(shadow);
   shadow.rotation.x = -Math.PI / 2;
+  let catchHeight = 0;
   let opt = initial,
     a = resolveAthleteAppearance(opt.traits);
   let role: PaintedRole = baseRunner ? 'runner' : opt.role;
@@ -235,6 +237,15 @@ export function createPaintedPlayerRig(
         const beat = Math.min(1,((time + opt.traits.seed % 5 * .13) % 3.8) / .52);
         frame.tilt -= .14*Math.sin(Math.PI*beat);
       }
+    }
+    if (clip === 'pitch_fist_pump') {
+      const drive = Math.sin(Math.PI*Math.min(1,time/CLIP_DURATIONS.pitch_fist_pump));
+      frame.cel = drive > .30 ? 6 : 8;
+      frame.shift = .09*drive;
+      frame.lean = -.16*drive;
+      frame.hop = .065*drive;
+      frame.tilt = .10*drive;
+      frame.expression = 2;
     }
     if (clip === 'pitch_salute') {
       const lift = Math.sin(Math.PI * Math.min(1,time/CLIP_DURATIONS.pitch_salute));
@@ -422,6 +433,13 @@ export function createPaintedPlayerRig(
     const showDetails = !rear || headSheet === 'helmet-quarter';
     headMat.uniforms.showDetails.value = Number(showDetails);
     if (showDetails) detail.paint(a, headSheet, faceCell, clip==='slide_safe' || (opt.quietInfielder && caught && mood==='happy') ? 3 : emotion, opt.team.accent);
+    const setMitt = role === 'catcher' && ['catch_target','catch_receive','catch_frame'].includes(clip);
+    const lift = setMitt ? catchHeight / (height * (1-frame.squash)) : 0;
+    bodyMat.uniforms.mittLift.value = lift / (256 * unit);
+    if (setMitt) {
+      headJoint.rotation.z -= catchHeight * .18;
+      headJoint.position.y += Math.min(0,catchHeight) * .22;
+    }
     bodyMat.uniforms.pocket.value.set(contactX/256, 1-contactY/256,
       caught && clip === 'field_receive' ? Math.max(0, 1-Math.abs(time-.28)/.22) : 0);
     number.visible =
@@ -451,7 +469,7 @@ export function createPaintedPlayerRig(
         handX=172+(handX-172)*u;
         handY=121+(handY-121)*u;
       }
-      ball.position.set(swingMirror*(handX-128)*unit*width,(249-handY)*unit,rear ? -.045 : .075);
+      ball.position.set(swingMirror*(handX-128)*unit*width,(249-handY)*unit+lift,rear ? -.045 : .075);
     }
     ball.visible = (roll && time % CLIP_DURATIONS.pitch_set < 1.3) || frame.held || (caught && !pitching);
     shadow.scale.set((0.8 - frame.hop * 0.33) * width * height, (0.42 - frame.hop * 0.2) * height, 1);
@@ -460,6 +478,7 @@ export function createPaintedPlayerRig(
     root,
     logicalYaw,
     updatePose: pose,
+    setCatchHeight(offset) { catchHeight = offset; },
     updateAppearance: apply,
     preparePlayback,
     batGripAt(clip,time,position,camera) {
