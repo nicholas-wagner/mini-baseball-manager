@@ -1,7 +1,7 @@
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { getCameraPresetPose, type CameraPose, type Vec3 } from '../camera/cameraRig';
-import { CLIP_DURATIONS, type CharacterAnimClip } from '../characters/animationState';
+import { CLIP_DURATIONS, deliveryClip, type CharacterAnimClip } from '../characters/animationState';
 import { targetOffset } from './firstAtBatPresentation';
 import { BASE_PATH_VERTICES as bags, CATCHER_HOME, batterBox, headingToward } from './diamondLayout';
 import type { Actor, DiamondPlay, Leg } from './diamondPlay';
@@ -70,8 +70,21 @@ export function closeActorAt(play: DiamondPlay, close: CloseAction, actor: Actor
       since >= .24 && since < .24 + CLIP_DURATIONS.pitch_fist_pump) {
     return pose('pitch_fist_pump', since - .24);
   }
-  if (actor === 'P' && play.legs.some(l=>l.to==='P') && since>.75) return pose('field_receive',.28);
-  if (actor === 'P') return time < CLIP_DURATIONS.pitch_windup ? pose('pitch_windup') : pose('field_ready');
+  if (actor === 'P') {
+    const delivery = deliveryClip(play.fromStretch);
+    const upright = CLIP_DURATIONS[delivery];
+    if (time < upright) return pose(delivery);
+    const back = play.legs.find(leg => leg.from === 'C' && leg.to === 'P');
+    if (!back) return pose('field_ready', time-upright);
+    const catchTime = time-back.end;
+    const approach = fraction(time,upright,back.end-.16);
+    const tuck = fraction(catchTime,.08,.46);
+    const offset = .24 * approach * (1-tuck*tuck*(3-2*tuck));
+    const feet = { ...start, z: start.z+offset };
+    if (catchTime < -.16) return pose('field_ready',time-upright,feet);
+    if (catchTime < .30) return pose('field_receive',catchTime+.16,feet);
+    return pose(play.fromStretch ? 'pitch_stretch_set' : 'pitch_set',catchTime-.30,feet);
+  }
   if (actor === 'BAT') {
     const swing = close.kind === 'foul_back' || close.kind === 'swinging_third' || close.kind === 'missed_pitch';
     const swingClip: CharacterAnimClip = play.buntAttempt ? 'bat_bunt' : 'bat_swing';

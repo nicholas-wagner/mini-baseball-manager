@@ -55,3 +55,20 @@ describe('painted pitching delivery', () => {
     }
   }
 });
+
+it.each(['L', 'R'] as const)('keeps the %s slide-step release at the fingertips through a camera cut', hand => {
+  const rig = createPaintedPlayerRig({ traits: PLAYER_CATALOG[0].traits, role: 'pitcher',
+    jerseyNumber: 5, team: SAMPLE_TEAM_PALETTES[0], throwsHand: hand });
+  try {
+    const release = CLIP_DURATIONS.pitch_stretch * PITCH_RELEASE_PHASE;
+    expect(release).toBeGreaterThanOrEqual(.48);
+    expect(release).toBeLessThanOrEqual(.52);
+    const front = new Vector3(0,2,5), rear = new Vector3(0,2,-5);
+    const at = (t: number, eye: Vector3) => rig.contactAt('pitch_stretch', t, rig.root.position, eye);
+    const glove = at(0, front), separated = at(release-.06, front), handAtRelease = at(release, front);
+    expect(separated.distanceTo(glove)).toBeGreaterThan(.1);
+    expect(handAtRelease.z - separated.z).toBeGreaterThan(.08);
+    expect(handAtRelease.distanceTo(at(release, rear))).toBeLessThan(.001);
+    expect(handAtRelease.x * (hand === 'L' ? 1 : -1)).toBeGreaterThan(.10);
+  } finally { rig.dispose(); }
+});

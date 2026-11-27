@@ -24,6 +24,7 @@ describe('shared painted minis', () => {
       used.add(bottom);
       used.add('rear-' + bottom);
     }
+    used.add('stretch');
     used.add('receivers');
     used.add('strides');
     expect([...used].sort()).toEqual(Object.keys(files).map(path => path.split('/').at(-1)!.slice(0,-4)).sort());

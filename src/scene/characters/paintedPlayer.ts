@@ -27,6 +27,7 @@ export interface PaintedPlayerOptions {
   reassurePitcher?: boolean;
   quietInfielder?: boolean;
   quietPitcher?: boolean;
+  checkedBase?: number;
 }
 
 export interface PaintedPlayerRig {
@@ -131,6 +132,7 @@ export function createPaintedPlayerRig(
   // or the rig is disposed, so a return throw never outruns the uniform texture.
   function playbackSheets() {
     const keys=new Set<string>([front.body,back.body,front.head,back.head,'baseplays']);
+    if (role === 'pitcher') keys.add('stretch');
     if (role==='runner' || role==='batter') {
       for (const key of ['runners','helmet-back','helmet-quarter','welcome',
         'play-front-'+a.bottoms,'play-rear-'+a.bottoms]) keys.add(key);
@@ -203,7 +205,7 @@ export function createPaintedPlayerRig(
     const tapping = clip === 'glove_tap';
     const brim = clip === 'helmet_tip' && time > .28 && time < 1.08;
     const leading = tapping || clip === 'runner_lead' || clip==='runner_push' || (role==='batter' && clip==='celebrate_hr');
-    const pitching = role==='pitcher' && ['idle','field_ready','pitch_gather','pitch_set','pitch_windup','pitch_super','practice_bullpen'].includes(clip);
+    const pitching = role==='pitcher' && ['idle','pitch_gather','pitch_set','pitch_stretch_set','pitch_stretch','pitch_shake_off','pitch_windup','pitch_super','practice_bullpen'].includes(clip);
     const motionRole = running || leading || sliding ? 'runner' : role==='pitcher' && !pitching && clip!=='celebrate_hr' ? 'fielder' : role;
     const stride = clip==='field_run' && !running;
     if (delivery) {
@@ -292,11 +294,15 @@ export function createPaintedPlayerRig(
     const width = 0.61 + BUILD_WIDTH[a.build] * 0.39;
     const height = STATURE_SCALE[a.stature];
     const floor = role === 'pitcher' ? 0.065 : 0.012;
+    let pitchSheet: 'stretch' | typeof front.body = style.body;
     if (pitching && delivery) {
       delivery.root.position.y = floor;
       delivery.root.rotation.y = rig.logicalYaw;
       delivery.root.scale.set(flip * height * width, height, height);
-      frame.cel = delivery.pose(frame.pitchPhase, a.pitchingMotion, a.bottoms);
+      const stretch = clip === 'pitch_stretch_set' || clip === 'pitch_stretch' || (clip === 'pitch_shake_off' && Boolean(opt.checkedBase));
+      const paint = delivery.pose(frame.pitchPhase, a.pitchingMotion, a.bottoms, stretch, rear);
+      frame.cel = paint.cel;
+      pitchSheet = paint.sheet;
     }
     const cheering = clip==='celebrate_hr' && (role==='runner' || role==='batter');
     if (cheering) {
@@ -321,8 +327,9 @@ export function createPaintedPlayerRig(
       frame.shift = .12 * leanOver;
       frame.tilt = -.08 * leanOver;
     }
-    const bodySheet = cheering || tapping || brim || clip === 'rail_lean' ? 'welcome' : basePlayPose ? 'baseplays' : receiving ? 'receivers' : stride ? 'strides' : running ? `play-${view}-${a.bottoms}` as const
-      : leading ? 'runners' : (clip === 'field_throw' || (role === 'pitcher' && !pitching)) ? (rear ? `rear-${a.bottoms}` as const : a.bottoms) : style.body;
+    const moundReady = role === 'pitcher' && clip === 'field_ready';
+    const bodySheet = moundReady ? `play-${view}-${a.bottoms}` as const : cheering || tapping || brim || clip === 'rail_lean' ? 'welcome' : basePlayPose ? 'baseplays' : receiving ? 'receivers' : stride ? 'strides' : running ? `play-${view}-${a.bottoms}` as const
+      : leading ? 'runners' : (clip === 'field_throw' || (role === 'pitcher' && !pitching)) ? (rear ? `rear-${a.bottoms}` as const : a.bottoms) : pitchSheet;
     const registration = bodySheet==='welcome' ? (brim ? [126,92,99,138] : tapping || clip === 'rail_lean' ? [126,92,235,113] : [126,92,40,54]) : anchors[bodySheet][frame.cel];
     const [nx,ny,contactX,contactY]=registration;
     const emotion = mood
@@ -388,7 +395,7 @@ export function createPaintedPlayerRig(
     headJoint.position.set(swingMirror * (nx - 128) * unit * width, (249 - ny - 8) * unit, 0.032);
     headJoint.rotation.z = rotationSign * frame.tilt;
     if (clip === 'catch_frame') headJoint.position.y -= .035 * Math.sin(Math.PI * Math.min(1, time / .32));
-    bodyMat.uniforms.sleeve.value.set(0, rear ? .59 : .46);
+    bodyMat.uniforms.sleeve.value.set(frame.glovePat, rear ? .59 : .46);
     const habit = stanceHabit(opt.traits.seed, role === 'pitcher', opt.quietPitcher);
     if (clip === 'bat_stance') {
       // Each player keeps a quiet pre-pitch habit through changes of club or uniform.
@@ -427,21 +434,32 @@ export function createPaintedPlayerRig(
     if (clip === 'runner_glance') {
       headJoint.rotation.y = -.47 * actorFlip;
       headJoint.rotation.z += .12 * actorFlip;
-    } else headJoint.rotation.y = 0;
+    } else {
+      // The runner stays on the same world-side of the mound when the camera or arm changes.
+      const glanceSide = clip === 'pitch_stretch_set'
+        ? (opt.checkedBase === 3 ? -1 : opt.checkedBase === 2 ? 1.55 : 1) * rotationSign * actorFlip : 1;
+      headJoint.rotation.y = frame.headTurn * glanceSide;
+    }
+    headJoint.rotation.x = frame.nod;
+    if (clip === 'pitch_shake_off' || clip === 'pitch_stretch_set') {
+      headJoint.position.x += .055 * headJoint.rotation.y;
+    }
     head.scale.set(256 * headUnit, 256 * headUnit, 1);
     head.position.set(0, 72 * headUnit, 0);
     const showDetails = !rear || headSheet === 'helmet-quarter';
     headMat.uniforms.showDetails.value = Number(showDetails);
     if (showDetails) detail.paint(a, headSheet, faceCell, clip==='slide_safe' || (opt.quietInfielder && caught && mood==='happy') ? 3 : emotion, opt.team.accent);
     const setMitt = role === 'catcher' && ['catch_target','catch_receive','catch_frame'].includes(clip);
-    const lift = setMitt ? catchHeight / (height * (1-frame.squash)) : 0;
+    const returnCatch = role === 'pitcher' && clip === 'field_receive';
+    const tuck = returnCatch ? -.14 * THREE.MathUtils.smoothstep(time,.18,.46) : 0;
+    const lift = setMitt ? catchHeight / (height * (1-frame.squash)) : tuck;
     bodyMat.uniforms.mittLift.value = lift / (256 * unit);
     if (setMitt) {
       headJoint.rotation.z -= catchHeight * .18;
       headJoint.position.y += Math.min(0,catchHeight) * .22;
     }
     bodyMat.uniforms.pocket.value.set(contactX/256, 1-contactY/256,
-      caught && clip === 'field_receive' ? Math.max(0, 1-Math.abs(time-.28)/.22) : 0);
+      caught && clip === 'field_receive' ? Math.max(0, 1-Math.abs(time-(returnCatch ? .16 : .28))/.22) : 0);
     number.visible =
       role !== 'catcher' &&
       (role === 'pitcher' || role === 'fielder' || role === 'runner') &&

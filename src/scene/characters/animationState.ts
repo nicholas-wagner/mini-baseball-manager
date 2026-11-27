@@ -6,6 +6,9 @@ export type CharacterAnimClip =
   | 'glove_tap'
   | 'catch_frame'
   | 'pitch_set'
+  | 'pitch_stretch_set'
+  | 'pitch_stretch'
+  | 'pitch_shake_off'
   | 'pitch_windup'
   | 'pitch_super'
   | 'bat_contact_set'
@@ -40,6 +43,7 @@ export type CharacterAnimClip =
   | 'celebrate_hr';
 
 // Release on an exact pose in the standee's 16-frame animation cycle.
+export const deliveryClip = (fromStretch = false) => fromStretch ? 'pitch_stretch' : 'pitch_windup';
 export const PITCH_RELEASE_PHASE = 9 / 16;
 export const GLOVE_CONTACT_PHASE = { field_dive: 8 / 16, field_high_jump: 10 / 16 } as const;
 
@@ -49,6 +53,9 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   glove_tap: 1.4,
   catch_frame: .36,
   pitch_set: 3.2,
+  pitch_stretch_set: 3.4,
+  pitch_stretch: .89,
+  pitch_shake_off: .72,
   pitch_salute: .66,
   pitch_fist_pump: .52,
   pitch_windup: 1.35,

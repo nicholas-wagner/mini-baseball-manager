@@ -9,7 +9,7 @@ import {
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const pulse = (t: number, start: number, end: number) =>
   Math.sin(Math.PI * clamp((t - start) / (end - start)));
-const pitchClips = new Set<CharacterAnimClip>(['pitch_windup', 'pitch_super', 'practice_bullpen']);
+const pitchClips = new Set<CharacterAnimClip>(['pitch_stretch', 'pitch_windup', 'pitch_super', 'practice_bullpen']);
 
 export function paintedMotion(
   role: PaintedRole,
@@ -27,11 +27,25 @@ export function paintedMotion(
     tilt = wave * 0.02,
     shift = 0;
   let held = false;
-  let pitchPhase = 0;
+  let pitchPhase = 0, headTurn = 0, nod = 0, glovePat = 0;
   if (role === 'pitcher') {
     lean = 0;
     squash = 0;
     tilt = wave * .009;
+    if (clip === 'pitch_set' || clip === 'pitch_stretch_set') {
+      const breath = Math.sin(phase * Math.PI * 2);
+      const peek = pulse(phase,.52,.90);
+      squash = .013 * breath + .011 * peek;
+      lean = -.018 * peek;
+      nod = .075 * peek;
+      glovePat = pulse(phase,.12,.24) - .45 * pulse(phase,.24,.35);
+      if (clip === 'pitch_stretch_set') headTurn = .50 * pulse(phase,.16,.52) ** 2;
+    }
+    if (clip === 'pitch_shake_off') {
+      const t = clamp(seconds / CLIP_DURATIONS.pitch_shake_off);
+      headTurn = .52 * Math.sin(t * Math.PI * 5) * pulse(t,0,.68);
+      nod = .19 * pulse(t,.65,1);
+    }
     if (pitchClips.has(clip)) {
       pitchPhase = phase;
       expression = phase < .16 || phase > .92 ? 0 : 1;
@@ -121,5 +135,5 @@ export function paintedMotion(
     expression = 2;
     hop = 0.17 * Math.abs(Math.sin(phase * 2 * Math.PI));
   }
-  return { cel, expression, hop, lean, squash, tilt, shift, held, pitchPhase };
+  return { cel, expression, hop, lean, squash, tilt, shift, held, pitchPhase, headTurn, nod, glovePat };
 }

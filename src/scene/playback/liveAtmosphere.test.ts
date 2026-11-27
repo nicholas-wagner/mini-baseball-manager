@@ -173,3 +173,43 @@ it('starts a barrel wave at contact, celebrates the homer at the wall, and suppr
     expect(visible('home run fireworks')).toBe(false);
   } finally { game.dispose(); }
 });
+
+it('selects the delivery from the occupied bases before the play, even when a single fills first', () => {
+  const single = {...event, outcome: 'single' as const, basesAfter: ['hitter',null,null] as PlayEvent['basesAfter']};
+  for (const outcome of ['ball','single','ground_out'] as const) {
+    const pitch = {...single, type: outcome === 'ball' ? 'pitch_thrown' as const : 'ball_in_play' as const, outcome};
+    const empty = choreographPlayEvent(pitch,1,[null,null,null]).play!;
+    const occupied = choreographPlayEvent(pitch,1,[null,'runner',null]).play!;
+    expect(empty.legs[0].start).toBeCloseTo(.76,2);
+    expect(occupied.legs[0].start).toBeCloseTo(.50,2);
+    expect(occupied.legs[0].end - occupied.legs[0].start).toBeCloseTo(empty.legs[0].end - empty.legs[0].start);
+  }
+});
+
+it('sets from the stretch before a pitch, checks the runner and shakes off then nods to ready', () => {
+  const {game, frame} = mount();
+  try {
+    game.syncMatchup(away,home,session);
+    const pitcher = frame(.1).getObjectByName('pitcher')!;
+    const head = pitcher.getObjectByName('painted head')!.parent!;
+    const body = pitcher.getObjectByName('painted uniform') as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>;
+    const windup = body.material.uniforms.sheet.value;
+    game.syncMatchup(away,home,{...session, bases:['runner',null,null]});
+    frame(.2);
+    const stretch = body.material.uniforms.sheet.value;
+    expect(stretch).not.toBe(windup);
+    const yaw = head.rotation.y;
+    frame(1.2);
+    expect(Math.abs(head.rotation.y-yaw)).toBeGreaterThan(.08);
+    game.triggerPitcherShakeOff();
+    frame(1.28);
+    const first = head.rotation.y;
+    frame(1.43);
+    expect(first * head.rotation.y).toBeLessThan(0);
+    frame(1.78);
+    expect(Math.abs(head.rotation.x)).toBeGreaterThan(.03);
+    frame(3.4);
+    expect(head.rotation.x).toBe(0);
+    expect(body.material.uniforms.sheet.value).toBe(stretch);
+  } finally { game.dispose(); }
+});

@@ -45,3 +45,17 @@ describe('plate and steal replays', () => {
     for (const kind of PLATE_AND_STEALS) expect(diamondPlay(kind).duration).toBeGreaterThan(diamondPlay(kind).finish);
   });
 });
+
+it.each([false,true])('tracks the return into the glove then steps onto the rubber (stretch %s)', fromStretch => {
+  const play = diamondPlay('called_pitch', undefined, undefined, undefined, undefined, fromStretch);
+  const pitch = play.legs[0], back = play.legs[1];
+  const at = (time: number) => actorAt(play,'P',time,'R');
+  expect(at(pitch.start).clip).toBe(fromStretch ? 'pitch_stretch' : 'pitch_windup');
+  expect(pitch.start).toBeCloseTo(fromStretch ? .50 : .76, 2);
+  expect(at(back.end-.24).clip).toBe('field_ready');
+  expect(at(back.end).clip).toBe('field_receive');
+  expect(at(back.end+.12).local - at(back.end).local).toBeCloseTo(.12);
+  expect(at(back.end).pos.z).toBeGreaterThan(at(0).pos.z);
+  expect(at(play.duration).pos).toEqual(at(0).pos);
+  expect(at(play.duration).clip).toBe(fromStretch ? 'pitch_stretch_set' : 'pitch_set');
+});

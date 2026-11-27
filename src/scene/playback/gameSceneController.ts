@@ -108,6 +108,11 @@ export class GameSceneController {
   private throws: ThrowsHand = 'R';
   private preview: AtBatPreview | null = null;
   private previewStart = 0;
+  private shakeOffStart = -Infinity;
+
+  public triggerPitcherShakeOff() {
+    if (!this.replay && !this.pitch) this.shakeOffStart = this.elapsedSec;
+  }
   private entrance: PlayerEntranceCue | null = null;
   private entranceTime = 0;
   private finishEntrance?: () => void;
@@ -340,6 +345,7 @@ export class GameSceneController {
       rig.updateAppearance({
         traits: defender.traits,
         quietInfielder: defender.personality === 'quiet_assassin',
+        checkedBase: (choreo?.basesBefore ?? session.bases).findIndex(Boolean) + 1,
         quietPitcher: defender.personality === 'quiet_assassin',
         reassurePitcher: coord.pos === 'C' && (session.balls >= 2 || fieldingSide.pitcherFatigue >= 60 || session.bases.filter(Boolean).length >= 2),
         team: fieldingTeam,
@@ -382,12 +388,13 @@ export class GameSceneController {
     this.welcome.hide();
     if (!choreo) {
       this.cameraPreset = defaultMatchupCameraPreset(battingSide.isHuman);
-      this.pitcherClip = 'pitch_set';
+      this.pitcherClip = session.bases.some(Boolean) ? 'pitch_stretch_set' : 'pitch_set';
       this.batterClip = 'bat_stance';
       this.fielderClip = 'field_ready';
       this.highlightPos = null;
     }
-    const play = choreo?.play ?? choreo?.close ?? choreo?.outfield ?? (choreo?.infield ? diamondPlay(choreo.infield, choreo.highlightFielderPos) : undefined);
+    const play = choreo?.play ?? choreo?.close ?? choreo?.outfield ?? (choreo?.infield ? diamondPlay(choreo.infield, choreo.highlightFielderPos, event ?? undefined, undefined, event?.pitchThrown, (choreo.basesBefore ?? session.bases).some(Boolean)) : undefined);
+    if (choreo) this.shakeOffStart = -Infinity;
     if (play && choreo) {
       const calledTarget = this.calledTarget ?? play.pitchTarget;
       if (play.close?.steal || play.kind === 'bullpen') this.calledTarget = null;
@@ -637,6 +644,8 @@ export class GameSceneController {
           this.targetRing.position.copy(rig.contactAt('catch_target', this.elapsedSec, rig.root.position, this.camera.position));
           this.targetRing.quaternion.copy(this.camera.quaternion);
         } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
+      } else if (pos === 'P' && this.elapsedSec-this.shakeOffStart < CLIP_DURATIONS.pitch_shake_off) {
+        rig.updatePose('pitch_shake_off',this.elapsedSec-this.shakeOffStart,undefined,this.camera.position);
       } else if (pos === 'P' && this.entrance?.role === 'pitcher') {
         rig.updatePose(this.pitcherRitual, entranceTime, undefined, this.camera.position);
       } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
