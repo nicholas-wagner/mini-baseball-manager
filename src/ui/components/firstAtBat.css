@@ -115,6 +115,53 @@
   display: flex;
   gap: 6px;
 }
+.atbat-steal-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.atbat-steal-chip {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 2px solid #193e37;
+  background: #d8f3dc;
+  color: #152f2e;
+  font-size: 11.5px;
+  font-weight: 850;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.atbat-steal-chip[aria-pressed="true"] {
+  background: #ffcc49;
+  color: #152f2e;
+  box-shadow: 2px 2px 0 #192735;
+}
+.live-context-chip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.live-context-chip button {
+  flex: 1 1 auto;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 2px solid #193e37;
+  background: #d8f3dc;
+  color: #152f2e;
+  font-size: 11.5px;
+  font-weight: 850;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.live-context-chip button[aria-pressed="true"] {
+  background: #ffcc49;
+  color: #152f2e;
+  box-shadow: 2px 2px 0 #192735;
+}
 .atbat-choices button,
 .atbat-go {
   min-height: 44px;

@@ -6,9 +6,13 @@ import {
   computeStealSuccessProbability,
   computeStealSuccessRate,
   getEligibleStealPlays,
+  isStealForcedByWalk,
+  isStealPlayLegal,
   resolveBaseStealPlay,
   resolveDefaultStealPlay,
   shouldAiAttemptSteal,
+  stealPlayToTacticalCall,
+  tacticalCallToStealPlay,
 } from './baserunning';
 
 describe('Speed-Driven Base Stealing & Baserunning Engine (TASK-070)', () => {
@@ -211,5 +215,35 @@ describe('Speed-Driven Base Stealing & Baserunning Engine (TASK-070)', () => {
 
     expect(computeStealSuccessRate(0, 0)).toBe(0);
     expect(computeStealSuccessRate(15, 5)).toBe(75);
+  });
+
+  it('validates legal steal plays, forced-by-walk rules, and tactical call conversions (TASK-109)', () => {
+    expect(isStealPlayLegal('steal_2b', ['r1', null, null])).toBe(true);
+    expect(isStealPlayLegal('steal_2b', ['r1', 'r2', null])).toBe(false);
+    expect(isStealPlayLegal('steal_3b', [null, 'r2', null])).toBe(true);
+    expect(isStealPlayLegal('steal_3b', [null, 'r2', 'r3'])).toBe(false);
+    expect(isStealPlayLegal('double_steal', ['r1', 'r2', null])).toBe(true);
+    expect(isStealPlayLegal('double_steal', [null, 'r2', null])).toBe(false);
+    expect(isStealPlayLegal('steal_home', [null, null, 'r3'])).toBe(true);
+    expect(isStealPlayLegal('steal_home', ['r1', null, null])).toBe(false);
+
+    // Forced-by-walk rules: 1B steals & double steals are always forced; 2B->3B only if 1B occupied; home only if loaded
+    expect(isStealForcedByWalk('steal_2b', ['r1', null, null])).toBe(true);
+    expect(isStealForcedByWalk('double_steal', ['r1', 'r2', null])).toBe(true);
+    expect(isStealForcedByWalk('steal_3b', [null, 'r2', null])).toBe(false);
+    expect(isStealForcedByWalk('steal_3b', ['r1', 'r2', null])).toBe(true);
+    expect(isStealForcedByWalk('steal_home', [null, null, 'r3'])).toBe(false);
+    expect(isStealForcedByWalk('steal_home', ['r1', null, 'r3'])).toBe(false);
+    expect(isStealForcedByWalk('steal_home', ['r1', 'r2', 'r3'])).toBe(true);
+
+    expect(stealPlayToTacticalCall('steal_2b')).toBe('steal');
+    expect(stealPlayToTacticalCall('steal_3b')).toBe('steal_3b');
+    expect(stealPlayToTacticalCall('double_steal')).toBe('double_steal');
+    expect(stealPlayToTacticalCall('steal_home')).toBe('steal_home');
+
+    expect(tacticalCallToStealPlay('steal', ['r1', null, null])).toBe('steal_2b');
+    expect(tacticalCallToStealPlay('steal', [null, 'r2', null])).toBe('steal_3b');
+    expect(tacticalCallToStealPlay('steal_3b', [null, 'r2', null])).toBe('steal_3b');
+    expect(tacticalCallToStealPlay('normal', ['r1', null, null])).toBeNull();
   });
 });

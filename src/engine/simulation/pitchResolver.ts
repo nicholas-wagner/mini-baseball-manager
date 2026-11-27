@@ -57,10 +57,12 @@ import {
   type HeritageGameplayProfile,
 } from '../rpg/specialPowerEffects';
 import { evaluatePositionAssignment } from '../rpg/specialistsAndPositions';
-import type { BaseState } from './gameState';
+import { advanceWalkRunners, type BaseState } from './gameState';
 import {
+  isStealForcedByWalk,
+  isStealPlayLegal,
   resolveBaseStealPlay,
-  resolveDefaultStealPlay,
+  tacticalCallToStealPlay,
   type StealDefenseCall,
   type StealPlayResolution,
   type StealPlayType,
@@ -113,6 +115,7 @@ export interface PitchResolution {
     | 'none';
   stealSuccess?: boolean;
   stealResolution?: StealPlayResolution;
+  runnerAdvanceFirstToThird?: boolean;
   commentary: string;
   soundCue: PlaySoundCue;
   ballFlight?: PlayEvent['ballFlight'];
@@ -182,30 +185,33 @@ function buildHeritagePowerTrigger(
   };
 }
 
-function resolveStealPlayTypeFromCall(
-  call: TacticalCall,
-  bases: BaseState,
-): StealPlayType | null {
-  if (call === 'steal') return resolveDefaultStealPlay(bases);
-  if (call === 'steal_3b' || call === 'double_steal' || call === 'steal_home') return call;
-  return null;
+function resolveActiveSteal(ctx: PitchResolverContext): StealPlayType | null {
+  if (ctx.stealPlay && isStealPlayLegal(ctx.stealPlay, ctx.bases)) {
+    return ctx.stealPlay;
+  }
+  return tacticalCallToStealPlay(ctx.tacticalCall, ctx.bases);
 }
 
-function resolveStealAttempt(
-  ctx: PitchResolverContext,
-  playType: StealPlayType,
-): PitchResolution | null {
+function buildStealPlayersMap(ctx: PitchResolverContext): Record<string, Player> {
   const playersMap: Record<string, Player> = ctx.battingPlayersById
     ? { ...ctx.battingPlayersById }
     : {};
   if (ctx.firstBaseRunner) {
     playersMap[ctx.firstBaseRunner.id] = ctx.firstBaseRunner;
   }
-  const result = resolveBaseStealPlay(
+  return playersMap;
+}
+
+function resolveStealOnBases(
+  ctx: PitchResolverContext,
+  playType: StealPlayType,
+  bases: BaseState,
+): StealPlayResolution | null {
+  return resolveBaseStealPlay(
     ctx.rng,
     playType,
-    ctx.bases,
-    playersMap,
+    bases,
+    buildStealPlayersMap(ctx),
     ctx.pitcher,
     ctx.catcher,
     {
@@ -214,18 +220,127 @@ function resolveStealAttempt(
       defenseCall: ctx.stealDefenseCall,
     },
   );
-  if (!result) return null;
+}
+
+const COUNT_PITCH_LABELS: Readonly<Record<'ball' | 'called_strike' | 'swinging_strike', string>> = {
+  ball: 'Ball!',
+  called_strike: 'Called strike!',
+  swinging_strike: 'Swinging strike!',
+};
+
+function applyStealToCountPitch(
+  ctx: PitchResolverContext,
+  playType: StealPlayType,
+  rawPitch: PitchResolution,
+): PitchResolution {
+  const result = resolveStealOnBases(ctx, playType, ctx.bases);
+  if (!result) return rawPitch;
+  const label =
+    COUNT_PITCH_LABELS[rawPitch.outcome as 'ball' | 'called_strike' | 'swinging_strike'] ?? 'Pitch!';
   return {
     kind: 'steal_attempt',
-    outcome: 'ball',
+    outcome: rawPitch.outcome,
     outsAdded: result.outsAdded,
     runnerId: result.stolenBaseRunnerIds[0] ?? result.caughtStealingRunnerId ?? undefined,
     stealSuccess: result.success,
     stealResolution: result,
-    commentary: result.commentary,
+    specialPowerTriggered: rawPitch.specialPowerTriggered,
+    commentary: `${label} ${result.commentary}`,
     soundCue: result.soundCue,
     fieldingHighlight: result.fieldingHighlight,
   };
+}
+
+function applyStealToWalk(
+  ctx: PitchResolverContext,
+  playType: StealPlayType,
+  rawPitch: PitchResolution,
+): PitchResolution {
+  if (isStealForcedByWalk(playType, ctx.bases)) {
+    return {
+      ...rawPitch,
+      commentary: `Ball four! ${ctx.batter.name} walks — runners advance safely.`,
+    };
+  }
+  const walked = advanceWalkRunners(ctx.bases, ctx.batter.id);
+  const steal = resolveStealOnBases(ctx, playType, walked.basesAfter);
+  if (!steal) return rawPitch;
+  return {
+    ...rawPitch,
+    outsAdded: steal.outsAdded,
+    runnerId: steal.stolenBaseRunnerIds[0] ?? steal.caughtStealingRunnerId ?? undefined,
+    stealSuccess: steal.success,
+    stealResolution: steal,
+    fieldingHighlight: steal.fieldingHighlight,
+    commentary: `Ball four! ${ctx.batter.name} walks — ${steal.commentary}`,
+    soundCue: steal.soundCue,
+  };
+}
+
+function applyStealToStrikeout(
+  ctx: PitchResolverContext,
+  playType: StealPlayType,
+  rawPitch: PitchResolution,
+): PitchResolution {
+  if (ctx.outs + 1 >= 3) return rawPitch;
+  const steal = resolveStealOnBases(ctx, playType, ctx.bases);
+  if (!steal) return rawPitch;
+  const doublePlay = !steal.success;
+  return {
+    ...rawPitch,
+    runnerId: steal.stolenBaseRunnerIds[0] ?? steal.caughtStealingRunnerId ?? undefined,
+    stealSuccess: steal.success,
+    stealResolution: steal,
+    fieldingHighlight: steal.fieldingHighlight,
+    commentary: doublePlay
+      ? `STRIKE-'EM-OUT, THROW-'EM-OUT DOUBLE PLAY! ${ctx.batter.name} strikes out and ${steal.commentary}`
+      : `Strike three! ${ctx.batter.name} strikes out, but ${steal.commentary}`,
+    soundCue: doublePlay ? 'double_play_snap' : steal.soundCue,
+  };
+}
+
+function applyStealToInPlay(
+  ctx: PitchResolverContext,
+  playType: StealPlayType,
+  rawPitch: PitchResolution,
+): PitchResolution {
+  const runningFromFirst =
+    (playType === 'steal_2b' || playType === 'double_steal') && Boolean(ctx.bases[0]);
+  if (rawPitch.outcome !== 'single' || !runningFromFirst) return rawPitch;
+  const runnerId = ctx.bases[0]!;
+  const runner = buildStealPlayersMap(ctx)[runnerId];
+  const speed = runner?.ratings.speed ?? 60;
+  const advanceChance = clampProb(0.68 + (speed - 60) * 0.006, 0.55, 0.94);
+  if (!ctx.rng.chance(advanceChance)) return rawPitch;
+  const runnerName = runner?.name ?? 'Runner';
+  return {
+    ...rawPitch,
+    runnerAdvanceFirstToThird: true,
+    commentary: `${rawPitch.commentary} Hit-and-run perfection! ${runnerName} motors from first to third!`,
+  };
+}
+
+function applyStealToPitchResolution(
+  ctx: PitchResolverContext,
+  playType: StealPlayType,
+  rawPitch: PitchResolution,
+): PitchResolution {
+  if (rawPitch.outcome === 'foul') {
+    return {
+      ...rawPitch,
+      commentary: `Foul ball! ${ctx.batter.name} protects the plate — Runner jogs back.`,
+    };
+  }
+  if (
+    rawPitch.outcome === 'ball' ||
+    rawPitch.outcome === 'called_strike' ||
+    rawPitch.outcome === 'swinging_strike'
+  ) {
+    return applyStealToCountPitch(ctx, playType, rawPitch);
+  }
+  if (rawPitch.outcome === 'walk') return applyStealToWalk(ctx, playType, rawPitch);
+  if (rawPitch.outcome === 'strikeout') return applyStealToStrikeout(ctx, playType, rawPitch);
+  return applyStealToInPlay(ctx, playType, rawPitch);
 }
 
 function pickBuntCharger(ctx: PitchResolverContext): Player {
@@ -472,6 +587,7 @@ function resolveOutOrError(
   luckErrorMultiplier: number,
   battedBallType: BattedBallType,
   powers: PowerBundle,
+  runnerInMotion = false,
 ): PitchResolution {
   const { rng, batter, outs, bases, defender, defenderPos } = ctx;
   const posEval = evaluatePositionAssignment(defender, defenderPos);
@@ -509,7 +625,8 @@ function resolveOutOrError(
     };
   }
 
-  const dpChance = battedBallType === 'ground_ball' ? 0.36 : 0.1;
+  const baseDpChance = battedBallType === 'ground_ball' ? 0.36 : 0.1;
+  const dpChance = runnerInMotion ? baseDpChance * 0.5 : baseDpChance;
   if (outs < 2 && bases[0] !== null && rng.chance(dpChance)) {
     const dpSpot = rng.pick(INFIELD_SPOTS);
     return {
@@ -571,6 +688,8 @@ export interface PitchResolverContext {
   battingPlayersById?: Readonly<Record<string, Player>>;
   catcherPopTimeBonus?: number;
   stealDefenseCall?: StealDefenseCall;
+  stealPlay?: StealPlayType | null;
+  hitAndRun?: boolean;
   relieverWarmupControlBonus?: number;
 }
 
@@ -756,6 +875,7 @@ function resolveContactResult(
   pitchType: PitchType,
   gbRateShift: number,
   powers: PowerBundle,
+  runnerInMotion = false,
 ): PitchResolution {
   const fatiguedPitcherProfile = {
     ...ctx.pitcher.battedBallProfile,
@@ -831,6 +951,7 @@ function resolveContactResult(
     defenderLuckErrMult,
     battedBallType,
     powers,
+    runnerInMotion,
   );
 }
 
@@ -867,6 +988,22 @@ function resolveBallOrWalk(balls: number, batterName: string): PitchResolution {
   };
 }
 
+function computeContactProb(
+  inZone: boolean,
+  effContact: number,
+  effStuff: number,
+  powers: PowerBundle,
+): number {
+  const whiffPenalty =
+    powers.pitcherHeritage.pitcherWhiffBonus +
+    powers.pitcherCaps.pitcherWhiffBonus +
+    powers.mindGames.whiffBonus +
+    (powers.pitcherSurge?.whiffBonus ?? 0);
+  return inZone
+    ? clampProb(0.76 + (effContact - effStuff) * 0.0048 - whiffPenalty, 0.34, 0.95)
+    : clampProb(0.48 + (effContact - effStuff) * 0.0032 - whiffPenalty, 0.16, 0.76);
+}
+
 function evaluateSwingResult(
   ctx: PitchResolverContext,
   inZone: boolean,
@@ -879,16 +1016,9 @@ function evaluateSwingResult(
   pitchType: PitchType,
   gbRateShift: number,
   powers: PowerBundle,
+  runnerInMotion: boolean,
 ): PitchResolution {
-  const whiffPenalty =
-    powers.pitcherHeritage.pitcherWhiffBonus +
-    powers.pitcherCaps.pitcherWhiffBonus +
-    powers.mindGames.whiffBonus +
-    (powers.pitcherSurge?.whiffBonus ?? 0);
-  const contactProb = inZone
-    ? clampProb(0.76 + (effContact - effStuff) * 0.0048 - whiffPenalty, 0.34, 0.95)
-    : clampProb(0.48 + (effContact - effStuff) * 0.0032 - whiffPenalty, 0.16, 0.76);
-
+  const contactProb = computeContactProb(inZone, effContact, effStuff, powers);
   if (!ctx.rng.chance(contactProb)) {
     const whiff = resolveSwingingStrikeOrOut(ctx.strikes, ctx.batter.name);
     if (whiff.outcome === 'strikeout' && ctx.canPitcherTriggerSpecial && !powers.pitcherSurge) {
@@ -919,6 +1049,7 @@ function evaluateSwingResult(
     pitchType,
     gbRateShift,
     powers,
+    runnerInMotion,
   );
 }
 
@@ -1236,8 +1367,7 @@ function resolvePrePitchTacticalAction(
       soundCue: 'ui_pop',
     };
   }
-  const stealPlay = resolveStealPlayTypeFromCall(ctx.tacticalCall, ctx.bases);
-  return stealPlay ? resolveStealAttempt(ctx, stealPlay) : null;
+  return null;
 }
 
 function collectActiveModifierTags(powers: PowerBundle, warmupControlBonus = 0): string[] {
@@ -1328,6 +1458,66 @@ function resolveBuntCall(
   );
 }
 
+function resolveTakenPitch(ctx: PitchResolverContext, inZone: boolean): PitchResolution {
+  return inZone
+    ? resolveCalledStrikeOrOut(ctx.strikes, ctx.batter.name)
+    : resolveBallOrWalk(ctx.balls, ctx.batter.name);
+}
+
+function computeSwingProbability(
+  stats: ReturnType<typeof computeEffectiveMatchupNumbers>,
+  fullPowers: PowerBundle,
+  inZone: boolean,
+  isHitAndRun: boolean,
+): number {
+  if (inZone) {
+    const boost = isHitAndRun ? 0.14 : 0;
+    return clampProb(0.67 + stats.swingMod + boost + fullPowers.mindGames.inZoneSwingDelta, 0.36, 0.92);
+  }
+  const boost = isHitAndRun ? 0.08 : 0;
+  return clampProb(0.26 - (stats.effEye - 65) * 0.002 + stats.chaseShift + boost, 0.08, 0.62);
+}
+
+function resolvePitchOutcome(
+  ctx: PitchResolverContext,
+  stats: ReturnType<typeof computeEffectiveMatchupNumbers>,
+  fullPowers: PowerBundle,
+  inZone: boolean,
+  pitchType: PitchType,
+  gbRateShift: number,
+  firstBaseStepBonus: number,
+  activeSteal: StealPlayType | null,
+  isPitchout: boolean,
+): PitchResolution {
+  const isStraightSteal = activeSteal !== null && ctx.strikes < 2 && !ctx.hitAndRun;
+  if (isPitchout || isStraightSteal) {
+    return resolveTakenPitch(ctx, inZone);
+  }
+  const swingProb = computeSwingProbability(
+    stats,
+    fullPowers,
+    inZone,
+    Boolean(activeSteal && ctx.hitAndRun),
+  );
+  if (!ctx.rng.chance(swingProb)) {
+    return resolveTakenPitch(ctx, inZone);
+  }
+  return evaluateSwingResult(
+    ctx,
+    inZone,
+    stats.effContact,
+    stats.effPower,
+    stats.effStuff,
+    firstBaseStepBonus,
+    stats.luckHitShift,
+    stats.defenderLuckErrMult,
+    pitchType,
+    gbRateShift,
+    fullPowers,
+    Boolean(activeSteal),
+  );
+}
+
 /** Resolves a single baseball pitch or tactical action cleanly from seeded state. */
 export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
   const powers = buildPowerBundle(ctx);
@@ -1359,33 +1549,28 @@ export function resolveSinglePitch(ctx: PitchResolverContext): PitchResolution {
     return resolveBuntCall(ctx, pitchType, adjustedMatchup, stats.effStuff, platoon, fullPowers);
   }
 
+  const activeSteal = resolveActiveSteal(ctx);
+  const isPitchout = ctx.stealDefenseCall === 'pitchout' || ctx.tacticalCall === 'pitchout';
   const zoneProb = clampProb(
     0.55 + (stats.effControl - stats.effEye) * 0.0025 + stats.luckZoneShift,
     0.24,
     0.82,
   );
-  const inZone = ctx.rng.chance(zoneProb);
-  const swingProb = inZone
-    ? clampProb(0.67 + stats.swingMod + fullPowers.mindGames.inZoneSwingDelta, 0.36, 0.88)
-    : clampProb(0.26 - (stats.effEye - 65) * 0.002 + stats.chaseShift, 0.08, 0.56);
-
-  const rawResult = !ctx.rng.chance(swingProb)
-    ? inZone
-      ? resolveCalledStrikeOrOut(ctx.strikes, ctx.batter.name)
-      : resolveBallOrWalk(ctx.balls, ctx.batter.name)
-    : evaluateSwingResult(
-        ctx,
-        inZone,
-        stats.effContact,
-        stats.effPower,
-        stats.effStuff,
-        platoon.firstBaseStepBonus,
-        stats.luckHitShift,
-        stats.defenderLuckErrMult,
-        pitchType,
-        enduranceFx.gbRateShift,
-        fullPowers,
-      );
+  const inZone = isPitchout ? false : ctx.rng.chance(zoneProb);
+  const pitchResult = resolvePitchOutcome(
+    ctx,
+    stats,
+    fullPowers,
+    inZone,
+    pitchType,
+    enduranceFx.gbRateShift,
+    platoon.firstBaseStepBonus,
+    activeSteal,
+    isPitchout,
+  );
+  const rawResult = activeSteal
+    ? applyStealToPitchResolution(ctx, activeSteal, pitchResult)
+    : pitchResult;
 
   const decorated = decorateActivePowerOutcome(rawResult, fullPowers);
   decorated.mathBreakdown = buildPitchMathBreakdown(

@@ -5,6 +5,7 @@ import { buildMascotCheerQuip, PITCH_CALL_GUIDE } from "../../engine/gm/openingD
 import { ClubMascotBuddy } from "./ClubMascotBuddy";
 import type { PitchType } from "../../engine/models/player";
 import type { TacticalCall } from "../../engine/models/playEvent";
+import type { StealOptionPreview, StealPlayType } from "../../engine/simulation/baserunning";
 import type { BullpenMode, BullpenRecommendation } from "../../engine/simulation/bullpenManager";
 import type { CatcherPitchCall } from "../../engine/simulation/catcherCalls";
 import type { GameSessionState } from "../../engine/simulation/gameState";
@@ -55,6 +56,9 @@ export function FirstAtBat({
   shakeOffTotal = 0,
   pitcherArsenal = [],
   selectedPitchType = null,
+  stealOptions = [],
+  armedStealPlay = null,
+  onToggleStealPlay,
   cue,
   onTarget,
   onSwing,
@@ -89,6 +93,9 @@ export function FirstAtBat({
   shakeOffTotal?: number;
   pitcherArsenal?: readonly PitcherSignOption[];
   selectedPitchType?: PitchType | null;
+  stealOptions?: readonly StealOptionPreview[];
+  armedStealPlay?: StealPlayType | null;
+  onToggleStealPlay?: (play: StealPlayType | null) => void;
   expanded: boolean;
   cue: LiveActionCue;
   onTarget: (target: PitchTargetIntent) => void;
@@ -128,19 +135,28 @@ export function FirstAtBat({
         ? "Get the first out."
         : "Get the next out.";
   const activePitch = pitches.find((p) => p.id === target) ?? pitches[0];
+  const twoStrikeSteal = Boolean(batting && armedStealPlay && session.strikes === 2);
   const action = batting
-    ? call === "bunt"
-      ? "Lay down bunt"
-      : "Swing"
+    ? armedStealPlay
+      ? twoStrikeSteal
+        ? "Steal & Swing (2K)"
+        : "Send Runner"
+      : call === "bunt"
+        ? "Lay down bunt"
+        : "Swing"
     : pitchingMode === "simple"
       ? "Throw Pitch"
       : activePitch.actionLabel;
   const tradeoffText = batting
-    ? call === "bunt"
-      ? "Tap down the line. Great with speed or runners."
-      : call === "power"
-        ? "More power. Easier to miss."
-        : "Easier to connect. Less power."
+    ? armedStealPlay
+      ? twoStrikeSteal
+        ? "2 strikes — runner goes AND batter swings to protect!"
+        : "Runner breaks on the pitch — ball or strike still counts."
+      : call === "bunt"
+        ? "Tap down the line. Great with speed or runners."
+        : call === "power"
+          ? "More power. Easier to miss."
+          : "Easier to connect. Less power."
     : pitchingMode === "simple"
       ? catcherCall?.reason ?? "Catcher calls pitch and spot."
       : activePitch.tradeoff;
@@ -333,18 +349,48 @@ export function FirstAtBat({
             {score} {objective}
           </h3>
           {batting ? (
-            <div className="atbat-choices" role="group" aria-label="Swing approach">
-              {swings.map((s) => (
-                <button
-                  key={s.id}
-                  disabled={locked}
-                  aria-pressed={s.id === call}
-                  onClick={() => onSwing(s.id)}
+            <>
+              {stealOptions.length > 0 && onToggleStealPlay ? (
+                <div
+                  className="atbat-steal-strip"
+                  role="group"
+                  aria-label="Base steal options"
                 >
-                  {s.name}
-                </button>
-              ))}
-            </div>
+                  {stealOptions.map((opt, idx) => {
+                    const isArmed = armedStealPlay === opt.playType;
+                    const chipLabel =
+                      isArmed && session.strikes === 2
+                        ? "💨 Steal + Swing (2K)"
+                        : `💨 ${opt.label} (${opt.successPct}%)`;
+                    return (
+                      <button
+                        key={opt.playType}
+                        type="button"
+                        data-testid={idx === 0 ? "guided-steal-btn" : `guided-steal-option-${opt.playType}`}
+                        className="atbat-steal-chip"
+                        aria-pressed={isArmed}
+                        disabled={locked}
+                        onClick={() => onToggleStealPlay(isArmed ? null : opt.playType)}
+                      >
+                        {chipLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <div className="atbat-choices" role="group" aria-label="Swing approach">
+                {swings.map((s) => (
+                  <button
+                    key={s.id}
+                    disabled={locked}
+                    aria-pressed={s.id === call}
+                    onClick={() => onSwing(s.id)}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </>
           ) : pitchingMode === "simple" ? (
             <div
               className="atbat-catcher-call"

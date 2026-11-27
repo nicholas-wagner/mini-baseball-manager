@@ -11,6 +11,11 @@ import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../e
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
 import {
+  stealPlayToTacticalCall,
+  type StealOptionPreview,
+  type StealPlayType,
+} from '../../engine/simulation/baserunning';
+import {
   BULLPEN_MODE_OPTIONS,
   type BullpenMode,
   type BullpenRecommendation,
@@ -113,6 +118,12 @@ interface LiveActionBarProps {
   arcadeTimingEnabled?: boolean;
   onToggleArcadeTiming?: () => void;
   quickStealOption?: { label: string; runnerName: string; successPct: number; call: TacticalCall } | null;
+  stealOptions?: readonly StealOptionPreview[];
+  armedStealPlay?: StealPlayType | null;
+  onToggleStealPlay?: (play: StealPlayType | null) => void;
+  hitAndRunArmed?: boolean;
+  onToggleHitAndRun?: () => void;
+  strikes?: number;
   isBatterFavorite?: boolean;
   onNextPitch: (timingGrade?: ArcadeTimingGrade) => void;
   onToggleWatchMode: () => void;
@@ -207,6 +218,12 @@ export function LiveActionBar({
   arcadeTimingEnabled = false,
   onToggleArcadeTiming,
   quickStealOption = null,
+  stealOptions = [],
+  armedStealPlay = null,
+  onToggleStealPlay,
+  hitAndRunArmed = false,
+  onToggleHitAndRun,
+  strikes = 0,
   isBatterFavorite = false,
   onNextPitch,
   onToggleWatchMode,
@@ -269,20 +286,72 @@ export function LiveActionBar({
   const showCpuShiftChip =
     isBatting && Boolean(aiDefenseShiftLabel) && aiDefenseShiftLabel !== 'Standard';
 
+  const resolvedStealOptions: readonly {
+    playType: StealPlayType;
+    label: string;
+    successPct: number;
+    call: TacticalCall;
+  }[] =
+    stealOptions.length > 0
+      ? stealOptions.map((opt) => ({
+          playType: opt.playType,
+          label: opt.label,
+          successPct: opt.successPct,
+          call: stealPlayToTacticalCall(opt.playType),
+        }))
+      : quickStealOption
+        ? [
+            {
+              playType:
+                quickStealOption.call === 'steal_3b' ||
+                quickStealOption.call === 'double_steal' ||
+                quickStealOption.call === 'steal_home'
+                  ? quickStealOption.call
+                  : 'steal_2b',
+              label: quickStealOption.label,
+              successPct: quickStealOption.successPct,
+              call: quickStealOption.call,
+            },
+          ]
+        : [];
+  const isStealArmed = Boolean(armedStealPlay) || tacticalCall.includes('steal');
+  const twoStrikeSteal = isBatting && isStealArmed && strikes === 2;
   const activeTradeoff = isBatting
-    ? tacticalCall === 'bunt' && buntPreviewLine
-      ? buntPreviewLine
-      : (SIMPLE_BAT_APPROACHES.find((opt) => opt.id === tacticalCall)?.tradeoff ??
-        SIMPLE_BAT_APPROACHES[1].tradeoff)
+    ? isStealArmed
+      ? twoStrikeSteal
+        ? '2 strikes — runner breaks AND batter swings to protect the plate!'
+        : hitAndRunArmed
+          ? 'Hit & Run — runner breaks and batter swings to put it in play!'
+          : 'Runner breaks on the pitch — ball or strike still counts.'
+      : tacticalCall === 'bunt' && buntPreviewLine
+        ? buntPreviewLine
+        : (SIMPLE_BAT_APPROACHES.find((opt) => opt.id === tacticalCall)?.tradeoff ??
+          SIMPLE_BAT_APPROACHES[1].tradeoff)
     : pitchingMode === 'simple'
       ? (catcherCall?.reason ?? 'Catcher calls pitch & location — tap Shake off for another sign.')
       : (SIMPLE_PITCH_CALLS.find((opt) => opt.id === pitchTarget)?.tradeoff ??
         SIMPLE_PITCH_CALLS[0].tradeoff);
 
-  const battingAction = tacticalCall.includes('steal') ? 'Send runners' : tacticalCall === 'bunt' ? 'Lay down bunt' : 'Swing';
+  const battingAction = isStealArmed
+    ? twoStrikeSteal
+      ? 'Steal & Swing (2K)'
+      : hitAndRunArmed
+        ? 'Hit & Run'
+        : 'Send Runner'
+    : tacticalCall === 'bunt'
+      ? 'Lay down bunt'
+      : 'Swing';
   const pitchAction = isBatting ? battingAction : 'Throw Pitch';
   const primaryLabel = gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)';
   const controlsLocked = gameCompleted || locked;
+  const toggleStealOption = (opt: (typeof resolvedStealOptions)[number]) => {
+    const active = armedStealPlay === opt.playType || tacticalCall === opt.call;
+    if (onToggleStealPlay) {
+      onToggleStealPlay(active ? null : opt.playType);
+    } else {
+      onSelectTacticalCall(active ? 'normal' : opt.call);
+    }
+  };
   const enduranceFillClass =
     pitcherEnduranceTier === 'gassed'
       ? 'bg-[#FF4D6D]'
@@ -326,44 +395,51 @@ export function LiveActionBar({
         data-testid="live-action-bar"
         className="live-thumb-dock rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] p-2"
       >
-        {showBullpenSuggestion && bullpenSuggestion ? (
+        {(showBullpenSuggestion && bullpenSuggestion) ||
+        (isBatting && resolvedStealOptions.length > 0) ||
+        (readyPowerLabel && onArmReadyPower) ? (
           <div className="live-context-chip" data-testid="dock-context-chip">
-            <button
-              type="button"
-              data-testid="bullpen-accept-btn"
-              disabled={controlsLocked}
-              onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
-            >
-              Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
-            </button>
-          </div>
-        ) : quickStealOption ? (
-          <div className="live-context-chip" data-testid="dock-context-chip">
-            <button
-              type="button"
-              data-testid="arcade-steal-btn"
-              aria-pressed={tacticalCall === quickStealOption.call}
-              disabled={gameCompleted}
-              onClick={() =>
-                onSelectTacticalCall(
-                  tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
-                )
-              }
-            >
-              💨 {quickStealOption.label} ({quickStealOption.successPct}%)
-            </button>
-          </div>
-        ) : readyPowerLabel && onArmReadyPower ? (
-          <div className="live-context-chip" data-testid="dock-context-chip">
-            <button
-              type="button"
-              data-testid="arcade-unleash-power-btn"
-              aria-pressed={powerArmed}
-              disabled={gameCompleted}
-              onClick={onArmReadyPower}
-            >
-              {powerArmed ? 'ARMED!' : readyPowerLabel}
-            </button>
+            {showBullpenSuggestion && bullpenSuggestion ? (
+              <button
+                type="button"
+                data-testid="bullpen-accept-btn"
+                disabled={controlsLocked}
+                onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
+              >
+                Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
+              </button>
+            ) : null}
+            {isBatting &&
+              resolvedStealOptions.map((opt, idx) => {
+                const active = armedStealPlay === opt.playType || tacticalCall === opt.call;
+                const chipText =
+                  active && strikes === 2
+                    ? '💨 Steal + Swing (2K)'
+                    : `💨 ${opt.label} (${opt.successPct}%)`;
+                return (
+                  <button
+                    key={opt.playType}
+                    type="button"
+                    data-testid={idx === 0 ? 'arcade-steal-btn' : `arcade-steal-option-${opt.playType}`}
+                    aria-pressed={active}
+                    disabled={gameCompleted}
+                    onClick={() => toggleStealOption(opt)}
+                  >
+                    {chipText}
+                  </button>
+                );
+              })}
+            {readyPowerLabel && onArmReadyPower ? (
+              <button
+                type="button"
+                data-testid="arcade-unleash-power-btn"
+                aria-pressed={powerArmed}
+                disabled={gameCompleted}
+                onClick={onArmReadyPower}
+              >
+                {powerArmed ? 'ARMED!' : readyPowerLabel}
+              </button>
+            ) : null}
           </div>
         ) : null}
         {isBatting ? (
@@ -597,26 +673,48 @@ export function LiveActionBar({
                 </div>
               )}
 
-              {isBatting && quickStealOption ? (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    data-testid="arcade-steal-btn"
-                    aria-pressed={tacticalCall === quickStealOption.call}
-                    disabled={gameCompleted}
-                    onClick={() =>
-                      onSelectTacticalCall(
-                        tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
-                      )
-                    }
-                    className={`px-2.5 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
-                      tacticalCall === quickStealOption.call
-                        ? 'bg-[#FFCC49] text-[#152F2E] shadow-[2px_2px_0_#192735]'
-                        : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFCC49]'
-                    }`}
-                  >
-                    💨 {quickStealOption.label} ({quickStealOption.successPct}%)
-                  </button>
+              {isBatting && resolvedStealOptions.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {resolvedStealOptions.map((opt, idx) => {
+                    const active = armedStealPlay === opt.playType || tacticalCall === opt.call;
+                    const chipText =
+                      active && strikes === 2
+                        ? '💨 Steal + Swing (2K)'
+                        : `💨 ${opt.label} (${opt.successPct}%)`;
+                    return (
+                      <button
+                        key={opt.playType}
+                        type="button"
+                        data-testid={idx === 0 ? 'arcade-steal-btn' : `arcade-steal-option-${opt.playType}`}
+                        aria-pressed={active}
+                        disabled={gameCompleted}
+                        onClick={() => toggleStealOption(opt)}
+                        className={`px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                          active
+                            ? 'bg-[#FFCC49] text-[#152F2E] shadow-[2px_2px_0_#192735]'
+                            : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFCC49]'
+                        }`}
+                      >
+                        {chipText}
+                      </button>
+                    );
+                  })}
+                  {onToggleHitAndRun && strikes < 2 ? (
+                    <button
+                      type="button"
+                      data-testid="arcade-hit-and-run-toggle"
+                      aria-pressed={hitAndRunArmed}
+                      disabled={gameCompleted}
+                      onClick={onToggleHitAndRun}
+                      className={`px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                        hitAndRunArmed
+                          ? 'bg-[#224F49] text-[#FFCC49] shadow-[2px_2px_0_#192735]'
+                          : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                      }`}
+                    >
+                      🏃 Hit &amp; Run{hitAndRunArmed ? ' ON' : ''}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
 

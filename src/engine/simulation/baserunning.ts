@@ -1,7 +1,7 @@
 import { getPositionalHandednessBonus } from '../handedness/handedness';
 import { getActiveHealthRatingPenalties } from '../health/healthEngine';
 import type { AiArchetype } from '../models/club';
-import type { PlayEvent, PlaySoundCue } from '../models/playEvent';
+import type { PlayEvent, PlaySoundCue, TacticalCall } from '../models/playEvent';
 import type { Player } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
 import { getFormStatModifiers } from '../rpg/formTracker';
@@ -234,6 +234,43 @@ export function resolveDefaultStealPlay(bases: BaseState): StealPlayType | null 
   if (r1 && r2 && !r3) return 'double_steal';
   if (r2 && !r3) return 'steal_3b';
   if (r3) return 'steal_home';
+  return null;
+}
+
+/** Returns true when a specific steal play is legal for the current base occupancy. */
+export function isStealPlayLegal(playType: StealPlayType, bases: BaseState): boolean {
+  const [r1, r2, r3] = bases;
+  if (playType === 'steal_2b') return Boolean(r1 && !r2);
+  if (playType === 'steal_3b') return Boolean(r2 && !r3);
+  if (playType === 'double_steal') return Boolean(r1 && r2 && !r3);
+  return Boolean(r3);
+}
+
+/** Returns true when a Ball-4 walk forces the stealing runner(s) safely ahead with no throw-out risk. */
+export function isStealForcedByWalk(playType: StealPlayType, bases: BaseState): boolean {
+  if (playType === 'steal_2b' || playType === 'double_steal') return true;
+  if (playType === 'steal_3b') return Boolean(bases[0]);
+  return Boolean(bases[0] && bases[1]);
+}
+
+const STEAL_PLAY_TO_CALL_MAP: Readonly<Record<StealPlayType, TacticalCall>> = {
+  steal_2b: 'steal',
+  steal_3b: 'steal_3b',
+  double_steal: 'double_steal',
+  steal_home: 'steal_home',
+};
+
+/** Maps a canonical StealPlayType to its legacy TacticalCall identifier. */
+export function stealPlayToTacticalCall(playType: StealPlayType): TacticalCall {
+  return STEAL_PLAY_TO_CALL_MAP[playType];
+}
+
+/** Resolves a StealPlayType from a legacy steal TacticalCall, or null for non-steal calls. */
+export function tacticalCallToStealPlay(call: TacticalCall, bases: BaseState): StealPlayType | null {
+  if (call === 'steal') return resolveDefaultStealPlay(bases);
+  if (call === 'steal_3b' || call === 'double_steal' || call === 'steal_home') {
+    return isStealPlayLegal(call, bases) ? call : null;
+  }
   return null;
 }
 

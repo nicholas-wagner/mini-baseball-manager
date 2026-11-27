@@ -40,7 +40,12 @@ import {
   selectBetweenGameSpotlight,
   selectClubSpotlightTrio,
 } from '../../engine/gm/openingDayHook';
-import { getEligibleStealPlays } from '../../engine/simulation/baserunning';
+import {
+  getEligibleStealPlays,
+  isStealPlayLegal,
+  tacticalCallToStealPlay,
+  type StealPlayType,
+} from '../../engine/simulation/baserunning';
 import {
   chooseAiDefensiveShift,
   isOffensiveTacticalCall,
@@ -342,6 +347,8 @@ export function GameDayScreen({
   const [smartPauseReason, setSmartPauseReason] = useState<string | null>(null);
   const [cameraMode, setCameraMode] = useState<LiveCameraMode>('auto');
   const [tacticalCall, setTacticalCall] = useState<TacticalCall>('normal');
+  const [armedStealPlay, setArmedStealPlay] = useState<StealPlayType | null>(null);
+  const [hitAndRunArmed, setHitAndRunArmed] = useState(false);
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType | null>(null);
   const [pitchTarget, setPitchTarget] = useState<PitchTargetIntent>('attack_zone');
   const [shakeOffCount, setShakeOffCount] = useState(0);
@@ -609,6 +616,8 @@ export function GameDayScreen({
     guidedPitchEvents.current.clear();
     gameLog.current = [];
     setTacticalCall('normal');
+    setArmedStealPlay(null);
+    setHitAndRunArmed(false);
     setEntranceCue(null);
     setGuidedHalf(null);
     setPlaybackEvent(null);
@@ -657,6 +666,8 @@ export function GameDayScreen({
     setGuidedHalf(guided ? clutch.session.inning + clutch.session.half : null);
     setShowMore(false);
     setTacticalCall(guided && (clutch.session.half === 'BOT') === clutch.session.home.isHuman ? 'contact' : 'normal');
+    setArmedStealPlay(null);
+    setHitAndRunArmed(false);
     setLiveSession(clutch.session);
     setRecentEvents([...clutch.events].reverse());
     setAtBatEvents([]);
@@ -720,6 +731,8 @@ export function GameDayScreen({
         const batterChanged = !halfChanged && nextBatting.lineupIndex !== prevBatting.lineupIndex;
         if (halfChanged) {
           setTacticalCall('normal');
+          setArmedStealPlay(null);
+          setHitAndRunArmed(false);
           setBatterGuess('none');
           setArmedPowerId(null);
           setPitchTarget('attack_zone');
@@ -727,6 +740,8 @@ export function GameDayScreen({
           setDismissedBullpenKey(null);
         } else if (batterChanged) {
           setTacticalCall((prev) => (prev === 'bunt' ? 'normal' : prev));
+          setArmedStealPlay(null);
+          setHitAndRunArmed(false);
           setPitchTarget('attack_zone');
         }
       }
@@ -790,7 +805,12 @@ export function GameDayScreen({
   );
 
   const resolveLiveStepInputs = useCallback(
-    (session: GameSessionState, callOverride?: TacticalCall, timingGrade?: ArcadeTimingGrade) => {
+    (
+      session: GameSessionState,
+      callOverride?: TacticalCall,
+      timingGrade?: ArcadeTimingGrade,
+      stealOverride?: StealPlayType | null,
+    ) => {
       const batterNow = getCurrentBatter(session);
       const pitcherNow = getCurrentPitcher(session);
       const nemesisBonus =
@@ -808,10 +828,14 @@ export function GameDayScreen({
         activeRelieverWarmupBonus && activeRelieverWarmupBonus.pitcherId === pitcherNow.id
           ? activeRelieverWarmupBonus.controlBonus
           : undefined;
+      const rawSteal = stealOverride !== undefined ? stealOverride : armedStealPlay;
+      const legalSteal = rawSteal && isStealPlayLegal(rawSteal, session.bases) ? rawSteal : null;
       return resolveIsolatedStepInputs(
         session,
         {
           tacticalCall: callOverride ?? tacticalCall,
+          stealPlay: legalSteal,
+          hitAndRun: Boolean(legalSteal && hitAndRunArmed),
           pitchingMode,
           bullpenMode,
           shakeOffCount,
@@ -833,10 +857,12 @@ export function GameDayScreen({
     [
       activeRelieverWarmupBonus,
       armedPowerId,
+      armedStealPlay,
       batterGuess,
       bullpenMode,
       defensiveShift,
       gameWeather,
+      hitAndRunArmed,
       nemesisHistory,
       pitchTarget,
       pitchingMode,
@@ -849,14 +875,15 @@ export function GameDayScreen({
   const handleNextPitch = useCallback((
     call = tacticalCall,
     timingGrade?: ArcadeTimingGrade,
-    opts?: { fromAutoWatch?: boolean },
+    opts?: { fromAutoWatch?: boolean; stealPlay?: StealPlayType | null },
   ) => {
     soundEngine.unlock();
+    if (!opts?.fromAutoWatch) setSheetOpen(false);
     if (!liveSession || liveSession.status === 'completed') return;
     if (thirdDecision) return;
     if (!opts?.fromAutoWatch && (playLockedRef.current || playLocked)) return;
     playLockedRef.current = true;
-    const isolated = resolveLiveStepInputs(liveSession, call, timingGrade);
+    const isolated = resolveLiveStepInputs(liveSession, call, timingGrade, opts?.stealPlay);
     const managed = watchMode === 'paused' && getBattingSide(liveSession).isHuman;
     const options = { ...isolated.options, thirdBaseCall:managed ? 'hold' as const : 'coach' as const };
     const result = stepPitch(liveSession, isolated.tacticalCall, options);
@@ -874,6 +901,8 @@ export function GameDayScreen({
       for (const event of events) guidedPitchEvents.current.add(event.seq);
     }
     setArmedPowerId(null);
+    setArmedStealPlay(null);
+    setHitAndRunArmed(false);
     applyStepResult(nextSession, events, activeOpponentId, isolated.options.pitchTarget);
     if (
       call === 'steal' ||
@@ -889,6 +918,7 @@ export function GameDayScreen({
   }, [activeOpponentId, applyStepResult, guiding, liveSession, playLocked, resolveLiveStepInputs, showMore, tacticalCall, thirdDecision, watchMode, speed]);
 
   const handleSimAtBat = () => {
+    setSheetOpen(false);
     if (!liveSession || liveSession.status === 'completed') return;
     const isolated = resolveLiveStepInputs(liveSession, tacticalCall);
     const { nextSession, events } = stepAtBat(
@@ -897,10 +927,13 @@ export function GameDayScreen({
       isolated.options,
     );
     setArmedPowerId(null);
+    setArmedStealPlay(null);
+    setHitAndRunArmed(false);
     applyStepResult(nextSession, events, activeOpponentId);
   };
 
   const handleSimHalfInning = () => {
+    setSheetOpen(false);
     if (!liveSession || liveSession.status === 'completed') return;
     const battingIsHuman = (liveSession.half === 'BOT') === liveSession.home.isHuman;
     const safeCall: TacticalCall =
@@ -909,10 +942,13 @@ export function GameDayScreen({
         : 'normal';
     const { nextSession, events } = stepHalfInning(liveSession, safeCall);
     setArmedPowerId(null);
+    setArmedStealPlay(null);
+    setHitAndRunArmed(false);
     applyStepResult(nextSession, events, activeOpponentId);
   };
 
   const handleClutchSim = () => {
+    setSheetOpen(false);
     if (!liveSession || liveSession.status === 'completed') return;
     const { nextSession, events } = simUntilClutchOrEnd(liveSession);
     applyStepResult(nextSession, events, activeOpponentId);
@@ -2398,6 +2434,10 @@ export function GameDayScreen({
     : [];
   const bestCandidate = quickStealCandidates.reduce<(typeof quickStealCandidates)[number] | undefined>(
     (best, play) => !best || play.successPct > best.successPct ? play : best, undefined);
+  const effectiveArmedSteal =
+    humanIsBatting && armedStealPlay && isStealPlayLegal(armedStealPlay, liveSession.bases)
+      ? armedStealPlay
+      : null;
   const bestQuickSteal = bestCandidate
     ? {
         label: bestCandidate.label,
@@ -2458,6 +2498,23 @@ export function GameDayScreen({
     currentPitcher.name,
   );
 
+  const handleToggleStealPlay = (play: StealPlayType | null) => {
+    setArmedStealPlay(play);
+    if (!play) setHitAndRunArmed(false);
+    soundEngine.play(play ? 'steal_burst' : 'ui_pop');
+  };
+
+  const handleToggleHitAndRun = () => {
+    setHitAndRunArmed((prev) => {
+      const next = !prev;
+      if (next && !effectiveArmedSteal && bestCandidate) {
+        setArmedStealPlay(bestCandidate.playType);
+      }
+      return next;
+    });
+    soundEngine.play('ui_pop');
+  };
+
   const handleSuggestedAction = (action: SuggestedQuickAction) => {
     if (action.type === 'arm_power' && action.powerId) {
       setArmedPowerId(action.powerId);
@@ -2465,25 +2522,33 @@ export function GameDayScreen({
       return;
     }
     if (action.type === 'steal' && action.tacticalCall) {
-      setTacticalCall(action.tacticalCall);
+      const resolvedSteal = tacticalCallToStealPlay(action.tacticalCall, liveSession.bases);
+      if (resolvedSteal) {
+        setArmedStealPlay(resolvedSteal);
+      } else {
+        setTacticalCall(action.tacticalCall);
+      }
       soundEngine.play('steal_burst');
       return;
     }
     if (action.type === 'mound_visit' && !moundVisitUsed) {
       const res = applyMoundVisit(liveSession, humanSideKey, 'calm_breath');
       if (res.applied && res.event) {
+        setSheetOpen(false);
         setMoundVisitUsed(true);
         applyStepResult(res.nextSession, [res.event], activeOpponent.id);
       }
       return;
     }
     if (action.type === 'bullpen_swap' && action.relieverId) {
+      setSheetOpen(false);
       handleBullpenSwap(action.relieverId);
       return;
     }
     if (action.type === 'pinch_hit' && action.pinchHitterId) {
       const res = applyPinchHitter(liveSession, humanSideKey, action.pinchHitterId);
       if (res.applied && res.event) {
+        setSheetOpen(false);
         soundEngine.play('organ_charge');
         applyStepResult(res.nextSession, [res.event], activeOpponent.id);
       }
@@ -2785,9 +2850,11 @@ export function GameDayScreen({
       setTacticalCall((call) => (call === 'bunt' ? 'normal' : 'bunt'));
       return;
     }
-    if (key === 's' && bestQuickSteal) {
+    if (key === 's' && bestCandidate) {
       event.preventDefault();
-      setTacticalCall(bestQuickSteal.call);
+      handleToggleStealPlay(
+        effectiveArmedSteal === bestCandidate.playType ? null : bestCandidate.playType,
+      );
       return;
     }
     if (key === 'h' && readyPowerOption) {
@@ -2973,6 +3040,24 @@ export function GameDayScreen({
               shakeOffTotal={guidedCatcherSeq.length}
               pitcherArsenal={guidedBatting ? [] : livePitcherSignOptions}
               selectedPitchType={selectedPitchType}
+              stealOptions={
+                guidedBatting
+                  ? getEligibleStealPlays(
+                      shown.bases,
+                      getBattingSide(shown).playersById,
+                      getCurrentPitcher(shown),
+                      getDefenderAtPosition(getFieldingSide(shown), 'C'),
+                      getFieldingSide(shown).pitcherFatigue,
+                      getFieldingSide(shown).catcherPopTimeBonus,
+                    )
+                  : []
+              }
+              armedStealPlay={
+                guidedBatting && armedStealPlay && isStealPlayLegal(armedStealPlay, shown.bases)
+                  ? armedStealPlay
+                  : null
+              }
+              onToggleStealPlay={handleToggleStealPlay}
               onShakeOff={handleShakeOffCatcher}
               onSelectPitchType={(pt) => {
                 setSelectedPitchType(pt);
@@ -3010,8 +3095,10 @@ export function GameDayScreen({
               onSwing={call=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setTacticalCall(call);}}
               onPitch={(grade) => handleNextPitch(tacticalCall, grade)} onSuggested={()=>{
                 const action = liveCue.suggestedAction;
-                if (action?.type === 'steal' && action.tacticalCall) handleNextPitch(action.tacticalCall);
-                else if (action) handleSuggestedAction(action);
+                if (action?.type === 'steal' && action.tacticalCall) {
+                  const stealPlay = tacticalCallToStealPlay(action.tacticalCall, liveSession.bases);
+                  handleNextPitch(tacticalCall, undefined, { stealPlay });
+                } else if (action) handleSuggestedAction(action);
               }} />}
             {offerOpeningPack && !handoff && liveSession.status === 'in_progress' &&
               <aside className="rally-gift">
@@ -3102,6 +3189,12 @@ export function GameDayScreen({
                 soundEngine.play('ui_pop');
               }}
               quickStealOption={bestQuickSteal}
+              stealOptions={quickStealCandidates}
+              armedStealPlay={effectiveArmedSteal}
+              onToggleStealPlay={handleToggleStealPlay}
+              hitAndRunArmed={hitAndRunArmed}
+              onToggleHitAndRun={handleToggleHitAndRun}
+              strikes={liveSession.strikes}
               isBatterFavorite={favoritePlayerIds.includes(currentBatter.id)}
               onArmReadyPower={
                 readyPowerOption
@@ -3119,11 +3212,19 @@ export function GameDayScreen({
               }}
               onToggleWatchMode={() => {
                 setSmartPauseReason(null);
-                setWatchMode((w) => (w === 'live' ? 'paused' : 'live'));
+                setWatchMode((w) => {
+                  const next = w === 'live' ? 'paused' : 'live';
+                  if (next === 'live') setSheetOpen(false);
+                  return next;
+                });
               }}
               onToggleSmartWatch={() => {
                 setSmartPauseReason(null);
-                setWatchMode((w) => (w === 'smart' ? 'paused' : 'smart'));
+                setWatchMode((w) => {
+                  const next = w === 'smart' ? 'paused' : 'smart';
+                  if (next === 'smart') setSheetOpen(false);
+                  return next;
+                });
                 soundEngine.play('ui_pop');
               }}
               onSimAtBat={handleSimAtBat}
@@ -3259,6 +3360,12 @@ export function GameDayScreen({
                 soundEngine.play('ui_pop');
               }}
               quickStealOption={bestQuickSteal}
+              stealOptions={quickStealCandidates}
+              armedStealPlay={effectiveArmedSteal}
+              onToggleStealPlay={handleToggleStealPlay}
+              hitAndRunArmed={hitAndRunArmed}
+              onToggleHitAndRun={handleToggleHitAndRun}
+              strikes={liveSession.strikes}
               isBatterFavorite={favoritePlayerIds.includes(currentBatter.id)}
               onArmReadyPower={
                 readyPowerOption
@@ -3276,11 +3383,19 @@ export function GameDayScreen({
               }}
               onToggleWatchMode={() => {
                 setSmartPauseReason(null);
-                setWatchMode((w) => (w === 'live' ? 'paused' : 'live'));
+                setWatchMode((w) => {
+                  const next = w === 'live' ? 'paused' : 'live';
+                  if (next === 'live') setSheetOpen(false);
+                  return next;
+                });
               }}
               onToggleSmartWatch={() => {
                 setSmartPauseReason(null);
-                setWatchMode((w) => (w === 'smart' ? 'paused' : 'smart'));
+                setWatchMode((w) => {
+                  const next = w === 'smart' ? 'paused' : 'smart';
+                  if (next === 'smart') setSheetOpen(false);
+                  return next;
+                });
                 soundEngine.play('ui_pop');
               }}
               onSimAtBat={handleSimAtBat}
@@ -3407,6 +3522,8 @@ export function GameDayScreen({
                 soundEngine.play('ui_pop');
               }}
               activeTacticalCall={tacticalCall}
+              armedStealPlay={effectiveArmedSteal}
+              onToggleStealPlay={handleToggleStealPlay}
               onSelectStealCall={(call) => {
                 setTacticalCall((prev) => (prev === call ? 'normal' : call));
                 soundEngine.play('ui_pop');
