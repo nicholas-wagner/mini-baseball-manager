@@ -1,4 +1,5 @@
-import type { Club } from '../models/club';
+import { settleGameEconomics } from '../economy/clubLedgerSettlement';
+import type { Club, ClubLedgerEntry } from '../models/club';
 import type { ManagerProfile } from '../models/manager';
 import { isPitcherPosition, type Player, type PlayerSeasonStats } from '../models/player';
 import {
@@ -11,6 +12,7 @@ import { evaluateClubhouseMentalAura } from '../rpg/mentalAndLeverage';
 import { computePostGamePitcherRecovery } from '../rpg/pitcherEndurance';
 import { evolveSpecialistArchetype } from '../rpg/specialistsAndPositions';
 import { enforceRatingBudget } from '../rpg/trainingCompromises';
+import { createSeededRng, type SeededRng } from '../rng/seededRng';
 import { applyGameStatDeltasToClub } from './baseballEngine';
 import type {
   BatterBoxLine,
@@ -26,6 +28,17 @@ export interface GameMvpSelection {
   summary: string;
 }
 
+export interface PostGameEconomyStamp {
+  recentLedgerEntries: ClubLedgerEntry[];
+  scheduledPromoId: string | null;
+}
+
+export interface PostGameRewardContext {
+  season?: number;
+  gameLabel?: string;
+  rng?: SeededRng;
+}
+
 export interface PostGameRewards {
   attendance: number;
   cashDelta: number;
@@ -33,6 +46,7 @@ export interface PostGameRewards {
   hypeDelta: number;
   fanDelta: number;
   playerXpById: Record<string, number>;
+  economyStamp?: PostGameEconomyStamp;
 }
 
 function scoreBatterLine(line: BatterBoxLine, won: boolean): number {
@@ -151,39 +165,74 @@ function computePlayerXpGain(delta: PlayerSeasonStats | undefined): number {
   );
 }
 
-/** Computes attendance, gate cash, manager XP, hype/fan shifts, and roster XP awards. */
+function rewardRng(club: Club, context?: PostGameRewardContext): SeededRng {
+  if (context?.rng) return context.rng;
+  return createSeededRng((club.wins + 1) * 10007 + (club.losses + 1) * 97 + (context?.season ?? 1) * 13);
+}
+
+function baseGateAttendance(club: Club, isHomeGame: boolean): number {
+  const hypeFactor = 0.55 + club.economy.teamHype / 100;
+  const popMultiplier = computeRosterPopularityAttendanceMultiplier(club.roster);
+  const siteShare = isHomeGame ? 1 : 0.65;
+  return Math.min(
+    club.stadium.capacity,
+    Math.max(120, Math.round(club.economy.fanBase * hypeFactor * popMultiplier * siteShare)),
+  );
+}
+
+function rewardMood(won: boolean): { managerXp: number; hypeDelta: number; fanShare: number } {
+  if (won) return { managerXp: 45, hypeDelta: 6, fanShare: 0.04 };
+  return { managerXp: 22, hypeDelta: -3, fanShare: 0.01 };
+}
+
+function awardPlayerXp(
+  club: Club,
+  deltas: GameSessionResult['playerStatDeltas'],
+): Record<string, number> {
+  const playerXpById: Record<string, number> = {};
+  for (const player of club.roster) {
+    const baseXp = computePlayerXpGain(deltas[player.id]);
+    playerXpById[player.id] = Math.max(2, Math.round(baseXp * player.xpGrowthMultiplier));
+  }
+  return playerXpById;
+}
+
+function ledgerGameLabel(context: PostGameRewardContext | undefined, isHomeGame: boolean): string {
+  if (context?.gameLabel) return context.gameLabel;
+  return isHomeGame ? 'Home Game' : 'Road Game';
+}
+
+/** Computes attendance, settled club cash, manager XP, hype/fan shifts, and roster XP awards. */
 export function calculatePostGameRewards(
   club: Club,
   result: GameSessionResult,
   isHomeGame: boolean,
   won: boolean,
+  context?: PostGameRewardContext,
 ): PostGameRewards {
-  const hypeFactor = 0.55 + club.economy.teamHype / 100;
-  const popMultiplier = computeRosterPopularityAttendanceMultiplier(club.roster);
-  const attendance = Math.min(
-    club.stadium.capacity,
-    Math.max(
-      120,
-      Math.round(club.economy.fanBase * hypeFactor * popMultiplier * (isHomeGame ? 1.0 : 0.65)),
-    ),
+  const settled = settleGameEconomics(
+    club,
+    {
+      season: context?.season ?? 1,
+      gameLabel: ledgerGameLabel(context, isHomeGame),
+      isHomeGame,
+      attendance: baseGateAttendance(club, isHomeGame),
+      won,
+    },
+    rewardRng(club, context),
   );
-  const gateShare = isHomeGame ? 0.65 : 0.25;
-  const gateRevenue = Math.round(attendance * club.economy.ticketPrice * gateShare);
-  const winBonus = won ? 1800 : 400;
-
-  const playerXpById: Record<string, number> = {};
-  for (const player of club.roster) {
-    const baseXp = computePlayerXpGain(result.playerStatDeltas[player.id]);
-    playerXpById[player.id] = Math.max(2, Math.round(baseXp * player.xpGrowthMultiplier));
-  }
-
+  const mood = rewardMood(won);
   return {
-    attendance,
-    cashDelta: gateRevenue + winBonus,
-    managerXp: won ? 45 : 22,
-    hypeDelta: won ? 6 : -3,
-    fanDelta: won ? Math.round(attendance * 0.04) : Math.round(attendance * 0.01),
-    playerXpById,
+    attendance: settled.attendance,
+    cashDelta: settled.entry.netDelta,
+    managerXp: mood.managerXp,
+    hypeDelta: mood.hypeDelta + settled.promoHype,
+    fanDelta: Math.round(settled.attendance * mood.fanShare),
+    playerXpById: awardPlayerXp(club, result.playerStatDeltas),
+    economyStamp: {
+      recentLedgerEntries: settled.club.economy.recentLedgerEntries ?? [],
+      scheduledPromoId: settled.club.economy.scheduledPromoId ?? null,
+    },
   };
 }
 
@@ -298,6 +347,12 @@ export function applyPostGameProgression(
         cash: Math.max(0, clubWithStats.economy.cash + rewards.cashDelta),
         fanBase: Math.max(100, clubWithStats.economy.fanBase + rewards.fanDelta),
         teamHype: Math.max(0, Math.min(100, clubWithStats.economy.teamHype + rewards.hypeDelta)),
+        ...(rewards.economyStamp
+          ? {
+              recentLedgerEntries: rewards.economyStamp.recentLedgerEntries,
+              scheduledPromoId: rewards.economyStamp.scheduledPromoId,
+            }
+          : {}),
       },
     },
     manager: applyManagerXpAndLevelUp(manager, rewards.managerXp, won),

@@ -7,6 +7,7 @@ import {
   LEAGUE_TIER_ORDER,
   MAX_ACTIVE_ROSTER_SIZE,
   MIN_ACTIVE_ROSTER_SIZE,
+  SOFT_CAP_MULTIPLIER,
   TIER_SALARY_CAPS,
   type Club,
   type LeagueTierId,
@@ -33,6 +34,8 @@ export interface SalaryCapCheck {
   remainingSpace: number;
   reason?: string;
 }
+
+export type SalaryCapCeiling = 'hard' | 'soft';
 
 export interface RetiredPlayerNotice {
   playerId: string;
@@ -79,25 +82,27 @@ export function computeClubPayroll(roster: readonly Player[]): number {
   return roster.reduce((sum, p) => sum + p.contract.salaryPerSeason, 0);
 }
 
-/** Validates whether adding a contract stays within the club's tier-scaled Salary Cap. */
+/** Validates whether adding a contract stays under the hard cap, or the 115% soft cap when asked. */
 export function validateSalaryCapRoom(
   club: Pick<Club, 'leagueTier' | 'roster'>,
   incomingAnnualSalary: number,
   outgoingAnnualSalary = 0,
+  ceiling: SalaryCapCeiling = 'hard',
 ): SalaryCapCheck {
   const cap = TIER_SALARY_CAPS[club.leagueTier];
+  const limit = ceiling === 'soft' ? Math.round(cap * SOFT_CAP_MULTIPLIER) : cap;
   const currentPayroll = computeClubPayroll(club.roster);
   const projectedPayroll = Math.max(0, currentPayroll - outgoingAnnualSalary + incomingAnnualSalary);
-  const remainingSpace = cap - currentPayroll;
+  const remainingSpace = limit - currentPayroll;
 
-  if (projectedPayroll > cap) {
+  if (projectedPayroll > limit) {
     return {
       allowed: false,
       currentPayroll,
       projectedPayroll,
       cap,
       remainingSpace,
-      reason: `Over ${club.leagueTier.toUpperCase()} Salary Cap ($${projectedPayroll.toLocaleString()} / $${cap.toLocaleString()}).`,
+      reason: `Over ${club.leagueTier.toUpperCase()} salary cap ($${projectedPayroll.toLocaleString()} / $${limit.toLocaleString()}).`,
     };
   }
   return {

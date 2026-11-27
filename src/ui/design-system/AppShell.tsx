@@ -8,6 +8,14 @@ export interface NavItem {
   badge?: string;
 }
 
+export type CashCapTone = 'healthy' | 'tight' | 'luxury_tax' | 'over_max';
+
+export interface ClubCashDisplay {
+  amount: number;
+  capStatus: CashCapTone;
+  onOpenTreasury: () => void;
+}
+
 interface AppShellProps {
   liveGame?: boolean;
   clubName: string;
@@ -19,7 +27,41 @@ interface AppShellProps {
   onToggleMute: () => void;
   utilityActions?: ReactNode;
   mobileUtilityActions?: ReactNode;
+  cashDisplay?: ClubCashDisplay;
   children: ReactNode;
+}
+
+const CAP_DOT: Record<CashCapTone, string> = {
+  healthy: '#2D6A4F',
+  tight: '#FFB703',
+  luxury_tax: '#E85D04',
+  over_max: '#E63946',
+};
+
+function formatCash(amount: number): string {
+  const sign = amount < 0 ? '-' : '';
+  const abs = Math.abs(Math.round(amount));
+  if (abs >= 100_000) return `${sign}$${Math.round(abs / 1000)}k`;
+  if (abs >= 10_000) {
+    const tenths = Math.round(abs / 100) / 10;
+    return `${sign}$${tenths.toFixed(1)}k`;
+  }
+  return `${sign}$${abs.toLocaleString()}`;
+}
+
+function CashPill({ cash, compact }: { cash: ClubCashDisplay; compact?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-label="Club cash"
+      data-testid={compact ? 'club-cash-pill-mobile' : 'club-cash-pill-desktop'}
+      onClick={cash.onOpenTreasury}
+      className="min-h-[44px] max-w-[7.5rem] px-2 rounded-xl bg-[#FBF4E4] text-[#181B2C] border-2 border-[#181B2C] shadow-[2px_2px_0_#181B2C] inline-flex items-center justify-center gap-1 font-extrabold text-xs"
+    >
+      <span className="h-2.5 w-2.5 rounded-full border border-[#181B2C] shrink-0" style={{ backgroundColor: CAP_DOT[cash.capStatus] }} />
+      <span className="truncate">💵 {formatCash(cash.amount)}</span>
+    </button>
+  );
 }
 
 export function AppShell({
@@ -33,6 +75,7 @@ export function AppShell({
   onToggleMute,
   utilityActions,
   mobileUtilityActions,
+  cashDisplay,
   children,
 }: AppShellProps) {
   useEffect(() => {
@@ -55,6 +98,8 @@ export function AppShell({
           </div>
           <div className="font-display text-lg leading-tight mt-0.5">{clubName}</div>
         </div>
+
+        {cashDisplay ? <CashPill cash={cashDisplay} /> : null}
 
         {navItems.length > 0 ? (
           <nav aria-label="Primary Navigation" className="flex-1 space-y-1.5">
@@ -121,6 +166,7 @@ export function AppShell({
             <div className="font-display text-sm leading-tight truncate">{clubName}</div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {cashDisplay ? <CashPill cash={cashDisplay} compact /> : null}
             {mobileUtilityActions ?? utilityActions}
             <button
               type="button"

@@ -12,6 +12,7 @@ import {
 } from '../engine/rpg/pitchArsenals';
 import { rollPitcherRole } from '../engine/rpg/pitcherRoles';
 import { rollBattedBallProfile } from '../engine/simulation/sabermetrics';
+import { migrateClubEconomy } from '../persistence/migrations';
 import {
   CURRENT_SAVE_SCHEMA_VERSION,
   DEFAULT_SAVE_SETTINGS,
@@ -118,6 +119,7 @@ function hydratePlayerDefaults(player: Player): Player {
 function hydrateClubDefaults(club: Club): Club {
   return {
     ...club,
+    economy: migrateClubEconomy(club.economy),
     stadium: {
       ...club.stadium,
       ballparkId: club.stadium?.ballparkId ?? 'sandlot_commons',

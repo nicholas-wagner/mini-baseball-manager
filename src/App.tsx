@@ -1,3 +1,4 @@
+import { evaluateSalaryCapStatus } from './engine/economy/clubLedgerSettlement';
 import type { ClutchMomentLaunch } from './engine/gm/gameDayMoments';
 import { Activity, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -34,6 +35,7 @@ import { SettingsModal } from './ui/components/SettingsModal';
 import { StoryChapterModal } from './ui/components/StoryChapterModal';
 import { TrophyCaseModal } from './ui/components/TrophyCaseModal';
 import { AppShell, type NavItem } from './ui/design-system/AppShell';
+import type { HubSubTab } from './ui/screens/ClubHubScreen';
 import { ClubCreatorScreen } from './ui/screens/ClubCreatorScreen';
 import { GameDayScreen } from './ui/screens/GameDayScreen';
 
@@ -95,7 +97,12 @@ export function App() {
   const [packsOpen, setPacksOpen] = useState(false);
   const [trophyOpen, setTrophyOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [hubInitialSubTab, setHubInitialSubTab] = useState<'stadiums' | 'relics' | 'uniforms'>('stadiums');
+  const [hubInitialSubTab, setHubInitialSubTab] = useState<HubSubTab>('stadiums');
+  const openTreasury = () => {
+    setHubInitialSubTab('treasury');
+    setActiveTab('economy');
+    soundEngine.play('ui_pop');
+  };
   const humanClub = useGameStore((s) => s.getHumanClub());
   const slotId = useCareerStoryStore(s => s.activeSlotId);
   const worldSeed = useGameStore(s => s.worldSeed);
@@ -444,7 +451,7 @@ export function App() {
     }
 
     return humanClub ? (
-      <ClubHubScreen initialSubTab={hubInitialSubTab} />
+      <ClubHubScreen initialSubTab={hubInitialSubTab} onOpenRoster={() => setActiveTab('roster')} />
     ) : (
       <ClubCreatorScreen onCreated={startOpening} />
     );
@@ -470,6 +477,15 @@ export function App() {
       onToggleMute={handleToggleMute}
       utilityActions={desktopUtilityActions}
       mobileUtilityActions={mobileUtilityActions}
+      cashDisplay={
+        humanClub
+          ? {
+              amount: humanClub.economy.cash,
+              capStatus: evaluateSalaryCapStatus(humanClub).status,
+              onOpenTreasury: openTreasury,
+            }
+          : undefined
+      }
     >
       <PwaInstallBanner deferred={!humanClub || inDugout} />
       <Suspense

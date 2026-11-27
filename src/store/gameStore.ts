@@ -1,3 +1,4 @@
+import { settleSeriesGameLogs } from '../engine/economy/clubLedgerSettlement';
 import { discoverPlayerHobby } from '../engine/rpg/playerHobbies';
 import { selectScorebookMoments, type ScorebookMoment } from '../engine/gm/scorebookMoments';
 import { create } from 'zustand';
@@ -427,7 +428,31 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           winsGained,
           lossesGained,
         );
-        let finalClub = autoProg.club;
+        const settledSeries =
+          humanSeriesGames.length > 0
+            ? settleSeriesGameLogs(
+                postHumanClub,
+                humanSeriesGames,
+                state.seasonNumber,
+                createSeededRng(state.worldSeed + state.seasonNumber * 17 + state.currentSeriesIndex * 131),
+              )
+            : null;
+        const promoHype = settledSeries
+          ? settledSeries.club.economy.teamHype - postHumanClub.economy.teamHype
+          : 0;
+        let finalClub = settledSeries
+          ? {
+              ...autoProg.club,
+              economy: {
+                ...autoProg.club.economy,
+                cash: settledSeries.club.economy.cash,
+                recentLedgerEntries: settledSeries.club.economy.recentLedgerEntries,
+                scheduledPromoId: settledSeries.club.economy.scheduledPromoId ?? null,
+                teamHype: Math.max(0, Math.min(100, autoProg.club.economy.teamHype + promoHype)),
+              },
+            }
+          : autoProg.club;
+        const ledgerNet = settledSeries ? settledSeries.netDelta : autoProg.cashEarned;
         const sweepBonusAwarded = totalSeriesWins >= 3 && totalSeriesLosses === 0;
         if (sweepBonusAwarded) {
           cashEarned += SERIES_SWEEP_BONUS_CASH;
@@ -460,7 +485,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           c.id === finalClub.id ? finalClub : c,
         );
         nextManager = autoProg.manager;
-        cashEarned += autoProg.cashEarned;
+        cashEarned += ledgerNet;
         levelUps = autoProg.levelUps;
 
         const oppClub =
@@ -1074,7 +1099,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       if (!capCheck.allowed) {
         return { signed: false, reason: capCheck.reason };
       }
-      const salaryCheck = validateSalaryCapRoom(club, incoming.contract.salaryPerSeason);
+      const salaryCheck = validateSalaryCapRoom(club, incoming.contract.salaryPerSeason, 0, 'soft');
       if (!salaryCheck.allowed) {
         return { signed: false, reason: salaryCheck.reason };
       }
@@ -1149,7 +1174,13 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const awayClub = isHomeGame ? opponentClub : humanClub;
       const homeClub = isHomeGame ? humanClub : opponentClub;
       const mvp = selectGameMvp(result, awayClub, homeClub);
-      const rewards = calculatePostGameRewards(humanClub, result, isHomeGame, won);
+      const rewards = calculatePostGameRewards(humanClub, result, isHomeGame, won, {
+        season: state.seasonNumber,
+        gameLabel: `${isHomeGame ? 'Home' : 'Road'} vs ${opponentClub.name}`,
+        rng: createSeededRng(
+          state.worldSeed + state.seasonNumber * 50 + humanClub.wins + humanClub.losses + 3,
+        ),
+      });
       const progressed = applyPostGameProgression(
         humanClub,
         manager,
