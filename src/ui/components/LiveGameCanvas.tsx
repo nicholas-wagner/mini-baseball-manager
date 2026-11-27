@@ -1,6 +1,6 @@
 import type { GameDayWeather } from '../../engine/simulation/weather';
 import { useUserPreferencesStore } from '../../store/userPreferences';
-import { Camera } from 'lucide-react';
+import { Camera, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Club } from '../../engine/models/club';
 import type { PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
@@ -38,6 +38,10 @@ interface LiveGameCanvasProps {
   entranceCue?: PlayerEntranceCue | null;
   onEntranceEnd?: () => void;
   onAudioCue?: (cue: PlaySoundCue) => void;
+  shakeOffSignal?: number;
+  showStretchCue?: boolean;
+  audioMuted?: boolean;
+  onToggleAudio?: () => void;
 }
 
 let webglPlayback: boolean | undefined;
@@ -73,13 +77,20 @@ export function LiveGameCanvas({
   entrance,
   guided = false,
   playFinished = false,
-  entranceCue = null, onEntranceEnd, onAudioCue,
+  entranceCue = null,
+  onEntranceEnd,
+  onAudioCue,
+  shakeOffSignal = 0,
+  showStretchCue = false,
+  audioMuted = false,
+  onToggleAudio,
 }: LiveGameCanvasProps) {
   const reducedMotion = useUserPreferencesStore(s => s.reducedMotion);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraButton = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<GameSceneController | null>(null);
+  const prevShakeOffRef = useRef(shakeOffSignal);
   const onAudioCueRef = useRef(onAudioCue);
   onAudioCueRef.current = onAudioCue;
   const [webglUnavailable, setWebglUnavailable] = useState(false);
@@ -104,7 +115,7 @@ export function LiveGameCanvas({
 
   useEffect(() => { controllerRef.current?.setWeather(weather); }, [weather]);
 
-  useEffect(() => { controllerRef.current?.setPreview(preview); }, [preview]);
+  useEffect(() => { controllerRef.current?.setIdlePreview(preview); }, [preview]);
 
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -123,6 +134,13 @@ export function LiveGameCanvas({
   }, [awayClub, homeClub, session, choreo, lastEvent]);
 
   useEffect(() => {
+    if (shakeOffSignal > prevShakeOffRef.current) {
+      controllerRef.current?.triggerPitcherShakeOff();
+    }
+    prevShakeOffRef.current = shakeOffSignal;
+  }, [shakeOffSignal]);
+
+  useEffect(() => {
     if (playFinished) controllerRef.current?.finishReplay();
   }, [playFinished, awayClub, homeClub, session, choreo, lastEvent]);
 
@@ -136,7 +154,13 @@ export function LiveGameCanvas({
 
   return (
     <div className={`live-field relative w-full ${guided ? 'h-[250px] sm:h-[350px] lg:h-[388px]' : 'h-[204px] sm:h-[320px] lg:h-[370px]'} rounded-2xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] overflow-hidden bg-[#63CAFF]`}>
-      <div ref={containerRef} className="w-full h-full" data-testid="live-game-3d-canvas" />
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        data-testid="live-game-3d-canvas"
+        data-preview={preview ?? ''}
+        data-shake-off-signal={String(shakeOffSignal)}
+      />
 
       {celebrateConfetti ? (
         <div
@@ -167,10 +191,32 @@ export function LiveGameCanvas({
       {overlay ? (
         <div
           data-testid="live-canvas-overlay"
-          className="pointer-events-none absolute left-2 right-12 top-2 z-20 flex justify-start"
+          className="pointer-events-none absolute left-2 right-14 top-2 z-20 flex justify-start"
         >
           {overlay}
         </div>
+      ) : null}
+
+      {onToggleAudio ? (
+        <button
+          type="button"
+          data-testid="live-audio-toggle"
+          aria-label={audioMuted ? 'Unmute audio' : 'Mute audio'}
+          aria-pressed={audioMuted}
+          onClick={onToggleAudio}
+          className="absolute top-1 right-1 z-20 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-[#F2CB75]/70 bg-[#132c36]/90 text-white cursor-pointer"
+        >
+          {audioMuted ? <VolumeX size={19} aria-hidden="true" /> : <Volume2 size={19} aria-hidden="true" />}
+        </button>
+      ) : null}
+
+      {showStretchCue ? (
+        <span
+          data-testid="from-the-stretch-cue"
+          className="pointer-events-none absolute bottom-1.5 left-2 z-20 px-2 py-0.5 rounded-full border border-[#F2CB75] bg-[#132c36]/90 text-[#FFF7E4] text-[10px] font-extrabold tracking-wide shadow-sm"
+        >
+          ⚾ From the Stretch
+        </span>
       ) : null}
 
       {onChangeCameraMode ? (

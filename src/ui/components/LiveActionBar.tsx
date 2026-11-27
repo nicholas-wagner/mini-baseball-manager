@@ -11,6 +11,11 @@ import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../e
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
 import {
+  stealPlayToTacticalCall,
+  type StealOptionPreview,
+  type StealPlayType,
+} from '../../engine/simulation/baserunning';
+import {
   BULLPEN_MODE_OPTIONS,
   type BullpenMode,
   type BullpenRecommendation,
@@ -112,7 +117,17 @@ interface LiveActionBarProps {
   onCycleSpeed?: () => void;
   arcadeTimingEnabled?: boolean;
   onToggleArcadeTiming?: () => void;
+  onePitchMode?: boolean;
+  onToggleOnePitchMode?: () => void;
+  audioMuted?: boolean;
+  onToggleAudio?: () => void;
   quickStealOption?: { label: string; runnerName: string; successPct: number; call: TacticalCall } | null;
+  stealOptions?: readonly StealOptionPreview[];
+  armedStealPlay?: StealPlayType | null;
+  onToggleStealPlay?: (play: StealPlayType | null) => void;
+  hitAndRunArmed?: boolean;
+  onToggleHitAndRun?: () => void;
+  strikes?: number;
   isBatterFavorite?: boolean;
   onNextPitch: (timingGrade?: ArcadeTimingGrade) => void;
   onToggleWatchMode: () => void;
@@ -206,7 +221,17 @@ export function LiveActionBar({
   onCycleSpeed,
   arcadeTimingEnabled = false,
   onToggleArcadeTiming,
+  onePitchMode = false,
+  onToggleOnePitchMode,
+  audioMuted = false,
+  onToggleAudio,
   quickStealOption = null,
+  stealOptions = [],
+  armedStealPlay = null,
+  onToggleStealPlay,
+  hitAndRunArmed = false,
+  onToggleHitAndRun,
+  strikes = 0,
   isBatterFavorite = false,
   onNextPitch,
   onToggleWatchMode,
@@ -269,20 +294,76 @@ export function LiveActionBar({
   const showCpuShiftChip =
     isBatting && Boolean(aiDefenseShiftLabel) && aiDefenseShiftLabel !== 'Standard';
 
+  const resolvedStealOptions: readonly {
+    playType: StealPlayType;
+    label: string;
+    successPct: number;
+    call: TacticalCall;
+  }[] =
+    stealOptions.length > 0
+      ? stealOptions.map((opt) => ({
+          playType: opt.playType,
+          label: opt.label,
+          successPct: opt.successPct,
+          call: stealPlayToTacticalCall(opt.playType),
+        }))
+      : quickStealOption
+        ? [
+            {
+              playType:
+                quickStealOption.call === 'steal_3b' ||
+                quickStealOption.call === 'double_steal' ||
+                quickStealOption.call === 'steal_home'
+                  ? quickStealOption.call
+                  : 'steal_2b',
+              label: quickStealOption.label,
+              successPct: quickStealOption.successPct,
+              call: quickStealOption.call,
+            },
+          ]
+        : [];
+  const isStealArmed = Boolean(armedStealPlay) || tacticalCall.includes('steal');
+  const twoStrikeSteal = isBatting && isStealArmed && strikes === 2;
   const activeTradeoff = isBatting
-    ? tacticalCall === 'bunt' && buntPreviewLine
-      ? buntPreviewLine
-      : (SIMPLE_BAT_APPROACHES.find((opt) => opt.id === tacticalCall)?.tradeoff ??
-        SIMPLE_BAT_APPROACHES[1].tradeoff)
+    ? isStealArmed
+      ? twoStrikeSteal
+        ? '2 strikes — runner breaks AND batter swings to protect the plate!'
+        : hitAndRunArmed
+          ? 'Hit & Run — runner breaks and batter swings to put it in play!'
+          : 'Runner breaks on the pitch — ball or strike still counts.'
+      : tacticalCall === 'bunt' && buntPreviewLine
+        ? buntPreviewLine
+        : (SIMPLE_BAT_APPROACHES.find((opt) => opt.id === tacticalCall)?.tradeoff ??
+          SIMPLE_BAT_APPROACHES[1].tradeoff)
     : pitchingMode === 'simple'
       ? (catcherCall?.reason ?? 'Catcher calls pitch & location — tap Shake off for another sign.')
       : (SIMPLE_PITCH_CALLS.find((opt) => opt.id === pitchTarget)?.tradeoff ??
         SIMPLE_PITCH_CALLS[0].tradeoff);
 
-  const battingAction = tacticalCall.includes('steal') ? 'Send runners' : tacticalCall === 'bunt' ? 'Lay down bunt' : 'Swing';
-  const pitchAction = isBatting ? battingAction : 'Throw Pitch';
+  const battingAction = isStealArmed
+    ? twoStrikeSteal
+      ? 'Steal & Swing (2K)'
+      : hitAndRunArmed
+        ? 'Hit & Run'
+        : 'Send Runner'
+    : tacticalCall === 'bunt'
+      ? onePitchMode
+        ? 'Lay down bunt · 1-Pitch'
+        : 'Lay down bunt'
+      : onePitchMode
+        ? 'Swing · 1-Pitch'
+        : 'Swing';
+  const pitchAction = isBatting ? battingAction : onePitchMode ? 'Throw · 1-Pitch' : 'Throw Pitch';
   const primaryLabel = gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)';
   const controlsLocked = gameCompleted || locked;
+  const toggleStealOption = (opt: (typeof resolvedStealOptions)[number]) => {
+    const active = armedStealPlay === opt.playType || tacticalCall === opt.call;
+    if (onToggleStealPlay) {
+      onToggleStealPlay(active ? null : opt.playType);
+    } else {
+      onSelectTacticalCall(active ? 'normal' : opt.call);
+    }
+  };
   const enduranceFillClass =
     pitcherEnduranceTier === 'gassed'
       ? 'bg-[#FF4D6D]'
@@ -326,44 +407,51 @@ export function LiveActionBar({
         data-testid="live-action-bar"
         className="live-thumb-dock rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] p-2"
       >
-        {showBullpenSuggestion && bullpenSuggestion ? (
+        {(showBullpenSuggestion && bullpenSuggestion) ||
+        (isBatting && resolvedStealOptions.length > 0) ||
+        (readyPowerLabel && onArmReadyPower) ? (
           <div className="live-context-chip" data-testid="dock-context-chip">
-            <button
-              type="button"
-              data-testid="bullpen-accept-btn"
-              disabled={controlsLocked}
-              onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
-            >
-              Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
-            </button>
-          </div>
-        ) : quickStealOption ? (
-          <div className="live-context-chip" data-testid="dock-context-chip">
-            <button
-              type="button"
-              data-testid="arcade-steal-btn"
-              aria-pressed={tacticalCall === quickStealOption.call}
-              disabled={gameCompleted}
-              onClick={() =>
-                onSelectTacticalCall(
-                  tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
-                )
-              }
-            >
-              💨 {quickStealOption.label} ({quickStealOption.successPct}%)
-            </button>
-          </div>
-        ) : readyPowerLabel && onArmReadyPower ? (
-          <div className="live-context-chip" data-testid="dock-context-chip">
-            <button
-              type="button"
-              data-testid="arcade-unleash-power-btn"
-              aria-pressed={powerArmed}
-              disabled={gameCompleted}
-              onClick={onArmReadyPower}
-            >
-              {powerArmed ? 'ARMED!' : readyPowerLabel}
-            </button>
+            {showBullpenSuggestion && bullpenSuggestion ? (
+              <button
+                type="button"
+                data-testid="bullpen-accept-btn"
+                disabled={controlsLocked}
+                onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
+              >
+                Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
+              </button>
+            ) : null}
+            {isBatting &&
+              resolvedStealOptions.map((opt, idx) => {
+                const active = armedStealPlay === opt.playType || tacticalCall === opt.call;
+                const chipText =
+                  active && strikes === 2
+                    ? '💨 Steal + Swing (2K)'
+                    : `💨 ${opt.label} (${opt.successPct}%)`;
+                return (
+                  <button
+                    key={opt.playType}
+                    type="button"
+                    data-testid={idx === 0 ? 'arcade-steal-btn' : `arcade-steal-option-${opt.playType}`}
+                    aria-pressed={active}
+                    disabled={gameCompleted}
+                    onClick={() => toggleStealOption(opt)}
+                  >
+                    {chipText}
+                  </button>
+                );
+              })}
+            {readyPowerLabel && onArmReadyPower ? (
+              <button
+                type="button"
+                data-testid="arcade-unleash-power-btn"
+                aria-pressed={powerArmed}
+                disabled={gameCompleted}
+                onClick={onArmReadyPower}
+              >
+                {powerArmed ? 'ARMED!' : readyPowerLabel}
+              </button>
+            ) : null}
           </div>
         ) : null}
         {isBatting ? (
@@ -421,13 +509,14 @@ export function LiveActionBar({
             <ComicButton
               size="sm"
               data-testid="live-primary-pitch-btn"
+              data-play-locked={locked ? 'true' : undefined}
               variant={powerArmed ? 'coral' : 'gold'}
               disabled={controlsLocked}
-              aria-busy={locked || undefined}
+              aria-busy={locked ? 'true' : undefined}
               icon={<Play className="w-3.5 h-3.5" />}
               onClick={() => onNextPitch()}
               aria-label={primaryLabel}
-              className="thumb-go flex-1 min-w-0"
+              className={`thumb-go flex-1 min-w-0${locked ? ' is-play-locked' : ''}`}
             >
               {gameCompleted ? cue.primaryButtonLabel : pitchAction}
             </ComicButton>
@@ -491,7 +580,7 @@ export function LiveActionBar({
                           aria-pressed={active}
                           disabled={gameCompleted}
                           onClick={() => onSelectPitchingMode(modeOpt.id)}
-                          className={`px-2 py-0.5 min-h-[28px] rounded-md font-heading font-extrabold text-[10px] leading-none cursor-pointer transition ${
+                          className={`px-2 py-0.5 min-h-[44px] rounded-md font-heading font-extrabold text-[10px] leading-none cursor-pointer transition ${
                             active
                               ? 'bg-[#224F49] text-[#FFCC49]'
                               : 'bg-transparent text-[#193D37] hover:bg-[#FFFDF8]'
@@ -518,7 +607,7 @@ export function LiveActionBar({
                       aria-pressed={tacticalCall === opt.id}
                       disabled={gameCompleted}
                       onClick={() => onSelectTacticalCall(opt.id)}
-                      className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
+                      className={`px-1 sm:px-2 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
                         tacticalCall === opt.id
                           ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
                           : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
@@ -536,7 +625,7 @@ export function LiveActionBar({
                     onClick={() =>
                       onSelectTacticalCall(tacticalCall === 'bunt' ? 'normal' : 'bunt')
                     }
-                    className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
+                    className={`px-1 sm:px-2 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
                       tacticalCall === 'bunt'
                         ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
                         : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
@@ -565,7 +654,7 @@ export function LiveActionBar({
                       data-testid="arcade-shake-off-btn"
                       disabled={controlsLocked}
                       onClick={onShakeOff}
-                      className="px-2.5 py-1 min-h-[38px] rounded-lg border-2 border-[#193E37] bg-[#FFF3BF] hover:bg-[#FFCC49] text-[#193D37] font-heading font-extrabold text-[11px] shrink-0 whitespace-nowrap cursor-pointer transition"
+                      className="px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] bg-[#FFF3BF] hover:bg-[#FFCC49] text-[#193D37] font-heading font-extrabold text-[11px] shrink-0 whitespace-nowrap cursor-pointer transition"
                     >
                       Shake off
                     </button>
@@ -585,7 +674,7 @@ export function LiveActionBar({
                       aria-pressed={pitchTarget === opt.id}
                       disabled={gameCompleted}
                       onClick={() => onSelectPitchTarget?.(opt.id)}
-                      className={`px-1 sm:px-2 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
+                      className={`px-1 sm:px-2 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[10.5px] sm:text-[11px] leading-tight whitespace-nowrap cursor-pointer ${
                         pitchTarget === opt.id
                           ? 'bg-[#224F49] text-white shadow-[inset_0_-3px_#F2C44F]'
                           : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
@@ -597,26 +686,48 @@ export function LiveActionBar({
                 </div>
               )}
 
-              {isBatting && quickStealOption ? (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    data-testid="arcade-steal-btn"
-                    aria-pressed={tacticalCall === quickStealOption.call}
-                    disabled={gameCompleted}
-                    onClick={() =>
-                      onSelectTacticalCall(
-                        tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
-                      )
-                    }
-                    className={`px-2.5 py-1 min-h-[42px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
-                      tacticalCall === quickStealOption.call
-                        ? 'bg-[#FFCC49] text-[#152F2E] shadow-[2px_2px_0_#192735]'
-                        : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFCC49]'
-                    }`}
-                  >
-                    💨 {quickStealOption.label} ({quickStealOption.successPct}%)
-                  </button>
+              {isBatting && resolvedStealOptions.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {resolvedStealOptions.map((opt, idx) => {
+                    const active = armedStealPlay === opt.playType || tacticalCall === opt.call;
+                    const chipText =
+                      active && strikes === 2
+                        ? '💨 Steal + Swing (2K)'
+                        : `💨 ${opt.label} (${opt.successPct}%)`;
+                    return (
+                      <button
+                        key={opt.playType}
+                        type="button"
+                        data-testid={idx === 0 ? 'arcade-steal-btn' : `arcade-steal-option-${opt.playType}`}
+                        aria-pressed={active}
+                        disabled={gameCompleted}
+                        onClick={() => toggleStealOption(opt)}
+                        className={`px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                          active
+                            ? 'bg-[#FFCC49] text-[#152F2E] shadow-[2px_2px_0_#192735]'
+                            : 'bg-[#D8F3DC] text-[#1B4332] hover:bg-[#FFCC49]'
+                        }`}
+                      >
+                        {chipText}
+                      </button>
+                    );
+                  })}
+                  {onToggleHitAndRun && strikes < 2 ? (
+                    <button
+                      type="button"
+                      data-testid="arcade-hit-and-run-toggle"
+                      aria-pressed={hitAndRunArmed}
+                      disabled={gameCompleted}
+                      onClick={onToggleHitAndRun}
+                      className={`px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] font-heading font-extrabold text-[11px] cursor-pointer transition ${
+                        hitAndRunArmed
+                          ? 'bg-[#224F49] text-[#FFCC49] shadow-[2px_2px_0_#192735]'
+                          : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
+                      }`}
+                    >
+                      🏃 Hit &amp; Run{hitAndRunArmed ? ' ON' : ''}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -636,7 +747,7 @@ export function LiveActionBar({
                     aria-pressed={selectedPitchType === null}
                     disabled={gameCompleted}
                     onClick={() => onSelectPitchType(null)}
-                    className={`px-2 py-0.5 min-h-[30px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] shrink-0 whitespace-nowrap cursor-pointer transition ${
+                    className={`px-2 py-0.5 min-h-[44px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] shrink-0 whitespace-nowrap cursor-pointer transition ${
                       selectedPitchType === null
                         ? 'bg-[#193D37] text-[#FFD166]'
                         : 'bg-[#FFFDF8] text-[#193D37] hover:bg-[#FFF3BF]'
@@ -655,7 +766,7 @@ export function LiveActionBar({
                         aria-pressed={active}
                         disabled={gameCompleted}
                         onClick={() => onSelectPitchType(active ? null : slot.pitchType)}
-                        className={`px-2 py-0.5 min-h-[30px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] shrink-0 whitespace-nowrap cursor-pointer transition ${
+                        className={`px-2 py-0.5 min-h-[44px] rounded-md border border-[#193E37] font-heading font-extrabold text-[10px] shrink-0 whitespace-nowrap cursor-pointer transition ${
                           active
                             ? 'bg-[#FFCC49] text-[#152F2E] shadow-[1px_1px_0_#192735]'
                             : slot.isWeak
@@ -733,7 +844,7 @@ export function LiveActionBar({
                 data-testid="arcade-unleash-power-btn"
                 disabled={gameCompleted}
                 onClick={onArmReadyPower}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[40px] max-w-[60%] sm:max-w-none rounded-lg border-2 border-[#192735] font-display text-[10px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#192735] shrink-0 transition ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1 min-h-[44px] max-w-[60%] sm:max-w-none rounded-lg border-2 border-[#192735] font-display text-[10px] sm:text-[11px] font-black tracking-wide cursor-pointer shadow-[2px_2px_0_#192735] shrink-0 transition ${
                   powerArmed
                     ? 'bg-[#FF4D6D] text-white'
                     : 'bg-[#FFCC49] text-[#152F2E] ring-2 ring-[#193D37] hover:bg-[#FFD86B]'
@@ -774,7 +885,7 @@ export function LiveActionBar({
                 data-testid="bullpen-accept-btn"
                 disabled={controlsLocked}
                 onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
-                className="flex-1 sm:flex-none min-h-[42px] text-[11px] sm:text-xs"
+                className="flex-1 sm:flex-none min-h-[44px] text-[11px] sm:text-xs"
               >
                 📞 Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
               </ComicButton>
@@ -784,7 +895,7 @@ export function LiveActionBar({
                   variant="cream"
                   data-testid="bullpen-keep-btn"
                   onClick={() => onDismissBullpenSuggestion(bullpenSuggestion.snoozeKey)}
-                  className="min-h-[42px] text-[11px] sm:text-xs"
+                  className="min-h-[44px] text-[11px] sm:text-xs"
                 >
                   Keep {currentPitcherFirst}
                 </ComicButton>
@@ -800,7 +911,7 @@ export function LiveActionBar({
                     setFastSimOpen(false);
                     setShiftOpen(false);
                   }}
-                  className="min-h-[42px] text-[11px] sm:text-xs"
+                  className="min-h-[44px] text-[11px] sm:text-xs"
                 >
                   Other ▾
                 </ComicButton>
@@ -814,13 +925,14 @@ export function LiveActionBar({
             <ComicButton
               size="sm"
               data-testid="live-primary-pitch-btn"
+              data-play-locked={locked ? 'true' : undefined}
               variant={cue.kind === 'power_armed' || powerArmed ? 'coral' : 'gold'}
               disabled={controlsLocked}
-              aria-busy={locked || undefined}
+              aria-busy={locked ? 'true' : undefined}
               icon={<Play className="w-3.5 h-3.5" />}
               aria-label={primaryLabel}
               onClick={() => onNextPitch()}
-              className="flex-1 min-w-0 px-2.5 text-xs whitespace-nowrap"
+              className={`flex-1 min-w-0 px-2.5 text-xs whitespace-nowrap${locked ? ' is-play-locked' : ''}`}
             >
               {gameCompleted ? cue.primaryButtonLabel : pitchAction}
             </ComicButton>
@@ -887,7 +999,7 @@ export function LiveActionBar({
               setBullpenOpen(false);
               setShiftOpen(false);
             }}
-            className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+            className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
           >
             {watchMode === 'live' ? 'Auto ▾' : 'Sim ▾'}
           </ComicButton>
@@ -910,7 +1022,7 @@ export function LiveActionBar({
                 setFastSimOpen(false);
                 setShiftOpen(false);
               }}
-              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
             >
               Pen ({bullpenOptions.length})
             </ComicButton>
@@ -928,9 +1040,36 @@ export function LiveActionBar({
                 setBullpenOpen(false);
                 setFastSimOpen(false);
               }}
-              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
             >
               {defensiveShift === 'standard' ? 'Shift ▾' : `${activeShiftShort} ▾`}
+            </ComicButton>
+          ) : null}
+
+          {onToggleOnePitchMode ? (
+            <ComicButton
+              size="sm"
+              variant={onePitchMode ? 'gold' : 'cream'}
+              data-testid="arcade-one-pitch-toggle"
+              aria-pressed={onePitchMode}
+              disabled={gameCompleted}
+              onClick={onToggleOnePitchMode}
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
+            >
+              {onePitchMode ? '⚡ 1-Pitch ON' : '⚡ 1-Pitch'}
+            </ComicButton>
+          ) : null}
+
+          {onToggleAudio ? (
+            <ComicButton
+              size="sm"
+              variant={audioMuted ? 'coral' : 'cream'}
+              data-testid="tactics-audio-toggle"
+              aria-pressed={audioMuted}
+              onClick={onToggleAudio}
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
+            >
+              {audioMuted ? '🔇 Muted' : '🔊 Sound'}
             </ComicButton>
           ) : null}
 
@@ -941,7 +1080,7 @@ export function LiveActionBar({
               data-testid="arcade-timing-toggle"
               disabled={gameCompleted}
               onClick={onToggleArcadeTiming}
-              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
             >
               {arcadeTimingEnabled ? '🎯 ON' : '🎯 Timing'}
             </ComicButton>
@@ -957,7 +1096,7 @@ export function LiveActionBar({
                 setTacticsOpen(false);
                 onOpenBoxScore();
               }}
-              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+              className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
             >
               Box
             </ComicButton>
@@ -969,7 +1108,7 @@ export function LiveActionBar({
             data-testid="control-mode-toggle"
             icon={<Sliders className="w-3.5 h-3.5" />}
             onClick={onToggleControlMode}
-            className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[38px]"
+            className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"
           >
             {controlMode === 'simple' ? 'Pro' : 'Simple'}
           </ComicButton>
@@ -985,7 +1124,7 @@ export function LiveActionBar({
             <button
               type="button"
               onClick={() => setShiftOpen(false)}
-              className="underline cursor-pointer"
+              className="min-h-[44px] px-2 inline-flex items-center underline cursor-pointer"
             >
               Close
             </button>
@@ -1103,7 +1242,7 @@ export function LiveActionBar({
               <button
                 type="button"
                 onClick={() => setBullpenOpen(false)}
-                className="underline cursor-pointer sm:hidden"
+                className="min-h-[44px] px-2 inline-flex items-center underline cursor-pointer sm:hidden"
               >
                 Close
               </button>
@@ -1125,7 +1264,7 @@ export function LiveActionBar({
                       aria-pressed={active}
                       disabled={gameCompleted}
                       onClick={() => onSelectBullpenMode(modeOpt.id)}
-                      className={`px-2 py-0.5 min-h-[30px] rounded-md font-heading font-extrabold text-[10px] leading-none normal-case cursor-pointer transition ${
+                      className={`px-2 py-0.5 min-h-[44px] rounded-md font-heading font-extrabold text-[10px] leading-none normal-case cursor-pointer transition ${
                         active
                           ? 'bg-[#224F49] text-[#FFCC49]'
                           : 'bg-transparent text-[#193D37] hover:bg-[#FFF3BF]'
@@ -1140,7 +1279,7 @@ export function LiveActionBar({
             <button
               type="button"
               onClick={() => setBullpenOpen(false)}
-              className="hidden sm:inline underline cursor-pointer"
+              className="hidden sm:inline-flex min-h-[44px] px-2 items-center underline cursor-pointer"
             >
               Close
             </button>
@@ -1308,7 +1447,7 @@ export function LiveActionBar({
                     type="button"
                     data-testid="inspect-batter-card-btn"
                     onClick={onInspectBatter}
-                    className="px-2.5 py-1 min-h-[40px] rounded-lg border border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
+                    className="px-2.5 py-1 min-h-[44px] rounded-lg border border-[#181B2C] bg-[#FFFDF7] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
                   >
                     🃏 {batterName?.split(' ')[0] ?? 'Batter'}
                   </button>
@@ -1318,7 +1457,7 @@ export function LiveActionBar({
                     type="button"
                     data-testid="inspect-pitcher-card-btn"
                     onClick={onInspectPitcher}
-                    className="px-2.5 py-1 min-h-[40px] rounded-lg border border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#1D3557] shrink-0 whitespace-nowrap cursor-pointer"
+                    className="px-2.5 py-1 min-h-[44px] rounded-lg border border-[#181B2C] bg-[#E0FBFC] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#1D3557] shrink-0 whitespace-nowrap cursor-pointer"
                   >
                     🃏 {pitcherName?.split(' ')[0] ?? 'Pitcher'}
                   </button>
@@ -1328,7 +1467,7 @@ export function LiveActionBar({
                     type="button"
                     data-testid="inspect-game-players-btn"
                     onClick={onInspectPlayers}
-                    className="px-2.5 py-1 min-h-[40px] rounded-lg border border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
+                    className="px-2.5 py-1 min-h-[44px] rounded-lg border border-[#181B2C] bg-[#FBF4E4] hover:bg-[#FFF3BF] text-[10.5px] font-extrabold text-[#181B2C] shrink-0 whitespace-nowrap cursor-pointer"
                   >
                     🃏 All
                   </button>
@@ -1361,7 +1500,7 @@ export function LiveActionBar({
             <button
               type="button"
               onClick={() => setMascotCheerText(null)}
-              className="text-[10px] underline cursor-pointer shrink-0"
+              className="min-h-[44px] px-2 inline-flex items-center text-[10px] underline cursor-pointer shrink-0"
             >
               Hide
             </button>

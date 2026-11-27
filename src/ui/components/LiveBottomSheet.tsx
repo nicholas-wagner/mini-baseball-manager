@@ -80,7 +80,7 @@ export function LiveBottomSheet({
       >
         <header className="live-sheet-handle">
           <h2 id={titleId}>{title}</h2>
-          <button type="button" onClick={onClose}>
+          <button type="button" data-testid="tactics-sheet-close-btn" onClick={onClose}>
             Close
           </button>
         </header>

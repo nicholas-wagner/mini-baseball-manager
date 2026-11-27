@@ -3,7 +3,7 @@ import type { TacticalCall } from '../models/playEvent';
 import type { PitchType } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
 import { getActivatablePowersForPlayer } from '../rpg/specialPowerEffects';
-import { shouldAiAttemptSteal } from './baserunning';
+import { shouldAiAttemptSteal, type StealPlayType } from './baserunning';
 import {
   getBattingSide,
   getCurrentBatter,
@@ -35,6 +35,10 @@ export interface StepPitchOptions {
   nemesisBonus?: NemesisMatchupEvaluation;
   arcadeTiming?: ArcadeTimingInput;
   stealDefenseCall?: 'normal' | 'hold_runner' | 'pitchout';
+  /** Optional decoupled steal intent so batter keeps their contact/normal/power swing approach. */
+  stealPlay?: StealPlayType | null;
+  /** Optional Hit-and-Run call letting the batter swing on <2 strikes while the runner is in motion. */
+  hitAndRun?: boolean;
   /** Controls human-team automatic pitching changes ('auto' | 'semi_auto' | 'manual'). AI clubs always auto-manage. */
   bullpenMode?: BullpenMode;
   /** Optional small Pro-mode control bonus (+2 CTL) when bringing in a reliever warmed up to HOT. */
@@ -45,6 +49,8 @@ export interface StepPitchOptions {
 
 export interface HumanLiveSelections {
   tacticalCall: TacticalCall;
+  stealPlay?: StealPlayType | null;
+  hitAndRun?: boolean;
   pitchingMode?: PitchingMode;
   bullpenMode?: BullpenMode;
   shakeOffCount?: number;
@@ -258,6 +264,8 @@ function resolveHumanBattingInputs(
         ? { actor: 'batter', grade: human.arcadeTimingGrade }
         : undefined,
       stealDefenseCall: 'normal',
+      stealPlay: human.stealPlay ?? null,
+      hitAndRun: Boolean(human.hitAndRun),
       bullpenMode: human.bullpenMode,
       enforceSideOwnership: true,
     },

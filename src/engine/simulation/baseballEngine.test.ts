@@ -13,6 +13,7 @@ import {
   simUntilClutchOrEnd,
   stepAtBat,
   stepHalfInning,
+  stepOnePitchAtBat,
   stepPitch,
 } from './baseballEngine';
 import {
@@ -538,5 +539,266 @@ describe('TASK-014 — Seeded Pitch-by-Pitch Baseball Simulation Engine', () => 
     const freshMph = freshStep.events.find((e) => e.pitchThrown)?.pitchThrown?.mph ?? 0;
     const tiredMph = tiredStep.events.find((e) => e.pitchThrown)?.pitchThrown?.mph ?? 0;
     expect(freshMph).toBeGreaterThan(tiredMph);
+  });
+
+  it('counts a real pitch, updates balls/strikes/fatigue/telemetry on steals, and honors pitchout & Ball-4 walk rules (TASK-109)', () => {
+    const { away, home } = makeMatchupClubs('R', 'R', 7900);
+    const runnerId = away.lineup[1].playerId;
+    const base = createGameSession(away, home, 10901);
+
+    // 1. Straight steal (<2 strikes, !hitAndRun) throws a real pitch, updates count, drains fatigue, emits pitchThrown
+    let sawBallAndSteal = false;
+    let sawStrikeAndSteal = false;
+    for (let i = 0; i < 40; i += 1) {
+      const spot: GameSessionState = {
+        ...createGameSession(away, home, 10900 + i),
+        outs: 0,
+        balls: 0,
+        strikes: 0,
+        bases: [runnerId, null, null],
+      };
+      const pitcherId = spot.home.activePitcherId;
+      const res = stepPitch(spot, 'normal', { stealPlay: 'steal_2b' });
+      const pLine = res.nextSession.boxScore.homePitchers[pitcherId];
+
+      expect(pLine.pitchesThrown).toBe(1);
+      expect(res.nextSession.home.pitcherFatigue).toBeGreaterThan(spot.home.pitcherFatigue);
+      expect(res.nextSession.balls + res.nextSession.strikes).toBe(1);
+      expect(pLine.ballsThrown + pLine.strikesThrown).toBe(1);
+      const stealEv = res.events.find((e) => e.type === 'stolen_base_attempt');
+      expect(stealEv).toBeDefined();
+      expect(stealEv?.pitchThrown?.mph).toBeGreaterThanOrEqual(58);
+      if (res.nextSession.balls === 1) sawBallAndSteal = true;
+      if (res.nextSession.strikes === 1) sawStrikeAndSteal = true;
+    }
+    expect(sawBallAndSteal).toBe(true);
+    expect(sawStrikeAndSteal).toBe(true);
+
+    // 2. Pitchout is ALWAYS a ball (never a strike) AND gives catcher the pitchout throw bonus
+    let pitchoutCS = 0;
+    let normalCS = 0;
+    for (let i = 0; i < 60; i += 1) {
+      const spot: GameSessionState = {
+        ...createGameSession(away, home, 11200 + i),
+        outs: 0,
+        balls: 1,
+        strikes: 1,
+        bases: [runnerId, null, null],
+      };
+      const poRes = stepPitch(spot, 'normal', { stealPlay: 'steal_2b', stealDefenseCall: 'pitchout' });
+      expect(poRes.nextSession.balls).toBe(2);
+      expect(poRes.nextSession.strikes).toBe(1);
+      expect(poRes.nextSession.boxScore.homePitchers[spot.home.activePitcherId].pitchesThrown).toBe(1);
+      if (poRes.nextSession.outs === 1) pitchoutCS += 1;
+
+      const normRes = stepPitch(spot, 'normal', { stealPlay: 'steal_2b' });
+      if (normRes.nextSession.outs === 1) normalCS += 1;
+    }
+    expect(pitchoutCS).toBeGreaterThan(normalCS);
+
+    // 3. Ball 4 Walk with forced runner (R1 -> 2B): runner advances safely with ZERO caught-stealing risk
+    for (let i = 0; i < 30; i += 1) {
+      const spot: GameSessionState = {
+        ...base,
+        rngSeed: 11500 + i,
+        outs: 0,
+        balls: 3,
+        strikes: 0,
+        bases: [runnerId, null, null],
+      };
+      const res = stepPitch(spot, 'normal', { stealPlay: 'steal_2b', stealDefenseCall: 'pitchout' });
+      expect(res.nextSession.outs).toBe(0);
+      expect(res.nextSession.balls).toBe(0);
+      expect(res.nextSession.strikes).toBe(0);
+      expect(res.nextSession.away.lineupIndex).toBe(1);
+      expect(res.nextSession.bases[1]).toBe(runnerId);
+      expect(res.nextSession.boxScore.awayBatters[runnerId].caughtStealing).toBe(0);
+      expect(res.nextSession.boxScore.awayBatters[away.lineup[0].playerId].walks).toBe(1);
+    }
+
+    // 4. Ball 4 Walk with UNFORCED runner (R2 -> 3B with 1B open): batter walks AND runner still resolves steal!
+    let unforcedWalkSafe = 0;
+    let unforcedWalkOut = 0;
+    for (let i = 0; i < 60; i += 1) {
+      const spot: GameSessionState = {
+        ...base,
+        rngSeed: 11800 + i,
+        outs: 0,
+        balls: 3,
+        strikes: 0,
+        bases: [null, runnerId, null],
+      };
+      const res = stepPitch(spot, 'normal', { stealPlay: 'steal_3b', stealDefenseCall: 'pitchout' });
+      expect(res.nextSession.balls).toBe(0);
+      expect(res.nextSession.away.lineupIndex).toBe(1);
+      expect(res.nextSession.bases[0]).toBe(away.lineup[0].playerId);
+      expect(res.nextSession.boxScore.awayBatters[away.lineup[0].playerId].walks).toBe(1);
+      if (res.nextSession.boxScore.awayBatters[runnerId].stolenBases === 1) {
+        unforcedWalkSafe += 1;
+        expect(res.nextSession.bases[2]).toBe(runnerId);
+      } else if (res.nextSession.boxScore.awayBatters[runnerId].caughtStealing === 1) {
+        unforcedWalkOut += 1;
+        expect(res.nextSession.outs).toBe(1);
+      }
+    }
+    expect(unforcedWalkSafe).toBeGreaterThan(0);
+    expect(unforcedWalkOut).toBeGreaterThan(0);
+  });
+
+  it('supports 2-strike plate protection (foul jog-back, Strike 3 + SB, Strike-Em-Out Throw-Em-Out DP) and Hit-and-Run boosts (TASK-109)', () => {
+    const { away, home } = makeMatchupClubs('R', 'R', 8100);
+    const runnerId = away.lineup[1].playerId;
+
+    let sawFoulJogBack = false;
+    let sawBallTakeAndSteal = false;
+    let sawInPlay = false;
+    let sawStrikeoutAndSB = false;
+    let sawStrikeEmOutThrowEmOutDP = false;
+    let sawTwoOutStrikeoutNoSteal = false;
+
+    for (let i = 0; i < 320; i += 1) {
+      const spot: GameSessionState = {
+        ...createGameSession(away, home, 12000 + i),
+        outs: 0,
+        balls: 1,
+        strikes: 2,
+        bases: [runnerId, null, null],
+      };
+      const res = stepPitch(spot, 'contact', { stealPlay: 'steal_2b' });
+      const pitcherId = spot.home.activePitcherId;
+      expect(res.nextSession.boxScore.homePitchers[pitcherId].pitchesThrown).toBe(1);
+
+      const foulEv = res.events.find((e) => e.outcome === 'foul');
+      if (foulEv) {
+        sawFoulJogBack = true;
+        expect(res.nextSession.strikes).toBe(2);
+        expect(res.nextSession.bases[0]).toBe(runnerId);
+        expect(res.nextSession.boxScore.awayBatters[runnerId].stolenBases).toBe(0);
+        expect(res.nextSession.boxScore.awayBatters[runnerId].caughtStealing).toBe(0);
+        expect(foulEv.commentary).toMatch(/runner jogs back/i);
+      }
+
+      if (res.nextSession.balls === 2 && res.events.some((e) => e.type === 'stolen_base_attempt')) {
+        sawBallTakeAndSteal = true;
+      }
+
+      if (res.events.some((e) => e.type === 'ball_in_play')) {
+        sawInPlay = true;
+        expect(res.nextSession.boxScore.awayBatters[runnerId].stolenBases).toBe(0);
+        expect(res.nextSession.boxScore.awayBatters[runnerId].caughtStealing).toBe(0);
+      }
+
+      if (res.events.some((e) => e.outcome === 'strikeout')) {
+        expect(res.nextSession.away.lineupIndex).toBe(1);
+        if (res.nextSession.outs === 1 && res.nextSession.boxScore.awayBatters[runnerId].stolenBases === 1) {
+          sawStrikeoutAndSB = true;
+        }
+        if (res.nextSession.outs === 2 && res.nextSession.boxScore.awayBatters[runnerId].caughtStealing === 1) {
+          sawStrikeEmOutThrowEmOutDP = true;
+        }
+      }
+
+      // With 2 outs already, Strike 3 ends the half-inning immediately with no steal stats
+      if (!sawTwoOutStrikeoutNoSteal) {
+        const twoOutSpot: GameSessionState = { ...spot, outs: 2 };
+        const twoOutRes = stepPitch(twoOutSpot, 'power', { stealPlay: 'steal_2b' });
+        if (twoOutRes.events.some((e) => e.outcome === 'strikeout')) {
+          sawTwoOutStrikeoutNoSteal = true;
+          expect(twoOutRes.nextSession.boxScore.awayBatters[runnerId].stolenBases).toBe(0);
+          expect(twoOutRes.nextSession.boxScore.awayBatters[runnerId].caughtStealing).toBe(0);
+        }
+      }
+    }
+
+    expect(sawFoulJogBack).toBe(true);
+    expect(sawBallTakeAndSteal).toBe(true);
+    expect(sawInPlay).toBe(true);
+    expect(sawStrikeoutAndSB).toBe(true);
+    expect(sawStrikeEmOutThrowEmOutDP).toBe(true);
+    expect(sawTwoOutStrikeoutNoSteal).toBe(true);
+
+    // Hit-and-Run (<2 strikes with hitAndRun: true): cuts DP rate and produces 1st-to-3rd advancement on singles
+    let stationaryDps = 0;
+    let hitAndRunDps = 0;
+    let hitAndRunFirstToThird = 0;
+    for (let i = 0; i < 600; i += 1) {
+      const spot: GameSessionState = {
+        ...createGameSession(away, home, 14000 + i),
+        outs: 0,
+        balls: 1,
+        strikes: 0,
+        bases: [runnerId, null, null],
+      };
+      const statRes = stepPitch(spot, 'contact');
+      if (statRes.events.some((e) => e.outcome === 'double_play')) stationaryDps += 1;
+
+      const hnrRes = stepPitch(spot, 'contact', { stealPlay: 'steal_2b', hitAndRun: true });
+      if (hnrRes.events.some((e) => e.outcome === 'double_play')) hitAndRunDps += 1;
+      if (hnrRes.events.some((e) => e.outcome === 'single') && hnrRes.nextSession.bases[2] === runnerId) {
+        hitAndRunFirstToThird += 1;
+      }
+    }
+    expect(hitAndRunFirstToThird).toBeGreaterThan(5);
+    expect(hitAndRunDps).toBeLessThan(stationaryDps);
+  });
+
+  it('steps an entire plate appearance to its deciding pitch in stepOnePitchAtBat while preserving pitch counts, fatigue, preDecidingSession, and 1-pitch steal control (TASK-111)', () => {
+    const { away, home } = makeMatchupClubs('R', 'R', 9111);
+
+    // 1. Multi-pitch PA preserves exact realistic pitchesThrown, endurance drain, balls/strikes, and preDecidingSession!
+    let sawMultiPitchPa = false;
+    for (let s = 0; s < 40; s += 1) {
+      const start = createGameSession(away, home, 21100 + s);
+      const pitcherId = start.home.activePitcherId;
+      const resA = stepOnePitchAtBat(start, 'contact');
+      const resB = stepOnePitchAtBat(start, 'contact');
+      expect(resA).toEqual(resB);
+
+      expect(resA.pitchesInAtBat).toBeGreaterThanOrEqual(1);
+      expect(resA.decidingEvent).not.toBeNull();
+      const endPitcher = resA.nextSession.boxScore.homePitchers[pitcherId];
+      const prePitcher = resA.preDecidingSession.boxScore.homePitchers[pitcherId];
+      expect(endPitcher.pitchesThrown).toBe(resA.pitchesInAtBat);
+      expect(prePitcher.pitchesThrown).toBe(resA.pitchesInAtBat - 1);
+      expect(resA.nextSession.home.pitcherFatigue).toBeGreaterThan(start.home.pitcherFatigue);
+      // PA concluded (batter advanced, half swapped, or game ended)
+      const concluded =
+        resA.nextSession.status === 'completed' ||
+        resA.nextSession.half !== start.half ||
+        resA.nextSession.away.lineupIndex !== start.away.lineupIndex;
+      expect(concluded).toBe(true);
+
+      if (resA.pitchesInAtBat >= 4) {
+        sawMultiPitchPa = true;
+        expect(resA.preDecidingSession.balls + resA.preDecidingSession.strikes).toBeGreaterThan(0);
+      }
+    }
+    expect(sawMultiPitchPa).toBe(true);
+
+    // 2. Active steal executes ONLY 1 steal pitch immediately so manager never loses control of a steal!
+    const runnerId = away.lineup[1].playerId;
+    const stealSpot: GameSessionState = {
+      ...createGameSession(away, home, 21900),
+      outs: 0,
+      balls: 0,
+      strikes: 0,
+      bases: [runnerId, null, null],
+    };
+    const stealByOpt = stepOnePitchAtBat(stealSpot, 'contact', { stealPlay: 'steal_2b' });
+    expect(stealByOpt.pitchesInAtBat).toBe(1);
+    expect(stealByOpt.preDecidingSession).toEqual(stealSpot);
+    expect(stealByOpt.nextSession.boxScore.homePitchers[stealSpot.home.activePitcherId].pitchesThrown).toBe(1);
+    expect(stealByOpt.decidingEvent?.type).toBe('stolen_base_attempt');
+
+    const stealByCall = stepOnePitchAtBat(stealSpot, 'steal');
+    expect(stealByCall.pitchesInAtBat).toBe(1);
+    expect(stealByCall.preDecidingSession).toEqual(stealSpot);
+
+    // 3. Completed game returns no-op safely
+    const done = { ...stealSpot, status: 'completed' as const };
+    const noop = stepOnePitchAtBat(done);
+    expect(noop.pitchesInAtBat).toBe(0);
+    expect(noop.events).toEqual([]);
+    expect(noop.decidingEvent).toBeNull();
   });
 });

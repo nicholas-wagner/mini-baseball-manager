@@ -25,7 +25,9 @@ interface BroadcastHudProps {
   defensiveShift: DefensiveShiftId;
   onSelectShift: (shift: DefensiveShiftId) => void;
   activeTacticalCall: TacticalCall;
+  armedStealPlay?: StealPlayType | null;
   onSelectStealCall: (call: TacticalCall) => void;
+  onToggleStealPlay?: (play: StealPlayType | null) => void;
   lastEvent: PlayEvent | null;
   atBatEvents?: readonly PlayEvent[];
 }
@@ -95,7 +97,9 @@ export function BroadcastHud({
   defensiveShift,
   onSelectShift,
   activeTacticalCall,
+  armedStealPlay = null,
   onSelectStealCall,
+  onToggleStealPlay,
   lastEvent,
   atBatEvents = [],
 }: BroadcastHudProps) {
@@ -223,7 +227,7 @@ export function BroadcastHud({
           </span>
           {stealOptions.map((opt) => {
             const call = STEAL_PLAY_TO_CALL[opt.playType];
-            const active = activeTacticalCall === call;
+            const active = armedStealPlay === opt.playType || activeTacticalCall === call;
             const variant =
               active ? 'coral' : opt.riskTier === 'green' ? 'turf' : opt.riskTier === 'amber' ? 'gold' : 'cream';
             return (
@@ -232,9 +236,14 @@ export function BroadcastHud({
                 size="sm"
                 variant={variant}
                 active={active}
-                onClick={() => onSelectStealCall(call)}
+                onClick={() => {
+                  if (onToggleStealPlay) onToggleStealPlay(active ? null : opt.playType);
+                  else onSelectStealCall(call);
+                }}
               >
-                {opt.label}: {opt.runnerName.split(' ')[0]} (SPD {opt.runnerSpeed} • {opt.successPct}%)
+                {active && session.strikes === 2
+                  ? `💨 Steal + Swing (2K)`
+                  : `${opt.label}: ${opt.runnerName.split(' ')[0]} (SPD ${opt.runnerSpeed} • ${opt.successPct}%)`}
               </ComicButton>
             );
           })}

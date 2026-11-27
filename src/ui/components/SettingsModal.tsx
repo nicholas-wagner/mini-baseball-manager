@@ -24,6 +24,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const pitchingMode = useUserPreferencesStore((s) => s.pitchingMode);
   const bullpenMode = useUserPreferencesStore((s) => s.bullpenMode);
   const frontOfficeMode = useUserPreferencesStore((s) => s.frontOfficeMode);
+  const onePitchMode = useUserPreferencesStore((s) => s.onePitchMode);
 
   const setSfxVolume = useUserPreferencesStore((s) => s.setSfxVolume);
   const toggleHaptics = useUserPreferencesStore((s) => s.toggleHaptics);
@@ -35,6 +36,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const setPitchingMode = useUserPreferencesStore((s) => s.setPitchingMode);
   const setBullpenMode = useUserPreferencesStore((s) => s.setBullpenMode);
   const setFrontOfficeMode = useUserPreferencesStore((s) => s.setFrontOfficeMode);
+  const toggleOnePitchMode = useUserPreferencesStore((s) => s.toggleOnePitchMode);
 
   if (!open) return null;
 
@@ -135,7 +137,22 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               >
                 Reduced Motion: {reducedMotion ? 'ON' : 'OFF'}
               </ComicButton>
+              <ComicButton
+                size="sm"
+                data-testid="settings-one-pitch-toggle"
+                variant={onePitchMode ? 'gold' : 'cream'}
+                aria-pressed={onePitchMode}
+                onClick={() => {
+                  toggleOnePitchMode();
+                  soundEngine.play('ui_pop');
+                }}
+              >
+                ⚡ 1-Pitch At-Bats: {onePitchMode ? 'ON' : 'OFF'}
+              </ComicButton>
             </div>
+            <p className="text-[11px] font-bold text-[#4A5068]">
+              1-Pitch At-Bats sims full realistic counts &amp; fatigue underneath and plays the 3D deciding pitch (steals still run pitch-by-pitch).
+            </p>
           </div>
 
           {/* Accessibility & Colorblind Stat Symbols */}
