@@ -20,7 +20,7 @@ it('hands the pictured Opening Day player to the manager and lets them inspect e
   const opening = within(screen.getByRole('region', { name: 'Opening Day feature' }));
   const name = opening.getByRole('heading').textContent!;
   const art = opening.getByRole('img') as HTMLImageElement;
-  expect(art.src).toMatch(/\.png/);
+  expect(art.src).toMatch(/\.(?:png|webp)/);
   fireEvent.click(opening.getByRole('button', { name: /^(Bat|Pitch) with / }));
   expect(screen.getByTestId('player-entrance')).toHaveTextContent(name);
   const scoreboard = within(screen.getByRole('region', {name:'Live Baseball Scoreboard'}));

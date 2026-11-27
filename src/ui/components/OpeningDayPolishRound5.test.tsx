@@ -55,7 +55,7 @@ describe('Opening Day Polish Round 5 (Clean Badges, Unified Opening Story, 2-Row
     const imgs = within(fan).getAllByRole('img') as HTMLImageElement[];
     expect(imgs).toHaveLength(3);
     for (const img of imgs) {
-      expect(img.src).toMatch(/\.png|data:image/i);
+      expect(img.src).toMatch(/\.(?:png|webp)|data:image/i);
     }
   });
 

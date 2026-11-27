@@ -4,7 +4,7 @@
 [![CI](https://github.com/nicholas-wagner/mini-baseball-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/nicholas-wagner/mini-baseball-manager/actions/workflows/ci.yml)
 [![PWA Ready](https://img.shields.io/badge/Android_PWA-Offline_First-2FB356?style=flat-square&labelColor=181B2C)](./vite.config.ts)
 
-**Mini Baseball Manager** is an open-source, offline-first **baseball management RPG with painted miniature players and 3,000 illustrated manga cards** built for desktop and Android PWA.
+**Mini Baseball Manager** is an open-source, offline-first **baseball management RPG with painted miniature players and 3,000 illustrated WebP manga cards** built for desktop and Android PWA.
 
 Manage lineups, draft global prospects, develop branching player & manager skill trees, unleash cultural myth & animal Special Powers, build a Sim-City ballpark district, fuel multi-season team rivalries, and watch games unfold in **over-the-shoulder 3D**—all stored locally on your device with zero centralized backend.
 
@@ -81,17 +81,19 @@ Open **Park scouting** before first pitch to see the fence distances and move a 
 
 In **Tactics**, choose when **Smart Watch** should pause for you, including a particular hitter, the tying run reaching base, or a tiring starter. The **Sandlot Gazette** calls selected career matchups. Between innings, the out-of-town board posts a final from another scheduled game in your tier.
 
-### Behind-the-catcher batting, mobile cockpit & desktop broadcast studio
+### Behind-the-catcher batting, stretch pitching, frame-locked audio, 1-pitch mode & living club treasury
 
-When your club is batting, the default camera sits right behind the catcher looking out to the mound, and the **Swing** / **Throw Pitch** controls stay locked until each pitch or play finishes. On phones, live play fits in one zero-scroll screen (`360×640`, `390×844`, and `844×390` landscape) with a single **Tactics** bottom sheet, a live TV K-Zone pitch plot, teammate dugout cheers, and a 3-tab post-game recap (**Highlights**, **Clubhouse**, **Box Score**). On desktop (`1280×800`), the 2-column Broadcast Studio pairs the 3D ballpark with keyboard shortcuts (`Space` swing/throw, `1/2/3` approach, `B` bunt, `S` steal, `H` hype, `T` tactics, `Esc` close), dynamic weather lighting, 3D home run fireworks, and illustrated 1994 Foil Pack relics and die-cut celebration stickers.
+When your club is batting, the default camera sits right behind the catcher looking out to the mound, and the **Swing** / **Throw Pitch** controls stay locked with a subtle progress sweep until each pitch, swing, bunt, and catcher throwback finishes. Pitchers step cleanly onto their lead foot from both cameras, automatically pitch **From the Stretch** with painted slide-step poses and runner glances whenever baserunners are aboard, visibly shake off catcher signs, and settle smoothly back onto the rubber after receiving the catcher’s return throw. Every sound effect (`bat_crack`, `bunt_tap`, `glove_pop`, post-mitt `strikeout_punch`, return-throw catch, steals, and HR fireworks) is frame-locked to the Three.js playback clock with synchronous mobile audio unlock.
 
-| Behind-the-catcher on a compact phone | Phone landscape cockpit | Unified Tactics sheet |
+Base stealing works like real baseball—every steal runs on a real pitched ball (updating balls, strikes, pitch counts, and Ball 4 walks), surfaces as a **1-tap `💨 Steal` chip** right on the mobile dock (auto-dismissing the Tactics sheet when sending runners), and automatically lets the batter **protect the plate with 2 strikes (`Steal & Swing (2K)`)** or run a **Hit & Run**. Want ultra-fast games? Toggle **⚡ 1-Pitch Mode** to simulate realistic multi-pitch counts and fatigue underneath while watching every full 3D deciding pitch. Between games, tap the persistent **💵 Cash Pill** to open your **Club Treasury**—tracking real settled P&L receipts from tickets, concessions, sponsors, TV deals, district plaza buildings, persisted Promo Nights, and roster/staff payroll under a **15% Soft-Cap Luxury Tax Buffer**, plus in-season contract extensions, a **1994 Foil Pack Cash Shop**, and a **Clubhouse Recovery Feast**. League rosters follow realistic tier age pyramids from `18–19` Rookie Sandlot prospects up to `25–35` Mini Major League veterans.
+
+| Behind-the-catcher on a compact phone | Phone landscape cockpit | Unified Tactics sheet (1-Pitch + Steal) |
 | --- | --- | --- |
-| ![Behind-the-catcher batting view on a 360 by 640 phone with Contact, Power, Bunt and Swing above the fold](./docs/screenshots/council-mobile-batting.webp) | ![Two-column behind-the-catcher landscape layout at 844 by 390](./docs/screenshots/council-landscape-batting.webp) | ![Unified mobile Tactics bottom sheet with Smart Watch, speed, sim, timing, box score and approach controls](./docs/screenshots/council-tactics-sheet.webp) |
+| ![Behind-the-catcher batting view on a 360 by 640 phone with From the Stretch, 1-tap Steal, Contact, Power, Bunt, Audio toggle and Swing above the fold](./docs/screenshots/council-mobile-batting.webp) | ![Two-column behind-the-catcher landscape layout at 844 by 390 with Stretch delivery, 1-tap Steal and Swing fully in view](./docs/screenshots/council-landscape-batting.webp) | ![Unified mobile Tactics bottom sheet with Smart Watch, 1-Pitch Mode, Sound, Timing, Steal, Hit and Run and approach controls](./docs/screenshots/council-tactics-sheet.webp) |
 
-| 3-tab post-game celebration | Desktop Broadcast Studio |
-| --- | --- |
-| ![Mobile 3-tab Post-Game modal with Highlights, Clubhouse and Box Score tabs above the fold](./docs/screenshots/council-postgame-tabs.webp) | ![1280 by 800 Desktop Broadcast Studio pairing the behind-the-catcher 3D ballpark with live shortcuts, Hype meter and pitcher endurance](./docs/screenshots/council-desktop-studio.webp) |
+| Mobile Club Treasury & Cash HUD | Desktop Broadcast Studio | Desktop Club Treasury & Salary Cap |
+| --- | --- | --- |
+| ![Mobile Club Treasury showing persistent Cash HUD pill, Salary Cap meter, itemized post-game P&L receipt and 1994 Foil Pack Cash Shop](./docs/screenshots/council-mobile-treasury.webp) | ![1280 by 800 Desktop Broadcast Studio pairing live Bunt stance and painted Stretch pitching with Cash HUD, 1-Pitch Mode, Steal and Hype controls](./docs/screenshots/council-desktop-studio.webp) | ![Desktop Club Treasury with Salary Cap meter, Staff Budget, 1994 Foil Pack Cash Shop, Clubhouse Recovery Feast and Persisted Promo Nights](./docs/screenshots/council-desktop-treasury.webp) |
 
 ## Core Pillars
 

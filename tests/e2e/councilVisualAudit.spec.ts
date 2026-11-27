@@ -179,6 +179,16 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expect(recap.getByTestId('postgame-boxscore-panel')).toBeVisible();
     await expectNoHorizontalOverflow(page, 390);
     await page.screenshot({ path: 'test-results/audit-390x844-08-postgame-boxscore.png' });
+
+    // 7. Tap persistent mobile Cash Pill -> Club Treasury & Finances (TASK-108)
+    await recap.getByRole('button', { name: /close/i }).first().click();
+    const mobileCashPill = page.getByTestId('club-cash-pill-mobile');
+    await expect(mobileCashPill).toBeVisible({ timeout: 10_000 });
+    await expectMinTapTarget(mobileCashPill, 44);
+    await mobileCashPill.click();
+    await expect(page.getByTestId('club-treasury-panel')).toBeVisible({ timeout: 10_000 });
+    await expectNoHorizontalOverflow(page, 390);
+    await page.screenshot({ path: 'test-results/audit-390x844-11-club-treasury.png' });
   });
 
   test('844x390 phone landscape: Live Landscape 2-column ballpark and action layout', async ({
@@ -243,5 +253,13 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
 
     await expectNoHorizontalOverflow(page, 1280);
     await page.screenshot({ path: 'test-results/audit-1280x800-10-desktop-broadcast.png' });
+
+    // Open Club Treasury directly via persistent Desktop Cash Pill (TASK-108)
+    const desktopCashPill = page.getByTestId('club-cash-pill-desktop');
+    await expect(desktopCashPill).toBeVisible();
+    await desktopCashPill.click();
+    await expect(page.getByTestId('club-treasury-panel')).toBeVisible({ timeout: 10_000 });
+    await expectNoHorizontalOverflow(page, 1280);
+    await page.screenshot({ path: 'test-results/audit-1280x800-12-desktop-treasury.png' });
   });
 });

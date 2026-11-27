@@ -55,9 +55,17 @@ function money(amount: number): string {
 
 function AffordBadge({ cash, cost }: { cash: number; cost: number }) {
   if (cost <= 0 || cash >= cost) {
-    return <span className="text-[#1B4332]">Affordable!</span>;
+    return (
+      <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#D8F3DC] text-[#1B4332] border border-[#1B4332]/25">
+        Affordable!
+      </span>
+    );
   }
-  return <span className="text-[#9D0208]">Need {money(cost - cash)} more</span>;
+  return (
+    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FFE5EC] text-[#9D0208] border border-[#9D0208]/25">
+      Need {money(cost - cash)} more
+    </span>
+  );
 }
 
 function Meter({
@@ -223,25 +231,33 @@ export function ClubTreasuryPanel({ club, seriesIndex, onNotice, onJump }: ClubT
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {FOIL_CASH_SHOP.map((pack) => (
-          <div key={pack.tier} className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] space-y-2">
-            <div className="font-display text-xs text-[#181B2C]">{pack.label}</div>
-            <div className="text-[11px] font-extrabold text-[#4A5068]">{money(pack.cost)}</div>
-            <AffordBadge cash={club.economy.cash} cost={pack.cost} />
-            <ComicButton size="sm" variant="gold" data-testid={`buy-foil-${pack.tier}`} onClick={() => buyPack(pack.tier, pack.label)}>
-              Buy Pack
-            </ComicButton>
+          <div key={pack.tier} className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-col justify-between gap-2">
+            <div>
+              <div className="font-display text-xs text-[#181B2C]">{pack.label}</div>
+              <div className="text-[11px] font-extrabold text-[#4A5068]">{money(pack.cost)}</div>
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+              <AffordBadge cash={club.economy.cash} cost={pack.cost} />
+              <ComicButton size="sm" variant="gold" data-testid={`buy-foil-${pack.tier}`} onClick={() => buyPack(pack.tier, pack.label)}>
+                Buy Pack
+              </ComicButton>
+            </div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-white space-y-2">
-          <div className="font-display text-sm text-[#181B2C]">Clubhouse Recovery Feast</div>
-          <p className="text-[11px] font-bold text-[#4A5068]">$750 once per series. Fatigue -18, morale +8.</p>
-          <AffordBadge cash={club.economy.cash} cost={750} />
-          <ComicButton size="sm" variant="turf" data-testid="host-feast" disabled={feastUsed} onClick={hostFeast}>
-            {feastUsed ? 'Already feasted this series' : 'Host Feast'}
-          </ComicButton>
+        <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-white flex flex-col justify-between gap-2">
+          <div className="space-y-1">
+            <div className="font-display text-sm text-[#181B2C]">Clubhouse Recovery Feast</div>
+            <p className="text-[11px] font-bold text-[#4A5068]">$750 once per series. Fatigue -18, morale +8.</p>
+          </div>
+          <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+            <AffordBadge cash={club.economy.cash} cost={750} />
+            <ComicButton size="sm" variant="turf" data-testid="host-feast" disabled={feastUsed} onClick={hostFeast}>
+              {feastUsed ? 'Already feasted this series' : 'Host Feast'}
+            </ComicButton>
+          </div>
         </div>
         <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-white space-y-2">
           <div className="font-display text-sm text-[#181B2C]">Promo Night</div>

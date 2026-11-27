@@ -8,6 +8,7 @@ import type { LiveGameCanvas } from './LiveGameCanvas';
 import type { ComponentProps } from 'react';
 
 vi.mock('./LiveGameCanvas', () => ({
+  isLiveWebglAvailable: () => false,
   LiveGameCanvas: ({ choreo, overlay, session }: ComponentProps<typeof LiveGameCanvas>) =>
     <div data-testid="field" data-play={choreo?.play?.kind ?? 'ready'} data-session={session.stepCounter} data-half={session.half}>{overlay}</div>,
 }));

@@ -56,15 +56,24 @@
   .atbat-header-actions {
     width: 100%;
     justify-content: space-between;
-    gap: 5px;
+    gap: 3px;
   }
   .atbat-guide header .atbat-timing-pill,
   .atbat-guide header .atbat-power-pill {
-    padding: 2px 7px;
+    padding: 2px 6px;
     font-size: 9.5px;
+  }
+  .atbat-guide header .atbat-power-pill {
+    flex: 1 1 auto;
+    min-width: 68px;
+    justify-content: center;
   }
   .atbat-guide header button {
     white-space: nowrap;
+    font-size: 10.5px;
+  }
+  .atbat-options summary {
+    min-width: 44px;
     font-size: 11px;
   }
 }
@@ -678,6 +687,26 @@
   }
   .guided-game .live-dock > .atbat-guide:not(.is-expanded) {
     margin-top: auto;
+    padding: 3px 8px 6px;
+  }
+  .guided-game .atbat-guide h3 {
+    font-size: 13px;
+    line-height: 1.15;
+    margin-bottom: 4px;
+  }
+  .guided-game .atbat-steal-strip {
+    margin-bottom: 4px;
+  }
+  .guided-game .atbat-choices button,
+  .guided-game .atbat-steal-chip,
+  .guided-game .atbat-guide .atbat-go {
+    min-height: 44px;
+  }
+  .guided-game .atbat-go {
+    margin-top: 4px;
+  }
+  .guided-game .swing-tradeoff {
+    display: none;
   }
   .live-game.studio-layout > :not(.live-studio) {
     grid-column: 1 / -1;
