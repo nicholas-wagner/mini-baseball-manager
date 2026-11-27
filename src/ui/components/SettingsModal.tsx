@@ -151,7 +151,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               </ComicButton>
             </div>
             <p className="text-[11px] font-bold text-[#4A5068]">
-              1-Pitch At-Bats sims full realistic counts &amp; fatigue underneath and plays the 3D deciding pitch (steals still run pitch-by-pitch).
+              1-Pitch At-Bats (Default in Simple) sims full realistic counts &amp; fatigue underneath and plays the 3D deciding pitch — Pro Manager defaults to Pitch-by-Pitch (steals still run pitch-by-pitch).
             </p>
           </div>
 

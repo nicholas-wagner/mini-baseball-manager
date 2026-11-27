@@ -1,4 +1,7 @@
-import { settleSeriesGameLogs } from '../engine/economy/clubLedgerSettlement';
+import {
+  LEDGER_HISTORY_CAP,
+  settleSeriesGameLogs,
+} from '../engine/economy/clubLedgerSettlement';
 import { discoverPlayerHobby } from '../engine/rpg/playerHobbies';
 import { selectScorebookMoments, type ScorebookMoment } from '../engine/gm/scorebookMoments';
 import { create } from 'zustand';
@@ -61,6 +64,7 @@ import {
 import {
   LEAGUE_TIER_ORDER,
   type Club,
+  type ClubLedgerEntry,
   type LeagueTierId,
 } from '../engine/models/club';
 import { createManagerProfile, type ManagerProfile } from '../engine/models/manager';
@@ -72,9 +76,11 @@ import {
 import { createSeededRng } from '../engine/rng/seededRng';
 import { unlockNextHeritageTier } from '../engine/rpg/heritageTrees';
 import {
+  canRetrainPlayerSkills,
   respecPlayerSkills,
   SKILL_RESPEC_CASH_FEE,
   toggleEquippedSpecialPower,
+  undoSessionSkillNode,
   unlockSkillNode,
 } from '../engine/rpg/skillTrees';
 import { crossTrainPosition } from '../engine/rpg/specialistsAndPositions';
@@ -224,11 +230,16 @@ export interface GameStoreState {
     request: TrainingDrillRequest,
   ) => { trained: boolean; reason?: string; summary: string };
   unlockPlayerSkill: (playerId: string, nodeId: string) => { unlocked: boolean; reason?: string };
+  undoPlayerSkillUnlock: (
+    playerId: string,
+    nodeId: string,
+  ) => { undone: boolean; refundedSp: number; reason?: string };
   unlockPlayerHeritageTier: (playerId: string) => { unlocked: boolean; reason?: string };
   togglePlayerSpecialPower: (
     playerId: string,
     powerId: string,
   ) => { changed: boolean; reason?: string };
+  retrainPlayerSkills: (playerId: string) => { refundedSp: number; reason?: string };
   respecPlayerSkillTree: (playerId: string) => { refundedSp: number; reason?: string };
   signFreeAgent: (playerId: string) => { signed: boolean; reason?: string };
   releasePlayer: (playerId: string) => { released: boolean; reason?: string };
@@ -1003,7 +1014,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
     },
 
     unlockPlayerSkill: (playerId, nodeId) => {
-      const club = get().getHumanClub();
+      const state = get();
+      const club = state.activeOffseason
+        ? findClubAcrossLeagues(state.activeOffseason.leagues, state.humanClubId) ?? state.getHumanClub()
+        : state.getHumanClub();
       if (!club) return { unlocked: false, reason: 'No active club found.' };
       const target = club.roster.find((p) => p.id === playerId);
       if (!target) return { unlocked: false, reason: 'Player is not on your roster.' };
@@ -1015,10 +1029,48 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         ...club,
         roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
       };
-      set((state) => ({
-        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      set((s) => ({
+        leagues: updateHumanClubInLeagues(s.leagues, nextClub),
+        ...(s.activeOffseason
+          ? {
+              activeOffseason: {
+                ...s.activeOffseason,
+                leagues: updateHumanClubInLeagues(s.activeOffseason.leagues, nextClub),
+              },
+            }
+          : {}),
       }));
       return { unlocked: true };
+    },
+
+    undoPlayerSkillUnlock: (playerId, nodeId) => {
+      const state = get();
+      const club = state.activeOffseason
+        ? findClubAcrossLeagues(state.activeOffseason.leagues, state.humanClubId) ?? state.getHumanClub()
+        : state.getHumanClub();
+      if (!club) return { undone: false, refundedSp: 0, reason: 'No active club found.' };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target) return { undone: false, refundedSp: 0, reason: 'Player is not on your roster.' };
+
+      const res = undoSessionSkillNode(target, nodeId);
+      if (!res.undone) return { undone: false, refundedSp: 0, reason: res.reason };
+
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+      };
+      set((s) => ({
+        leagues: updateHumanClubInLeagues(s.leagues, nextClub),
+        ...(s.activeOffseason
+          ? {
+              activeOffseason: {
+                ...s.activeOffseason,
+                leagues: updateHumanClubInLeagues(s.activeOffseason.leagues, nextClub),
+              },
+            }
+          : {}),
+      }));
+      return { undone: true, refundedSp: res.refundedSp };
     },
 
     unlockPlayerHeritageTier: (playerId) => {
@@ -1059,35 +1111,69 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       return { changed: true };
     },
 
-    respecPlayerSkillTree: (playerId) => {
-      const club = get().getHumanClub();
+    retrainPlayerSkills: (playerId) => {
+      const state = get();
+      const isOffseason = Boolean(state.activeOffseason);
+      const club = state.activeOffseason
+        ? findClubAcrossLeagues(state.activeOffseason.leagues, state.humanClubId) ?? state.getHumanClub()
+        : state.getHumanClub();
       if (!club) return { refundedSp: 0, reason: 'No active club found.' };
       const target = club.roster.find((p) => p.id === playerId);
       if (!target) return { refundedSp: 0, reason: 'Player is not on your roster.' };
-      if (target.unlockedSkillIds.length === 0) {
-        return { refundedSp: 0, reason: 'No skill tree nodes to respec.' };
-      }
-      if (club.economy.cash < SKILL_RESPEC_CASH_FEE) {
-        return {
-          refundedSp: 0,
-          reason: `Need $${SKILL_RESPEC_CASH_FEE} cash to respec.`,
-        };
+
+      const eligibility = canRetrainPlayerSkills(target, {
+        isOffseason,
+        clubCash: club.economy.cash,
+      });
+      if (!eligibility.allowed) {
+        return { refundedSp: 0, reason: eligibility.reason };
       }
 
-      const res = respecPlayerSkills(target);
+      const res = respecPlayerSkills(target, { markCareerRetrain: true });
+      const endingCash = club.economy.cash - SKILL_RESPEC_CASH_FEE;
+      const ledgerEntry: ClubLedgerEntry = {
+        id: `ldg-${state.seasonNumber}-retrain-${target.id}-${state.rosterActionNonce}`,
+        season: state.seasonNumber,
+        gameLabel: `Offseason Retrain · ${target.name}`,
+        revenueTotal: 0,
+        expenseTotal: SKILL_RESPEC_CASH_FEE,
+        netDelta: -SKILL_RESPEC_CASH_FEE,
+        lines: [{ label: `Skill Retrain (${target.name})`, amount: SKILL_RESPEC_CASH_FEE, kind: 'expense' }],
+        luxuryTaxPaid: 0,
+        promoConsumedId: null,
+        bailoutTriggered: false,
+        bailoutAmount: 0,
+        endingCash,
+      };
+      const nextLedger = [ledgerEntry, ...(club.economy.recentLedgerEntries ?? [])].slice(
+        0,
+        LEDGER_HISTORY_CAP,
+      );
       const nextClub: Club = {
         ...club,
         roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
         economy: {
           ...club.economy,
-          cash: club.economy.cash - SKILL_RESPEC_CASH_FEE,
+          cash: endingCash,
+          recentLedgerEntries: nextLedger,
         },
       };
-      set((state) => ({
-        leagues: updateHumanClubInLeagues(state.leagues, nextClub),
+      set((s) => ({
+        rosterActionNonce: s.rosterActionNonce + 1,
+        leagues: updateHumanClubInLeagues(s.leagues, nextClub),
+        ...(s.activeOffseason
+          ? {
+              activeOffseason: {
+                ...s.activeOffseason,
+                leagues: updateHumanClubInLeagues(s.activeOffseason.leagues, nextClub),
+              },
+            }
+          : {}),
       }));
       return { refundedSp: res.refundedSp };
     },
+
+    respecPlayerSkillTree: (playerId) => get().retrainPlayerSkills(playerId),
 
     signFreeAgent: (playerId) => {
       const club = get().getHumanClub();

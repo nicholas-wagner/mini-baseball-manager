@@ -24,6 +24,7 @@ export interface UserPreferences {
   hasCustomizedUniform: boolean;
   arcadeTimingEnabled: boolean;
   onePitchMode: boolean;
+  onePitchModeExplicit?: boolean;
 }
 
 const PREFS_STORAGE_KEY = 'mbm.user.prefs.v1';
@@ -42,7 +43,8 @@ const DEFAULT_PREFS: UserPreferences = {
   frontOfficeMode: 'auto',
   hasCustomizedUniform: false,
   arcadeTimingEnabled: false,
-  onePitchMode: false,
+  onePitchMode: true,
+  onePitchModeExplicit: false,
 };
 
 function parsePitchingMode(raw: unknown): PitchingMode {
@@ -60,14 +62,20 @@ function parseFrontOfficeMode(raw: unknown): FrontOfficeMode {
   return DEFAULT_PREFS.frontOfficeMode;
 }
 
-function readSavedPrefs(): UserPreferences {
+export function parseSavedUserPreferences(raw: string | null): UserPreferences {
+  if (!raw) return { ...DEFAULT_PREFS };
   try {
-    if (typeof window === 'undefined' || typeof window.localStorage?.getItem !== 'function') {
-      return { ...DEFAULT_PREFS };
-    }
-    const raw = window.localStorage.getItem(PREFS_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_PREFS };
     const parsed = JSON.parse(raw) as Partial<UserPreferences>;
+    const gameDayControlMode: GameDayControlMode =
+      parsed.gameDayControlMode === 'advanced' ? 'advanced' : DEFAULT_PREFS.gameDayControlMode;
+    const defaultOnePitchForMode = gameDayControlMode === 'simple';
+    const onePitchMode =
+      typeof parsed.onePitchMode === 'boolean' ? parsed.onePitchMode : defaultOnePitchForMode;
+    const onePitchModeExplicit =
+      typeof parsed.onePitchModeExplicit === 'boolean'
+        ? parsed.onePitchModeExplicit
+        : typeof parsed.onePitchMode === 'boolean' && parsed.onePitchMode !== defaultOnePitchForMode;
+
     return {
       sfxVolume:
         typeof parsed.sfxVolume === 'number' && Number.isFinite(parsed.sfxVolume)
@@ -79,15 +87,26 @@ function readSavedPrefs(): UserPreferences {
       colorblindStatSymbols: parsed.colorblindStatSymbols ?? DEFAULT_PREFS.colorblindStatSymbols,
       enableInjuries: parsed.enableInjuries ?? DEFAULT_PREFS.enableInjuries,
       enableIllnesses: parsed.enableIllnesses ?? DEFAULT_PREFS.enableIllnesses,
-      gameDayControlMode:
-        parsed.gameDayControlMode === 'advanced' ? 'advanced' : DEFAULT_PREFS.gameDayControlMode,
+      gameDayControlMode,
       pitchingMode: parsePitchingMode(parsed.pitchingMode),
       bullpenMode: parseBullpenMode(parsed.bullpenMode),
       frontOfficeMode: parseFrontOfficeMode(parsed.frontOfficeMode),
       hasCustomizedUniform: parsed.hasCustomizedUniform ?? DEFAULT_PREFS.hasCustomizedUniform,
       arcadeTimingEnabled: parsed.arcadeTimingEnabled ?? DEFAULT_PREFS.arcadeTimingEnabled,
-      onePitchMode: parsed.onePitchMode ?? DEFAULT_PREFS.onePitchMode,
+      onePitchMode,
+      onePitchModeExplicit,
     };
+  } catch {
+    return { ...DEFAULT_PREFS };
+  }
+}
+
+function readSavedPrefs(): UserPreferences {
+  try {
+    if (typeof window === 'undefined' || typeof window.localStorage?.getItem !== 'function') {
+      return { ...DEFAULT_PREFS };
+    }
+    return parseSavedUserPreferences(window.localStorage.getItem(PREFS_STORAGE_KEY));
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -157,6 +176,7 @@ function extractPrefs(state: UserPreferencesStore): UserPreferences {
     hasCustomizedUniform: state.hasCustomizedUniform,
     arcadeTimingEnabled: state.arcadeTimingEnabled,
     onePitchMode: state.onePitchMode,
+    onePitchModeExplicit: state.onePitchModeExplicit ?? false,
   };
 }
 
@@ -166,6 +186,14 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
     syncDomPreferences(next);
     writeSavedPrefs(next);
     set(next);
+  };
+
+  const applyControlMode = (mode: GameDayControlMode) => {
+    const patch: Partial<UserPreferences> = { gameDayControlMode: mode };
+    if (!get().onePitchModeExplicit) {
+      patch.onePitchMode = mode === 'simple';
+    }
+    applyPatch(patch);
   };
 
   return {
@@ -178,11 +206,9 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
       applyPatch({ colorblindStatSymbols: !get().colorblindStatSymbols }),
     toggleInjuries: () => applyPatch({ enableInjuries: !get().enableInjuries }),
     toggleIllnesses: () => applyPatch({ enableIllnesses: !get().enableIllnesses }),
-    setGameDayControlMode: (mode) => applyPatch({ gameDayControlMode: mode }),
+    setGameDayControlMode: (mode) => applyControlMode(mode),
     toggleGameDayControlMode: () =>
-      applyPatch({
-        gameDayControlMode: get().gameDayControlMode === 'simple' ? 'advanced' : 'simple',
-      }),
+      applyControlMode(get().gameDayControlMode === 'simple' ? 'advanced' : 'simple'),
     setPitchingMode: (mode) => applyPatch({ pitchingMode: mode }),
     cyclePitchingMode: () => {
       const cur = get().pitchingMode;
@@ -205,8 +231,9 @@ export const useUserPreferencesStore = create<UserPreferencesStore>((set, get) =
     markUniformCustomized: () => applyPatch({ hasCustomizedUniform: true }),
     setArcadeTimingEnabled: (enabled) => applyPatch({ arcadeTimingEnabled: enabled }),
     toggleArcadeTiming: () => applyPatch({ arcadeTimingEnabled: !get().arcadeTimingEnabled }),
-    setOnePitchMode: (enabled) => applyPatch({ onePitchMode: enabled }),
-    toggleOnePitchMode: () => applyPatch({ onePitchMode: !get().onePitchMode }),
+    setOnePitchMode: (enabled) => applyPatch({ onePitchMode: enabled, onePitchModeExplicit: true }),
+    toggleOnePitchMode: () =>
+      applyPatch({ onePitchMode: !get().onePitchMode, onePitchModeExplicit: true }),
     resetDefaults: () => applyPatch({ ...DEFAULT_PREFS }),
   };
 });

@@ -350,6 +350,7 @@ export interface Player {
   equippedPowerIds: string[];
   equippedRelicIds: string[];
   heritageTierUnlocked: 0 | 1 | 2 | 3;
+  careerRetrainsUsed?: number;
 
   // Live Status & Form
   marketTier: PlayerMarketTier;

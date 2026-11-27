@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Award, Check, Lock, RotateCcw, Sparkles, Star } from 'lucide-react';
+import { Award, Check, Lock, RotateCcw, Sparkles, Star, Undo2 } from 'lucide-react';
 import { FlagBadge } from '../../art/flags/FlagBadge';
 import { soundEngine } from '../../audio/soundEngine';
 import { sortPlayersForSkillTree } from '../../engine/gm/openingDayHook';
 import {
+  canUnlockManagerSkillNode,
+  getManagerBuildIdentity,
   MANAGER_SKILL_NODES,
-  unlockManagerSkillNode,
+  MANAGER_SKILL_SP_CAP,
 } from '../../engine/manager/managerTree';
 import {
   computePlayerOverall,
@@ -16,11 +18,16 @@ import {
   getHeritageBranch,
 } from '../../engine/rpg/heritageTrees';
 import {
+  canRetrainPlayerSkills,
   canUnlockSkillNode,
   getAvailableSkillBranches,
   getMaxEquippedPowerSlots,
   getNodesForBranch,
+  getPlayerBuildIdentity,
+  MAX_CAREER_RETRAINS_PER_PLAYER,
+  SKILL_NODES_BY_ID,
   SKILL_RESPEC_CASH_FEE,
+  type PlayerBuildTone,
   type SkillBranchId,
 } from '../../engine/rpg/skillTrees';
 import { unlockHumanManagerNode } from '../../store/clubHubActions';
@@ -35,22 +42,45 @@ const BRANCH_LABELS: Record<SkillBranchId, string> = {
   fielder: 'Defensive Craft Tree',
 };
 
+const BUILD_TONE_CLASSES: Record<PlayerBuildTone, string> = {
+  balanced: 'bg-[#E0FBFC] text-[#1D3557]',
+  power: 'bg-[#FFE5EC] text-[#9D0208]',
+  contact: 'bg-[#D8F3DC] text-[#1B4332]',
+  speed: 'bg-[#FFF3BF] text-[#7A4F01]',
+  heat: 'bg-[#FFE5EC] text-[#9D0208]',
+  spin: 'bg-[#F3E8FF] text-[#5B21B6]',
+  control: 'bg-[#E0F2FE] text-[#075985]',
+  glove: 'bg-[#D8F3DC] text-[#1B4332]',
+  two_way: 'bg-[#FFC300] text-[#181B2C]',
+};
+
+const MANAGER_TONE_CLASSES: Record<'skipper' | 'coach' | 'mogul' | 'balanced', string> = {
+  skipper: 'bg-[#FFE5EC] text-[#9D0208]',
+  coach: 'bg-[#D8F3DC] text-[#1B4332]',
+  mogul: 'bg-[#FFF3BF] text-[#7A4F01]',
+  balanced: 'bg-[#E0FBFC] text-[#1D3557]',
+};
+
 export function SkillTreeScreen() {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const manager = useGameStore((s) => s.manager);
+  const activeOffseason = useGameStore((s) => s.activeOffseason);
   const favoritePlayerIds = useGameStore((s) => s.favoritePlayerIds);
   const unlockPlayerSkill = useGameStore((s) => s.unlockPlayerSkill);
+  const undoPlayerSkillUnlock = useGameStore((s) => s.undoPlayerSkillUnlock);
   const unlockPlayerHeritageTier = useGameStore((s) => s.unlockPlayerHeritageTier);
   const togglePlayerSpecialPower = useGameStore((s) => s.togglePlayerSpecialPower);
-  const respecPlayerSkillTree = useGameStore((s) => s.respecPlayerSkillTree);
+  const retrainPlayerSkills = useGameStore((s) => s.retrainPlayerSkills);
 
   const [treeMode, setTreeMode] = useState<'players' | 'manager'>('players');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
   const [activeBranch, setActiveBranch] = useState<SkillBranchId | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [sessionUnlockedByPlayer, setSessionUnlockedByPlayer] = useState<Record<string, string[]>>({});
 
   if (!humanClub) return null;
 
+  const isOffseason = Boolean(activeOffseason);
   const totalPlayerSp = humanClub.roster.reduce((sum, p) => sum + p.skillPoints, 0);
   const managerSp = manager?.skillPoints ?? 0;
 
@@ -70,14 +100,50 @@ export function SkillTreeScreen() {
   const heritageBranch = getHeritageBranch(player.nationalityId);
   const nextHeritage = canUnlockNextHeritageTier(player);
   const maxPowerSlots = getMaxEquippedPowerSlots(player.level);
+  const buildIdentity = getPlayerBuildIdentity(player);
+  const budgetPct = Math.min(100, Math.round((buildIdentity.spentSp / Math.max(1, buildIdentity.maxSp)) * 100));
+  const sessionStack = (sessionUnlockedByPlayer[player.id] ?? []).filter((id) =>
+    player.unlockedSkillIds.includes(id),
+  );
+  const retrainCheck = canRetrainPlayerSkills(player, {
+    isOffseason,
+    clubCash: humanClub.economy.cash,
+  });
+  const retrainsUsed = player.careerRetrainsUsed ?? 0;
+
+  const managerIdentity = manager ? getManagerBuildIdentity(manager) : null;
+  const managerBudgetPct = managerIdentity
+    ? Math.min(100, Math.round((managerIdentity.spentSp / Math.max(1, managerIdentity.maxSp)) * 100))
+    : 0;
 
   const handleUnlockNode = (nodeId: string, nodeName: string) => {
     const res = unlockPlayerSkill(player.id, nodeId);
     if (res.unlocked) {
       soundEngine.play('level_up');
+      setSessionUnlockedByPlayer((prev) => ({
+        ...prev,
+        [player.id]: [...(prev[player.id] ?? []), nodeId],
+      }));
       setFeedback(`Unlocked ${nodeName} for ${player.name}!`);
     } else {
       setFeedback(res.reason ?? 'Unable to unlock skill node.');
+    }
+  };
+
+  const handleUndoLast = () => {
+    const lastNodeId = sessionStack[sessionStack.length - 1];
+    if (!lastNodeId) return;
+    const nodeName = SKILL_NODES_BY_ID[lastNodeId]?.name ?? lastNodeId;
+    const res = undoPlayerSkillUnlock(player.id, lastNodeId);
+    if (res.undone) {
+      soundEngine.play('ui_pop');
+      setSessionUnlockedByPlayer((prev) => ({
+        ...prev,
+        [player.id]: (prev[player.id] ?? []).slice(0, -1),
+      }));
+      setFeedback(`Undid ${nodeName} — refunded ${res.refundedSp} SP for free.`);
+    } else {
+      setFeedback(res.reason ?? 'Unable to undo skill node.');
     }
   };
 
@@ -103,13 +169,16 @@ export function SkillTreeScreen() {
     }
   };
 
-  const handleRespec = () => {
-    const res = respecPlayerSkillTree(player.id);
+  const handleRetrain = () => {
+    const res = retrainPlayerSkills(player.id);
     if (res.refundedSp > 0) {
       soundEngine.play('cash_chime');
-      setFeedback(`Respecced ${player.name}: refunded ${res.refundedSp} SP ($${SKILL_RESPEC_CASH_FEE}).`);
+      setSessionUnlockedByPlayer((prev) => ({ ...prev, [player.id]: [] }));
+      setFeedback(
+        `Retrained ${player.name}: refunded ${res.refundedSp} SP ($${SKILL_RESPEC_CASH_FEE.toLocaleString()}).`,
+      );
     } else {
-      setFeedback(res.reason ?? 'Nothing to respec.');
+      setFeedback(res.reason ?? 'Unable to retrain right now.');
     }
   };
 
@@ -117,7 +186,7 @@ export function SkillTreeScreen() {
     <div className="space-y-3">
       <div className="p-2 rounded-2xl border-2 border-[#181B2C] bg-[#FFF3BF] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 shadow-[3px_3px_0_#181B2C]">
         <div className="text-[10.5px] sm:text-xs font-extrabold text-[#181B2C] leading-tight">
-          ⚡ Spend <span className="underline">Skill Points (SP)</span> for Heritage &amp; Special Powers — base stats auto-level!
+          ⚡ Build real player &amp; manager identities — mix Tier 1–2 skills for balanced builds or lock in a Tier-3 Capstone!
         </div>
         <div className="grid grid-cols-2 sm:flex gap-1.5 shrink-0">
           <ComicButton
@@ -143,13 +212,39 @@ export function SkillTreeScreen() {
         </div>
       </div>
 
-      {treeMode === 'manager' && manager ? (
+      {treeMode === 'manager' && manager && managerIdentity ? (
         <ComicCard
           title={`MANAGER SKILL TREE — ${manager.name.toUpperCase()} (LV.${manager.level})`}
-          subtitle={`${manager.skillPoints} Manager SP Ready • Unlock Skipper Powers, Coaching Boosts & Mogul Bonuses`}
+          subtitle={`${manager.skillPoints} Manager SP Ready • Max ${MANAGER_SKILL_SP_CAP} / 15 SP & 1 Tier-4 Capstone — shape your GM identity`}
           headerBg="#7209B7"
         >
           <div data-testid="manager-skill-tree-panel" className="space-y-3">
+            <div className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div
+                  data-testid="manager-legacy-budget"
+                  className="font-display text-xs text-[#181B2C]"
+                >
+                  Manager Legacy Budget: {managerIdentity.spentSp} / {managerIdentity.maxSp} SP
+                </div>
+                <span
+                  data-testid="manager-build-identity"
+                  className={`px-2 py-0.5 rounded-lg border-2 border-[#181B2C] text-[11px] font-display ${MANAGER_TONE_CLASSES[managerIdentity.tone]}`}
+                >
+                  {managerIdentity.label}
+                </span>
+              </div>
+              <div className="h-2.5 w-full rounded-full border-2 border-[#181B2C] bg-[#EFECE4] overflow-hidden">
+                <div
+                  className="h-full bg-[#7209B7] transition-all"
+                  style={{ width: `${managerBudgetPct}%` }}
+                />
+              </div>
+              <p className="text-[10.5px] font-bold text-[#4A5068]">
+                Spread points across Tier 1–3 as a Balanced GM, or commit to 1 Tier-4 Capstone (Skipper Legend, Player-Dev Guru, or Cash Mogul).
+              </p>
+            </div>
+
             {feedback ? (
               <div
                 data-testid="skill-tree-feedback"
@@ -158,30 +253,42 @@ export function SkillTreeScreen() {
                 {feedback}
               </div>
             ) : null}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {MANAGER_SKILL_NODES.map((node) => {
                 const owned = manager.unlockedNodeIds.includes(node.id);
-                const check = unlockManagerSkillNode(manager, node.id);
+                const check = canUnlockManagerSkillNode(manager, node.id);
+                const isCapstone = node.spCost >= 2;
+                const isCapstoneLocked = !owned && isCapstone && Boolean(managerIdentity.capstoneId);
                 return (
                   <div
                     key={node.id}
                     className={`p-3 rounded-xl border-2 border-[#181B2C] flex flex-col justify-between gap-2 ${
-                      owned ? 'bg-[#D8F3DC]' : check.unlocked ? 'bg-[#FFF3BF]' : 'bg-[#FFFDF7]'
+                      owned ? 'bg-[#D8F3DC]' : check.allowed ? 'bg-[#FFF3BF]' : 'bg-[#FFFDF7]'
                     }`}
                   >
                     <div>
                       <div className="flex items-center justify-between gap-1 text-xs font-display text-[#181B2C]">
                         <span>{node.name}</span>
-                        <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] text-[10px] uppercase">
+                        <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] text-[10px] uppercase shrink-0">
                           {node.branch}
                         </span>
                       </div>
+                      {isCapstoneLocked ? (
+                        <span
+                          data-testid={`manager-capstone-locked-${node.id}`}
+                          className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md border border-[#181B2C] bg-[#FFE5EC] text-[#9D0208] text-[10px] font-extrabold"
+                        >
+                          🔒 Capstone Locked
+                        </span>
+                      ) : null}
                       <p className="text-[11px] font-bold text-[#4A5068] mt-1">{node.description}</p>
                     </div>
                     <ComicButton
                       size="sm"
-                      variant={owned ? 'turf' : check.unlocked ? 'gold' : 'cream'}
-                      disabled={owned || !check.unlocked}
+                      data-testid={`manager-node-btn-${node.id}`}
+                      variant={owned ? 'turf' : check.allowed ? 'gold' : 'cream'}
+                      disabled={owned || !check.allowed}
                       onClick={() => {
                         const res = unlockHumanManagerNode(node.id);
                         if (res.unlocked) {
@@ -192,7 +299,13 @@ export function SkillTreeScreen() {
                         }
                       }}
                     >
-                      {owned ? 'Unlocked ✓' : `Unlock (${node.spCost} SP)`}
+                      {owned
+                        ? 'Unlocked ✓'
+                        : check.allowed
+                          ? `Unlock (${node.spCost} SP)`
+                          : isCapstoneLocked
+                            ? '🔒 Capstone Locked'
+                            : check.reason ?? `Unlock (${node.spCost} SP)`}
                     </ComicButton>
                   </div>
                 );
@@ -203,7 +316,7 @@ export function SkillTreeScreen() {
       ) : (
       <ComicCard
         title="PLAYER SKILL TREES & HERITAGE MASTERY"
-        subtitle={`${humanClub.city} ${humanClub.name} • Cash $${humanClub.economy.cash.toLocaleString()} • Spend SP to evolve specialists & unlock scarce finishers`}
+        subtitle={`${humanClub.city} ${humanClub.name} • Cash $${humanClub.economy.cash.toLocaleString()} • Balanced Tier 1–2 across lanes OR 1 Tier-3 Capstone specialist`}
         headerBg="#1D3557"
       >
         <div className="space-y-2.5">
@@ -277,46 +390,99 @@ export function SkillTreeScreen() {
             </div>
           ) : null}
 
-          {/* Compact Selected Player Summary Bar */}
+          {/* Selected Player Summary + Career Talent Budget + Build Identity + Undo/Retrain */}
           <div
             data-testid="skill-tree-player-summary"
-            className="p-2 sm:p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-2"
+            className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2"
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <PlayerPortraitBadge
-                player={player}
-                primaryColor={humanClub.colors.primary}
-                accentColor={humanClub.colors.accent}
-                size="xs"
-                testId="skill-tree-player-portrait"
-              />
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <FlagBadge nationalityId={player.nationalityId} size="sm" />
-                  <span className="font-display text-xs sm:text-sm text-[#181B2C] truncate">
-                    {player.name} ({player.position})
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[10px]">
-                    {player.skillPoints} SP Available
-                  </span>
-                </div>
-                <div className="text-[10.5px] font-bold text-[#4A5068]">
-                  {SPECIALIST_LABELS[player.specialistArchetype]} • Powers:{' '}
-                  {player.equippedPowerIds.length}/{maxPowerSlots} • Heritage:{' '}
-                  {player.heritageTierUnlocked}/3
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <PlayerPortraitBadge
+                  player={player}
+                  primaryColor={humanClub.colors.primary}
+                  accentColor={humanClub.colors.accent}
+                  size="xs"
+                  testId="skill-tree-player-portrait"
+                />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <FlagBadge nationalityId={player.nationalityId} size="sm" />
+                    <span className="font-display text-xs sm:text-sm text-[#181B2C] truncate">
+                      {player.name} ({player.position})
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#181B2C] text-[#FFD166] font-display text-[10px]">
+                      {player.skillPoints} SP Available
+                    </span>
+                    <span
+                      data-testid="player-build-identity"
+                      className={`px-2 py-0.5 rounded-md border border-[#181B2C] font-display text-[10px] ${BUILD_TONE_CLASSES[buildIdentity.tone]}`}
+                    >
+                      {buildIdentity.shortTag} · {buildIdentity.label}
+                    </span>
+                  </div>
+                  <div className="text-[10.5px] font-bold text-[#4A5068]">
+                    {SPECIALIST_LABELS[player.specialistArchetype]} • Powers:{' '}
+                    {player.equippedPowerIds.length}/{maxPowerSlots} • Heritage:{' '}
+                    {player.heritageTierUnlocked}/3
+                  </div>
                 </div>
               </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {sessionStack.length > 0 ? (
+                  <ComicButton
+                    size="sm"
+                    variant="sky"
+                    data-testid="skill-tree-undo-btn"
+                    icon={<Undo2 className="w-3.5 h-3.5" />}
+                    onClick={handleUndoLast}
+                  >
+                    ↩ Undo Last
+                  </ComicButton>
+                ) : null}
+                {player.unlockedSkillIds.length > 0 ? (
+                  <ComicButton
+                    size="sm"
+                    variant="coral"
+                    data-testid="skill-tree-retrain-btn"
+                    icon={<RotateCcw className="w-3.5 h-3.5" />}
+                    disabled={!retrainCheck.allowed}
+                    title={retrainCheck.reason ?? 'Full Offseason skill retrain'}
+                    onClick={handleRetrain}
+                  >
+                    {retrainsUsed >= MAX_CAREER_RETRAINS_PER_PLAYER
+                      ? 'Retrain Used (1/1)'
+                      : `Offseason Retrain ($${SKILL_RESPEC_CASH_FEE.toLocaleString()} · 1/career)`}
+                  </ComicButton>
+                ) : null}
+              </div>
             </div>
-            {player.unlockedSkillIds.length > 0 ? (
-              <ComicButton
-                size="sm"
-                variant="coral"
-                icon={<RotateCcw className="w-3.5 h-3.5" />}
-                onClick={handleRespec}
-              >
-                Respec (${SKILL_RESPEC_CASH_FEE})
-              </ComicButton>
-            ) : null}
+
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[10.5px] font-extrabold text-[#181B2C]">
+                <span data-testid="career-talent-budget">
+                  Career Talent: {buildIdentity.spentSp} / {buildIdentity.maxSp} SP
+                  {buildIdentity.remainingBudgetSp === 0 ? ' (Cap Reached)' : ` (${buildIdentity.remainingBudgetSp} SP room)`}
+                </span>
+                {player.unlockedSkillIds.length > 0 && !retrainCheck.allowed && retrainCheck.reason ? (
+                  <span className="text-[10px] font-bold text-[#9D0208]">
+                    {retrainCheck.reason}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-[#4A5068]">
+                    Balanced = Tier 1–2 across lanes • Specialist = 1 Tier-3 Capstone
+                  </span>
+                )}
+              </div>
+              <div className="h-2 w-full rounded-full border border-[#181B2C] bg-[#EFECE4] overflow-hidden">
+                <div
+                  className={`h-full transition-all ${
+                    buildIdentity.remainingBudgetSp === 0 ? 'bg-[#E63946]' : 'bg-[#2FB356]'
+                  }`}
+                  style={{ width: `${budgetPct}%` }}
+                />
+              </div>
+            </div>
           </div>
 
           {/* 3-Tier Cultural Heritage Branch (TASK-020) */}
@@ -400,8 +566,8 @@ export function SkillTreeScreen() {
                 <div key={tier} className="space-y-1.5">
                   <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#4A5068]">
                     {tier === 3
-                      ? 'Tier 3 — Capstone Special Powers (Scarce Limited-Charge Finishers)'
-                      : `Tier ${tier} — Foundation & Specialist Upgrades`}
+                      ? 'Tier 3 — Capstone Specializations (1 lane max; All-Stars / Lv 12 unlock 1 Primary + 1 Fielder)'
+                      : `Tier ${tier} — Foundation & Balanced Upgrades`}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                     {tierNodes.map((node) => {
@@ -410,6 +576,11 @@ export function SkillTreeScreen() {
                       const isEquipped =
                         node.capstonePowerId !== undefined &&
                         player.equippedPowerIds.includes(node.capstonePowerId);
+                      const isSpecializedOut =
+                        !isUnlocked &&
+                        node.tier === 3 &&
+                        !check.allowed &&
+                        Boolean(check.reason && /specialized in|max \d+ tier-3 capstone/i.test(check.reason));
                       return (
                         <div
                           key={node.id}
@@ -430,6 +601,15 @@ export function SkillTreeScreen() {
                                 {node.spCost} SP
                               </span>
                             </div>
+                            {isSpecializedOut ? (
+                              <span
+                                data-testid={`capstone-locked-pill-${node.id}`}
+                                title={check.reason}
+                                className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md border border-[#181B2C] bg-[#FFE5EC] text-[#9D0208] text-[10px] font-extrabold"
+                              >
+                                🔒 Specialized
+                              </span>
+                            ) : null}
                             <p className="text-[11px] font-bold text-[#4A5068] mt-1">
                               {node.description}
                             </p>
@@ -458,7 +638,11 @@ export function SkillTreeScreen() {
                               disabled={!check.allowed}
                               onClick={() => handleUnlockNode(node.id, node.name)}
                             >
-                              {check.allowed ? `Unlock (${node.spCost} SP)` : check.reason ?? 'Locked'}
+                              {check.allowed
+                                ? `Unlock (${node.spCost} SP)`
+                                : isSpecializedOut
+                                  ? '🔒 Specialized'
+                                  : check.reason ?? 'Locked'}
                             </ComicButton>
                           )}
                         </div>

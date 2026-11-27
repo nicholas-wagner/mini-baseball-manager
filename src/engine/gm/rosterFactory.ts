@@ -421,6 +421,7 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     equippedPowerIds: [],
     equippedRelicIds: [],
     heritageTierUnlocked: 0,
+    careerRetrainsUsed: 0,
     marketTier,
     specialistArchetype,
     ...(pitcherRole ? { pitcherRole } : {}),

@@ -50,7 +50,7 @@ describe('3-Mode Pitching Controls (Simple Catcher+Shake-Off / Normal Location /
     const catcherCall = guide.getByTestId('guided-catcher-call');
     const firstSignText = catcherCall.textContent ?? '';
     expect(firstSignText).toMatch(/catcher/i);
-    expect(guide.getByRole('button', { name: /throw pitch/i })).toBeVisible();
+    expect(guide.getByRole('button', { name: /throw · 1-pitch|throw pitch/i })).toBeVisible();
     // Simple mode hides manual location & pitch buttons
     expect(guide.queryByRole('button', { name: /over plate/i })).toBeNull();
     expect(guide.queryByRole('button', { name: /low chase/i })).toBeNull();

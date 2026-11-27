@@ -2051,6 +2051,7 @@ export function GameDayScreen({
                         size="sm"
                         variant={onePitchMode ? 'gold' : 'cream'}
                         active={onePitchMode}
+                        title="1-Pitch At-Bats (Default in Simple Mode; Pro Manager defaults to Pitch-by-Pitch)"
                         onClick={() => {
                           toggleOnePitchMode();
                           soundEngine.play('ui_pop');

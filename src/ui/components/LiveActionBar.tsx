@@ -1052,6 +1052,7 @@ export function LiveActionBar({
               variant={onePitchMode ? 'gold' : 'cream'}
               data-testid="arcade-one-pitch-toggle"
               aria-pressed={onePitchMode}
+              title="1-Pitch At-Bats (Default in Simple Mode; Pro Manager defaults to Pitch-by-Pitch)"
               disabled={gameCompleted}
               onClick={onToggleOnePitchMode}
               className="shrink-0 sm:flex-1 px-2 text-[10.5px] sm:text-xs whitespace-nowrap min-h-[44px]"

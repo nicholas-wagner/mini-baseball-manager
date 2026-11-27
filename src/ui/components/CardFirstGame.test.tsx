@@ -36,10 +36,10 @@ it('hands the pictured Opening Day player to the manager and lets them inspect e
   const catcherCall = guide.queryByTestId('guided-catcher-call');
   if (catcherCall) {
     expect(catcherCall).toBeVisible();
-    expect(guide.getByRole('button', { name: 'Throw Pitch' })).toBeVisible();
+    expect(guide.getByRole('button', { name: /Throw · 1-Pitch|Throw Pitch/ })).toBeVisible();
   } else {
     fireEvent.click(guide.getByRole('button',{name:'Power'}));
-    expect(guide.getByRole('button',{name:'Swing'})).toBeVisible();
+    expect(guide.getByRole('button',{name:/^Swing/})).toBeVisible();
   }
   fireEvent.click(guide.getByRole('button',{name:'More controls'}));
   expect(screen.getByTestId('fast-sim-toggle')).toBeVisible();
@@ -61,7 +61,7 @@ it('replays the same first out and lets the manager hand the rally to the second
     fireEvent.click(screen.getByRole('button', {name: /Bat with Marcus/}));
     fireEvent.click(screen.getByRole('button', {name: 'Power'}));
     expect(screen.getByText('More power. Easier to miss.')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', {name: 'Swing'}));
+    fireEvent.click(screen.getByRole('button', {name: /^Swing/}));
     act(() => vi.advanceTimersByTime(30000));
     const result = () => within(screen.getByRole('region', {name: 'Play result'}));
     expect(result().getByRole('heading')).toHaveTextContent('Marcus Baker');
@@ -78,7 +78,7 @@ it('replays the same first out and lets the manager hand the rally to the second
     for (let pitches = 0; pitches < 50 && !screen.queryByRole('button', {name:'Change sides'}); pitches++) {
       const next = screen.queryByRole('button', {name:'Next batter'});
       if (next) fireEvent.click(next);
-      fireEvent.click(screen.getByRole('button', {name:'Swing'}));
+      fireEvent.click(screen.getByRole('button', {name:/^Swing/}));
       act(() => vi.advanceTimersByTime(30000));
     }
     const inventory = useFoilPackStore.getState().unopenedPacks;

@@ -32,7 +32,7 @@ it('returns from the dugout to the same batter, out, runners and swing selection
   vi.useFakeTimers();
   try {
     fireEvent.click(screen.getByRole('button',{name:'Power'}));
-    fireEvent.click(screen.getByRole('button',{name:'Swing'}));
+    fireEvent.click(screen.getByRole('button',{name:/^Swing/}));
     act(() => vi.advanceTimersByTime(30000));
     fireEvent.click(screen.getByRole('button',{name:'Next batter'}));
   } finally { vi.useRealTimers(); }

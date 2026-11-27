@@ -141,7 +141,7 @@ describe('TASK-099 live cockpit', () => {
       render(<GameDayScreen />);
       fireEvent.click(screen.getByRole('button', { name: /Bat with / }));
 
-      const swingBtn = screen.getByRole('button', { name: 'Swing' });
+      const swingBtn = screen.getByRole('button', { name: /^Swing/ });
       expect(swingBtn).not.toBeDisabled();
 
       // Clicking Swing locks immediately and a second click before play completion is ignored

@@ -255,7 +255,9 @@ export function FirstAtBat({
                     aria-pressed={onePitchMode}
                     onClick={onToggleOnePitchMode}
                   >
-                    {onePitchMode ? "⚡ 1-Pitch Mode: ON" : "⚡ 1-Pitch Mode: OFF"}
+                    {onePitchMode
+                      ? "⚡ 1-Pitch Mode: ON (Default in Simple)"
+                      : "⚡ 1-Pitch Mode: OFF (Pitch-by-Pitch)"}
                   </button>
                 )}
                 {!batting &&

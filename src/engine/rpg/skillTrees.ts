@@ -1,12 +1,54 @@
 import {
   isPitcherPosition,
   type Player,
+  type PlayerMarketTier,
   type PlayerRatings,
 } from '../models/player';
 import { evolveSpecialistArchetype } from './specialistsAndPositions';
 import { enforceRatingBudget } from './trainingCompromises';
 
 export type SkillBranchId = 'pitcher' | 'batter' | 'fielder';
+
+export type PlayerBuildTone =
+  | 'balanced'
+  | 'power'
+  | 'contact'
+  | 'speed'
+  | 'heat'
+  | 'spin'
+  | 'control'
+  | 'glove'
+  | 'two_way';
+
+export interface PlayerCapstoneLimits {
+  total: number;
+  maxPrimary: number;
+  maxFielder: number;
+}
+
+export interface PlayerCapstoneSummary {
+  primaryCapstoneNodeId: string | null;
+  fielderCapstoneNodeId: string | null;
+  totalCapstones: number;
+}
+
+export interface PlayerBuildIdentity {
+  label: string;
+  shortTag: string;
+  tone: PlayerBuildTone;
+  spentSp: number;
+  maxSp: number;
+  remainingBudgetSp: number;
+  primaryCapstoneName: string | null;
+  fielderCapstoneName: string | null;
+}
+
+export interface SkillUndoResult {
+  undone: boolean;
+  refundedSp: number;
+  reason?: string;
+  player: Player;
+}
 
 export type SkillRatingKey = keyof Pick<
   PlayerRatings,
@@ -72,7 +114,32 @@ export interface SkillTreeCombatBonuses {
   equippedCapstoneNames: string[];
 }
 
-export const SKILL_RESPEC_CASH_FEE = 250;
+export const SKILL_RESPEC_CASH_FEE = 2_000;
+export const MAX_CAREER_RETRAINS_PER_PLAYER = 1;
+
+const MARKET_TIER_SP_CAPS: Readonly<Record<PlayerMarketTier, number>> = {
+  all_star: 18,
+  rookie: 14,
+  above_average: 14,
+  average: 12,
+  veteran: 12,
+  below_average: 12,
+};
+
+const BREAKOUT_AWARD_PATTERN = /all[- ]?star|mvp|most valuable|cy young|golden arm/i;
+
+const PRIMARY_CAPSTONE_IDENTITIES: Readonly<
+  Record<string, { label: string; shortTag: string; tone: PlayerBuildTone }>
+> = {
+  cap_moonshot_bomb: { label: 'Power Specialist', shortTag: '💣 Power', tone: 'power' },
+  cap_rally_spark: { label: 'Contact Maestro', shortTag: '🎯 Contact', tone: 'contact' },
+  cap_laser_eye: { label: 'Contact Maestro', shortTag: '👁️ Contact', tone: 'contact' },
+  cap_ninja_bunt: { label: 'Speed Demon', shortTag: '⚡ Speed', tone: 'speed' },
+  cap_blazing_comet: { label: 'Flamethrower Ace', shortTag: '🔥 Heat', tone: 'heat' },
+  cap_ghost_knuckle: { label: 'Spin Wizard', shortTag: '🌀 Spin', tone: 'spin' },
+  cap_tornado_slider: { label: 'Spin Wizard', shortTag: '🌀 Spin', tone: 'spin' },
+  cap_ice_veins: { label: 'Command Artist', shortTag: '🧊 Command', tone: 'control' },
+};
 
 export const SKILL_TREE_NODES: readonly SkillTreeNode[] = [
   // PITCHER BRANCH (11 nodes across 3 lanes)
@@ -468,6 +535,149 @@ export function getNodesForBranch(branch: SkillBranchId): readonly SkillTreeNode
   return SKILL_TREE_NODES.filter((node) => node.branch === branch);
 }
 
+/** Returns total SP spent across a player's unlocked skill tree nodes. */
+export function getPlayerSpentSkillPoints(player: Pick<Player, 'unlockedSkillIds'>): number {
+  let spent = 0;
+  for (const id of new Set(player.unlockedSkillIds)) {
+    spent += SKILL_NODES_BY_ID[id]?.spCost ?? 0;
+  }
+  return spent;
+}
+
+function hasBreakoutCareerAward(awards: readonly string[] | undefined): boolean {
+  if (!awards || awards.length === 0) return false;
+  return awards.some((award) => BREAKOUT_AWARD_PATTERN.test(award));
+}
+
+/** Returns career SP budget cap by marketTier, promoting Lv 12+ or major-award breakouts to 18 SP. */
+export function getPlayerSkillBudgetCap(
+  player: Pick<Player, 'marketTier' | 'level' | 'awards' | 'careerService'>,
+): number {
+  if (player.marketTier === 'all_star') return 18;
+  if (player.level >= 12 || hasBreakoutCareerAward(player.awards)) return 18;
+  return MARKET_TIER_SP_CAPS[player.marketTier] ?? 12;
+}
+
+/** Returns Tier-3 capstone specialization limits for a player (2 for All-Star/Lv12+ legends, 1 otherwise). */
+export function getMaxPlayerCapstones(
+  player: Pick<Player, 'marketTier' | 'level' | 'awards' | 'careerService'>,
+): PlayerCapstoneLimits {
+  const cap = getPlayerSkillBudgetCap(player);
+  return cap >= 18
+    ? { total: 2, maxPrimary: 1, maxFielder: 1 }
+    : { total: 1, maxPrimary: 1, maxFielder: 1 };
+}
+
+/** Summarizes unlocked Tier-3 capstones across primary (batter/pitcher) and fielder branches. */
+export function getPlayerCapstoneSummary(
+  player: Pick<Player, 'unlockedSkillIds'>,
+): PlayerCapstoneSummary {
+  let primaryCapstoneNodeId: string | null = null;
+  let fielderCapstoneNodeId: string | null = null;
+  let totalCapstones = 0;
+
+  for (const id of new Set(player.unlockedSkillIds)) {
+    const node = SKILL_NODES_BY_ID[id];
+    if (!node || node.tier !== 3) continue;
+    totalCapstones += 1;
+    if (node.branch === 'fielder') {
+      fielderCapstoneNodeId ??= node.id;
+    } else {
+      primaryCapstoneNodeId ??= node.id;
+    }
+  }
+
+  return { primaryCapstoneNodeId, fielderCapstoneNodeId, totalCapstones };
+}
+
+function resolveIdentityMeta(
+  spentSp: number,
+  capstones: PlayerCapstoneSummary,
+): { label: string; shortTag: string; tone: PlayerBuildTone } {
+  if (spentSp === 0) {
+    return { label: 'Developing Prospect', shortTag: '🌱 Prospect', tone: 'balanced' };
+  }
+  if (capstones.primaryCapstoneNodeId && capstones.fielderCapstoneNodeId) {
+    return { label: 'Two-Way All-Star', shortTag: '⭐ Two-Way', tone: 'two_way' };
+  }
+  if (capstones.primaryCapstoneNodeId) {
+    return (
+      PRIMARY_CAPSTONE_IDENTITIES[capstones.primaryCapstoneNodeId] ?? {
+        label: 'Role Specialist',
+        shortTag: '★ Specialist',
+        tone: 'balanced',
+      }
+    );
+  }
+  if (capstones.fielderCapstoneNodeId) {
+    return { label: 'Defensive Anchor', shortTag: '🧤 Glove', tone: 'glove' };
+  }
+  if (spentSp >= 6) {
+    return { label: 'Balanced All-Around', shortTag: '⚖️ Balanced', tone: 'balanced' };
+  }
+  return { label: 'Rising Contributor', shortTag: '📈 Rising', tone: 'balanced' };
+}
+
+/** Computes a player's RPG Build Identity badge, SP budget usage, and active capstones. */
+export function getPlayerBuildIdentity(
+  player: Pick<Player, 'unlockedSkillIds' | 'marketTier' | 'level' | 'awards' | 'careerService'>,
+): PlayerBuildIdentity {
+  const spentSp = getPlayerSpentSkillPoints(player);
+  const maxSp = getPlayerSkillBudgetCap(player);
+  const capstones = getPlayerCapstoneSummary(player);
+  const meta = resolveIdentityMeta(spentSp, capstones);
+  const primaryCapstoneName = capstones.primaryCapstoneNodeId
+    ? (SKILL_NODES_BY_ID[capstones.primaryCapstoneNodeId]?.name ?? null)
+    : null;
+  const fielderCapstoneName = capstones.fielderCapstoneNodeId
+    ? (SKILL_NODES_BY_ID[capstones.fielderCapstoneNodeId]?.name ?? null)
+    : null;
+
+  return {
+    ...meta,
+    spentSp,
+    maxSp,
+    remainingBudgetSp: Math.max(0, maxSp - spentSp),
+    primaryCapstoneName,
+    fielderCapstoneName,
+  };
+}
+
+function checkCapstoneEligibility(player: Player, node: SkillTreeNode): SkillUnlockEligibility | null {
+  if (node.tier !== 3) return null;
+  const summary = getPlayerCapstoneSummary(player);
+  const limits = getMaxPlayerCapstones(player);
+  const existingSameBranchId =
+    node.branch === 'fielder' ? summary.fielderCapstoneNodeId : summary.primaryCapstoneNodeId;
+
+  if (existingSameBranchId) {
+    const existingName = SKILL_NODES_BY_ID[existingSameBranchId]?.name ?? existingSameBranchId;
+    return {
+      allowed: false,
+      reason: `Specialized in ${existingName} — other ${node.branch} Tier-3 capstones are locked.`,
+    };
+  }
+  if (summary.totalCapstones >= limits.total) {
+    return {
+      allowed: false,
+      reason: `Max ${limits.total} Tier-3 Capstone reached (reach All-Star / Lv 12 to unlock a 2nd specialization).`,
+    };
+  }
+  return null;
+}
+
+function checkBudgetEligibility(player: Player, node: SkillTreeNode): SkillUnlockEligibility | null {
+  const spentSp = getPlayerSpentSkillPoints(player);
+  const maxSp = getPlayerSkillBudgetCap(player);
+  if (spentSp + node.spCost > maxSp) {
+    return {
+      allowed: false,
+      reason: `Career Talent cap reached (${spentSp}/${maxSp} SP — need ${node.spCost} SP room).`,
+    };
+  }
+  return null;
+}
+
 /** Validates whether a player can unlock a given skill tree node right now. */
 export function canUnlockSkillNode(player: Player, nodeId: string): SkillUnlockEligibility {
   const node = SKILL_NODES_BY_ID[nodeId];
@@ -480,6 +690,11 @@ export function canUnlockSkillNode(player: Player, nodeId: string): SkillUnlockE
   if (player.unlockedSkillIds.includes(nodeId)) {
     return { allowed: false, reason: 'Skill already unlocked.' };
   }
+  const capstoneBlock = checkCapstoneEligibility(player, node);
+  if (capstoneBlock) return capstoneBlock;
+  const budgetBlock = checkBudgetEligibility(player, node);
+  if (budgetBlock) return budgetBlock;
+
   const missingReq = node.prerequisiteIds.find((req) => !player.unlockedSkillIds.includes(req));
   if (missingReq) {
     const reqName = SKILL_NODES_BY_ID[missingReq]?.name ?? missingReq;
@@ -577,8 +792,73 @@ export function toggleEquippedSpecialPower(player: Player, powerId: string): Pow
   };
 }
 
+/** Checks whether a player can perform their rare Offseason Career Retrain ($2,000, 1/career). */
+export function canRetrainPlayerSkills(
+  player: Pick<Player, 'unlockedSkillIds' | 'careerRetrainsUsed'>,
+  context: { isOffseason: boolean; clubCash: number },
+): SkillUnlockEligibility {
+  if (player.unlockedSkillIds.length === 0) {
+    return { allowed: false, reason: 'No skill tree nodes to retrain.' };
+  }
+  if (!context.isOffseason) {
+    return { allowed: false, reason: 'Offseason Retrain is only available during the Offseason.' };
+  }
+  if ((player.careerRetrainsUsed ?? 0) >= MAX_CAREER_RETRAINS_PER_PLAYER) {
+    return { allowed: false, reason: 'Career retrain already used (1 per player).' };
+  }
+  if (context.clubCash < SKILL_RESPEC_CASH_FEE) {
+    return { allowed: false, reason: `Need $${SKILL_RESPEC_CASH_FEE.toLocaleString()} cash to retrain.` };
+  }
+  return { allowed: true };
+}
+
+/** Free instant undo for a node unlocked during the current Skill Tree screen visit. */
+export function undoSessionSkillNode(player: Player, nodeId: string): SkillUndoResult {
+  const node = SKILL_NODES_BY_ID[nodeId];
+  if (!node || !player.unlockedSkillIds.includes(nodeId)) {
+    return { undone: false, refundedSp: 0, reason: 'Skill node is not currently unlocked.', player };
+  }
+  const dependentId = player.unlockedSkillIds.find((otherId) =>
+    SKILL_NODES_BY_ID[otherId]?.prerequisiteIds.includes(nodeId),
+  );
+  if (dependentId) {
+    const depName = SKILL_NODES_BY_ID[dependentId]?.name ?? dependentId;
+    return {
+      undone: false,
+      refundedSp: 0,
+      reason: `Undo ${depName} first before undoing ${node.name}.`,
+      player,
+    };
+  }
+
+  const nextRatings = applyStatBonusesWithinCaps(player.ratings, player.statCaps, node.statBonuses, -1);
+  const nextEquipped = node.capstonePowerId
+    ? player.equippedPowerIds.filter((id) => id !== node.capstonePowerId)
+    : player.equippedPowerIds;
+
+  return {
+    undone: true,
+    refundedSp: node.spCost,
+    player: {
+      ...player,
+      skillPoints: player.skillPoints + node.spCost,
+      unlockedSkillIds: player.unlockedSkillIds.filter((id) => id !== nodeId),
+      equippedPowerIds: nextEquipped,
+      ratings: nextRatings,
+      specialistArchetype: evolveSpecialistArchetype({
+        position: player.position,
+        specialistArchetype: player.specialistArchetype,
+        ratings: nextRatings,
+      }),
+    },
+  };
+}
+
 /** Refunds all SP spent in the role skill tree and removes unlocked tree node bonuses/capstones. */
-export function respecPlayerSkills(player: Player): SkillRespecResult {
+export function respecPlayerSkills(
+  player: Player,
+  options?: { markCareerRetrain?: boolean },
+): SkillRespecResult {
   let refundedSp = 0;
   let nextRatings = { ...player.ratings };
   const removedPowerIds = new Set<string>();
@@ -591,6 +871,10 @@ export function respecPlayerSkills(player: Player): SkillRespecResult {
     if (node.capstonePowerId) removedPowerIds.add(node.capstonePowerId);
   }
 
+  const nextRetrains = options?.markCareerRetrain
+    ? (player.careerRetrainsUsed ?? 0) + 1
+    : player.careerRetrainsUsed;
+
   return {
     refundedSp,
     player: {
@@ -599,6 +883,7 @@ export function respecPlayerSkills(player: Player): SkillRespecResult {
       unlockedSkillIds: [],
       equippedPowerIds: player.equippedPowerIds.filter((id) => !removedPowerIds.has(id)),
       ratings: nextRatings,
+      ...(nextRetrains !== undefined ? { careerRetrainsUsed: nextRetrains } : {}),
     },
   };
 }

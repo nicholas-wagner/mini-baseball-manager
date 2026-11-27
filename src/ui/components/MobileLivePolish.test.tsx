@@ -299,9 +299,12 @@ describe('Mobile Live Polish, 1-Tap Steal UX, Auto-Dismiss Tactics Sheet & 2-Str
   });
 
   it('exposes 1-Pitch At-Bat Mode toggles in Guided Options, LiveActionBar Tactics, and SettingsModal with primary button cues and deciding-pitch resolution (TASK-111)', () => {
-    // 1. SettingsModal toggle persists onePitchMode
+    // 1. SettingsModal toggle defaults ON in Simple Mode and persists explicit changes
     const settingsView = render(<SettingsModal open onClose={vi.fn()} />);
     const settingsToggle = screen.getByTestId('settings-one-pitch-toggle');
+    expect(settingsToggle).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(settingsToggle);
+    expect(useUserPreferencesStore.getState().onePitchMode).toBe(false);
     expect(settingsToggle).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(settingsToggle);
     expect(useUserPreferencesStore.getState().onePitchMode).toBe(true);
