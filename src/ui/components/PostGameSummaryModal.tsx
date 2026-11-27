@@ -345,7 +345,7 @@ export function PostGameSummaryModal({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`min-h-[44px] px-2 py-1.5 rounded-xl border-2 border-[#181B2C] font-display text-[11px] sm:text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer ${
+                  className={`min-h-[44px] px-1 sm:px-2 py-1.5 rounded-xl border-2 border-[#181B2C] font-heading font-extrabold text-[11px] sm:text-xs tracking-tight flex items-center justify-center gap-1 transition-colors cursor-pointer ${
                     selected
                       ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
                       : 'bg-[#FFFDF7] text-[#4A5068] hover:bg-[#FFF3BF]'

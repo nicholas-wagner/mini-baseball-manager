@@ -447,7 +447,7 @@
   letter-spacing: 0.01em;
   color: #4a5068;
 }
-.live-sheet-root { position: fixed; inset: 0; z-index: 70; }
+.live-sheet-root { position: fixed; inset: 0; z-index: 40; }
 .live-sheet-backdrop {
   position: absolute;
   inset: 0;
@@ -495,9 +495,11 @@
 .live-sheet-handle button {
   min-height: 44px;
   min-width: 44px;
+  padding: 0 12px;
   border-radius: 8px;
   border: 2px solid #181b2c;
   background: #ffcc49;
+  color: #181b2c;
   font-weight: 800;
   cursor: pointer;
 }
@@ -507,8 +509,8 @@
   .live-game.studio-layout {
     display: flex;
     flex-direction: column;
-    height: 100dvh;
-    max-height: 100dvh;
+    height: calc(100dvh - max(6px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - max(6px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
     overflow: hidden;
   }
   .live-game .live-studio { display: contents; }
@@ -540,12 +542,14 @@
 }
 
 @media (orientation: landscape) and (max-height: 540px) and (max-width: 1024px) {
+  .atbat-guide:not(.is-expanded) header > span { display: none; }
+  .atbat-header-actions { width: 100%; justify-content: space-between; gap: 4px; }
   .live-game.studio-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(256px, 38vw);
     grid-template-rows: auto minmax(0, 1fr);
-    height: 100dvh;
-    max-height: 100dvh;
+    height: calc(100dvh - max(6px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - max(6px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
     overflow: hidden;
   }
   .live-game .live-score-row {
@@ -595,13 +599,14 @@
 @media (min-width: 1024px) {
   .live-game.studio-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
     grid-template-rows: minmax(0, 1fr);
     height: calc(100dvh - 44px);
     overflow: hidden;
     gap: 8px;
     align-items: stretch;
   }
+  .live-game .dugout-launch { display: none; }
   .live-game .live-studio { display: contents; }
   .live-game .live-stage {
     grid-column: 1;

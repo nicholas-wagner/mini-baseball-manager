@@ -130,6 +130,7 @@ interface LiveActionBarProps {
   onInspectPlayers?: () => void;
   onOpenBoxScore?: () => void;
   density?: 'full' | 'dock';
+  defaultTacticsOpen?: boolean;
   onOpenTactics?: () => void;
 }
 
@@ -223,10 +224,11 @@ export function LiveActionBar({
   onInspectPlayers,
   onOpenBoxScore,
   density = 'full',
+  defaultTacticsOpen = false,
   onOpenTactics,
 }: LiveActionBarProps) {
   const [bullpenOpen, setBullpenOpen] = useState(false);
-  const [tacticsOpen, setTacticsOpen] = useState(false);
+  const [tacticsOpen, setTacticsOpen] = useState(defaultTacticsOpen);
   const tacticsId = useId();
   const [fastSimOpen, setFastSimOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
@@ -461,9 +463,9 @@ export function LiveActionBar({
     >
       {/* Row 1: Unified Single-Row Arcade Call Bar + 3-Mode Pitching Controls + Slim Hype Bar */}
       <div data-testid="live-calls-block" className="space-y-1.5">
-        <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <div className="flex flex-col gap-1.5">
           {controlMode === 'simple' ? (
-            <div className="space-y-1 flex-1 min-w-0 w-full">
+            <div className="space-y-1 min-w-0 w-full">
               {!isBatting && onSelectPitchingMode ? (
                 <div
                   data-testid="pitching-mode-switcher"
@@ -502,11 +504,8 @@ export function LiveActionBar({
               {isBatting ? (
                 <div
                   data-testid="arcade-call-bar"
-                  className="grid grid-cols-4 sm:flex sm:flex-wrap items-center gap-1"
+                  className="grid grid-cols-4 items-center gap-1"
                 >
-                  <span className="hidden sm:inline font-display text-[10px] uppercase text-[#193D37] mr-0.5">
-                    Swing:
-                  </span>
                   {SIMPLE_BAT_APPROACHES.map((opt) => (
                     <button
                       key={opt.id}
@@ -572,11 +571,8 @@ export function LiveActionBar({
                 <div
                   data-testid="arcade-call-bar"
                   data-pitching-cols="3"
-                  className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1"
+                  className="grid grid-cols-3 items-center gap-1"
                 >
-                  <span className="hidden sm:inline font-display text-[10px] uppercase text-[#193D37] mr-0.5">
-                    Spot:
-                  </span>
                   {SIMPLE_PITCH_CALLS.map((opt) => (
                     <button
                       key={opt.id}
@@ -699,11 +695,11 @@ export function LiveActionBar({
           {/* High-Contrast ⚡ Special Power Hype Meter */}
           <div
             data-testid="arcade-hype-bar"
-            className={`flex items-center justify-between gap-1.5 w-full sm:w-auto sm:ml-auto px-2 py-1 rounded-xl border-2 border-[#192735] ${
+            className={`flex items-center justify-between gap-1.5 w-full px-2 py-1 rounded-xl border-2 border-[#192735] ${
               readyPowerLabel && onArmReadyPower ? 'bg-[#FFF3BF]' : 'bg-[#FFFDF8]'
             }`}
           >
-            <div className="flex items-center gap-1.5 min-w-0 flex-1 sm:flex-none sm:min-w-[132px]">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <span className="text-[10px] font-extrabold uppercase text-[#193D37] shrink-0">
                 ⚡ Hype
               </span>

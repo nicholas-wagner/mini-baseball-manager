@@ -139,8 +139,8 @@ export function ScoreboardStrip({
           <span aria-hidden="true">{expanded ? '▴' : '▾'}</span>
         </span>
       </button>}
-      {showFullBlock && <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full">
-      <div className="bg-[#122D21] border-2 border-[#0B1E16] rounded-xl px-1.5 sm:px-2 py-0.5 sm:py-1 min-w-[136px] sm:min-w-[215px]">
+      {showFullBlock && <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 w-full">
+      <div className="bg-[#122D21] border-2 border-[#0B1E16] rounded-xl px-1.5 sm:px-2 py-0.5 sm:py-1 min-w-[136px] sm:min-w-[170px]">
         <div className="hidden sm:grid grid-cols-[1fr_24px_24px_24px] gap-x-1 text-[9px] font-extrabold uppercase tracking-wider text-[#89C2A5] border-b border-[#245842] pb-0.5">
           <span>TEAM</span>
           <span className="text-center text-[#FFC300]">R</span>
@@ -182,7 +182,7 @@ export function ScoreboardStrip({
       </div>
 
       {/* Inning + Base Diamond + B/S/O Count Lamps + Numeric Count */}
-      {!guidedCollapsible && <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+      {!guidedCollapsible && <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 min-w-0">
         <div className="px-1.5 sm:px-2.5 py-1 rounded-xl bg-[#122D21] border-2 border-[#0B1E16] font-mono-tabular text-[11px] sm:text-sm font-extrabold text-[#FFD166] whitespace-nowrap">
           {half === 'TOP' ? '▲' : '▼'} {inning}
         </div>

@@ -3089,7 +3089,10 @@ export function GameDayScreen({
               onSimAtBat={handleSimAtBat}
               onSimHalfInning={handleSimHalfInning}
               onClutchSim={handleClutchSim}
-              onSimToEnd={handleSimToEnd}
+              onSimToEnd={() => {
+                setSheetOpen(false);
+                handleSimToEnd();
+              }}
               onSelectTacticalCall={(call) => {
                 setTacticalCall(call);
                 soundEngine.play('ui_pop');
@@ -3129,11 +3132,16 @@ export function GameDayScreen({
 
           <LiveBottomSheet
             presentation={sheetOpen || !wideStudio ? 'sheet' : 'inline'}
-            open={sheetOpen || (wideStudio && showFullHud)}
+            open={
+              liveSession.status !== 'completed' &&
+              !modalSummary &&
+              (sheetOpen || (wideStudio && showFullHud))
+            }
             title="Tactics"
             onClose={closeTactics}
           >
             {showFullHud && (sheetOpen || !wideStudio) && <LiveActionBar
+              defaultTacticsOpen={sheetOpen}
               watchSettings={<WatchSettings open={watchMode === 'smart'} side={{...humanClub,lineup:[...liveSession[humanSideKey].lineup]}} value={watchChoice} onChange={v=>{lastStop.current=null; setWatchChoice(v)}}/>}
               catcherSuggestion={acceptSign}
               cue={liveCue}
@@ -3237,7 +3245,10 @@ export function GameDayScreen({
               onSimAtBat={handleSimAtBat}
               onSimHalfInning={handleSimHalfInning}
               onClutchSim={handleClutchSim}
-              onSimToEnd={handleSimToEnd}
+              onSimToEnd={() => {
+                setSheetOpen(false);
+                handleSimToEnd();
+              }}
               onSelectTacticalCall={(call) => {
                 setTacticalCall(call);
                 soundEngine.play('ui_pop');
