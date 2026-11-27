@@ -113,7 +113,7 @@ describe('Event Choreographer & Diamond Coordinates (TASK-016)', () => {
 it('keeps the bat on the shoulder for a called third strike and swings through a swinging third strike', () => {
   const looking = choreographPlayEvent(buildEvent({ outcome: 'strikeout', soundCue: 'ump_strike_call' }), 1);
   const chasing = choreographPlayEvent(buildEvent({ outcome: 'strikeout', soundCue: 'strikeout_punch' }), 1);
-  expect(looking.batterClip).toBe('bat_stance');
+  expect(looking.batterClip).toBe('bat_take');
   expect(looking.close?.kind).toBe('called_third');
   expect(chasing.close?.kind).toBe('swinging_third');
 });
@@ -144,4 +144,10 @@ it('choreographs a bunt pop-up as a bat_bunt pop-up caught by the catcher or pit
   expect(step.play?.buntAttempt).toBe(true);
   expect(step.play?.pickup).toBe('C');
   expect(step.play?.legs[1].kind).toBe('pop');
+});
+
+it('carries a recorded swing into the standalone stolen-base cue', () => {
+  const event = buildEvent({type:'stolen_base_attempt',outcome:'swinging_strike',basesAfter:[null,'runner',null]});
+  const cue = choreographPlayEvent(event,1,['runner',null,null]);
+  expect(cue.batterClip).toBe('bat_swing');
 });

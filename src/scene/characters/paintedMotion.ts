@@ -26,6 +26,7 @@ export function paintedMotion(
     squash = wave * 0.015,
     tilt = wave * 0.02,
     shift = 0;
+  let barrelAngle = .98 + .05 * wave, gripChoke = 0, stanceWidth = 0, bodyTurn = 0;
   let held = false;
   let pitchPhase = 0, headTurn = 0, nod = 0, glovePat = 0;
   if (role === 'pitcher') {
@@ -64,7 +65,8 @@ export function paintedMotion(
     tilt = 0.065 * load - 0.055 * drive;
     squash = 0.025 + 0.035 * load - 0.025 * drive;
     if (swings) {
-      const finish = clamp((phase - .58) / .29);
+      barrelAngle = (cel === 0 ? .98 : .47) + .04 * wave;
+      const finish = clamp((phase - .58) / .20) - .5 * clamp((phase-.78)/.22);
       lean += .085 * finish;
       shift += .095 * finish;
       tilt -= .12 * finish;
@@ -72,10 +74,57 @@ export function paintedMotion(
     if (clip === 'bat_power_set') {
       const load = clamp(seconds / .32);
       cel = Number(load > .45);
-      lean = -.13 * load;
-      shift = -.14 * load;
-      squash = .085 * load;
-      tilt = .1 * load;
+      lean -= .13 * load;
+      shift -= .14 * load;
+      squash += (.060 + .014 * wave) * load;
+      tilt += .10 * load;
+      stanceWidth = .65 * load;
+      barrelAngle = .98 - .67 * load + .075 * wave;
+    }
+    if (clip === 'bat_contact_set') {
+      const choke = clamp(seconds/.28);
+      shift += .025 * choke;
+      squash += (.07 + .014 * wave) * choke;
+      lean += .038 * choke;
+      gripChoke = .17 * choke;
+      barrelAngle -= .13 * choke;
+    }
+    if (clip === 'bat_take') {
+      const check = pulse(seconds,0,.34);
+      shift -= .075 * check;
+      lean -= .095 * check;
+      barrelAngle -= .30 * check;
+      tilt += .11 * check;
+    }
+    if (clip === 'bat_recover') {
+      const recoil = clamp(seconds/CLIP_DURATIONS.bat_recover);
+      cel = recoil < .35 ? 2 : recoil < .65 ? 1 : 0;
+      lean += .043 * (1-recoil);
+      shift += .048 * (1-recoil);
+      tilt -= .06 * (1-recoil);
+      barrelAngle = .98 - .58*(1-recoil);
+    }
+    if (clip === 'bat_slump') {
+      const drop = clamp(seconds/.48);
+      cel = 0;
+      squash += .14 * drop;
+      tilt -= .28 * drop;
+      nod = .27 * drop;
+      lean += .09 * drop;
+      barrelAngle += 1.58 * drop;
+    }
+    if (clip === 'bat_square' || clip === 'bat_bunt' || clip === 'bat_bunt_tap' || clip === 'bat_bunt_pullback') {
+      const square = clip === 'bat_bunt_pullback' ? 1-clamp(seconds/CLIP_DURATIONS.bat_bunt_pullback)
+        : clip === 'bat_square' ? clamp(seconds/CLIP_DURATIONS.bat_square)
+        : clip === 'bat_bunt' ? clamp(seconds/.22) : 1;
+      const cushion = clip === 'bat_bunt_tap' ? pulse(seconds,0,.14) : 0;
+      bodyTurn = .27 * square;
+      stanceWidth = .22 * square;
+      cel = square >= .60 ? 3 : 0;
+      shift += .075 * square - .055 * cushion;
+      lean += .06 * square - .065 * cushion;
+      squash += (.07 + .012 * wave) * square;
+      barrelAngle += 1.28 * square;
     }
     if (clip === 'bat_bomb') {
       lean -= .10 * load;
@@ -135,5 +184,5 @@ export function paintedMotion(
     expression = 2;
     hop = 0.17 * Math.abs(Math.sin(phase * 2 * Math.PI));
   }
-  return { cel, expression, hop, lean, squash, tilt, shift, held, pitchPhase, headTurn, nod, glovePat };
+  return { cel, expression, hop, lean, squash, tilt, shift, held, pitchPhase, headTurn, nod, glovePat, barrelAngle, gripChoke, stanceWidth, bodyTurn };
 }

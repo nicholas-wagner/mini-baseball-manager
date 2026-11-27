@@ -34,9 +34,9 @@ import {
   type CameraPose,
   type CameraPresetId,
 } from '../camera/cameraRig';
-import { CLIP_DURATIONS, type CharacterAnimClip } from '../characters/animationState';
+import { CLIP_DURATIONS, PITCH_RELEASE_PHASE, type CharacterAnimClip } from '../characters/animationState';
 import { createPaintedPlayerRig, type PaintedPlayerRig } from '../characters/paintedPlayer';
-import { createBallparkVfxSystem } from '../vfx/vfxSystem';
+import { createBallparkVfxSystem, inSwingArcWindow } from '../vfx/vfxSystem';
 import {
   BASE_PATH_VERTICES,
   DIAMOND_DEFENDER_COORDS,
@@ -108,10 +108,11 @@ export class GameSceneController {
   private throws: ThrowsHand = 'R';
   private preview: AtBatPreview | null = null;
   private previewStart = 0;
+  private queuedStance?: ReturnType<typeof rehearsalPose>;
   private shakeOffStart = -Infinity;
 
   public triggerPitcherShakeOff() {
-    if (!this.replay && !this.pitch) this.shakeOffStart = this.elapsedSec;
+    this.shakeOffStart = this.elapsedSec;
   }
   private entrance: PlayerEntranceCue | null = null;
   private entranceTime = 0;
@@ -154,7 +155,13 @@ export class GameSceneController {
     }
   }
   public setPreview(intent: AtBatPreview | null) {
+    this.setIdlePreview(intent);
+  }
+
+  public setIdlePreview(intent: AtBatPreview | null) {
     if (intent === this.preview) return;
+    this.queuedStance = !intent && isSwingPreview(this.preview)
+      ? rehearsalPose(this.preview,this.elapsedSec-this.previewStart,this.steadyCamera) : undefined;
     if (this.preview && !isSwingPreview(this.preview) && intent === null) this.queuedTarget = this.preview;
     if (intent) this.queuedTarget = null;
     this.preview = intent;
@@ -223,6 +230,7 @@ export class GameSceneController {
       batterBox('R').yaw,
     );
     this.batterRig.root.position.copy(batterBox('R').position);
+    this.batterRig.root.name = 'batter';
     this.scene.add(this.batterRig.root);
 
     this.runnerRigs = [1, 2, 3].map((baseIdx) => {
@@ -316,7 +324,11 @@ export class GameSceneController {
     this.pitcherRitual = pitcher.personality === 'showboat' || pitcher.traits.seed % 3 === 0 ? 'pitch_salute' : 'pitch_gather';
     this.bats = effectiveBat;
     this.throws = pitcher.throws;
+    const battingPreview = isSwingPreview(this.preview)
+      ? rehearsalPose(this.preview,this.elapsedSec-this.previewStart,this.steadyCamera) : this.queuedStance;
+    this.queuedStance = undefined;
     this.batterRig.updateAppearance({
+      battingPreview: choreo ? battingPreview : undefined,
       traits: batter.traits,
       team: battingTeam,
       jerseyNumber: batter.jerseyNumber,
@@ -413,7 +425,7 @@ export class GameSceneController {
       const reliefStrikeout = pitcher.position === 'RP' && event?.outcome === 'strikeout'
         && (event.isClutchMoment || (event.leverageIndex ?? 0) >= 1.3 || Boolean(choreo.basesBefore?.some(Boolean)));
       const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
-      this.replay = { freezeAt:choreo.freezeAt, play: { ...play, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon },
+      this.replay = { freezeAt:choreo.freezeAt, play: { ...play, battingPreview, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon },
         cheer: crowdReaction(play), readout: playReadout(event), cast: { C: at('C'), P: at('P'), SS: at('SS'), '1B': at('1B'), '2B': at('2B'),
         '3B': at('3B'), LF: at('LF'), CF: at('CF'), RF: at('RF'),
         BAT: this.batterRig, RUN: this.runnerRigs[play.scorerBase ? play.scorerBase-1 : play.runnerToThird ? play.runnerToThird-1 : play.close?.steal ? play.close.fromBase - 1 : play.kind === 'sac_fly' ? 2 : 0] },
@@ -441,6 +453,16 @@ export class GameSceneController {
 
       if (event?.type === 'pitch_thrown' && choreo.ballStyle) {
         const play = createDelivery(choreo.ballStyle, this.throws, this.bats, choreo.pitcherClip, choreo.batterClip);
+        // The Design Lab showcase defaults to a full windup. Match standalone live
+        // cues to the same occupied-base clock as a complete diamond replay.
+        if (choreo.pitcherClip === 'pitch_stretch') {
+          const release = CLIP_DURATIONS.pitch_stretch * PITCH_RELEASE_PHASE;
+          const advance = play.releaseAt - release;
+          play.pitcherClip = 'pitch_stretch';
+          play.releaseAt = release;
+          play.swingAt -= advance;
+          play.plateAt -= advance;
+        }
         this.pitch = { play, start: this.elapsedSec,
           rate: (play.plateAt + .42) * 1000 / choreo.durationMs, initialized: false, callout: choreo.callout ?? { text: play.pitch.calloutText, color: play.pitch.trailColor } };
         this.cameraPose = getCameraPresetPose(this.cameraPreset, this.elapsedSec, 0, this.throws, this.bats);
@@ -505,6 +527,10 @@ export class GameSceneController {
       Math.max(0, catchTime), undefined, this.camera.position, receive >= 0 && receive < .33);
     const swing = time - play.swingAt;
     const active = swing >= 0 && swing < CLIP_DURATIONS[this.batterClip];
+    const fullSwing = this.batterClip === 'bat_swing' || this.batterClip === 'bat_bomb';
+    const barrel = fullSwing && !this.vfx.reducedMotion && inSwingArcWindow(receive)
+      ? this.batterRig.contactAt(this.batterClip,play.plateAt-play.swingAt,this.batterRig.root.position,this.camera.position) : null;
+    this.vfx.drawSwingArc(barrel,this.bats,receive);
     this.batterRig.updatePose(active ? this.batterClip : 'bat_stance', active ? swing : 0, undefined, this.camera.position);
     const flight = sampleDeliveryFlight(play,time);
     if (flight && receive < 0) {

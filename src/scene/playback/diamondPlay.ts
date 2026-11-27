@@ -1,3 +1,4 @@
+import { plateBatterPose, type BattingPreviewPose } from './firstAtBatPresentation';
 import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
 import { pitchSeconds, shapePitch, type PitchFlight } from './pitchFlight';
 import { reactionCamera, reactionPose, bullpenPlay } from './teamReactions';
@@ -41,6 +42,7 @@ export function isBuntEvent(event?: PlayEvent): boolean {
 export interface DiamondPlay {
   kind: DiamondPlayKind;
   fromStretch?: boolean;
+  battingPreview?: BattingPreviewPose;
   legs: Leg[];
   pickup: Actor;
   fieldAt: Vec3;
@@ -75,7 +77,7 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
   const plate = release + (pitchInfo ? pitchSeconds(pitchInfo.mph) : .56);
   const pitch: Leg = {from:'P', to:'BAT', start:release, end:plate, kind:'pitch', pitch:pitchInfo};
   const buntAttempt = kind === 'bunt_out' || kind === 'bunt_single' || isBuntEvent(event);
-  if (isCloseKind(kind)) return { ...buildClosePlay(kind, pitch, stealBase, buntAttempt), fromStretch };
+  if (isCloseKind(kind)) return { ...buildClosePlay(kind, pitch, stealBase, buntAttempt, event?.outcome), fromStretch };
   if (isOutfieldKind(kind)) return { ...buildOutfieldPlay(kind, pitch, event), fromStretch };
   const pop = kind === 'pop_up';
   const bunt = kind === 'bunt_out' || kind === 'bunt_single';
@@ -282,14 +284,7 @@ function baseActorAt(play: DiamondPlay, actor: Actor, time: number, bats: Effect
     const arrival = lead ? play.leadArrival : play.batterArrival;
     const go = plate + (lead ? 0.04 : 0.20);
     if (!lead && time < go) {
-      const swing: CharacterAnimClip = (play.kind === 'bunt_out' || play.kind === 'bunt_single' || play.buntAttempt) ? 'bat_bunt' : play.kind === 'home_run' ? 'bat_bomb' : 'bat_swing';
-      local = time - plate + CLIP_DURATIONS[swing] * 0.45;
-      if (time > plate && swing !== 'bat_bunt') {
-        local = CLIP_DURATIONS[swing] * (.45 + .53 * progress(time,plate,go));
-      }
-      clip = local < 0 ? 'bat_stance' : swing;
-      pos = start;
-      yaw = box.yaw;
+      return { pos:start, yaw:box.yaw, ...plateBatterPose(play,time) };
     } else {
       if (!lead && (play.kind === 'bunt_single' || play.kind === 'fielding_error')) {
         return runBases(start,0,1,time,go,arrival);

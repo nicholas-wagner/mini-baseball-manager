@@ -1,4 +1,5 @@
 import { sacrificeAdvances } from '../../engine/simulation/sacrificeAdvances';
+import { plateBatterPose } from './firstAtBatPresentation';
 import { finishPlay } from './teamReactions';
 import { closeKindFor, stealFrom } from './plateAndSteals';
 import { BASE_PATH_VERTICES, CATCHER_HOME, OUTFIELD_STARTS, PITCHING_RUBBER } from './diamondLayout';
@@ -275,7 +276,7 @@ export function choreographPlayEvent(
       play:close, close, basesBefore,
       cameraPreset: 'broadcast_diamond',
       pitcherClip: deliveryClip(fromStretch),
-      batterClip: 'bat_stance',
+      batterClip: close ? plateBatterPose(close,close.legs[0].end).clip : 'bat_stance',
       fielderClip: stoleBase ? 'field_run' : 'field_dive',
       highlightFielderPos: 'C',
       ballStyle: null,
@@ -329,15 +330,7 @@ export function choreographPlayEvent(
         ? 'over_shoulder_batter'
         : preset.cameraPreset,
       pitcherClip: timed || fromStretch ? deliveryClip(fromStretch) : preset.pitcherClip,
-      batterClip: close
-        ? close.kind === 'swinging_third' || close.kind === 'foul_back' || close.kind === 'missed_pitch'
-          ? isBunt
-            ? 'bat_bunt'
-            : 'bat_swing'
-          : 'bat_stance'
-        : isBunt
-          ? 'bat_bunt'
-          : preset.batterClip,
+      batterClip: close ? plateBatterPose(close,close.legs[0].end).clip : isBunt ? 'bat_bunt' : preset.batterClip,
       fielderClip: event.fieldingHighlight?.anim ?? preset.fielderClip,
       highlightFielderPos: event.fieldingHighlight?.fielderPos,
       ballStyle: event.ballFlight?.style ?? preset.ballStyle,

@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
+import { CLIP_DURATIONS, PITCH_RELEASE_PHASE } from '../characters/animationState';
+import { BALL_TRAJECTORY_PRESETS } from '../vfx/ballTrajectory';
 import { GameSceneController } from './gameSceneController';
 import { generateSixTierWorld } from '../../engine/league/seasonEngine';
 import { createGameSession } from '../../engine/simulation/baseballEngine';
@@ -211,5 +213,90 @@ it('sets from the stretch before a pitch, checks the runner and shakes off then 
     frame(3.4);
     expect(head.rotation.x).toBe(0);
     expect(body.material.uniforms.sheet.value).toBe(stretch);
+  } finally { game.dispose(); }
+});
+
+it('carries the squared preview into the live bunt without reloading the bat', () => {
+  const {game,frame} = mount();
+  try {
+    game.syncMatchup(away,home,session);
+    game.setIdlePreview('bunt');
+    const scene = frame(.67);
+    const body = scene.getObjectByName('batter')!.getObjectByName('painted uniform') as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>;
+    expect(body.material.uniforms.cell.value.x).toBe(3);
+    const bunt = {...event, type:'ball_in_play' as const, outcome:'bunt_single' as const};
+    game.setPreview(null);
+    game.syncMatchup(away,home,session,choreographPlayEvent(bunt,1),bunt);
+    frame(.68);
+    expect(body.material.uniforms.cell.value.x).toBe(3);
+  } finally { game.dispose(); }
+});
+
+it.each(['foul','swinging_strike','strikeout','home_run','ball','called_strike','bunt_single'] as const)(
+  'shows the handed swing ribbon only through a full swing on %s', outcome => {
+    const {game,frame} = mount();
+    const action: PlayEvent = {...event,outcome,type:outcome==='home_run'||outcome==='bunt_single'?'ball_in_play':'pitch_thrown'};
+    const step = choreographPlayEvent(action,1), plate = step.play!.legs[0].end;
+    try {
+      game.syncMatchup(away,home,session,step,action);
+      const arc = frame(plate+.03).getObjectByName('swing arc')!;
+      expect(arc.visible).toBe(['foul','swinging_strike','strikeout','home_run'].includes(outcome));
+      game.setCameraOverride(null,true);
+      frame(plate+.04);
+      expect(arc.visible).toBe(false);
+      game.setCameraOverride(null,false);
+      frame(plate+.40);
+      expect(arc.visible).toBe(false);
+    } finally { game.dispose(); }
+  });
+
+it.each(['bunt_out','bunt_single'] as const)('drops the squared bat horizontally at the hitter’s hands on a %s', outcome => {
+  const { game, frame } = mount();
+  const action: PlayEvent = {...event, outcome, type:'ball_in_play'};
+  const step = choreographPlayEvent(action,1);
+  const play = step.play!, scale = step.durationMs / (play.duration*1000);
+  try {
+    game.syncMatchup(away,home,session,step,action);
+    const drop = play.legs[0].end+.2;
+    const scene = frame((drop+.10)*scale);
+    const bat = scene.getObjectsByProperty('name','bat barrel').find(node => node.visible && node.parent?.parent === scene)!;
+    expect(bat).toBeDefined();
+    const along = new THREE.Vector3(0,1,0).applyQuaternion(bat.quaternion);
+    expect(Math.abs(along.y)).toBeLessThan(.24);
+    expect(bat.position.y).toBeGreaterThan(.25);
+    frame((drop+.75)*scale);
+    expect(bat.position.y).toBeLessThan(.15);
+  } finally { game.dispose(); }
+});
+
+it('times the slide-step and barrel smear together for a standalone pitch cue', () => {
+  const {game,frame} = mount();
+  const action: PlayEvent={...event,outcome:'swinging_strike'};
+  const {durationMs,...step}=choreographPlayEvent(action,1,['runner',null,null]);
+  const solo = {...step,play:undefined,close:undefined,ballStyle:'fastball' as const,durationMs};
+  const release = CLIP_DURATIONS.pitch_stretch * PITCH_RELEASE_PHASE;
+  const plate = release + BALL_TRAJECTORY_PRESETS.fastball.durationSec;
+  const scale = solo.durationMs/1000/(plate+.42);
+  try {
+    game.syncMatchup(away,home,session,solo,action);
+    const scene = frame((plate+.025)*scale);
+    expect(scene.getObjectByName('swing arc')!.visible).toBe(true);
+    frame((plate+.24)*scale);
+    expect(scene.getObjectByName('swing arc')!.visible).toBe(false);
+  } finally { game.dispose(); }
+});
+
+it('keeps the mound and batter breathing while the manager reads a completed pitch', () => {
+  const {game,frame} = mount();
+  const step = choreographPlayEvent(event,1);
+  try {
+    game.syncMatchup(away,home,session,step,event);
+    const end = step.durationMs/1000;
+    const scene = frame(end+.1);
+    const height = (role: string) => scene.getObjectByName(role)!.getObjectByName('painted head')!.getWorldPosition(new THREE.Vector3()).y;
+    const pitcher = height('pitcher'), batter = height('batter');
+    frame(end+.67);
+    expect(Math.abs(height('pitcher')-pitcher)).toBeGreaterThan(.001);
+    expect(Math.abs(height('batter')-batter)).toBeGreaterThan(.001);
   } finally { game.dispose(); }
 });

@@ -1,3 +1,4 @@
+import type { EffectiveBatSide } from '../../engine/handedness/types';
 import { createStadiumCelebration } from './stadiumCelebration';
 import { createBaseUmpire } from './baseUmpire';
 import { createPaintedBat } from '../characters/paintedBat';
@@ -21,6 +22,7 @@ export interface BallparkVfxSystem {
   reducedMotion: boolean;
   setReducedMotion: (reduced: boolean) => void;
   droppedBat: THREE.Mesh;
+  drawSwingArc: (barrel: Vec3 | null, side: EffectiveBatSide, sincePlate: number) => void;
   umpire: ReturnType<typeof createBaseUmpire>;
   setCalloutsVisible: (visible: boolean) => void;
   launchBall: (style: BallVfxStyle, callout?: { text: string; color?: string }) => { cameraShake: number };
@@ -75,12 +77,51 @@ function createComicCalloutTexture(text: string, bgColor: string): THREE.CanvasT
   return tex;
 }
 
+// The outer edge crosses the registered barrel at the midpoint of its sweep.
+export const inSwingArcWindow = (sincePlate: number) => sincePlate > -.09 && sincePlate < .15;
+const arcSegments = 28;
+function createSwingArc() {
+  const vertices: number[] = [], triangles: number[] = [];
+  for (let i = 0; i <= arcSegments; i++) {
+    const u = i/arcSegments, angle = (u-.5)*2.3;
+    const width = .015 + .105*Math.sin(Math.PI*u);
+    for (const radius of [.93-width,.93]) {
+      vertices.push(radius*Math.cos(angle)-.93, .22*Math.sin(angle), -radius*Math.sin(angle));
+    }
+    if (i > 0) {
+      const a = 2*i-2;
+      triangles.push(a,a+1,a+2,a+1,a+3,a+2);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices,3));
+  geometry.setIndex(triangles);
+  const arc = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    color: '#ffe3a2', side: THREE.DoubleSide, transparent:true, depthWrite:false,
+  }));
+  arc.name = 'swing arc';
+  arc.visible = false;
+  return arc;
+}
+
 export function createBallparkVfxSystem(): BallparkVfxSystem {
   const group = new THREE.Group();
 
   const celebration = createStadiumCelebration();
   let reducedMotion = false;
   group.add(celebration.group);
+  const arc = createSwingArc();
+  group.add(arc);
+  const drawSwingArc: BallparkVfxSystem['drawSwingArc'] = (barrel,side,sincePlate) => {
+    arc.visible = Boolean(barrel && !reducedMotion && inSwingArcWindow(sincePlate));
+    if (!arc.visible || !barrel) return;
+    const head = Math.min(arcSegments,Math.ceil((sincePlate+.09)/.18*arcSegments));
+    const tail = Math.max(0,Math.floor((sincePlate+.01)/.18*arcSegments));
+    arc.geometry.setDrawRange(tail*6,(head-tail)*6);
+    arc.material.opacity = .72*(1-THREE.MathUtils.smoothstep(sincePlate,.055,.15));
+    arc.position.copy(barrel);
+    arc.scale.x = side === 'R' ? 1 : -1;
+  };
   const ball = createBallFlightVisual();
   const umpire=createBaseUmpire();
   group.add(umpire.sprite);
@@ -236,6 +277,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
   const clear = () => {
     celebration.clear();
     immediate = null;
+    arc.visible = false;
     umpire.sprite.visible=false;
     dust.visible = false;
     bat.barrel.visible = false;
@@ -250,6 +292,8 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
 
   const dispose = () => {
     clear();
+    arc.geometry.dispose();
+    arc.material.dispose();
     celebration.dispose();
     ball.dispose();
     bat.dispose();
@@ -263,7 +307,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     captions = visible;
     for (const item of callouts) item.sprite.visible = visible;
   };
-  return { group, celebration, get reducedMotion() { return reducedMotion; },
-    setReducedMotion(value) { reducedMotion=value; celebration.setReducedMotion(value); },
+  return { group, celebration, drawSwingArc, get reducedMotion() { return reducedMotion; },
+    setReducedMotion(value) { reducedMotion=value; if (value) arc.visible=false; celebration.setReducedMotion(value); },
     umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, kickChalk, clear, spawnComicCallout, update, dispose };
 }

@@ -18,6 +18,12 @@ export type CharacterAnimClip =
   | 'bat_stance'
   | 'bat_swing'
   | 'bat_bunt'
+  | 'bat_recover'
+  | 'bat_take'
+  | 'bat_slump'
+  | 'bat_square'
+  | 'bat_bunt_tap'
+  | 'bat_bunt_pullback'
   | 'bat_bomb'
   | 'catch_receive'
   | 'field_ready'
@@ -68,6 +74,12 @@ export const CLIP_DURATIONS: Record<CharacterAnimClip, number> = {
   bat_swing: 0.95,
   bat_bunt: 0.9,
   bat_bomb: 1.55,
+  bat_recover: .30,
+  bat_take: .34,
+  bat_slump: .55,
+  bat_square: .22,
+  bat_bunt_tap: .14,
+  bat_bunt_pullback: .29,
   field_ready: 1.6,
   catch_receive: 0.42,
   field_scoop: 0.7,

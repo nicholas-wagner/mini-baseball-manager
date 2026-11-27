@@ -14,6 +14,10 @@ import { acquirePaint, paintedMaterial, releasePaint, setInks } from './paintedM
 import { paintedMotion } from './paintedMotion';
 import { createFaceDetails } from './paintedDetails';
 
+// Knob of the horizontal bunt bat in each painted view (x/y in the 256px cel).
+const buntKnob = {
+  pants: [[61,157], [62,161]], shorts: [[84,157], [92,157]], skirt: [[66,154], [64,145]],
+} as const;
 const runnerRow = { pants: 0, shorts: 4, skirt: 8 };
 
 export interface PaintedPlayerOptions {
@@ -28,6 +32,7 @@ export interface PaintedPlayerOptions {
   quietInfielder?: boolean;
   quietPitcher?: boolean;
   checkedBase?: number;
+  battingPreview?: { clip: CharacterAnimClip; time: number };
 }
 
 export interface PaintedPlayerRig {
@@ -200,7 +205,9 @@ export function createPaintedPlayerRig(
     const running = (role === 'runner' || role === 'batter') && (clip === 'field_run' || clip === 'runner_glance');
     const sliding = clip === 'runner_slide' || clip === 'slide_safe';
     const tagging = clip === 'field_tag' && role !== 'catcher';
-    const popping = clip === 'catch_throw' || clip === 'catch_point' || clip==='catch_handoff';
+    const throwing = clip === 'catch_throw';
+    const uprightThrow = throwing && time >= .10 && time < .52;
+    const popping = uprightThrow || clip === 'catch_point' || clip==='catch_handoff';
     const basePlayPose = sliding || tagging || popping;
     const tapping = clip === 'glove_tap';
     const brim = clip === 'helmet_tip' && time > .28 && time < 1.08;
@@ -224,6 +231,15 @@ export function createPaintedPlayerRig(
     const homeTag = clip === 'field_tag' && role === 'catcher';
     const heldCatch = homeTag || clip === 'catch_frame';
     const frame = paintedMotion(motionRole, heldCatch ? 'catch_receive' : clip === 'runner_glance' ? 'field_run' : clip, heldCatch ? .22 : time);
+    // Carry the held stance into the first few frames of the action, including the barrel and grip.
+    if (opt.battingPreview && role === 'batter' && (clip === 'bat_swing' || clip === 'bat_bomb' || clip === 'bat_take' || clip === 'bat_square') && time < .18) {
+      const u = THREE.MathUtils.smoothstep(time,0,.18);
+      const from = paintedMotion('batter',opt.battingPreview.clip,opt.battingPreview.time);
+      for (const k of ['lean','shift','squash','tilt','stanceWidth','gripChoke','barrelAngle','bodyTurn'] as const) {
+        frame[k] = THREE.MathUtils.lerp(from[k],frame[k],u);
+      }
+      if (u < .5) frame.cel = from.cel;
+    }
     if (clip === 'catch_frame') {
       frame.tilt += .035 * Math.sin(Math.PI * Math.min(1, time / .32));
     }
@@ -285,6 +301,7 @@ export function createPaintedPlayerRig(
       frame.squash = tagging ? -.09*gather : 0;
       frame.shift = 0;
     }
+    if (throwing && !uprightThrow) frame.cel = 5;
     const style = motionRole==='runner' && role==='batter' && sliding ? paintedSheets(a,'runner',rear) : rear ? back : front;
     const view = rear ? 'rear' : 'front';
     const receiving = clip === 'field_receive' || clip === 'field_pop';
@@ -332,6 +349,15 @@ export function createPaintedPlayerRig(
       : leading ? 'runners' : (clip === 'field_throw' || (role === 'pitcher' && !pitching)) ? (rear ? `rear-${a.bottoms}` as const : a.bottoms) : pitchSheet;
     const registration = bodySheet==='welcome' ? (brim ? [126,92,99,138] : tapping || clip === 'rail_lean' ? [126,92,235,113] : [126,92,40,54]) : anchors[bodySheet][frame.cel];
     const [nx,ny,contactX,contactY]=registration;
+    if (throwing) {
+      // Keep the neck on a continuous rise-and-fall curve across the crouch and throw paintings.
+      const reach = THREE.MathUtils.smoothstep(time,0,.27) * (1-THREE.MathUtils.smoothstep(time,.33,.60));
+      const target = anchors[style.body][5];
+      const chinHeight = (neckY: number) => (249-neckY-8)*.0057 + 72*.00455;
+      frame.squash = 1-(chinHeight(target[1])*.982 + .16*reach)/chinHeight(ny);
+      frame.lean = .05 * reach;
+      frame.tilt = -.07 * reach;
+    }
     const emotion = mood
       ? mood === 'happy'
         ? 0
@@ -348,7 +374,7 @@ export function createPaintedPlayerRig(
     headMat.uniforms.sheet.value = sheet(headSheet);
     const rows = basePlayPose ? 6 : 3;
     bodyMat.uniforms.rows.value = rows;
-    bodyMat.uniforms.stanceWidth.value = clip === 'bat_power_set' ? .65 * Math.min(1, time / .32) : 0;
+    bodyMat.uniforms.stanceWidth.value = frame.stanceWidth;
     bodyMat.uniforms.cell.value.set(frame.cel % 4, rows-1-Math.floor(frame.cel/4));
     headMat.uniforms.cell.value.set(faceCell % 4, 2 - Math.floor(faceCell / 4));
     headMat.uniforms.maskHelmet.value = Number(role === 'catcher');
@@ -359,10 +385,7 @@ export function createPaintedPlayerRig(
     const unit = role === 'pitcher' || plantedRunner || clip === 'field_throw' ? 0.0047 : 0.0057;
     bat.barrel.visible = role === 'batter' && !running && !leading && !sliding && (frame.cel < 2 || brim);
     if (bat.barrel.visible) {
-      bat.place(frame.cel, rear, contactX, contactY, unit, width, time);
-      // Keep the loaded barrel clear of the helmet silhouette in either batter's box.
-      if (clip === 'bat_power_set') bat.barrel.rotation.z = (rear ? -1 : 1) * 1.38;
-      if (clip === 'bat_contact_set') bat.barrel.translateY(-.17 * Math.min(1, time / .32));
+      bat.place(rear, contactX, contactY, unit, width, frame.barrelAngle, frame.gripChoke);
       if (brim) bat.barrel.rotation.z = (rear ? -1 : 1) * 2.29;
     }
     const headUnit = 0.00455 * (a.headShape === 'chubby' ? 1.05 : 1);
@@ -372,6 +395,7 @@ export function createPaintedPlayerRig(
     shadow.position.x = billboard.position.x * .6;
     shadow.position.z = billboard.position.z * .6;
     actor.position.x = actorFlip * rotationSign * frame.shift;
+    actor.rotation.y = actorFlip * rotationSign * frame.bodyTurn;
     actor.rotation.z = actorFlip * rotationSign * frame.lean - (running ? .10 * acrossScreen : 0);
     actor.scale.set(actorFlip * height * (1 + frame.squash * 0.45), height * (1 - frame.squash), 1);
     // At contact the illustrated barrel reaches across the plate in either camera.
@@ -384,7 +408,7 @@ export function createPaintedPlayerRig(
     }
     if (!brim && role==='batter' && frame.cel>=2 && !running && !leading) {
       // Hands painted into the swing and bunt cels, measured wrist-to-wrist.
-      const grip = frame.cel===3 ? [128,139] : a.bottoms==='pants' ? [146,rear?126:137] :
+      const grip = frame.cel===3 ? buntKnob[a.bottoms][Number(rear)] : a.bottoms==='pants' ? [146,rear?126:137] :
         a.bottoms==='shorts' ? [143,rear?129:130] : [140,rear?122:122];
       swungGrip.position.set(swingMirror*(grip[0]-128)*unit*width,(249-grip[1])*unit,.04);
     }
@@ -482,10 +506,12 @@ export function createPaintedPlayerRig(
         handX = pocket[2]+(contactX-pocket[2])*u;
         handY = pocket[3]+(contactY-pocket[3])*u;
       }
-      if (clip==='catch_throw' && time<.30) {
-        const u=Math.max(0,time/.30);
-        handX=172+(handX-172)*u;
-        handY=121+(handY-121)*u;
+      if (uprightThrow && time<.30) {
+        const u=THREE.MathUtils.smoothstep(time,.10,.30);
+        const pocket = anchors[style.body][5];
+        const startX = rear ? 256-pocket[2] : pocket[2];
+        handX=startX+(handX-startX)*u;
+        handY=pocket[3]+(handY-pocket[3])*u;
       }
       ball.position.set(swingMirror*(handX-128)*unit*width,(249-handY)*unit+lift,rear ? -.045 : .075);
     }

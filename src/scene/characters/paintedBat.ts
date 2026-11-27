@@ -19,12 +19,12 @@ export function createPaintedBat() {
   const outline = new THREE.Mesh(wood, edge);
   outline.scale.set(1.15,1.006,1.15);
   barrel.add(outline);
-  function place(cel: number, rear: boolean, gripX: number, gripY: number, unit: number, width: number, time: number) {
+  function place(rear: boolean, gripX: number, gripY: number, unit: number, width: number, angle: number, choke: number) {
     barrel.position.set((gripX-128)*unit*width,(249-gripY)*unit,0.027);
     const outward = rear ? 1 : -1;
-    const angle = (cel === 0 ? .98 : .47) + .035 * Math.sin(time * 4);
     barrel.rotation.z = -outward * angle;
     barrel.rotation.x = -.15;
+    barrel.translateY(-choke);
   }
   return { barrel, place, dispose() { wood.dispose(); paint.dispose(); edge.dispose(); } };
 }
