@@ -23,6 +23,7 @@ import batch2026 from './batch-2026.json';
 import batch2051 from './batch-2051.json';
 import batch2076 from './batch-2076.json';
 import batch2101 from './batch-2101.json';
+import batch2126 from './batch-2126.json';
 
 export const stories = {
   ...batch1501,
@@ -50,4 +51,5 @@ export const stories = {
   ...batch2051,
   ...batch2076,
   ...batch2101,
+  ...batch2126,
 };
