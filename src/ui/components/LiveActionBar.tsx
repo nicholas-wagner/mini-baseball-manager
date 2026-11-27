@@ -129,6 +129,8 @@ interface LiveActionBarProps {
   onInspectPitcher?: () => void;
   onInspectPlayers?: () => void;
   onOpenBoxScore?: () => void;
+  density?: 'full' | 'dock';
+  onOpenTactics?: () => void;
 }
 
 const SIMPLE_BAT_APPROACHES = SWING_CALL_GUIDE;
@@ -220,6 +222,8 @@ export function LiveActionBar({
   onInspectPitcher,
   onInspectPlayers,
   onOpenBoxScore,
+  density = 'full',
+  onOpenTactics,
 }: LiveActionBarProps) {
   const [bullpenOpen, setBullpenOpen] = useState(false);
   const [tacticsOpen, setTacticsOpen] = useState(false);
@@ -285,6 +289,170 @@ export function LiveActionBar({
           : pitcherEnduranceTier === 'solid'
             ? 'bg-[#2EC4B6]'
             : 'bg-[#2FB356]';
+
+  const mascotButton = clubMascot && clubColors ? (
+    <button
+      type="button"
+      data-testid="live-dugout-mascot-btn"
+      aria-label={`High-five ${clubMascot}`}
+      title={`Tap ${clubMascot} for a dugout cheer!`}
+      onClick={() => {
+        const nextTap = mascotTapCount + 1;
+        setMascotTapCount(nextTap);
+        setMascotCheerText(buildMascotCheerQuip(clubMascot, mascotMood, nextTap));
+        soundEngine.play(mascotMood === 'cheering' ? 'crowd_cheer' : 'ui_pop');
+      }}
+      className="rounded-2xl p-0.5 cursor-pointer hover:scale-105 active:scale-95 transition shrink-0"
+    >
+      <ClubMascotBuddy
+        mascot={clubMascot}
+        primaryColor={clubColors.primary}
+        secondaryColor={clubColors.secondary}
+        accentColor={clubColors.accent}
+        mood={mascotMood}
+        size="sm"
+        testId="live-dugout-mascot-buddy"
+      />
+    </button>
+  ) : null;
+
+  if (density === 'dock') {
+    return (
+      <div
+        data-testid="live-action-bar"
+        className="live-thumb-dock rounded-2xl border-[2.5px] border-[#192735] bg-[#FFF7E4] shadow-[3px_3px_0_#192735] p-2"
+      >
+        {showBullpenSuggestion && bullpenSuggestion ? (
+          <div className="live-context-chip" data-testid="dock-context-chip">
+            <button
+              type="button"
+              data-testid="bullpen-accept-btn"
+              disabled={gameCompleted}
+              onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
+            >
+              Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
+            </button>
+          </div>
+        ) : quickStealOption ? (
+          <div className="live-context-chip" data-testid="dock-context-chip">
+            <button
+              type="button"
+              data-testid="arcade-steal-btn"
+              aria-pressed={tacticalCall === quickStealOption.call}
+              disabled={gameCompleted}
+              onClick={() =>
+                onSelectTacticalCall(
+                  tacticalCall === quickStealOption.call ? 'normal' : quickStealOption.call,
+                )
+              }
+            >
+              💨 {quickStealOption.label} ({quickStealOption.successPct}%)
+            </button>
+          </div>
+        ) : readyPowerLabel && onArmReadyPower ? (
+          <div className="live-context-chip" data-testid="dock-context-chip">
+            <button
+              type="button"
+              data-testid="arcade-unleash-power-btn"
+              aria-pressed={powerArmed}
+              disabled={gameCompleted}
+              onClick={onArmReadyPower}
+            >
+              {powerArmed ? 'ARMED!' : readyPowerLabel}
+            </button>
+          </div>
+        ) : null}
+        {isBatting ? (
+          <div data-testid="arcade-call-bar" className="atbat-choices" role="group" aria-label="Swing approach">
+            {SIMPLE_BAT_APPROACHES.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={tacticalCall === opt.id}
+                disabled={gameCompleted}
+                onClick={() => onSelectTacticalCall(opt.id)}
+              >
+                {opt.shortLabel}
+              </button>
+            ))}
+            <button
+              type="button"
+              data-testid="arcade-bunt-btn"
+              aria-pressed={tacticalCall === 'bunt'}
+              disabled={gameCompleted}
+              onClick={() => onSelectTacticalCall(tacticalCall === 'bunt' ? 'normal' : 'bunt')}
+            >
+              🏏 Bunt
+            </button>
+          </div>
+        ) : pitchingMode === 'simple' ? (
+          <div data-testid="arcade-catcher-call" className="atbat-catcher-call" aria-live="polite">
+            <strong>
+              🧤 Catcher:{' '}
+              {catcherCall ? `${catcherCall.targetLabel} · ${catcherCall.pitchShortLabel}` : 'Over Plate · 4-Seam'}
+            </strong>
+            {onShakeOff && shakeOffTotal > 1 ? (
+              <button type="button" data-testid="arcade-shake-off-btn" disabled={gameCompleted} onClick={onShakeOff}>
+                Shake off
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <div data-testid="arcade-call-bar" data-pitching-cols="3" className="atbat-choices" role="group" aria-label="Pitch target">
+            {SIMPLE_PITCH_CALLS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={pitchTarget === opt.id}
+                disabled={gameCompleted}
+                onClick={() => onSelectPitchTarget?.(opt.id)}
+              >
+                {opt.shortLabel}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="live-primary-row">
+          {!(arcadeTimingEnabled && !gameCompleted) ? (
+            <ComicButton
+              size="sm"
+              data-testid="live-primary-pitch-btn"
+              variant={powerArmed ? 'coral' : 'gold'}
+              disabled={gameCompleted}
+              icon={<Play className="w-3.5 h-3.5" />}
+              onClick={() => onNextPitch()}
+              className="thumb-go flex-1 min-w-0"
+            >
+              {gameCompleted ? cue.primaryButtonLabel : pitchAction}
+            </ComicButton>
+          ) : (
+            <ArcadeTimingMeter
+              isBatting={isBatting}
+              disabled={gameCompleted}
+              actionLabel={`${pitchAction}!`}
+              powerArmed={powerArmed}
+              onLockTiming={(grade) => onNextPitch(grade)}
+            />
+          )}
+          {mascotButton}
+          <button
+            type="button"
+            className="tactics-toggle"
+            aria-expanded={false}
+            onClick={onOpenTactics}
+          >
+            Tactics
+          </button>
+        </div>
+        {mascotCheerText ? (
+          <div data-testid="live-mascot-cheer-bubble" role="status" className="atbat-mascot-cheer">
+            <span>📣 {mascotCheerText}</span>
+            <button type="button" onClick={() => setMascotCheerText(null)}>Hide</button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -660,6 +828,7 @@ export function LiveActionBar({
             onClick={() => setTacticsOpen(!tacticsOpen)}>
             {!isBatting && isPitcherTired && bullpenMode === 'manual' && hasBullpenPicker ? 'Tactics • Pen!' : 'Tactics'}
           </button>
+          {mascotButton}
         </div>
 
         {catcherSuggestion}
@@ -1166,31 +1335,6 @@ export function LiveActionBar({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {clubMascot && clubColors ? (
-            <button
-              type="button"
-              data-testid="live-dugout-mascot-btn"
-              aria-label={`High-five ${clubMascot}`}
-              title={`Tap ${clubMascot} for a dugout cheer!`}
-              onClick={() => {
-                const nextTap = mascotTapCount + 1;
-                setMascotTapCount(nextTap);
-                setMascotCheerText(buildMascotCheerQuip(clubMascot, mascotMood, nextTap));
-                soundEngine.play(mascotMood === 'cheering' ? 'crowd_cheer' : 'ui_pop');
-              }}
-              className="rounded-2xl p-0.5 cursor-pointer hover:scale-105 active:scale-95 transition shrink-0"
-            >
-              <ClubMascotBuddy
-                mascot={clubMascot}
-                primaryColor={clubColors.primary}
-                secondaryColor={clubColors.secondary}
-                accentColor={clubColors.accent}
-                mood={mascotMood}
-                size="sm"
-                testId="live-dugout-mascot-buddy"
-              />
-            </button>
-          ) : null}
           {cue.suggestedAction ? (
             <ComicButton
               size="sm"

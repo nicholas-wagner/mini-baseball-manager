@@ -308,7 +308,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
   };
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div data-testid="roster-screen" className="space-y-3 sm:space-y-4 min-w-0 overflow-x-clip">
       <FrontOfficeModeBar
         compact
         club={humanClub}
@@ -415,7 +415,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
               data-testid="roster-view-lineup-btn"
               variant={rosterView === 'lineup' ? 'gold' : 'cream'}
               active={rosterView === 'lineup'}
-              className="w-full px-1.5 text-[11px] sm:text-xs whitespace-nowrap"
+              className="w-full min-w-0 px-1.5 text-[11px] sm:text-xs whitespace-normal leading-tight"
               onClick={() => {
                 setRosterView('lineup');
                 setPrintGallery(false);
@@ -429,7 +429,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
               data-testid="roster-view-cards-btn"
               variant={rosterView === 'cards' && !printGallery ? 'coral' : 'cream'}
               active={rosterView === 'cards' && !printGallery}
-              className="w-full px-1.5 text-[11px] sm:text-xs whitespace-nowrap"
+              className="w-full min-w-0 px-1.5 text-[11px] sm:text-xs whitespace-normal leading-tight"
               onClick={() => {
                 setRosterView('cards');
                 setPrintGallery(false);
@@ -443,7 +443,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
               data-testid="roster-view-gallery-btn"
               variant={rosterView === 'cards' && printGallery ? 'turf' : 'cream'}
               active={rosterView === 'cards' && printGallery}
-              className="w-full px-1.5 text-[11px] sm:text-xs whitespace-nowrap"
+              className="w-full min-w-0 px-1.5 text-[11px] sm:text-xs whitespace-normal leading-tight"
               onClick={() => {
                 setRosterView('cards');
                 setPrintGallery(true);
@@ -505,7 +505,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
             ) : (
               <div
                 data-testid="roster-binder-grid"
-                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3"
+                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:gap-4 gap-2.5 sm:gap-3"
               >
                 {filteredBinderEntries.map(({ player, roleTag }) => {
                   const ovr = computePlayerOverall(player);
@@ -532,7 +532,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                           toggleFavoritePlayer(player.id);
                           soundEngine.play('ui_pop');
                         }}
-                        className={`absolute top-1.5 right-1.5 z-10 w-9 h-9 rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer shadow-[2px_2px_0_#181B2C] ${
+                        className={`absolute top-1.5 right-1.5 z-10 min-h-[44px] min-w-[44px] rounded-xl border-2 border-[#181B2C] flex items-center justify-center text-sm font-extrabold cursor-pointer shadow-[2px_2px_0_#181B2C] ${
                           isFav
                             ? 'bg-[#FFC300] text-[#181B2C]'
                             : 'bg-[#FFFDF7]/95 text-[#4A5068] hover:bg-[#FFF3BF]'
@@ -588,7 +588,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
             )}
           </div>
         ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-6 gap-4 items-start min-w-0">
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -700,7 +700,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                           icon={<ArrowLeftRight className="w-3.5 h-3.5" />}
                           aria-label={`Swap slot ${idx + 1}`}
                           onClick={() => handleSlotSwapClick(idx, player.id)}
-                          className="px-1.5 sm:px-2.5 min-h-[38px] text-[10.5px] sm:text-xs"
+                          className="px-1.5 sm:px-2.5 min-h-[44px] min-w-[44px] text-[10.5px] sm:text-xs"
                         >
                           <span className="hidden sm:inline">{isSelected ? 'Selected' : 'Swap'}</span>
                           <span className="sm:hidden">{isSelected ? 'Pick' : 'Swap'}</span>

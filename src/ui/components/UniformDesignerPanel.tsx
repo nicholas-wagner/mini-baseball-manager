@@ -82,7 +82,7 @@ function UniformKitShowcaseSvg({ draft, clubName }: { draft: UniformCustomizatio
   return (
     <svg
       viewBox="0 0 260 155"
-      className="w-full max-w-[280px] mx-auto rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7]"
+      className="w-full max-h-[132px] max-w-[280px] mx-auto rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7]"
       role="img"
       aria-label={`${clubName} custom uniform preview`}
     >
@@ -249,21 +249,24 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
   };
 
   return (
-    <div data-testid="uniform-designer-panel" className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-3.5 items-start">
-        {/* Compact Side-by-Side Kit + Live 2.5D Chibi Preview (keeps Presets & Colors above the fold on mobile!) */}
-        <div className="p-2.5 sm:p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2.5 text-center">
+    <div
+      data-testid="uniform-designer-panel"
+      className="grid grid-cols-1 gap-3 min-w-0 overflow-x-clip xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-start xl:gap-6"
+    >
+      <div data-testid="uniform-above-fold" className="grid grid-cols-1 gap-3 min-w-0 xl:contents">
+        {/* Compact kit + chibi. Presets and colors stay in this fold on phones. */}
+        <div className="p-2.5 sm:p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2.5 text-center xl:col-start-1">
           <div className="font-display text-xs uppercase text-[#181B2C] flex items-center justify-center gap-1.5">
             <Palette className="w-4 h-4 text-[#E63946]" />
             Live Uniform &amp; Crest Preview
           </div>
           <div
             data-testid="uniform-hero-strip"
-            className="grid grid-cols-[1fr_104px] items-center gap-2"
+            className="grid grid-cols-[minmax(0,1fr)_88px] items-center gap-2"
           >
             <UniformKitShowcaseSvg draft={draft} clubName={`${club.city} ${club.name}`} />
             {modelPlayer ? (
-              <div className="w-[104px] h-[116px] mx-auto rounded-xl border-2 border-[#181B2C]/20 bg-[#FFFDF7] flex items-center justify-center overflow-hidden">
+              <div className="w-[88px] h-[104px] mx-auto rounded-xl border-2 border-[#181B2C]/20 bg-[#FFFDF7] flex items-center justify-center overflow-hidden">
                 <PaintedUniformPreview
                   traits={modelPlayer.traits}
                   team={{
@@ -302,8 +305,7 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
           ) : null}
         </div>
 
-        {/* Interactive Controls */}
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0 xl:col-start-2 xl:row-start-1">
           {/* 1-Tap 90s Team Kit Presets */}
           <div className="p-2.5 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
             <div className="font-display text-xs uppercase text-[#181B2C]">
@@ -383,6 +385,10 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
             </label>
           </div>
 
+        </div>
+      </div>
+
+      <div className="space-y-3 min-w-0 xl:col-start-2">
           {/* Jersey Pattern */}
           <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2">
             <div className="font-display text-xs uppercase text-[#181B2C]">Jersey Pattern</div>
@@ -455,7 +461,6 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
               ))}
             </div>
           </div>
-        </div>
       </div>
     </div>
   );
