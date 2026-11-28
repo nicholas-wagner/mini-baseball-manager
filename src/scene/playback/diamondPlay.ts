@@ -453,12 +453,13 @@ export function diamondCamera(play: DiamondPlay, t: number, bats: EffectiveBatSi
     return {position:{x:mound.x+1.8,y:1.85,z:mound.z+3.8},lookAt:{...mound,y:1.02},fov:36};
   }
   if (play.close) return closeCamera(play, play.close, t, bats, throws);
-  if (t < plate + 0.10) return play.batterView
-    ? getCameraPresetPose('over_shoulder_batter', 0, 0, throws, bats)
-    : {
-      position: { x: bats === 'R' ? -2.25 : 2.25, y: 2.7, z: 4.8 },
-      lookAt: { x: 0, y: 1.14, z: -2.75 }, fov: 39,
-    };
+  if (t < plate + 0.10) return getCameraPresetPose(
+    play.batterView ? 'over_shoulder_batter' : 'over_shoulder_pitcher',
+    0,
+    0,
+    throws,
+    bats,
+  );
   if (play.buntAdvances && t < play.finish - .36) {
     return { position: {x: 8, y: 11, z: 6}, lookAt: {x: 2, y: .5, z: -10.5}, fov: 44 };
   }

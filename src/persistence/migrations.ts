@@ -9,6 +9,8 @@ export function migrateClubEconomy(economy: ClubEconomy): ClubEconomy {
     ...economy,
     scheduledPromoId: economy.scheduledPromoId ?? null,
     recentLedgerEntries: history.slice(0, LEDGER_HISTORY_CAP),
-    spaUsedInSeriesIndex: economy.spaUsedInSeriesIndex,
+    ...(typeof economy.spaUsedInSeriesIndex === 'number'
+      ? { spaUsedInSeriesIndex: economy.spaUsedInSeriesIndex }
+      : {}),
   };
 }

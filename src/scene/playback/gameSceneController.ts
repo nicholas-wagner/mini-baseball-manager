@@ -774,7 +774,7 @@ export class GameSceneController {
     } : this.entrance?.role === 'pitcher' ? {
       position: {x:mound.x+(this.throws === 'R' ? 1 : -1)*.42,y:mound.y+1.21,z:mound.z+1.94},
       lookAt: {x:mound.x,y:mound.y+1.08,z:mound.z}, fov: 32,
-    } : preview ? previewShot(preview,this.bats)
+    } : preview ? previewShot(preview, this.bats, this.throws)
       : getCameraPresetPose(activePreset, this.elapsedSec, 0, this.throws, this.bats);
     const fov = fitFieldOfView(targetPose.fov, this.camera.aspect);
     if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }

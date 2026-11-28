@@ -47,14 +47,14 @@ export function getCameraPresetPose(
   switch (preset) {
     case 'over_shoulder_pitcher': {
       // Right-hander throwing shoulder sits on -X (from behind facing +Z); Left-hander sits on +X!
-      const shoulderSide = pitcherThrows === 'R' ? -1.48 : 1.48;
+      const shoulderSide = pitcherThrows === 'R' ? -1.18 : 1.18;
       return {
         position: {
           x: shoulderSide + Math.sin(elapsedSec * 0.7) * 0.08,
-          y: 2.55 + Math.cos(elapsedSec * 0.9) * 0.04,
-          z: -14.72,
+          y: 2.48 + Math.cos(elapsedSec * 0.9) * 0.04,
+          z: -15.35,
         },
-        lookAt: { x: pitcherThrows === 'R' ? 0.1 : -0.1, y: 0.88, z: 1.1 },
+        lookAt: { x: pitcherThrows === 'R' ? 0.08 : -0.08, y: 0.9, z: 1.1 },
         fov: 44,
       };
     }

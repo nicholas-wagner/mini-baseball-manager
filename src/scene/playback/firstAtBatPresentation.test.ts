@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { Vector3, PerspectiveCamera } from "three";
-import { CATCHER_HOME } from "./diamondLayout";
+import { CATCHER_HOME, PITCHING_RUBBER } from "./diamondLayout";
 import { actorAt, diamondCamera, diamondPlay } from "./diamondPlay";
 import { choreographPlayEvent } from "./eventChoreographer";
 import { defaultMatchupCameraPreset } from "./gameSceneController";
@@ -180,4 +180,46 @@ it('positions the default batting preview and pitch view behind the catcher look
   );
   expect(battingStep.play?.batterView).toBe(true);
   expect(battingStep.cameraPreset).toBe('over_shoulder_batter');
+});
+
+it('keeps pitching previews, clutch pitches, fouls, walks, and balls in play behind the pitcher', () => {
+  for (const throwsHand of ['R', 'L'] as const) {
+    for (const side of ['L', 'R'] as const) {
+      for (const intent of ['attack_zone', 'paint_corners', 'bury_offspeed', 'high_heat'] as const) {
+        const shot = previewShot(intent, side, throwsHand);
+        expect(shot.position.z).toBeLessThan(PITCHING_RUBBER.z - 2);
+        expect(shot.lookAt.z).toBeGreaterThan(0);
+      }
+      for (const kind of ['called_pitch', 'missed_pitch', 'ball_pitch', 'called_third', 'swinging_third', 'foul_back', 'ball_four', 'single', 'ground_out'] as const) {
+        const play = { ...diamondPlay(kind), batterView: false };
+        const shot = diamondCamera(play, play.legs[0].start + 0.12, side, throwsHand);
+        expect(shot.position.z, `${kind} ${throwsHand} vs ${side}`).toBeLessThan(PITCHING_RUBBER.z - 2);
+        expect(shot.lookAt.z, `${kind} ${throwsHand} vs ${side}`).toBeGreaterThan(0);
+      }
+    }
+  }
+
+  const clutchPitchStep = choreographPlayEvent(
+    {
+      seq: 2,
+      type: 'pitch_thrown',
+      inning: 5,
+      half: 'TOP',
+      outsBefore: 2,
+      outsAfter: 2,
+      balls: 2,
+      strikes: 2,
+      awayScore: 3,
+      homeScore: 3,
+      basesAfter: ['r1', 'r2', null],
+      isClutchMoment: true,
+      commentary: 'Called strike on the corner',
+      outcome: 'called_strike',
+    },
+    1,
+    ['r1', 'r2', null],
+    { humanBatting: false },
+  );
+  expect(clutchPitchStep.play?.batterView).toBeFalsy();
+  expect(clutchPitchStep.cameraPreset).toBe('over_shoulder_pitcher');
 });

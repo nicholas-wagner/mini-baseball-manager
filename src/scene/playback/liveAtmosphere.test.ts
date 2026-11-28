@@ -206,10 +206,13 @@ it('sets from the stretch before a pitch, checks the runner and shakes off then 
     game.triggerPitcherShakeOff();
     frame(1.28);
     const first = head.rotation.y;
+    const preNodY = head.position.y;
     frame(1.43);
     expect(first * head.rotation.y).toBeLessThan(0);
     frame(1.78);
-    expect(Math.abs(head.rotation.x)).toBeGreaterThan(.03);
+    // Pitcher nod stays collar-locked (vertical dip + tilt, zero 3D X plane pitch detachment).
+    expect(head.rotation.x).toBe(0);
+    expect(head.position.y).toBeLessThan(preNodY - 0.002);
     frame(3.4);
     expect(head.rotation.x).toBe(0);
     expect(body.material.uniforms.sheet.value).toBe(stretch);

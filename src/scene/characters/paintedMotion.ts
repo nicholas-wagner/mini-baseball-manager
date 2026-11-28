@@ -26,9 +26,10 @@ export function paintedMotion(
     squash = wave * 0.015,
     tilt = wave * 0.02,
     shift = 0;
-  let barrelAngle = .98 + .05 * wave, gripChoke = 0, stanceWidth = 0, bodyTurn = 0;
+  let barrelAngle = .78 + .05 * wave, gripChoke = 0, stanceWidth = 0, bodyTurn = 0;
   let held = false;
-  let pitchPhase = 0, headTurn = 0, nod = 0, glovePat = 0;
+  let pitchPhase = 0, headTurn = 0, nod = 0;
+  const glovePat = 0;
   if (role === 'pitcher') {
     lean = 0;
     squash = 0;
@@ -39,12 +40,11 @@ export function paintedMotion(
       squash = .013 * breath + .011 * peek;
       lean = -.018 * peek;
       nod = .075 * peek;
-      glovePat = pulse(phase,.12,.24) - .45 * pulse(phase,.24,.35);
-      if (clip === 'pitch_stretch_set') headTurn = .50 * pulse(phase,.16,.52) ** 2;
+      if (clip === 'pitch_stretch_set') headTurn = .22 * pulse(phase,.16,.52) ** 2;
     }
     if (clip === 'pitch_shake_off') {
       const t = clamp(seconds / CLIP_DURATIONS.pitch_shake_off);
-      headTurn = .52 * Math.sin(t * Math.PI * 5) * pulse(t,0,.68);
+      headTurn = .24 * Math.sin(t * Math.PI * 5) * pulse(t,0,.68);
       nod = .19 * pulse(t,.65,1);
     }
     if (pitchClips.has(clip)) {
@@ -65,7 +65,7 @@ export function paintedMotion(
     tilt = 0.065 * load - 0.055 * drive;
     squash = 0.025 + 0.035 * load - 0.025 * drive;
     if (swings) {
-      barrelAngle = (cel === 0 ? .98 : .47) + .04 * wave;
+      barrelAngle = (cel === 0 ? .78 : .36) + .04 * wave;
       const finish = clamp((phase - .58) / .20) - .5 * clamp((phase-.78)/.22);
       lean += .085 * finish;
       shift += .095 * finish;
@@ -79,7 +79,7 @@ export function paintedMotion(
       squash += (.060 + .014 * wave) * load;
       tilt += .10 * load;
       stanceWidth = .65 * load;
-      barrelAngle = .98 - .67 * load + .075 * wave;
+      barrelAngle = .78 - .52 * load + .075 * wave;
     }
     if (clip === 'bat_contact_set') {
       const choke = clamp(seconds/.28);
@@ -87,13 +87,13 @@ export function paintedMotion(
       squash += (.07 + .014 * wave) * choke;
       lean += .038 * choke;
       gripChoke = .17 * choke;
-      barrelAngle -= .13 * choke;
+      barrelAngle -= .18 * choke;
     }
     if (clip === 'bat_take') {
       const check = pulse(seconds,0,.34);
       shift -= .075 * check;
       lean -= .095 * check;
-      barrelAngle -= .30 * check;
+      barrelAngle -= .26 * check;
       tilt += .11 * check;
     }
     if (clip === 'bat_recover') {
@@ -102,7 +102,7 @@ export function paintedMotion(
       lean += .043 * (1-recoil);
       shift += .048 * (1-recoil);
       tilt -= .06 * (1-recoil);
-      barrelAngle = .98 - .58*(1-recoil);
+      barrelAngle = .78 - .52*(1-recoil);
     }
     if (clip === 'bat_slump') {
       const drop = clamp(seconds/.48);
@@ -111,7 +111,7 @@ export function paintedMotion(
       tilt -= .28 * drop;
       nod = .27 * drop;
       lean += .09 * drop;
-      barrelAngle += 1.58 * drop;
+      barrelAngle -= 2.85 * drop;
     }
     if (clip === 'bat_square' || clip === 'bat_bunt' || clip === 'bat_bunt_tap' || clip === 'bat_bunt_pullback') {
       const square = clip === 'bat_bunt_pullback' ? 1-clamp(seconds/CLIP_DURATIONS.bat_bunt_pullback)
@@ -124,7 +124,7 @@ export function paintedMotion(
       shift += .075 * square - .055 * cushion;
       lean += .06 * square - .065 * cushion;
       squash += (.07 + .012 * wave) * square;
-      barrelAngle += 1.28 * square;
+      barrelAngle -= 2.25 * square;
     }
     if (clip === 'bat_bomb') {
       lean -= .10 * load;

@@ -217,28 +217,25 @@ export function closeCamera(play: DiamondPlay, close: CloseAction, t: number, ba
       x: target.x + 3.8, y: 5.6 - 3.3 * zoom, z: target.z + 10.5 - 6.6 * zoom,
     }, fov: 48 - 10 * zoom };
   }
-  if (play.batterView && !close.steal) {
+  if (!close.steal) {
     if (close.kind === 'ball_four' && t > plate+.85) {
       const p = closeActorAt(play,close,'BAT',t,bats,bags[0]).pos;
       return { position:{x:p.x+2.6,y:2.9,z:p.z+5},lookAt:{x:p.x,y:.91,z:p.z},fov:39 };
     }
-    return getCameraPresetPose('over_shoulder_batter', 0, 0, throws, bats);
+    return getCameraPresetPose(
+      play.batterView ? 'over_shoulder_batter' : 'over_shoulder_pitcher',
+      0,
+      0,
+      throws,
+      bats,
+    );
   }
   const atPlate = { position: { x: sign*3.75, y: 1.83, z: -3.95 }, lookAt: { x: -sign*.17, y: 1.06, z: .35 }, fov: 36 };
-  if (close.kind.endsWith('_pitch') || close.kind.endsWith('_third')) {
-    // Keep both endpoints visible while the viewer follows the small moving ball.
-    return {position:{x:sign*4.8,y:2.8,z:-16.8}, lookAt:{x:0,y:.94,z:-7}, fov:36};
-  }
-  if (!close.steal && t < play.legs[0].start + .12) return getCameraPresetPose('over_shoulder_pitcher',t,0,throws,bats);
-  if (close.kind === 'ball_four' && t > plate+.85) {
-    const p = closeActorAt(play,close,'BAT',t,bats,bags[0]).pos;
-    return { position:{x:p.x+2.6,y:2.9,z:p.z+5},lookAt:{x:p.x,y:.91,z:p.z},fov:39 };
-  }
   if (close.steal && t < play.legs[0].start+.1) {
     const lead = closeActorAt(play,close,'RUN',t,bats,bags[close.fromBase]).pos;
     return { position:{x:lead.x+2.6,y:2.8,z:lead.z+4.2},lookAt:{x:lead.x-.3,y:.9,z:lead.z-.35},fov:42 };
   }
-  if (!close.steal || t < plate+.65) return atPlate;
+  if (t < plate+.65) return atPlate;
   const bag = play.fieldAt;
   const incoming = headingToward(bag,bags[close.fromBase]);
   const side = incoming - Math.PI/2;

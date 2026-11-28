@@ -21,10 +21,12 @@ export function createPaintedBat() {
   barrel.add(outline);
   function place(rear: boolean, gripX: number, gripY: number, unit: number, width: number, angle: number, choke: number) {
     barrel.position.set((gripX-128)*unit*width,(249-gripY)*unit,0.027);
-    const outward = rear ? 1 : -1;
-    barrel.rotation.z = -outward * angle;
-    barrel.rotation.x = -.15;
-    barrel.translateY(-choke);
+    // Positive angle cocks the bat up and back over the batter's back shoulder
+    // away from home plate in both behind-the-catcher (rear) and behind-the-pitcher (front) views.
+    const shoulderSign = rear ? 1 : -1;
+    barrel.rotation.z = shoulderSign * angle;
+    barrel.rotation.x = -.10;
+    barrel.translateY(-(choke + .08));
   }
   return { barrel, place, dispose() { wood.dispose(); paint.dispose(); edge.dispose(); } };
 }

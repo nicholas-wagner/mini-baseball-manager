@@ -1,4 +1,4 @@
-import type { EffectiveBatSide } from "../../engine/handedness/types";
+import type { EffectiveBatSide, ThrowsHand } from "../../engine/handedness/types";
 import type { PitchTargetIntent } from "../../engine/simulation/pitchMindGames";
 import { getCameraPresetPose } from "../camera/cameraRig";
 import type { DiamondPlay } from "./diamondPlay";
@@ -16,16 +16,15 @@ export type AtBatPreview = PitchTargetIntent | SwingPreview;
 export function isSwingPreview(intent: AtBatPreview | null): intent is SwingPreview {
   return intent === 'balanced' || intent === 'contact' || intent === 'power' || intent === 'bunt';
 }
-export function previewShot(intent: AtBatPreview, side: EffectiveBatSide) {
+export function previewShot(
+  intent: AtBatPreview,
+  side: EffectiveBatSide,
+  throws: ThrowsHand = "R",
+) {
   if (isSwingPreview(intent)) {
-    return getCameraPresetPose("over_shoulder_batter", 0, 0, "R", side);
+    return getCameraPresetPose("over_shoulder_batter", 0, 0, throws, side);
   }
-  const sign = side === "R" ? 1 : -1;
-  return {
-    position: { x: sign * 1.9, y: 1.92, z: -4.4 },
-    lookAt: { x: 0, y: 0.9, z: 0.82 },
-    fov: 39,
-  };
+  return getCameraPresetPose("over_shoulder_pitcher", 0, 0, throws, side);
 }
 export function targetOffset(target: AtBatPreview, side: EffectiveBatSide) {
   const away = side === "R" ? 1 : -1;

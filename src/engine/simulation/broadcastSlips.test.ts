@@ -282,6 +282,20 @@ describe('90s TV Broadcast Lower-Third Stat Slips (TASK-120)', () => {
     const pitcher = getCurrentPitcher(session);
     const batter = getCurrentBatter(session);
 
+    // Seed existing club K record above 10 so 5/7/10 Ks exercise PITCHING GEM spotlights cleanly
+    const homeWithHighKRecord = {
+      ...homeClub,
+      franchiseRecords: {
+        ...homeClub.franchiseRecords!,
+        mostSingleGameStrikeouts: {
+          value: 12,
+          holderName: 'Past Ace',
+          holderId: 'past-ace',
+          season: 1,
+          detail: '12 Ks',
+        },
+      },
+    };
     for (const ks of [5, 7, 10]) {
       const kSession = {
         ...session,
@@ -308,7 +322,7 @@ describe('90s TV Broadcast Lower-Third Stat Slips (TASK-120)', () => {
           half: 'TOP',
         }),
         awayClub,
-        homeClub,
+        homeClub: homeWithHighKRecord,
       });
       expect(kSlip?.kind).toBe('pitcher_spotlight');
       expect(kSlip?.kicker).toBe(`PITCHING GEM: ${ks} Ks TODAY!`);

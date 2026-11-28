@@ -423,10 +423,11 @@ export function createPaintedPlayerRig(
     nearArm.position.set(0, body.position.y, 0.063);
     nearArm.visible = !tapping && !cheering && !basePlayPose && !pitching && role !== 'runner';
     bodyMat.uniforms.collar.value.set(nx / 256, 1 - ny / 256);
-    headJoint.position.set(swingMirror * (nx - 128) * unit * width, (249 - ny - 8) * unit, 0.032);
+    const neckSeat = role === 'pitcher' ? 12 : 8;
+    headJoint.position.set(swingMirror * (nx - 128) * unit * width, (249 - ny - neckSeat) * unit, 0.032);
     headJoint.rotation.z = rotationSign * frame.tilt;
     if (clip === 'catch_frame') headJoint.position.y -= .035 * Math.sin(Math.PI * Math.min(1, time / .32));
-    bodyMat.uniforms.sleeve.value.set(frame.glovePat, rear ? .59 : .46);
+    bodyMat.uniforms.sleeve.value.set(role === 'pitcher' ? 0 : frame.glovePat, rear ? .59 : .46);
     const habit = stanceHabit(opt.traits.seed, role === 'pitcher', opt.quietPitcher);
     if (clip === 'bat_stance') {
       // Each player keeps a quiet pre-pitch habit through changes of club or uniform.
@@ -436,10 +437,10 @@ export function createPaintedPlayerRig(
         bodyMat.uniforms.sleeve.value.x = beat * (rear ? -1 : 1);
       }
       else if (habit === 'tap' && bat.barrel.visible) {
-        // Two taps from the painted grip, then a pause in the loaded stance.
+        // Two taps from the painted grip down toward the plate, then back over the shoulder.
         const cycle = (time + Math.abs(opt.traits.seed % 5) * .17) % 3.6;
         const tap = (start: number) => Math.sin(Math.PI * Math.min(1, Math.max(0, (cycle - start) / .52))) ** 2;
-        bat.barrel.rotation.z += (rear ? 1 : -1) * 2.72 * (tap(.10) + tap(.70));
+        bat.barrel.rotation.z += (rear ? -1 : 1) * 2.05 * (tap(.10) + tap(.70));
       }
       else actor.position.x += .085 * beat * actorFlip;
     }
@@ -468,12 +469,19 @@ export function createPaintedPlayerRig(
     } else {
       // The runner stays on the same world-side of the mound when the camera or arm changes.
       const glanceSide = clip === 'pitch_stretch_set'
-        ? (opt.checkedBase === 3 ? -1 : opt.checkedBase === 2 ? 1.55 : 1) * rotationSign * actorFlip : 1;
-      headJoint.rotation.y = frame.headTurn * glanceSide;
+        ? (opt.checkedBase === 3 ? -1 : opt.checkedBase === 2 ? 1.15 : 1) * rotationSign * actorFlip : 1;
+      const rawHeadTurn = frame.headTurn * glanceSide;
+      headJoint.rotation.y = role === 'pitcher'
+        ? THREE.MathUtils.clamp(rawHeadTurn, -.24, .24)
+        : rawHeadTurn;
     }
-    headJoint.rotation.x = frame.nod;
-    if (clip === 'pitch_shake_off' || clip === 'pitch_stretch_set') {
-      headJoint.position.x += .055 * headJoint.rotation.y;
+    if (role === 'pitcher') {
+      // Keep the flat 2D head quad seated squarely on the neck collar; express nods as a subtle dip + tilt.
+      headJoint.rotation.x = 0;
+      headJoint.position.y -= .018 * frame.nod;
+      headJoint.rotation.z += rotationSign * .06 * frame.nod;
+    } else {
+      headJoint.rotation.x = frame.nod;
     }
     head.scale.set(256 * headUnit, 256 * headUnit, 1);
     head.position.set(0, 72 * headUnit, 0);

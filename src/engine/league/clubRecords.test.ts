@@ -6,6 +6,7 @@ import { createGameSession } from '../simulation/baseballEngine';
 import {
   createEmptyFranchiseRecords,
   detectLiveRecordBreaker,
+  hydrateFranchiseRecords,
   updateClubFranchiseRecordsAfterGame,
   type ClubFranchiseRecords,
 } from './clubRecords';
@@ -53,8 +54,9 @@ function makeEvent(overrides: Partial<PlayEvent>): PlayEvent {
 }
 
 describe('Persistent Club Franchise Records & Live Record-Breaker Alert (TASK-124 Part C)', () => {
-  it('initializes clean empty franchise records', () => {
-    expect(createEmptyFranchiseRecords()).toEqual({
+  it('initializes clean empty franchise records and safely hydrates partial or invalid saved data', () => {
+    const empty = createEmptyFranchiseRecords();
+    expect(empty).toEqual({
       longestHomeRunFt: null,
       mostSingleGameStrikeouts: null,
       mostSingleGameHits: null,
@@ -63,6 +65,9 @@ describe('Persistent Club Franchise Records & Live Record-Breaker Alert (TASK-12
       mostSeasonHomeRuns: null,
       mostSeasonStolenBases: null,
     });
+    expect(hydrateFranchiseRecords(null)).toEqual(empty);
+    expect(hydrateFranchiseRecords({ currentWinStreak: Number.NaN }).currentWinStreak).toBe(0);
+    expect(hydrateFranchiseRecords({ currentWinStreak: 4.9 }).currentWinStreak).toBe(4);
   });
 
   it('detects live inaugural and surpassed HR distance, single-game K, and single-game Hit records for human club only', () => {

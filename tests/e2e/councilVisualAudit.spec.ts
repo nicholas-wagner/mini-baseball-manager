@@ -197,7 +197,15 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expectNoHorizontalOverflow(page, 390);
     await page.screenshot({ path: 'test-results/audit-390x844-11-club-treasury.png' });
 
-    // 8. Check Skill Trees (Career Talent Cap + Build Identity, TASK-114) & League Boss Badge (TASK-120)
+    // 7b. Check Club Rituals picker in Uniforms & Gear (TASK-122)
+    await page.getByRole('button', { name: /uniforms & gear/i }).first().click();
+    const ritualsCard = page.getByTestId('club-rituals-card');
+    await expect(ritualsCard).toBeVisible({ timeout: 10_000 });
+    await ritualsCard.scrollIntoViewIfNeeded();
+    await expectNoHorizontalOverflow(page, 390);
+    await page.screenshot({ path: 'test-results/audit-390x844-16-club-rituals.png' });
+
+    // 8. Check Skill Trees (Career Talent Cap + Build Identity, TASK-114/125) & League Boss Badge (TASK-120)
     await page.getByRole('button', { name: /skill tree/i }).first().click();
     await expect(page.getByTestId('career-talent-budget')).toBeVisible({ timeout: 10_000 });
     await expectNoHorizontalOverflow(page, 390);
@@ -258,6 +266,9 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expectMinTapTarget(page.getByTestId('live-audio-toggle'), 44);
     await expectMinTapTarget(page.getByTestId('live-primary-pitch-btn').first(), 44);
 
+    await expectNoHorizontalOverflow(page, 1280);
+    await page.screenshot({ path: 'test-results/audit-1280x800-10-desktop-broadcast.png' });
+
     // Full Live batting stance preview OR pitcher shake-off hook works live on desktop
     const buntBtn = page.getByTestId('arcade-bunt-btn').first();
     const shakeOffBtn = page.getByTestId('arcade-shake-off-btn').first();
@@ -271,9 +282,6 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
       await expect(desktopCanvas).toHaveAttribute('data-shake-off-signal', '1');
     }
 
-    await expectNoHorizontalOverflow(page, 1280);
-    await page.screenshot({ path: 'test-results/audit-1280x800-10-desktop-broadcast.png' });
-
     // Open Club Treasury directly via persistent Desktop Cash Pill (TASK-108, TASK-115)
     const desktopCashPill = page.getByTestId('club-cash-pill-desktop');
     await expect(desktopCashPill).toBeVisible();
@@ -283,10 +291,58 @@ test.describe('Council Cross-Device Visual Audit (TASK-101)', () => {
     await expectNoHorizontalOverflow(page, 1280);
     await page.screenshot({ path: 'test-results/audit-1280x800-12-desktop-treasury.png' });
 
-    // Open Skill Trees on Desktop to inspect Career Talent Budget & Manager Legacy (TASK-114)
+    // Open Skill Trees on Desktop to inspect Career Talent Budget & Manager Legacy (TASK-114, TASK-125)
     await page.getByRole('button', { name: /skill tree/i }).first().click();
     await expect(page.getByTestId('career-talent-budget')).toBeVisible({ timeout: 10_000 });
     await expectNoHorizontalOverflow(page, 1280);
     await page.screenshot({ path: 'test-results/audit-1280x800-15-desktop-skills.png' });
+
+    // Open Trophy & Sticker Album on Desktop to inspect Franchise Records & Victory Polaroids (TASK-122, TASK-124)
+    await page.getByRole('button', { name: /open trophy and sticker album/i }).first().click();
+    const trophyModal = page.getByTestId('trophy-case-modal');
+    await expect(trophyModal).toBeVisible({ timeout: 10_000 });
+    await expect(trophyModal.getByTestId('trophy-franchise-records-shelf')).toBeVisible();
+    await expect(trophyModal.getByTestId('trophy-polaroids-shelf')).toBeVisible();
+    await expectNoHorizontalOverflow(page, 1280);
+    await page.screenshot({ path: 'test-results/audit-1280x800-17-desktop-trophies.png' });
+  });
+
+  test('390x844 Pixel 7 portrait: Behind-the-pitcher live view', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'Pixel 7 pitching audit runs in android-mobile project');
+    test.slow();
+    await seedOpeningDay(page, 2089);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto('/');
+    const sideToggle = page.getByTestId('opening-side-toggle');
+    await expect(sideToggle).toBeVisible({ timeout: 10_000 });
+    if (/pitch first/i.test(await sideToggle.innerText())) {
+      await sideToggle.click();
+    }
+    await page.getByRole('button', { name: /^Pitch with / }).click();
+    await expect(page.getByTestId('live-game-3d-canvas')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('player-entrance')).toHaveCount(0, { timeout: 6_000 });
+    await expectNoHorizontalOverflow(page, 390);
+    await page.screenshot({ path: 'test-results/audit-390x844-18-mobile-pitching.png' });
+  });
+
+  test('1280x800 desktop: Behind-the-pitcher broadcast view', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Desktop pitching audit runs in desktop-chrome project');
+    test.slow();
+    await seedOpeningDay(page, 2089);
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    await page.goto('/');
+    const sideToggle = page.getByTestId('opening-side-toggle');
+    await expect(sideToggle).toBeVisible({ timeout: 10_000 });
+    if (/pitch first/i.test(await sideToggle.innerText())) {
+      await sideToggle.click();
+    }
+    await page.getByRole('button', { name: /^Pitch with / }).click();
+    await expect(page.getByTestId('live-game-3d-canvas')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('player-entrance')).toHaveCount(0, { timeout: 6_000 });
+    await openLiveTacticsOrMore(page);
+    await expectNoHorizontalOverflow(page, 1280);
+    await page.screenshot({ path: 'test-results/audit-1280x800-19-desktop-pitching.png' });
   });
 });

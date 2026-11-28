@@ -1,3 +1,5 @@
+import { createEmptyFranchiseRecords } from '../league/clubRecords';
+import { DEFAULT_CLUB_RITUALS } from './polaroidKeepsakes';
 import type { CatalogPlayer, DrawCatalogPlayer } from '../catalog/playerCatalog';
 import { rollBatsHand, rollThrowsHand } from '../handedness/handedness';
 import type { FieldPosition } from '../handedness/types';
@@ -589,6 +591,9 @@ export function createClub(rng: SeededRng, options: CreateClubOptions): Club {
     bullpenIds,
     rotationCursor: 0,
     coaches: createDefaultCoachStaff(),
+    clubRituals: { ...DEFAULT_CLUB_RITUALS },
+    polaroids: [],
+    franchiseRecords: createEmptyFranchiseRecords(),
     stadium: createInitialStadium(
       options.stadiumName ?? `${options.city} Sandlot Park`,
       options.leagueTier,

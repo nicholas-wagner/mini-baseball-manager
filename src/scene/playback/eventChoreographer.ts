@@ -351,7 +351,7 @@ export function choreographPlayEvent(
     }
     return {
       play:timed, infield, outfield, close, basesBefore,
-      cameraPreset: (context.humanBatting || event.isClutchMoment) && preset.cameraPreset === 'over_shoulder_pitcher'
+      cameraPreset: context.humanBatting && preset.cameraPreset === 'over_shoulder_pitcher'
         ? 'over_shoulder_batter'
         : preset.cameraPreset,
       pitcherClip: timed || fromStretch ? deliveryClip(fromStretch) : preset.pitcherClip,

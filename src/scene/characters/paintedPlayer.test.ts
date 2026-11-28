@@ -277,3 +277,87 @@ it.each(['L','R'] as const)('raises the power barrel above the balanced barrel f
     }
   } finally {rig.dispose();}
 });
+
+it.each(['L', 'R'] as const)(
+  'cocks the bat back over the shoulder away from home plate for a %s hitter in both camera views',
+  (batSide) => {
+    const rig = createPaintedPlayerRig({
+      team: SAMPLE_TEAM_PALETTES[0],
+      jerseyNumber: 30,
+      role: 'batter',
+      batSide,
+      traits: PLAYER_CATALOG[0].traits,
+    });
+    try {
+      const box = batterBox(batSide);
+      rig.root.position.copy(box.position);
+      rig.logicalYaw = box.yaw;
+      const bat = rig.root.getObjectByName('bat barrel')!;
+      // RHB stands at x < 0 (plate is toward +x, back shoulder is toward -x); LHB is mirrored.
+      const awayFromPlateSign = batSide === 'R' ? -1 : 1;
+      for (const camZ of [5.5, -15.35]) {
+        for (const clip of ['bat_stance', 'bat_contact_set', 'bat_power_set'] as const) {
+          rig.updatePose(clip, 0.32, undefined, new Vector3(0, 2.4, camZ));
+          const grip = bat.localToWorld(new Vector3(0, 0.08, 0));
+          const tip = bat.localToWorld(new Vector3(0, 0.94, 0));
+          expect(tip.y, `${batSide} ${clip} z=${camZ}`).toBeGreaterThan(grip.y + 0.45);
+          expect((tip.x - grip.x) * awayFromPlateSign, `${batSide} ${clip} z=${camZ}`).toBeGreaterThan(0.12);
+        }
+      }
+    } finally {
+      rig.dispose();
+    }
+  },
+);
+
+it('keeps pitcher pants unwarped and head seated solidly on the collar before every pitch', () => {
+  for (const throwsHand of ['R', 'L'] as const) {
+    const baseOpts = {
+      team: SAMPLE_TEAM_PALETTES[0],
+      jerseyNumber: 21,
+      role: 'pitcher' as const,
+      throwsHand,
+      traits: PLAYER_CATALOG[0].traits,
+    };
+    const rig = createPaintedPlayerRig(baseOpts);
+    try {
+      const body = rig.root.getObjectByName('painted uniform') as import('three').Mesh<
+        import('three').BufferGeometry,
+        import('three').ShaderMaterial
+      >;
+      const head = rig.root.getObjectByName('painted head')!;
+      const headJoint = head.parent!;
+      for (const camZ of [-15.35, 5.5]) {
+        const camera = new Vector3(0, 2.48, camZ);
+        for (const checkedBase of [0, 1, 2, 3]) {
+          rig.updateAppearance({ ...baseOpts, checkedBase });
+          for (const clip of ['pitch_set', 'pitch_stretch_set', 'pitch_shake_off', 'pitch_gather'] as const) {
+            for (const t of [0.1, 0.28, 0.55, 0.95, 1.35]) {
+              rig.updatePose(clip, t, undefined, camera);
+              // Never run the batter sleeve cuff warp across the pitcher's pants/hips.
+              expect(body.material.uniforms.sleeve.value.x, `${throwsHand} ${clip} z=${camZ} t=${t}`).toBe(0);
+              // Never tilt the flat 2D head quad forward/back in 3D X or twist it off the neck.
+              expect(headJoint.rotation.x, `${throwsHand} ${clip} z=${camZ} t=${t}`).toBe(0);
+              expect(Math.abs(headJoint.rotation.y), `${throwsHand} ${clip} z=${camZ} t=${t}`).toBeLessThanOrEqual(0.25);
+            }
+          }
+          // Head X must stay locked to the painted collar during shake-off and stretch glances (no sideways slide).
+          rig.updatePose('pitch_shake_off', 0, undefined, camera);
+          const collarX = headJoint.position.x;
+          for (const t of [0.08, 0.16, 0.25, 0.42]) {
+            rig.updatePose('pitch_shake_off', t, undefined, camera);
+            expect(Math.abs(headJoint.position.x - collarX), `${throwsHand} shake_off t=${t}`).toBeLessThan(0.002);
+          }
+          rig.updatePose('pitch_stretch_set', 0, undefined, camera);
+          const stretchCollarX = headJoint.position.x;
+          for (const t of [0.4, 0.9, 1.15, 1.6]) {
+            rig.updatePose('pitch_stretch_set', t, undefined, camera);
+            expect(Math.abs(headJoint.position.x - stretchCollarX), `${throwsHand} stretch base=${checkedBase} t=${t}`).toBeLessThan(0.002);
+          }
+        }
+      }
+    } finally {
+      rig.dispose();
+    }
+  }
+});
