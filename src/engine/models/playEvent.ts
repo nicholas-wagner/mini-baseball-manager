@@ -94,6 +94,12 @@ export type AtBatOutcome =
   | 'pickoff_out'
   | 'pickoff_safe';
 
+export interface HomeRunStatcast {
+  distanceFt: number;
+  exitVeloMph: number;
+  landmarkCall: string;
+}
+
 export interface PlayEvent {
   seq: number;
   type: PlayEventType;
@@ -113,6 +119,8 @@ export interface PlayEvent {
   isClutchMoment: boolean;
   leverageIndex?: number;
   isRivalrySpark?: boolean;
+  brokenBat?: boolean;
+  hrStatcast?: HomeRunStatcast;
   specialPowerTriggered?: {
     actor: 'pitcher' | 'batter' | 'fielder' | 'manager';
     powerId: string;

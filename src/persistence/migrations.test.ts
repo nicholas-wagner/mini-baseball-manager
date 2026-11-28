@@ -75,6 +75,11 @@ describe('TASK-108 economy & TASK-114 skill-tree migrations', () => {
     const loaded = migrateSavePayload(raw);
     expect(loaded.leagues.low_a[0].economy.scheduledPromoId).toBeNull();
     expect(loaded.leagues.low_a[0].economy.recentLedgerEntries).toEqual([]);
+    expect(loaded.leagues.low_a[0].clubRituals).toEqual({
+      hrCelebration: 'helmet_high_five',
+      luckySnack: 'strawberry_milkshakes',
+    });
+    expect(loaded.leagues.low_a[0].polaroids).toEqual([]);
     expect(loaded.leagues.low_a[0].roster[0].careerRetrainsUsed).toBe(0);
     expect(loaded.leagues.low_a[0].roster[1].careerRetrainsUsed).toBe(1);
   });

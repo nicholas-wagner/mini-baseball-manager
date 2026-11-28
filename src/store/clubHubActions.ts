@@ -95,6 +95,10 @@ import {
 import {
   applyRoutineFrontOfficeAutomation,
 } from '../engine/gm/frontOfficeMode';
+import {
+  sanitizeClubRituals,
+  type ClubRitualProfile,
+} from '../engine/gm/polaroidKeepsakes';
 import type { ThrowsHand } from '../engine/handedness/types';
 import { hireRetiredLegendCoachForClub } from '../engine/league/playoffBracket';
 import type { RetiredLegendCoachCandidate } from '../engine/rpg/lifecycle';
@@ -502,6 +506,25 @@ export function applyHumanUniformCustomization(
   useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updated) });
   useUserPreferencesStore.getState().markUniformCustomized();
   return { applied: true };
+}
+
+export function updateHumanClubRituals(
+  rituals: Partial<ClubRitualProfile>,
+): { updated: boolean; rituals?: ClubRitualProfile } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { updated: false };
+  const current = sanitizeClubRituals(club.clubRituals);
+  const nextRituals = sanitizeClubRituals({
+    ...current,
+    ...rituals,
+  });
+  const updatedClub: Club = {
+    ...club,
+    clubRituals: nextRituals,
+  };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updatedClub) });
+  return { updated: true, rituals: nextRituals };
 }
 
 export function runHumanRoutineFrontOfficePass(

@@ -3,6 +3,7 @@ import { generateSixTierWorld } from '../league/seasonEngine';
 import {
   applyOpeningDaySparkSp,
   buildFirstPitchCoachTip,
+  buildMascotTapCheer,
   buildMvpDugoutQuote,
   buildPostGameMvpHeadline,
   buildTeammateDugoutCheer,
@@ -555,5 +556,96 @@ describe('Opening Day First-Time Hook Engine (Spotlight Trio & First-Pitch Coach
       1994,
     );
     expect(solo?.teammate.id).toBe(batter.id);
+  });
+
+  it('produces personalized Synergy Bond banter weaving club lucky snack, favorite star flag & mascot tap cheers (TASK-122)', () => {
+    const club = makeClub(1994);
+    const sluggerA = club.roster[0];
+    const sluggerB = club.roster[1];
+    const pitcher = club.roster.find((p) => p.position === 'SP')!;
+
+    const hrEvent: PlayEvent = {
+      seq: 42,
+      inning: 4,
+      half: 'BOT',
+      type: 'ball_in_play',
+      outsBefore: 1,
+      outsAfter: 1,
+      balls: 2,
+      strikes: 1,
+      awayScore: 1,
+      homeScore: 3,
+      basesAfter: [null, null, null],
+      batterId: sluggerA.id,
+      pitcherId: pitcher.id,
+      outcome: 'home_run',
+      isClutchMoment: true,
+      commentary: 'Moonshot!',
+    };
+
+    const bondCheer = buildTeammateDugoutCheer(
+      hrEvent,
+      club.roster,
+      [sluggerA.id],
+      1994,
+      {
+        chemistryBonds: [
+          {
+            id: 'bash_brothers',
+            name: 'Bash Brothers',
+            callout: 'BASH BROTHERS DUO!',
+            memberNames: [sluggerA.name, sluggerB.name],
+            description: 'Sluggers feed off each other',
+            bonuses: { power: 3, clutch: 2 },
+          },
+        ],
+        clubRituals: {
+          hrCelebration: 'dugout_dance_line',
+          luckySnack: 'strawberry_milkshakes',
+        },
+      },
+    );
+
+    expect(bondCheer).not.toBeNull();
+    expect(bondCheer!.teammate.id).toBe(sluggerB.id);
+    expect(bondCheer!.bondBadge).toBe('Bash Brothers');
+    expect(bondCheer!.isActiveStarFavorite).toBe(true);
+    expect(bondCheer!.message.toLowerCase()).toContain('bash brothers');
+    expect(bondCheer!.message.toLowerCase()).toContain('strawberry milkshakes');
+
+    // Without bond, HR uses club HR celebration phrase when clubRituals passed
+    const ritualHrCheer = buildTeammateDugoutCheer(
+      hrEvent,
+      club.roster,
+      [sluggerA.id],
+      1994,
+      {
+        clubRituals: {
+          hrCelebration: 'dugout_dance_line',
+          luckySnack: 'rally_nachos',
+        },
+      },
+    );
+    expect(ritualHrCheer!.message.toLowerCase()).toContain('dance');
+    expect(ritualHrCheer!.isActiveStarFavorite).toBe(true);
+
+    // Mascot tap cycles playful ballpark cheers and valid sound cues
+    const tap0 = buildMascotTapCheer('Rocket Dog', 0, {
+      hrCelebration: 'helmet_high_five',
+      luckySnack: 'rally_nachos',
+    });
+    const tap1 = buildMascotTapCheer('Rocket Dog', 1, {
+      hrCelebration: 'helmet_high_five',
+      luckySnack: 'rally_nachos',
+    });
+    const tap3 = buildMascotTapCheer('Rocket Dog', 3, {
+      hrCelebration: 'helmet_high_five',
+      luckySnack: 'rally_nachos',
+    });
+    expect(tap0.text).toMatch(/peanuts/i);
+    expect(tap0.soundCue).toBe('vendor_bell');
+    expect(tap1.text).toMatch(/rally caps/i);
+    expect(tap1.soundCue).toBe('stadium_stomp_clap');
+    expect(tap3.text.toLowerCase()).toContain('rally nachos');
   });
 });

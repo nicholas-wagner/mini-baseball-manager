@@ -52,6 +52,7 @@ import {
   type StepPitchOptions,
 } from './aiManager';
 import { resolvePickoffAttempt, shouldAiAttemptSteal } from './baserunning';
+import { computeHomeRunStatcast, detectBrokenBatBloop } from './arcadeJuice';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
 
 export type { StepPitchOptions } from './aiManager';
@@ -115,6 +116,8 @@ function makeEvent(
     pickoffBase: partial.pickoffBase,
     isClutchMoment: isClutchSituation(state),
     leverageIndex: getCurrentLeverage(state).leverageIndex,
+    ...(partial.brokenBat ? { brokenBat: true } : {}),
+    ...(partial.hrStatcast ? { hrStatcast: partial.hrStatcast } : {}),
     specialPowerTriggered: partial.specialPowerTriggered,
     thirdBase: partial.thirdBase,
     ballFlight: partial.ballFlight,
@@ -611,11 +614,61 @@ function applyPostPlateHypeAndCooldowns(
   );
 }
 
+function buildArcadeJuicePatch(
+  state: GameSessionState,
+  res: PitchResolution,
+  batterId: string,
+  isPowerSwing: boolean,
+): Pick<PlayEvent, 'brokenBat' | 'hrStatcast' | 'commentary' | 'soundCue'> {
+  const nextSeq = state.eventSeq + 1;
+  if (res.outcome === 'home_run') {
+    const batter = getBattingSide(state).playersById[batterId];
+    return {
+      commentary: res.commentary,
+      soundCue: res.soundCue,
+      ...(batter
+        ? {
+            hrStatcast: computeHomeRunStatcast({
+              batter,
+              landingX: res.ballFlight?.landingX ?? 0,
+              landingZ: res.ballFlight?.landingZ ?? -46,
+              ballparkId: state.ballparkId,
+              eventSeq: nextSeq,
+              isPowerSwing,
+            }),
+          }
+        : {}),
+    };
+  }
+
+  const brokenBloop = detectBrokenBatBloop({
+    outcome: res.outcome,
+    battedBallType: res.battedBallType,
+    pitchType: res.pitchThrown?.pitchType,
+    eventSeq: nextSeq,
+    batterId,
+  });
+  if (brokenBloop) {
+    return {
+      brokenBat: true,
+      soundCue: 'broken_bat',
+      commentary: `Shattered-bat bloop! ${res.commentary}`,
+    };
+  }
+
+  return {
+    ...(res.soundCue === 'broken_bat' ? { brokenBat: true } : {}),
+    commentary: res.commentary,
+    soundCue: res.soundCue,
+  };
+}
+
 function applyPlateComplete(
   state: GameSessionState,
   res: PitchResolution,
   batterId: string,
   pitcherId: string,
+  isPowerSwing = false,
 ): PlayEvent[] {
   const outsBefore = state.outs;
   const batting = getBattingSide(state);
@@ -680,6 +733,7 @@ function applyPlateComplete(
 
   const eventType =
     res.outcome === 'walk' || res.outcome === 'strikeout' ? 'pitch_thrown' : 'ball_in_play';
+  const juice = buildArcadeJuicePatch(state, res, batterId, isPowerSwing);
 
   return [
     makeEvent(state, {
@@ -688,6 +742,8 @@ function applyPlateComplete(
       batterId,
       pitcherId,
       outcome: res.outcome,
+      brokenBat: juice.brokenBat,
+      hrStatcast: juice.hrStatcast,
       specialPowerTriggered: res.specialPowerTriggered,
       thirdBase: res.thirdBase,
       ballFlight: res.ballFlight,
@@ -695,8 +751,8 @@ function applyPlateComplete(
       pitchThrown: res.pitchThrown,
       mathBreakdown: res.mathBreakdown,
       battedBallType: res.battedBallType,
-      commentary: res.commentary,
-      soundCue: res.soundCue,
+      commentary: juice.commentary,
+      soundCue: juice.soundCue,
     }),
   ];
 }
@@ -987,6 +1043,7 @@ function dispatchPitchResolution(
   resolution: PitchResolution,
   batterId: string,
   pitcherId: string,
+  isPowerSwing = false,
 ): PlayEvent[] {
   if (resolution.kind === 'pitch_event') {
     return [applyCountPitch(next, resolution, batterId, pitcherId)];
@@ -994,7 +1051,7 @@ function dispatchPitchResolution(
   if (resolution.kind === 'steal_attempt') {
     return [applyStealAttempt(next, resolution, batterId, pitcherId)];
   }
-  return applyPlateComplete(next, resolution, batterId, pitcherId);
+  return applyPlateComplete(next, resolution, batterId, pitcherId, isPowerSwing);
 }
 
 function getSpecialReadinessForStep(
@@ -1372,7 +1429,7 @@ export function stepPitch(
     leverage,
   );
   resolveThirdBaseCall(next, resolution, rng, safeOpts);
-  events.push(...dispatchPitchResolution(next, resolution, batter.id, pitcher.id));
+  events.push(...dispatchPitchResolution(next, resolution, batter.id, pitcher.id, pitchCall === 'power'));
   finalizePitchStep(next, prevBases, events, safeOpts.bullpenMode);
 
   return { nextSession: next, events };

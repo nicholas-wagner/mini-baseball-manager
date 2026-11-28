@@ -103,6 +103,7 @@ import {
   canTriggerSpecialAbility,
   SPECIAL_ABILITY_HYPE_COST,
 } from '../../engine/rpg/abilityCooldowns';
+import { evaluateClubhouseChemistry } from '../../engine/rpg/chemistry';
 import {
   evaluatePitcherEnduranceEffect,
   fatigueToEndurance,
@@ -131,6 +132,10 @@ import {
   getAvailableBenchPlayers,
   resolveArgueCallGamble,
 } from '../../engine/simulation/dugoutDrama';
+import {
+  canArgueLatestCall,
+  evaluateRallyChain,
+} from '../../engine/simulation/arcadeJuice';
 import {
   computeLiveActionCue,
   type SuggestedQuickAction,
@@ -389,6 +394,9 @@ export function GameDayScreen({
   const [moundVisitUsed, setMoundVisitUsed] = useState(false);
   const [argueUsed, setArgueUsed] = useState(false);
   const [managerEjected, setManagerEjected] = useState(false);
+  const [argueToast, setArgueToast] = useState<{ ejected: boolean; text: string } | null>(null);
+  const [halfInningEvents, setHalfInningEvents] = useState<PlayEvent[]>([]);
+  const [stadiumWaveSignal, setStadiumWaveSignal] = useState(0);
   const [foilModalOpen, setFoilModalOpen] = useState(false);
   const [armedPowerId, setArmedPowerId] = useState<string | null>(null);
   const [atBatEvents, setAtBatEvents] = useState<PlayEvent[]>([]);
@@ -481,6 +489,21 @@ export function GameDayScreen({
   }, [humanClub, scheduledOpponent, scheduledIsHome, worldSeed, gameLength, activeGameplan, pendingLivePlayoff]);
   const openingMoment = useMemo(() => !liveSession && humanClub && humanClub.wins + humanClub.losses === 0
     ? openingRequest ?? buildScheduledMoment(true) : null, [openingRequest, buildScheduledMoment, liveSession, humanClub]);
+
+  useEffect(() => {
+    if (!argueToast) return undefined;
+    const timer = window.setTimeout(() => setArgueToast(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [argueToast]);
+
+  const handleMascotBuddyTap = useCallback(() => {
+    setStadiumWaveSignal((count) => count + 1);
+  }, []);
+
+  const humanChemistry = useMemo(
+    () => (humanClub ? evaluateClubhouseChemistry(humanClub.roster) : null),
+    [humanClub],
+  );
 
   const rivalryPreview = useMemo(() => {
     if (!humanClub || !activeOpponent) return null;
@@ -647,6 +670,9 @@ export function GameDayScreen({
     setMoundVisitUsed(false);
     setArgueUsed(false);
     setManagerEjected(false);
+    setArgueToast(null);
+    setHalfInningEvents([]);
+    setStadiumWaveSignal(0);
     setLastChoreo(null);
     setDecidingPitchCue(null);
     playLockedRef.current = false;
@@ -707,6 +733,11 @@ export function GameDayScreen({
     setHitAndRunArmed(false);
     setLiveSession(clutch.session);
     setRecentEvents([...clutch.events].reverse());
+    setHalfInningEvents(
+      clutch.gameEvents.filter(
+        (ev) => ev.inning === clutch.session.inning && ev.half === clutch.session.half,
+      ),
+    );
     setAtBatEvents([]);
     setArmedPowerId(null);
     setPitchTarget('attack_zone');
@@ -716,6 +747,8 @@ export function GameDayScreen({
     setMoundVisitUsed(false);
     setArgueUsed(false);
     setManagerEjected(false);
+    setArgueToast(null);
+    setStadiumWaveSignal(0);
     setLastChoreo(null);
     setDecidingPitchCue(null);
     playLockedRef.current = false;
@@ -837,6 +870,21 @@ export function GameDayScreen({
           soundEngine.play('organ_seventh_stretch');
         }
         setRecentEvents((prev) => [...emitted.slice().reverse(), ...prev].slice(0, 12));
+        setHalfInningEvents((prev) => {
+          const sameFrame = prev.filter(
+            (ev) => ev.inning === lastEvent.inning && ev.half === lastEvent.half,
+          );
+          const matchingEmitted = emitted.filter(
+            (ev) => ev.inning === lastEvent.inning && ev.half === lastEvent.half,
+          );
+          const nextFrame = [...sameFrame, ...matchingEmitted];
+          const prevRally = evaluateRallyChain(sameFrame, lastEvent.inning, lastEvent.half);
+          const nextRally = evaluateRallyChain(nextFrame, lastEvent.inning, lastEvent.half);
+          if (nextRally.soundCue && nextRally.hitStreak > prevRally.hitStreak) {
+            soundEngine.play(nextRally.soundCue);
+          }
+          return nextFrame;
+        });
         recordNemesisEvents(emitted);
         const pitchEvs = emitted.filter((ev) => Boolean(ev.pitchThrown));
         if (pitchEvs.length > 0) {
@@ -2799,8 +2847,41 @@ export function GameDayScreen({
         humanClub.roster,
         favoritePlayerIds,
         worldSeed + seasonNumber * 97,
+        {
+          chemistryBonds: humanChemistry?.activeBonds,
+          clubRituals: humanClub.clubRituals,
+        },
       )
     : null;
+  const liveRallyChain = evaluateRallyChain(halfInningEvents, shown.inning, shown.half);
+  const activeHrStatcast =
+    !pendingDecision && !showNextMatchup && playbackEvent?.hrStatcast
+      ? playbackEvent.hrStatcast
+      : null;
+  const canArgueCallNow = canArgueLatestCall(
+    latestEv,
+    argueUsed,
+    liveSession.status === 'completed',
+    !humanIsBatting,
+  );
+  const handleArgueCall = () => {
+    if (argueUsed || liveSession.status === 'completed') return;
+    const rng = createSeededRng(liveSession.rngSeed + liveSession.stepCounter * 71 + 19);
+    const gamble = resolveArgueCallGamble(rng, liveSession, humanSideKey);
+    setArgueUsed(true);
+    if (gamble.ejected) setManagerEjected(true);
+    setArgueToast({
+      ejected: gamble.ejected,
+      text: gamble.ejected
+        ? '🚨 SKIPPER EJECTED!! +28 Hype'
+        : '🔥 DUGOUT FIRED UP! +35 Hype',
+    });
+    soundEngine.play(
+      gamble.event.soundCue ?? (gamble.ejected ? 'ump_strike_call' : 'stadium_stomp_clap'),
+    );
+    setSheetOpen(false);
+    applyStepResult(gamble.nextSession, [gamble.event], activeOpponent.id);
+  };
   const rawBullpenRec =
     !humanIsBatting && bullpenMode === 'semi_auto' && !playing && !handoff
       ? evaluateBullpenCall(liveSession, humanSideKey)
@@ -3043,7 +3124,10 @@ export function GameDayScreen({
     shown.bases.some(Boolean) &&
       liveSession.status === 'in_progress' &&
       !entranceCue &&
-      !liveDugoutCheer,
+      !liveDugoutCheer &&
+      !liveRallyChain.label &&
+      !activeHrStatcast &&
+      !argueToast,
   );
   const broadcastSlipEvent = pendingDecision || showNextMatchup ? null : playbackEvent;
   const liveBroadcastSlip =
@@ -3069,6 +3153,7 @@ export function GameDayScreen({
               defensiveShift={defensiveShift}
               broadcastSlip={liveBroadcastSlip ? <BroadcastStatSlip slip={liveBroadcastSlip} /> : null}
               shakeOffSignal={shakeOffTrigger}
+              stadiumWaveSignal={stadiumWaveSignal}
               showStretchCue={showStretchCue}
               audioMuted={audioMuted}
               onToggleAudio={handleToggleLiveAudio}
@@ -3098,67 +3183,120 @@ export function GameDayScreen({
                   player={entranceCue.role === 'pitcher' ? picturedPitcher : picturedBatter} pitching={entranceCue.role === 'pitcher'} />
                 : <BatterEntrance key={picturedBatter.id} player={picturedBatter} />}</>}
               celebrateConfetti={celebrateScore && !(handoff && !playing)}
-              overlay={
-                guiding && !showMore && advancedFrom && prePlaySession ? (
-                  <RunnerCue session={prePlaySession} advancedFrom={advancedFrom} />
-                ) : guiding && !showMore && guidedBatting && !playing && !lastChoreo && shown.bases.some(Boolean) ? (
-                  <RunnerCue session={shown} />
-                ) : pitchingChange && liveSession.status === 'in_progress' ? (
-                  <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border-2 border-[#172C29] bg-[#FFF7E4] px-3 py-1.5 text-sm font-bold text-[#172C29] shadow-sm">
-                    <span role="status">{bullpenMessage}</span>
-                    {(!playing || nextDefensivePitcher) && watchMode === 'paused' && (
-                      <button type="button" disabled={playLocked} className="pointer-events-auto min-h-11 rounded-lg bg-[#FFCC49] px-3 font-display cursor-pointer disabled:opacity-60"
-                        onClick={() => handleNextPitch(tacticalCall)}>
-                        {humanIsBatting ? 'Face next pitch' : 'Throw next pitch'}
-                      </button>
-                    )}
-                  </div>
-                ) : lastChoreo?.play?.holdForceCall ? (
-                  <div className="flex items-center gap-2">
-                  <ClubMascotBuddy mascot={humanClub.mascot} primaryColor={humanClub.colors.primary}
-                    secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm"
-                    mood={pendingDecision ? 'watching' : 'peeking'} />
-                  {!pendingDecision && playing && <span className="plate-verdict" role="status">{buntCall ?? 'Out at first'}</span>}
-                  </div>
-                ) : handoff && !playing ? null : liveCallout ? (
-                  <div
-                    role="status"
-                    data-testid="comic-callout-banner"
-                    className="px-3 py-1.5 rounded-xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] flex items-center justify-center gap-2 max-w-[95%] text-center"
-                    style={{ backgroundColor: liveCallout.bg, color: liveCallout.text }}
-                  >
-                    {celebrateScore ? (
-                      <ClubMascotBuddy
-                        mascot={humanClub.mascot}
-                        primaryColor={humanClub.colors.primary}
-                        secondaryColor={humanClub.colors.secondary}
-                        accentColor={humanClub.colors.accent}
-                        mood="cheering"
-                        size="sm"
-                        testId="live-celebration-mascot"
-                      />
-                    ) : null}
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-display text-xs sm:text-sm tracking-wide">
-                        {liveCallout.title}
-                      </span>
-                      <span className="hidden sm:inline text-[10px] font-extrabold opacity-95">
-                        {liveCallout.coachQuip}
-                      </span>
+              overlay={(() => {
+                const primaryOverlay =
+                  guiding && !showMore && advancedFrom && prePlaySession ? (
+                    <RunnerCue session={prePlaySession} advancedFrom={advancedFrom} />
+                  ) : guiding && !showMore && guidedBatting && !playing && !lastChoreo && shown.bases.some(Boolean) ? (
+                    <RunnerCue session={shown} />
+                  ) : pitchingChange && liveSession.status === 'in_progress' ? (
+                    <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border-2 border-[#172C29] bg-[#FFF7E4] px-3 py-1.5 text-sm font-bold text-[#172C29] shadow-sm">
+                      <span role="status">{bullpenMessage}</span>
+                      {(!playing || nextDefensivePitcher) && watchMode === 'paused' && (
+                        <button type="button" disabled={playLocked} className="pointer-events-auto min-h-11 rounded-lg bg-[#FFCC49] px-3 font-display cursor-pointer disabled:opacity-60"
+                          onClick={() => handleNextPitch(tacticalCall)}>
+                          {humanIsBatting ? 'Face next pitch' : 'Throw next pitch'}
+                        </button>
+                      )}
                     </div>
+                  ) : lastChoreo?.play?.holdForceCall ? (
+                    <div className="flex items-center gap-2">
+                    <ClubMascotBuddy mascot={humanClub.mascot} primaryColor={humanClub.colors.primary}
+                      secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm"
+                      mood={pendingDecision ? 'watching' : 'peeking'} />
+                    {!pendingDecision && playing && <span className="plate-verdict" role="status">{buntCall ?? 'Out at first'}</span>}
+                    </div>
+                  ) : handoff && !playing ? null : liveCallout ? (
+                    <div
+                      role="status"
+                      data-testid="comic-callout-banner"
+                      className="px-3 py-1.5 rounded-xl border-[3px] border-[#181B2C] shadow-[4px_4px_0_#181B2C] flex items-center justify-center gap-2 max-w-[95%] text-center"
+                      style={{ backgroundColor: liveCallout.bg, color: liveCallout.text }}
+                    >
+                      {celebrateScore ? (
+                        <ClubMascotBuddy
+                          mascot={humanClub.mascot}
+                          primaryColor={humanClub.colors.primary}
+                          secondaryColor={humanClub.colors.secondary}
+                          accentColor={humanClub.colors.accent}
+                          mood="cheering"
+                          size="sm"
+                          testId="live-celebration-mascot"
+                        />
+                      ) : null}
+                      <div className="flex flex-col items-center justify-center gap-0.5">
+                        <span className="font-display text-xs sm:text-sm tracking-wide">
+                          {liveCallout.title}
+                        </span>
+                        <span className="hidden sm:inline text-[10px] font-extrabold opacity-95">
+                          {liveCallout.coachQuip}
+                        </span>
+                      </div>
+                    </div>
+                  ) : readout ? <div key={playbackEvent?.seq} className="flex items-center gap-1" role="status">
+                    {playbackEvent?.outcome === 'foul' && <span className="foul-peek" aria-hidden="true"><ClubMascotBuddy mascot={humanClub.mascot}
+                      primaryColor={humanClub.colors.primary} secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm" /></span>}
+                    <span className="plate-verdict">
+                      {buntCall ?? readout.label}
+                      {!buntCall && playbackEvent?.pitchThrown
+                        ? ` · ${playbackEvent.pitchThrown.mph} mph ${PITCH_TYPE_SHORT_LABELS[playbackEvent.pitchThrown.pitchType]}`
+                        : ''}
+                      {decidingPitchCue ? ` · ${decidingPitchCue}` : ''}
+                    </span>
+                  </div> : null;
+
+                const hasJuicePills = Boolean(
+                  activeHrStatcast || liveRallyChain.label || argueToast,
+                );
+                if (!primaryOverlay && !hasJuicePills) return null;
+
+                const rallyToneClass =
+                  liveRallyChain.tone === 'electric'
+                    ? 'bg-[#7209B7] text-[#FFD166]'
+                    : liveRallyChain.tone === 'fire'
+                      ? 'bg-[#FF4D6D] text-[#FFFDF7]'
+                      : 'bg-[#FFC300] text-[#181B2C]';
+
+                return (
+                  <div className="flex flex-col items-start gap-1 max-w-full">
+                    {primaryOverlay}
+                    {hasJuicePills ? (
+                      <div className="flex flex-wrap items-center gap-1 max-w-full">
+                        {activeHrStatcast ? (
+                          <div
+                            data-testid="hr-statcast-pill"
+                            className="px-2 py-0.5 rounded-full border-2 border-[#181B2C] bg-[#FFC300] text-[#181B2C] font-display text-[10px] sm:text-[11px] leading-tight shadow-[2px_2px_0_#181B2C] max-w-full truncate"
+                          >
+                            💥 {activeHrStatcast.distanceFt} FT · {activeHrStatcast.exitVeloMph} MPH · {activeHrStatcast.landmarkCall}
+                          </div>
+                        ) : null}
+                        {liveRallyChain.label ? (
+                          <div
+                            data-testid="rally-chain-badge"
+                            data-rally-tone={liveRallyChain.tone ?? ''}
+                            className={`px-2 py-0.5 rounded-full border-2 border-[#181B2C] font-display text-[10px] sm:text-[11px] leading-tight shadow-[2px_2px_0_#181B2C] whitespace-nowrap ${rallyToneClass}`}
+                          >
+                            {liveRallyChain.label}
+                          </div>
+                        ) : null}
+                        {argueToast ? (
+                          <div
+                            data-testid="argue-call-toast"
+                            role="status"
+                            className={`px-2.5 py-0.5 rounded-full border-2 border-[#181B2C] font-display text-[10px] sm:text-[11px] leading-tight shadow-[2px_2px_0_#181B2C] ${
+                              argueToast.ejected
+                                ? 'bg-[#E63946] text-[#FFFDF7]'
+                                : 'bg-[#FFC300] text-[#181B2C]'
+                            }`}
+                          >
+                            {argueToast.text}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
-                ) : readout ? <div key={playbackEvent?.seq} className="flex items-center gap-1" role="status">
-                  {playbackEvent?.outcome === 'foul' && <span className="foul-peek" aria-hidden="true"><ClubMascotBuddy mascot={humanClub.mascot}
-                    primaryColor={humanClub.colors.primary} secondaryColor={humanClub.colors.secondary} accentColor={humanClub.colors.accent} size="sm" /></span>}
-                  <span className="plate-verdict">
-                    {buntCall ?? readout.label}
-                    {!buntCall && playbackEvent?.pitchThrown
-                      ? ` · ${playbackEvent.pitchThrown.mph} mph ${PITCH_TYPE_SHORT_LABELS[playbackEvent.pitchThrown.pitchType]}`
-                      : ''}
-                    {decidingPitchCue ? ` · ${decidingPitchCue}` : ''}
-                  </span>
-                </div> : null
-              }
+                );
+              })()}
             />
         </div>
         <div className="live-right">
@@ -3298,6 +3436,10 @@ export function GameDayScreen({
               mascotName={showFullHud ? null : humanClub.mascot}
               mascotColors={humanClub.colors}
               mascotMood={liveMascotMood}
+              clubRituals={humanClub.clubRituals}
+              onMascotTap={handleMascotBuddyTap}
+              canArgueCall={canArgueCallNow}
+              onArgueCall={handleArgueCall}
               onTarget={target=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setPitchTarget(target);}}
               onSwing={call=>{setEntranceCue(null);setLastChoreo(null);setPlaybackEvent(null);setTacticalCall(call);}}
               onPitch={(grade) => handleNextPitch(tacticalCall, grade)} onSuggested={()=>{
@@ -3333,7 +3475,11 @@ export function GameDayScreen({
               upcomingBatters={humanIsBatting ? [] : upcomingBatters}
               clubMascot={humanClub.mascot}
               clubColors={humanClub.colors}
+              clubRituals={humanClub.clubRituals}
               mascotMood={liveMascotMood}
+              onMascotTap={handleMascotBuddyTap}
+              canArgueCall={canArgueCallNow}
+              onArgueCall={handleArgueCall}
               buntPreviewLine={buntPreviewLine}
               defensiveShift={defensiveShift}
               onSelectDefensiveShift={(shift) => {
@@ -3510,7 +3656,11 @@ export function GameDayScreen({
               upcomingBatters={humanIsBatting ? [] : upcomingBatters}
               clubMascot={humanClub.mascot}
               clubColors={humanClub.colors}
+              clubRituals={humanClub.clubRituals}
               mascotMood={liveMascotMood}
+              onMascotTap={handleMascotBuddyTap}
+              canArgueCall={canArgueCallNow}
+              onArgueCall={handleArgueCall}
               buntPreviewLine={buntPreviewLine}
               defensiveShift={defensiveShift}
               onSelectDefensiveShift={(shift) => {
@@ -4242,15 +4392,7 @@ export function GameDayScreen({
                         size="sm"
                         variant={argueUsed ? 'cream' : 'coral'}
                         disabled={argueUsed || liveSession.status === 'completed'}
-                        onClick={() => {
-                          const rng = createSeededRng(
-                            liveSession.rngSeed + liveSession.stepCounter * 71 + 19,
-                          );
-                          const gamble = resolveArgueCallGamble(rng, liveSession, humanSideKey);
-                          setArgueUsed(true);
-                          if (gamble.ejected) setManagerEjected(true);
-                          applyStepResult(gamble.nextSession, [gamble.event], activeOpponent.id);
-                        }}
+                        onClick={handleArgueCall}
                       >
                         {managerEjected ? '🚨 Skipper Ejected' : '🔥 Kick Dirt! (Argue Call)'}
                       </ComicButton>

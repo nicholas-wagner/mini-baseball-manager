@@ -21,6 +21,7 @@ import { toBaseballCardPlayer } from '../utils/playerCardAdapter';
 import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { FlipBaseballCard } from './FlipBaseballCard';
 import { HobbyConversation } from './OffTheClock';
+import { PolaroidKeepsakeCard } from './PolaroidKeepsakeCard';
 import { ScorebookPrint } from './ScorebookPrint';
 
 export type PostGameTabId = 'highlights' | 'clubhouse' | 'box_score';
@@ -375,6 +376,15 @@ export function PostGameSummaryModal({
                 kept={humanClub.keepsakes}
                 onKeep={keepMoment}
               />
+
+              {summary.latestPolaroid ? (
+                <PolaroidKeepsakeCard
+                  polaroid={summary.latestPolaroid}
+                  club={humanClub}
+                  compact
+                  testId="postgame-victory-polaroid"
+                />
+              ) : null}
 
               <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-3.5 items-start">
                 <div

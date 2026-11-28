@@ -3,10 +3,11 @@ import { ClipboardList, FastForward, Play, RefreshCw, Shield, SkipForward, Slide
 import { soundEngine } from '../../audio/soundEngine';
 import type { LiveBroadcastLowerThird } from '../../engine/gm/gameDayMoments';
 import {
-  buildMascotCheerQuip,
+  buildMascotTapCheer,
   PITCH_CALL_GUIDE,
   SWING_CALL_GUIDE,
 } from '../../engine/gm/openingDayHook';
+import type { ClubRitualProfile } from '../../engine/gm/polaroidKeepsakes';
 import { PITCH_TYPE_SHORT_LABELS, type FormState, type PitchType } from '../../engine/models/player';
 import type { PlayEvent, TacticalCall } from '../../engine/models/playEvent';
 import type { PitcherEnduranceTier } from '../../engine/rpg/pitcherEndurance';
@@ -81,7 +82,11 @@ interface LiveActionBarProps {
   upcomingBatters?: readonly UpcomingBatterSummary[];
   clubMascot?: string;
   clubColors?: { primary: string; secondary: string; accent: string };
+  clubRituals?: ClubRitualProfile;
   mascotMood?: 'happy' | 'cheering' | 'rally' | 'determined';
+  onMascotTap?: () => void;
+  canArgueCall?: boolean;
+  onArgueCall?: () => void;
   buntPreviewLine?: string | null;
   defensiveShift?: DefensiveShiftId;
   onSelectDefensiveShift?: (shift: DefensiveShiftId) => void;
@@ -187,7 +192,11 @@ export function LiveActionBar({
   upcomingBatters = [],
   clubMascot,
   clubColors,
+  clubRituals,
   mascotMood = 'happy',
+  onMascotTap,
+  canArgueCall = false,
+  onArgueCall,
   buntPreviewLine = null,
   defensiveShift = 'standard',
   onSelectDefensiveShift,
@@ -395,8 +404,10 @@ export function LiveActionBar({
       onClick={() => {
         const nextTap = mascotTapCount + 1;
         setMascotTapCount(nextTap);
-        setMascotCheerText(buildMascotCheerQuip(clubMascot, mascotMood, nextTap));
-        soundEngine.play(mascotMood === 'cheering' ? 'crowd_cheer' : 'ui_pop');
+        const cheer = buildMascotTapCheer(clubMascot, nextTap - 1, clubRituals);
+        setMascotCheerText(cheer.text);
+        soundEngine.play(cheer.soundCue);
+        onMascotTap?.();
       }}
       className="rounded-2xl p-0.5 cursor-pointer hover:scale-105 active:scale-95 transition shrink-0"
     >
@@ -421,6 +432,7 @@ export function LiveActionBar({
         {(showBullpenSuggestion && bullpenSuggestion) ||
         (isBatting && resolvedStealOptions.length > 0) ||
         (!isBatting && Boolean(pickoffOption) && Boolean(onPickoff)) ||
+        (canArgueCall && Boolean(onArgueCall)) ||
         (readyPowerLabel && onArmReadyPower) ? (
           <div className="live-context-chip" data-testid="dock-context-chip">
             {showBullpenSuggestion && bullpenSuggestion ? (
@@ -431,6 +443,17 @@ export function LiveActionBar({
                 onClick={() => onAcceptBullpenSuggestion?.(bullpenSuggestion.recommendedReliever.id)}
               >
                 Bring In {bullpenSuggestion.recommendedReliever.name.split(' ')[0]}
+              </button>
+            ) : null}
+            {canArgueCall && onArgueCall ? (
+              <button
+                type="button"
+                data-testid="argue-call-chip"
+                disabled={controlsLocked}
+                onClick={onArgueCall}
+                style={{ backgroundColor: '#FFE5EC', color: '#9D0208' }}
+              >
+                🗣️ Argue Call!
               </button>
             ) : null}
             {!isBatting && pickoffOption && onPickoff ? (
@@ -829,18 +852,31 @@ export function LiveActionBar({
             </div>
           ) : null}
 
-          {/* 1-Tap Pickoff 1B/2B chip when pitching with runner on 1B or 2B (Simple & Pro, Desktop & Sheet) */}
-          {!isBatting && pickoffOption && onPickoff ? (
+          {/* 1-Tap Pickoff 1B/2B & 1-per-game Cartoon "Argue Call!" chip */}
+          {(!isBatting && pickoffOption && onPickoff) || (canArgueCall && onArgueCall) ? (
             <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                data-testid="arcade-pickoff-btn"
-                disabled={controlsLocked}
-                onClick={() => onPickoff(pickoffOption.base)}
-                className="px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] bg-[#E0FBFC] hover:bg-[#FFCC49] text-[#152F2E] font-heading font-extrabold text-[11px] cursor-pointer transition disabled:opacity-55 disabled:cursor-not-allowed"
-              >
-                👀 {pickoffOption.label}
-              </button>
+              {!isBatting && pickoffOption && onPickoff ? (
+                <button
+                  type="button"
+                  data-testid="arcade-pickoff-btn"
+                  disabled={controlsLocked}
+                  onClick={() => onPickoff(pickoffOption.base)}
+                  className="px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#193E37] bg-[#E0FBFC] hover:bg-[#FFCC49] text-[#152F2E] font-heading font-extrabold text-[11px] cursor-pointer transition disabled:opacity-55 disabled:cursor-not-allowed"
+                >
+                  👀 {pickoffOption.label}
+                </button>
+              ) : null}
+              {canArgueCall && onArgueCall ? (
+                <button
+                  type="button"
+                  data-testid="argue-call-chip"
+                  disabled={controlsLocked}
+                  onClick={onArgueCall}
+                  className="px-2.5 py-1 min-h-[44px] rounded-lg border-2 border-[#181B2C] bg-[#FFE5EC] hover:bg-[#FFC300] text-[#9D0208] font-heading font-extrabold text-[11px] shadow-[2px_2px_0_#181B2C] cursor-pointer transition disabled:opacity-55 disabled:cursor-not-allowed"
+                >
+                  🗣️ Argue Call!
+                </button>
+              ) : null}
             </div>
           ) : null}
 

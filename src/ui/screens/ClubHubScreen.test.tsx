@@ -39,8 +39,17 @@ describe('ClubHubScreen — Ballparks, Coaches, Practice Complex & Manager RPG',
     await user.click(screen.getByRole('button', { name: /run slump-buster film room/i }));
     expect(screen.getByText(/slump-buster film room:/i)).toBeInTheDocument();
 
-    // 4. Uniforms & Gear room -> Relics & Chemistry equips a 90s Relic onto the active player
+    // 4. Uniforms & Gear room -> Club Rituals picker persists HR Celebration & Lucky Snack
     await user.click(screen.getByRole('button', { name: /uniforms & gear/i }));
+    expect(screen.getByTestId('club-rituals-card')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /dugout dance line/i }));
+    await user.click(screen.getByRole('button', { name: /rally nachos/i }));
+    expect(useGameStore.getState().getHumanClub()?.clubRituals).toEqual({
+      hrCelebration: 'dugout_dance_line',
+      luckySnack: 'rally_nachos',
+    });
+
+    // 5. Uniforms & Gear room -> Relics & Chemistry equips a 90s Relic onto the active player
     await user.click(screen.getByRole('button', { name: /relics & chemistry/i }));
     expect(screen.getByText(/clubhouse chemistry:/i)).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: /equip relic/i })[0]);

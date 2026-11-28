@@ -3,6 +3,11 @@ import {
   settleSeriesGameLogs,
 } from '../engine/economy/clubLedgerSettlement';
 import { discoverPlayerHobby } from '../engine/rpg/playerHobbies';
+import {
+  appendPolaroidKeepsake,
+  maybeCreateVictoryPolaroid,
+  type PolaroidKeepsake,
+} from '../engine/gm/polaroidKeepsakes';
 import { selectScorebookMoments, type ScorebookMoment } from '../engine/gm/scorebookMoments';
 import { create } from 'zustand';
 import {
@@ -130,6 +135,7 @@ export interface StartNewCareerInput {
 
 export interface PostGameSummary {
   moments?: ScorebookMoment[];
+  latestPolaroid?: PolaroidKeepsake | null;
   opponentClubId: string;
   opponentName: string;
   isHomeGame: boolean;
@@ -1293,7 +1299,46 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           ledgerCap: LEDGER_HISTORY_CAP,
         },
       );
-      const settledHumanClub = bossSettlement.club;
+      const humanScore = isHomeGame ? result.homeScore : result.awayScore;
+      const opponentScore = isHomeGame ? result.awayScore : result.homeScore;
+      const isWalkOff =
+        won &&
+        result.events.some(
+          (ev) =>
+            ev.type === 'game_end' &&
+            (ev.soundCue === 'fireworks_boom' || ev.commentary.toLowerCase().includes('walk-off')),
+        );
+      const humanRosterIds = new Set(bossSettlement.club.roster.map((p) => p.id));
+      const starPlayerIds = [
+        ...Object.entries(result.playerStatDeltas)
+          .filter(([id]) => humanRosterIds.has(id))
+          .sort(
+            ([, a], [, b]) =>
+              b.homeRuns * 4 + b.hits * 2 + b.rbis * 2 + b.pitchingStrikeouts -
+              (a.homeRuns * 4 + a.hits * 2 + a.rbis * 2 + a.pitchingStrikeouts),
+          )
+          .map(([id]) => id),
+        ...state.favoritePlayerIds,
+      ];
+      const latestPolaroid = maybeCreateVictoryPolaroid({
+        club: bossSettlement.club,
+        opponentName: `${opponentClub.city} ${opponentClub.name}`,
+        humanScore,
+        opponentScore,
+        isWalkOff,
+        isBossVictory: won && bossSettlement.bounty.isBossShowdown,
+        isOpeningWin: won && humanClub.wins === 0,
+        mvpId: mvp.playerId,
+        starPlayerIds,
+        season: state.seasonNumber,
+        gameNumber: humanClub.wins + humanClub.losses + 1,
+      });
+      const settledHumanClub: Club = latestPolaroid
+        ? {
+            ...bossSettlement.club,
+            polaroids: appendPolaroidKeepsake(bossSettlement.club.polaroids ?? [], latestPolaroid),
+          }
+        : bossSettlement.club;
       const updatedOpponent = applyGameStatDeltasToClub(
         opponentClub,
         result.playerStatDeltas,
@@ -1383,6 +1428,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         (sweepBonusAwarded ? SERIES_SWEEP_BONUS_CASH : 0) + bossSettlement.bounty.bountyAwarded;
       const summary: PostGameSummary = {
         moments: selectScorebookMoments(result.events, side.playersById, isHomeGame, opponentClub.name, gameId, guidedEvents),
+        latestPolaroid,
         opponentClubId: opponentClub.id,
         opponentName: `${opponentClub.city} ${opponentClub.name}`,
         isHomeGame,

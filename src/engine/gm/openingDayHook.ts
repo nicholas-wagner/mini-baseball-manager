@@ -1,15 +1,22 @@
 import type { Club } from '../models/club';
-import type { AtBatOutcome, PlayEvent, TacticalCall } from '../models/playEvent';
+import type { AtBatOutcome, PlayEvent, PlaySoundCue, TacticalCall } from '../models/playEvent';
 import {
   computePlayerOverall,
   isPitcherPosition,
   PITCH_TYPE_SHORT_LABELS,
   type Player,
 } from '../models/player';
+import type { ActiveSynergyBond, SynergyBondId } from '../rpg/chemistry';
 import { fatigueToEndurance } from '../rpg/pitcherEndurance';
 import { createSeededRng, type SeededRng } from '../rng/seededRng';
 import type { GameSessionState } from '../simulation/gameState';
 import type { PitchTargetIntent } from '../simulation/pitchMindGames';
+import {
+  getClubSnackMeta,
+  getHrCelebrationMeta,
+  sanitizeClubRituals,
+  type ClubRitualProfile,
+} from './polaroidKeepsakes';
 
 export interface SpotlightStarCard {
   roleId: 'captain' | 'ace' | 'speedster';
@@ -297,6 +304,29 @@ export function buildMascotCheerQuip(
   const pool = MASCOT_QUIPS[mood];
   const picked = pool[Math.abs(seedIndex) % pool.length];
   return `${mascot.split(' ')[0]}: "${picked}"`;
+}
+
+export interface MascotTapCheer {
+  text: string;
+  soundCue: Extract<PlaySoundCue, 'vendor_bell' | 'stadium_stomp_clap'>;
+}
+
+/** Cycles playful ballpark cheers & crowd-wave cues whenever the player taps the live mascot buddy. */
+export function buildMascotTapCheer(
+  mascot: string,
+  tapIndex: number,
+  clubRituals?: ClubRitualProfile,
+): MascotTapCheer {
+  const snack = getClubSnackMeta(sanitizeClubRituals(clubRituals).luckySnack).snackNameLower;
+  const firstWord = mascot.split(' ')[0];
+  const pool: readonly MascotTapCheer[] = [
+    { text: `${firstWord}: "Peanuts! Cracker Jack! Let's go!"`, soundCue: 'vendor_bell' },
+    { text: `${firstWord}: "Rally caps on!! Start the wave!!"`, soundCue: 'stadium_stomp_clap' },
+    { text: `${firstWord}: "Stomp-stomp-CLAP! Make some noise!"`, soundCue: 'stadium_stomp_clap' },
+    { text: `${firstWord}: "Fresh ${snack} for a big inning!"`, soundCue: 'vendor_bell' },
+    { text: `${firstWord}: "Stand up and cheer — rally time!!"`, soundCue: 'stadium_stomp_clap' },
+  ];
+  return pool[Math.abs(tapIndex) % pool.length];
 }
 
 const DERBY_INVITE_CARD: BetweenGameSpotlightCard = {
@@ -755,12 +785,21 @@ export interface TeammateDugoutCheer {
   teammate: Player;
   /** True when the cheering teammate is one of the user's starred Favorites. */
   isFavorite: boolean;
-  /** Cute, upbeat 1-line reaction (strictly <= 7 words). */
+  /** True when the active batter/pitcher who made the play is a starred Favorite. */
+  isActiveStarFavorite?: boolean;
+  /** Optional active Synergy Bond pill when a bond partner cheers. */
+  bondBadge?: string;
+  /** Cute, upbeat 1-line reaction (strictly <= 7 words for standard cheers, or warm bond banter). */
   message: string;
   /** Expressive comic emoji accent. */
   emoji: string;
   /** Visual pill tone matching the play moment. */
   mood: DugoutCheerMood;
+}
+
+export interface DugoutCheerOptions {
+  chemistryBonds?: readonly ActiveSynergyBond[];
+  clubRituals?: ClubRitualProfile;
 }
 
 type DugoutCheerKind =
@@ -909,30 +948,115 @@ function pickCheeringTeammate(
   return { teammate: picked, isFavorite: favSet.has(picked.id) };
 }
 
+const SYNERGY_BOND_BANTER: Readonly<Record<SynergyBondId, (snack: string) => string>> = {
+  bash_brothers: (snack) => `Bash Brothers! Clear the fence and ${snack} are on me! 💖`,
+  battery_telepathy: (snack) => `Battery Telepathy! Locked in — ${snack} after this gem! 💖`,
+  double_play_wizards: (snack) => `Turn-Two Wizards! Silky glovework earns ${snack} tonight! 💖`,
+  speed_demons: (snack) => `Speed Demons! Burn the bases for ${snack} later! 💖`,
+  clutch_captains: (snack) => `Clubhouse Captains! Big spark — ${snack} on the skipper! 💖`,
+  no_fly_zone: (snack) => `No-Fly Zone! Nothing drops — ${snack} are on me! 💖`,
+};
+
+function findActiveHumanHero(event: PlayEvent, teammates: readonly Player[]): Player | null {
+  const heroIds = [event.batterId, event.pitcherId, event.fieldingHighlight?.fielderId];
+  for (const id of heroIds) {
+    if (!id) continue;
+    const match = teammates.find((p) => p.id === id);
+    if (match) return match;
+  }
+  return null;
+}
+
+function findSynergyBondPartner(
+  activeHero: Player | null,
+  teammates: readonly Player[],
+  bonds?: readonly ActiveSynergyBond[],
+): { partner: Player; bond: ActiveSynergyBond } | null {
+  if (!activeHero || !bonds || bonds.length === 0) return null;
+  for (const bond of bonds) {
+    if (!bond.memberNames.includes(activeHero.name)) continue;
+    const partner = teammates.find(
+      (p) => p.id !== activeHero.id && bond.memberNames.includes(p.name),
+    );
+    if (partner) return { partner, bond };
+  }
+  return null;
+}
+
+function resolveStandardCheerMessage(
+  kind: DugoutCheerKind,
+  template: DugoutCheerTemplate,
+  rng: SeededRng,
+  clubRituals?: ClubRitualProfile,
+): string {
+  if (kind === 'home_run' && clubRituals) {
+    return getHrCelebrationMeta(sanitizeClubRituals(clubRituals).hrCelebration).banterPhrase;
+  }
+  return rng.pick(template.lines);
+}
+
+function buildBondCheerPayload(
+  event: PlayEvent,
+  bondMatch: { partner: Player; bond: ActiveSynergyBond },
+  favoriteIds: readonly string[],
+  isActiveStarFavorite: boolean,
+  mood: DugoutCheerMood,
+  clubRituals?: ClubRitualProfile,
+): TeammateDugoutCheer {
+  const snack = getClubSnackMeta(sanitizeClubRituals(clubRituals).luckySnack).snackNameLower;
+  return {
+    id: `cheer-${event.seq}-${bondMatch.partner.id}`,
+    eventSeq: event.seq,
+    teammate: bondMatch.partner,
+    isFavorite: favoriteIds.includes(bondMatch.partner.id),
+    ...(isActiveStarFavorite ? { isActiveStarFavorite: true } : {}),
+    bondBadge: bondMatch.bond.name,
+    message: SYNERGY_BOND_BANTER[bondMatch.bond.id](snack),
+    emoji: '💖',
+    mood,
+  };
+}
+
 /**
- * Deterministically builds a charming <=7-word dugout cheer reaction from a favorite or bench
- * teammate for cheer-worthy plays (hits, Ks, bunts, steals, web gems, and signature powers).
+ * Deterministically builds a charming dugout cheer reaction from a Synergy Bond partner,
+ * favorite, or bench teammate for cheer-worthy plays (hits, Ks, bunts, steals, web gems, and powers).
  */
 export function buildTeammateDugoutCheer(
   event: PlayEvent | null,
   teammates: readonly Player[],
   favoriteIds: readonly string[],
   rngSeed: number,
+  options?: DugoutCheerOptions,
 ): TeammateDugoutCheer | null {
   if (!event || teammates.length === 0) return null;
   const kind = classifyDugoutCheerKind(event);
   if (!kind) return null;
 
   const rng = createSeededRng((rngSeed + event.seq * 131 + 17) >>> 0);
-  const { teammate, isFavorite } = pickCheeringTeammate(teammates, favoriteIds, event, rng);
   const template = DUGOUT_CHEER_TEMPLATES[kind];
+  const activeHero = findActiveHumanHero(event, teammates);
+  const isActiveStarFavorite = Boolean(activeHero && favoriteIds.includes(activeHero.id));
+  const bondMatch = findSynergyBondPartner(activeHero, teammates, options?.chemistryBonds);
 
+  if (bondMatch) {
+    return buildBondCheerPayload(
+      event,
+      bondMatch,
+      favoriteIds,
+      isActiveStarFavorite,
+      template.mood,
+      options?.clubRituals,
+    );
+  }
+
+  const { teammate, isFavorite } = pickCheeringTeammate(teammates, favoriteIds, event, rng);
   return {
     id: `cheer-${event.seq}-${teammate.id}`,
     eventSeq: event.seq,
     teammate,
     isFavorite,
-    message: rng.pick(template.lines),
+    ...(isActiveStarFavorite ? { isActiveStarFavorite: true } : {}),
+    message: resolveStandardCheerMessage(kind, template, rng, options?.clubRituals),
     emoji: template.emoji,
     mood: template.mood,
   };

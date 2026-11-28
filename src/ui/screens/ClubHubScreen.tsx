@@ -42,6 +42,11 @@ import {
 } from '../../engine/rpg/practiceEngine';
 import { RELIC_CATALOG } from '../../engine/rpg/relics';
 import {
+  CLUB_SNACK_CATALOG,
+  HR_CELEBRATION_CATALOG,
+  sanitizeClubRituals,
+} from '../../engine/gm/polaroidKeepsakes';
+import {
   commissionHumanBallpark,
   equipHumanPlayerRelic,
   fireHumanClubStaff,
@@ -51,6 +56,7 @@ import {
   runHumanPracticeActivity,
   runHumanStaffClinic,
   unequipHumanPlayerRelic,
+  updateHumanClubRituals,
   upgradeHumanStadium,
 } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
@@ -504,7 +510,95 @@ export function ClubHubScreen({ initialSubTab = 'stadiums', onOpenRoster }: Club
         ) : null}
 
         {subTab === 'uniforms' ? (
-          <UniformDesignerPanel club={club} onNotice={setNotice} />
+          <div className="space-y-4">
+            <UniformDesignerPanel club={club} onNotice={setNotice} />
+            {(() => {
+              const rituals = sanitizeClubRituals(club.clubRituals);
+              return (
+                <div
+                  data-testid="club-rituals-card"
+                  className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF8E7] shadow-[3px_3px_0_#181B2C] space-y-3"
+                >
+                  <div>
+                    <div className="font-display text-xs sm:text-sm uppercase text-[#181B2C]">
+                      🎉 Club Rituals — Dugout Celebrations &amp; Lucky Snack
+                    </div>
+                    <p className="text-[11px] font-bold text-[#4A5068]">
+                      Personalizes teammate HR banter, mascot cheers &amp; handwritten Victory Polaroid captions!
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1D3557]">
+                      Home Run Celebration
+                    </div>
+                    <div
+                      role="group"
+                      aria-label="Home Run Celebration"
+                      className="grid grid-cols-2 sm:grid-cols-4 gap-1.5"
+                    >
+                      {HR_CELEBRATION_CATALOG.map((cel) => {
+                        const active = rituals.hrCelebration === cel.id;
+                        return (
+                          <button
+                            key={cel.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => {
+                              updateHumanClubRituals({ hrCelebration: cel.id });
+                              setNotice(`HR Celebration set to ${cel.emoji} ${cel.label}!`);
+                              soundEngine.play('ui_pop');
+                            }}
+                            className={`min-h-[44px] px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] text-left font-heading font-extrabold text-[11px] leading-tight cursor-pointer transition ${
+                              active
+                                ? 'bg-[#FFC300] text-[#181B2C] shadow-[2px_2px_0_#181B2C]'
+                                : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
+                            }`}
+                          >
+                            {cel.emoji} {cel.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#1B4332]">
+                      Lucky Clubhouse Snack
+                    </div>
+                    <div
+                      role="group"
+                      aria-label="Lucky Clubhouse Snack"
+                      className="grid grid-cols-2 sm:grid-cols-5 gap-1.5"
+                    >
+                      {CLUB_SNACK_CATALOG.map((snack) => {
+                        const active = rituals.luckySnack === snack.id;
+                        return (
+                          <button
+                            key={snack.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => {
+                              updateHumanClubRituals({ luckySnack: snack.id });
+                              setNotice(`Lucky Clubhouse Snack set to ${snack.emoji} ${snack.label}!`);
+                              soundEngine.play('ui_pop');
+                            }}
+                            className={`min-h-[44px] px-2.5 py-1.5 rounded-xl border-2 border-[#181B2C] text-left font-heading font-extrabold text-[11px] leading-tight cursor-pointer transition ${
+                              active
+                                ? 'bg-[#D8F3DC] text-[#1B4332] shadow-[2px_2px_0_#181B2C]'
+                                : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
+                            }`}
+                          >
+                            {snack.emoji} {snack.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         ) : null}
 
         {subTab === 'staff' ? (

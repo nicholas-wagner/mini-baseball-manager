@@ -80,6 +80,8 @@ export function DugoutCheerBubble({
       role="status"
       aria-live="polite"
       className={`inline-flex items-center gap-2 max-w-full sm:max-w-sm pl-2 pr-1 py-1 rounded-2xl border-2 border-[#181B2C] shadow-[3px_3px_0_#181B2C] ${moodStyle.bg} ${
+        cheer.isActiveStarFavorite ? 'ring-2 ring-[#FFC300]' : ''
+      } ${
         reducedMotion ? '' : 'transition-opacity duration-300'
       } ${isFading ? 'opacity-0' : 'opacity-100'} ${className}`}
     >
@@ -91,7 +93,7 @@ export function DugoutCheerBubble({
         testId="dugout-cheer-portrait"
       />
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-[#181B2C]">
+        <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-[#181B2C] flex-wrap">
           <span className="truncate">{firstName}</span>
           {cheer.isFavorite ? (
             <span
@@ -102,9 +104,26 @@ export function DugoutCheerBubble({
               ⭐
             </span>
           ) : null}
+          {cheer.bondBadge ? (
+            <span
+              data-testid="dugout-cheer-bond-badge"
+              className="px-1.5 py-0.2 rounded-full bg-[#FFE5EC] border border-[#181B2C] text-[9px] font-black text-[#9D0208] shrink-0"
+            >
+              💖 {cheer.bondBadge}
+            </span>
+          ) : null}
+          {cheer.isActiveStarFavorite ? (
+            <span
+              data-testid="dugout-cheer-favorite-sparkle"
+              aria-label="Star favorite sparkle"
+              className="px-1 rounded-full bg-[#FFC300] border border-[#181B2C] text-[9px] font-black text-[#181B2C] shrink-0"
+            >
+              ⭐💖✨
+            </span>
+          ) : null}
           <span className="text-[#4A5068] shrink-0">· Dugout</span>
         </div>
-        <div className={`font-display text-xs leading-snug truncate ${moodStyle.accentText}`}>
+        <div className={`font-display text-xs leading-snug ${cheer.bondBadge ? 'line-clamp-2' : 'truncate'} ${moodStyle.accentText}`}>
           {cheer.emoji} “{cheer.message}”
         </div>
       </div>
