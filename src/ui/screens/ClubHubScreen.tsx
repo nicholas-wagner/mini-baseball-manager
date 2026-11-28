@@ -42,7 +42,6 @@ import {
   PRACTICE_COMPLEX_ACTIVITIES,
   type PracticeComplexActivityId,
 } from '../../engine/rpg/practiceEngine';
-import { RELIC_CATALOG } from '../../engine/rpg/relics';
 import {
   CLUB_SNACK_CATALOG,
   HR_CELEBRATION_CATALOG,
@@ -50,14 +49,12 @@ import {
 } from '../../engine/gm/polaroidKeepsakes';
 import {
   commissionHumanBallpark,
-  equipHumanPlayerRelic,
   fireHumanClubStaff,
   hireHumanAthleticTrainer,
   hireHumanClubStaff,
   hireHumanTeamDoctor,
   runHumanPracticeActivity,
   runHumanStaffClinic,
-  unequipHumanPlayerRelic,
   updateHumanClubRituals,
   upgradeHumanStadium,
 } from '../../store/clubHubActions';
@@ -67,6 +64,7 @@ import { ClubTreasuryPanel, type TreasuryJumpTarget } from '../components/ClubTr
 import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
 import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
+import { RelicLockerPanel } from '../components/RelicLockerPanel';
 import { StaffCrewCard } from '../components/StaffCrewCard';
 import { UniformDesignerPanel } from '../components/UniformDesignerPanel';
 import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
@@ -831,63 +829,15 @@ export function ClubHubScreen({ initialSubTab = 'stadiums', onOpenRoster }: Club
               )}
             </div>
 
-            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="relic-player-select" className="text-xs font-extrabold uppercase text-[#181B2C]">
-                  90s Gear Locker ({selectedPlayer.name} — {selectedPlayer.equippedRelicIds.length}/2 Equipped)
-                </label>
-                <select
-                  id="relic-player-select"
-                  value={selectedPlayer.id}
-                  onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  className="min-h-[44px] px-2 rounded-xl border-2 border-[#181B2C] bg-white text-xs font-bold"
-                >
-                  {club.roster.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.position} — {p.name} ({p.equippedRelicIds.length}/2 Relics)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {RELIC_CATALOG.slice(0, 9).map((relic) => {
-                  const equipped = selectedPlayer.equippedRelicIds.includes(relic.id);
-                  return (
-                    <div
-                      key={relic.id}
-                      className={`p-2 rounded-xl border-2 border-[#181B2C] flex flex-col justify-between gap-1.5 ${
-                        equipped ? 'bg-[#FFF3BF]' : 'bg-white'
-                      }`}
-                    >
-                      <div>
-                        <div className="font-display text-xs text-[#181B2C]">{relic.name}</div>
-                        <div className="text-[10px] font-bold text-[#4A5068]">{relic.flavor}</div>
-                      </div>
-                      <ComicButton
-                        size="sm"
-                        variant={equipped ? 'coral' : 'turf'}
-                        onClick={() => {
-                          if (equipped) {
-                            unequipHumanPlayerRelic(selectedPlayer.id, relic.id);
-                            setNotice(`Unequipped ${relic.name} from ${selectedPlayer.name}.`);
-                          } else {
-                            const res = equipHumanPlayerRelic(selectedPlayer.id, relic.id);
-                            setNotice(
-                              res.equipped
-                                ? `Equipped ${relic.name} on ${selectedPlayer.name}!`
-                                : (res.reason ?? 'Cannot equip.'),
-                            );
-                          }
-                          soundEngine.play('ui_pop');
-                        }}
-                      >
-                        {equipped ? 'Unequip' : 'Equip Relic'}
-                      </ComicButton>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <RelicLockerPanel
+              club={club}
+              selectedPlayer={selectedPlayer}
+              worldSeed={worldSeed}
+              seriesIndex={seriesIndex}
+              relicMultiplier={staffBonuses.relicBonusMultiplier}
+              onSelectPlayer={setSelectedPlayerId}
+              onNotice={setNotice}
+            />
           </div>
         ) : null}
 

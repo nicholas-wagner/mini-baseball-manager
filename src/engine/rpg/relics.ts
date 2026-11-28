@@ -83,10 +83,19 @@ export function unequipRelicFromPlayer(player: Player, relicId: string): Player 
   };
 }
 
-/** Computes total rating bonuses from a player's equipped relics, amplified by Equipment Manager (`1.0..1.38`). */
+export type RelicFoilTier = 1 | 2 | 3;
+
+export const RELIC_FOIL_MULTIPLIERS: Readonly<Record<RelicFoilTier, number>> = {
+  1: 1.0,
+  2: 1.25,
+  3: 1.5,
+};
+
+/** Computes total rating bonuses from a player's equipped relics, amplified by Equipment Manager & Foil Tier. */
 export function evaluatePlayerRelicBonuses(
   player: Pick<Player, 'equippedRelicIds'>,
   equipmentManagerMultiplier = 1.0,
+  foilTierByRelicId?: Readonly<Record<string, RelicFoilTier>>,
 ): Record<keyof PlayerRatings, number> {
   const totals: Record<keyof PlayerRatings, number> = {
     contact: 0,
@@ -112,9 +121,10 @@ export function evaluatePlayerRelicBonuses(
   for (const relicId of player.equippedRelicIds ?? []) {
     const relic = getRelicById(relicId);
     if (!relic) continue;
+    const foilScale = RELIC_FOIL_MULTIPLIERS[foilTierByRelicId?.[relicId] ?? 1];
     for (const [key, delta] of Object.entries(relic.bonuses)) {
       if (typeof delta === 'number') {
-        totals[key as keyof PlayerRatings] += Math.round(delta * scale);
+        totals[key as keyof PlayerRatings] += Math.round(delta * scale * foilScale);
       }
     }
   }

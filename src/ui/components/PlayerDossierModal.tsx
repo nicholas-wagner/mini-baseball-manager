@@ -16,6 +16,16 @@ import { resolvePlayerCardBio } from '../../engine/models/playerBio';
 import { getNationalityById } from '../../engine/nationalities/pickNationality';
 import { getRelicById } from '../../engine/rpg/relics';
 import {
+  checkRelicRoleCompatibility,
+  resolveClubRelicInventory,
+} from '../../engine/rpg/relicLocker';
+import {
+  equipHumanPlayerRelic,
+  unequipHumanPlayerRelic,
+} from '../../store/clubHubActions';
+import { useGameStore } from '../../store/gameStore';
+import { soundEngine } from '../../audio/soundEngine';
+import {
   evaluateCapstoneGameplayProfile,
   evaluateHeritageGameplayProfile,
 } from '../../engine/rpg/specialPowerEffects';
@@ -70,16 +80,27 @@ const RATING_GROUPS: readonly {
 ];
 
 export function PlayerDossierModal({ player, clubName, onClose }: PlayerDossierModalProps) {
+  const humanClub = useGameStore((s) => s.getHumanClub());
   if (!player) return null;
 
-  const ovr = computePlayerOverall(player);
-  const nation = getNationalityById(player.nationalityId);
-  const heritage = evaluateHeritageGameplayProfile(player, 1.0);
-  const capstones = evaluateCapstoneGameplayProfile(player, 1.0);
-  const battingSaber = computeBattingSabermetrics(player.seasonStats);
-  const pitchingSaber = computePitchingSabermetrics(player.seasonStats);
-  const fieldingSaber = computeFieldingSabermetrics(player.seasonStats);
-  const relics = (player.equippedRelicIds ?? [])
+  const isHumanPlayer = Boolean(humanClub?.roster.some((p) => p.id === player.id));
+  const livePlayer = (isHumanPlayer ? humanClub?.roster.find((p) => p.id === player.id) : null) ?? player;
+  const ownedLockerRelics = isHumanPlayer && humanClub
+    ? resolveClubRelicInventory(humanClub)
+        .map((e) => ({ entry: e, relic: getRelicById(e.relicId) }))
+        .filter((item): item is { entry: (typeof humanClub.relicInventory extends (infer U)[] | undefined ? U : never); relic: NonNullable<ReturnType<typeof getRelicById>> } =>
+          Boolean(item.relic) && checkRelicRoleCompatibility(livePlayer, item.entry.relicId).compatible,
+        )
+    : [];
+
+  const ovr = computePlayerOverall(livePlayer);
+  const nation = getNationalityById(livePlayer.nationalityId);
+  const heritage = evaluateHeritageGameplayProfile(livePlayer, 1.0);
+  const capstones = evaluateCapstoneGameplayProfile(livePlayer, 1.0);
+  const battingSaber = computeBattingSabermetrics(livePlayer.seasonStats);
+  const pitchingSaber = computePitchingSabermetrics(livePlayer.seasonStats);
+  const fieldingSaber = computeFieldingSabermetrics(livePlayer.seasonStats);
+  const relics = (livePlayer.equippedRelicIds ?? [])
     .map((id) => getRelicById(id))
     .filter((r): r is NonNullable<typeof r> => Boolean(r));
 
@@ -182,11 +203,48 @@ export function PlayerDossierModal({ player, clubName, onClose }: PlayerDossierM
                   {relics.map((r) => (
                     <span
                       key={r.id}
-                      className="px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[10px] font-extrabold text-[#1D3557]"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#E0FBFC] border border-[#181B2C] text-[10px] font-extrabold text-[#1D3557]"
                     >
-                      🎒 {r.name}
+                      🏺 {r.name}
+                      {isHumanPlayer ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            unequipHumanPlayerRelic(livePlayer.id, r.id);
+                            soundEngine.play('ui_pop');
+                          }}
+                          className="ml-0.5 text-[#9D0208] hover:underline cursor-pointer"
+                          aria-label={`Unequip ${r.name}`}
+                        >
+                          ×
+                        </button>
+                      ) : null}
                     </span>
                   ))}
+                </div>
+              ) : null}
+              {isHumanPlayer && ownedLockerRelics.length > 0 && relics.length < 2 ? (
+                <div
+                  data-testid="dossier-quick-equip-relics"
+                  className="flex flex-wrap items-center gap-1 pt-1 border-t border-dashed border-[#181B2C]/20"
+                >
+                  <span className="text-[9.5px] font-extrabold uppercase text-[#4A5068]">Quick-Equip:</span>
+                  {ownedLockerRelics
+                    .filter((item) => !livePlayer.equippedRelicIds.includes(item.relic.id))
+                    .slice(0, 4)
+                    .map(({ relic, entry }) => (
+                      <button
+                        key={relic.id}
+                        type="button"
+                        onClick={() => {
+                          equipHumanPlayerRelic(livePlayer.id, relic.id, { swapFromHolder: true });
+                          soundEngine.play('ui_pop');
+                        }}
+                        className="px-1.5 py-0.5 rounded border border-[#181B2C] bg-[#FFF3BF] hover:bg-[#FFC300] text-[9.5px] font-extrabold text-[#181B2C] cursor-pointer"
+                      >
+                        + {relic.name} {'★'.repeat(entry.foilTier)}
+                      </button>
+                    ))}
                 </div>
               ) : null}
             </div>

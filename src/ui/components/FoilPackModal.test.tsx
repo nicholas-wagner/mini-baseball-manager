@@ -91,4 +91,21 @@ describe('FoilPackModal (TASK-100 Tactile 1994 Foil Pack Upgrade)', () => {
     expect(screen.queryByTestId('foil-relic-artwork-img')).not.toBeInTheDocument();
     expect(screen.getByTestId('foil-card-artwork').querySelector('svg')).toBeInTheDocument();
   });
+
+  it('shows In-Modal 1994 Card Shop, Relic Collection & Legendary Pity Meter, Gum Trivia, and lets player buy & assign cards', () => {
+    render(<FoilPackModal open onClose={vi.fn()} />);
+
+    expect(screen.getByTestId('foil-pack-pity-strip')).toHaveTextContent(/Relic Collection/i);
+    expect(screen.getByTestId('foil-pack-pity-strip')).toHaveTextContent(/Legendary Pity Meter/i);
+    expect(screen.getByTestId('foil-pack-card-shop')).toBeInTheDocument();
+
+    // Buy a Sandlot Foil pack right inside the modal shop, then rip it open
+    fireEvent.click(screen.getByRole('button', { name: /buy \$1,200/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rip open 1994 foil pack/i }));
+    expect(screen.getByTestId('foil-pack-gum-trivia')).toHaveTextContent(/1994 Gum Fact/i);
+
+    // Card #1 Relic gives player agency to equip onto a compatible player right inside the modal!
+    fireEvent.click(screen.getByRole('button', { name: /equip now/i }));
+    expect(screen.getByTestId('foil-pack-pulls-section')).toHaveTextContent(/equipped/i);
+  });
 });

@@ -89,9 +89,14 @@ import {
   type PracticeComplexRequest,
 } from '../engine/rpg/practiceEngine';
 import {
-  equipRelicOnPlayer,
   unequipRelicFromPlayer,
 } from '../engine/rpg/relics';
+import {
+  equipRelicFromClubLocker,
+  fuseDuplicateRelic,
+  purchaseVintageRelic,
+  recycleSpareRelic,
+} from '../engine/rpg/relicLocker';
 import {
   applyRoutineFrontOfficeAutomation,
 } from '../engine/gm/frontOfficeMode';
@@ -467,20 +472,51 @@ export function unlockHumanManagerNode(nodeId: string): { unlocked: boolean; rea
 export function equipHumanPlayerRelic(
   playerId: string,
   relicId: string,
-): { equipped: boolean; reason?: string } {
+  options?: { swapFromHolder?: boolean },
+): { equipped: boolean; reason?: string; swappedFromName?: string } {
   const state = useGameStore.getState();
   const club = state.getHumanClub();
   if (!club) return { equipped: false, reason: 'No active club.' };
-  const target = club.roster.find((p) => p.id === playerId);
-  if (!target) return { equipped: false, reason: 'Player not found.' };
-  const res = equipRelicOnPlayer(target, relicId);
+  const res = equipRelicFromClubLocker(club, playerId, relicId, options);
   if (!res.equipped) return { equipped: false, reason: res.reason };
-  const updatedClub: Club = {
-    ...club,
-    roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
-  };
-  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, updatedClub) });
-  return { equipped: true };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, res.club) });
+  return { equipped: true, swappedFromName: res.swappedFromName };
+}
+
+export function fuseHumanClubRelic(
+  relicId: string,
+): { fused: boolean; reason?: string; newFoilTier?: 1 | 2 | 3 } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { fused: false, reason: 'No active club.' };
+  const res = fuseDuplicateRelic(club, relicId);
+  if (!res.fused) return { fused: false, reason: res.reason };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, res.club) });
+  return { fused: true, newFoilTier: res.newFoilTier };
+}
+
+export function recycleHumanClubRelic(
+  relicId: string,
+): { recycled: boolean; cashAwarded: number; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { recycled: false, cashAwarded: 0, reason: 'No active club.' };
+  const res = recycleSpareRelic(club, relicId);
+  if (!res.recycled) return { recycled: false, cashAwarded: 0, reason: res.reason };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, res.club) });
+  return { recycled: true, cashAwarded: res.cashAwarded };
+}
+
+export function buyHumanVintageRelic(
+  relicId: string,
+): { purchased: boolean; price: number; reason?: string } {
+  const state = useGameStore.getState();
+  const club = state.getHumanClub();
+  if (!club) return { purchased: false, price: 0, reason: 'No active club.' };
+  const res = purchaseVintageRelic(club, relicId);
+  if (!res.purchased) return { purchased: false, price: res.price, reason: res.reason };
+  useGameStore.setState({ leagues: replaceHumanClub(state.leagues, res.club) });
+  return { purchased: true, price: res.price };
 }
 
 export function unequipHumanPlayerRelic(playerId: string, relicId: string): void {

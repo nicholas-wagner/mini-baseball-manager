@@ -13,6 +13,10 @@ import {
   rollPitcherArsenal,
 } from '../engine/rpg/pitchArsenals';
 import { rollPitcherRole } from '../engine/rpg/pitcherRoles';
+import {
+  resolveClubRelicInventory,
+  resolveDiscoveredRelicIds,
+} from '../engine/rpg/relicLocker';
 import { rollBattedBallProfile } from '../engine/simulation/sabermetrics';
 import { migrateClubEconomy } from '../persistence/migrations';
 import {
@@ -123,11 +127,15 @@ function hydratePlayerDefaults(player: Player): Player {
 }
 
 function hydrateClubDefaults(club: Club): Club {
+  const hydratedRoster = club.roster.map(hydratePlayerDefaults);
+  const clubWithRoster = { ...club, roster: hydratedRoster };
   return {
     ...club,
     clubRituals: sanitizeClubRituals(club.clubRituals),
     polaroids: Array.isArray(club.polaroids) ? club.polaroids : [],
     franchiseRecords: hydrateFranchiseRecords(club.franchiseRecords),
+    relicInventory: resolveClubRelicInventory(clubWithRoster),
+    discoveredRelicIds: resolveDiscoveredRelicIds(clubWithRoster),
     economy: migrateClubEconomy(club.economy),
     stadium: {
       ...club.stadium,
@@ -138,7 +146,7 @@ function hydrateClubDefaults(club: Club): Club {
       activeStaff: club.coaches?.activeStaff ?? [],
       clinicSessionsUsedThisOffseason: club.coaches?.clinicSessionsUsedThisOffseason ?? 0,
     },
-    roster: club.roster.map(hydratePlayerDefaults),
+    roster: hydratedRoster,
     academyProspects: (club.academyProspects ?? []).map(hydratePlayerDefaults),
   };
 }

@@ -121,6 +121,12 @@ export interface ClubColors {
   crestEmblem?: CrestEmblemId;
 }
 
+export interface RelicInventoryEntry {
+  relicId: string;
+  count: number;
+  foilTier: 1 | 2 | 3;
+}
+
 export interface DistrictTile {
   slotId: string;
   buildingId: string | null;
@@ -184,6 +190,8 @@ export interface Club {
   clubRituals?: ClubRitualProfile;
   polaroids?: PolaroidKeepsake[];
   franchiseRecords?: ClubFranchiseRecords;
+  relicInventory?: RelicInventoryEntry[];
+  discoveredRelicIds?: string[];
   id: string;
   isHuman: boolean;
   city: string;

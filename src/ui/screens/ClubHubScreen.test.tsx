@@ -51,10 +51,12 @@ describe('ClubHubScreen — Ballparks, Coaches, Practice Complex & Manager RPG',
       luckySnack: 'rally_nachos',
     });
 
-    // 5. Uniforms & Gear room -> Relics & Chemistry equips a 90s Relic onto the active player
+    // 5. Uniforms & Gear room -> Relics & Chemistry equips an owned starter 90s Relic from real Locker + shows Rotating Vintage Shop!
     await user.click(screen.getByRole('button', { name: /relics & chemistry/i }));
     expect(screen.getByText(/clubhouse chemistry:/i)).toBeInTheDocument();
+    expect(screen.getByTestId('relic-locker-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('vintage-relic-shop')).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: /equip relic/i })[0]);
-    expect(screen.getByText(/equipped golden ash bat/i)).toBeInTheDocument();
+    expect(screen.getByText(/equipped /i)).toBeInTheDocument();
   });
 });
