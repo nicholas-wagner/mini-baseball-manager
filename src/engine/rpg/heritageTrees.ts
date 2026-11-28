@@ -54,29 +54,37 @@ const CATEGORY_TIER2_BONUSES: Readonly<
   luck: { contact: 2, clutch: 3 },
 };
 
+function formatBonusesPlain(bonuses: Readonly<Partial<Record<SkillRatingKey, number>>>): string {
+  return Object.entries(bonuses)
+    .map(([key, val]) => `+${val} ${key.slice(0, 3).toUpperCase()}`)
+    .join(' · ');
+}
+
 /** Returns the 3-tier Cultural Heritage Myth/Animal skill branch for any nationality. */
 export function getHeritageBranch(nationalityId: NationalityId): HeritageBranchSpec {
   const nation = NATIONALITIES_BY_ID[nationalityId];
   const ability = nation.heritageAbility;
+  const t1Bonuses = CATEGORY_TIER1_BONUSES[ability.category];
+  const t2Bonuses = CATEGORY_TIER2_BONUSES[ability.category];
   const t1: HeritageTierNode = {
     tier: 1,
     spCost: 1,
     title: `${ability.name} I — Roots`,
-    description: `Awaken ${ability.mythOrAnimal} discipline (+2 core heritage tools).`,
-    statBonuses: CATEGORY_TIER1_BONUSES[ability.category],
+    description: `Permanent ${formatBonusesPlain(t1Bonuses)} & +14% stronger active power.`,
+    statBonuses: t1Bonuses,
   };
   const t2: HeritageTierNode = {
     tier: 2,
     spCost: 2,
     title: `${ability.name} II — Spirit`,
-    description: `High-leverage ${ability.mythOrAnimal} surge (+3 clutch edge at LI >= 1.55).`,
-    statBonuses: CATEGORY_TIER2_BONUSES[ability.category],
+    description: `Permanent ${formatBonusesPlain(t2Bonuses)} & bigger surge in clutch innings.`,
+    statBonuses: t2Bonuses,
   };
   const t3: HeritageTierNode = {
     tier: 3,
     spCost: 3,
-    title: `${ability.name} III — Signature`,
-    description: `Unlocks active Myth/Animal Power: ${ability.shortEffect}`,
+    title: `${ability.name} III — Mastery`,
+    description: `+2 CLU & max-rank ${ability.name} active surge (+42% boost).`,
     statBonuses: { clutch: 2 },
     signaturePowerId: ability.id,
   };

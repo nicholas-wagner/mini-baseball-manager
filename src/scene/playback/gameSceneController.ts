@@ -21,8 +21,9 @@ import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types
 import * as THREE from 'three';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import type { PortraitTeamColors } from '../../art/portraits/types';
+import { resolveMatchupUniforms } from '../../engine/customization/uniformDesigner';
 import { resolveEffectiveBatSide } from '../../engine/handedness/handedness';
-import type { Club } from '../../engine/models/club';
+import type { Club, ClubColors } from '../../engine/models/club';
 import type { PlayEvent, PlaySoundCue } from '../../engine/models/playEvent';
 import type { Player } from '../../engine/models/player';
 import type { GameSessionState } from '../../engine/simulation/gameState';
@@ -57,12 +58,29 @@ const FALLBACK_TEAM: PortraitTeamColors = {
   monogram: 'SC',
 };
 
-function toTeamColors(club: Club): PortraitTeamColors {
+function toPortraitTeamColors(colors: ClubColors): PortraitTeamColors {
   return {
-    primary: club.colors.primary,
-    secondary: club.colors.secondary,
-    accent: club.colors.accent,
-    monogram: club.colors.monogram,
+    primary: colors.primary,
+    secondary: colors.secondary,
+    accent: colors.accent,
+    monogram: colors.monogram,
+  };
+}
+
+/** Resolves distinct 3D uniform colors for Away (road/anti-clash) and Home clubs. */
+export function resolveMatchupTeamColors(
+  awayClub: Pick<Club, 'colors'>,
+  homeClub: Pick<Club, 'colors'>,
+): {
+  awayTeamColors: PortraitTeamColors;
+  homeTeamColors: PortraitTeamColors;
+  clashAdjusted: boolean;
+} {
+  const { away, home, clashAdjusted } = resolveMatchupUniforms(awayClub.colors, homeClub.colors);
+  return {
+    awayTeamColors: toPortraitTeamColors(away),
+    homeTeamColors: toPortraitTeamColors(home),
+    clashAdjusted,
   };
 }
 
@@ -196,6 +214,10 @@ export class GameSceneController {
     this.previewStart = this.elapsedSec;
   }
   private cameraPreset: CameraPresetId = 'over_shoulder_pitcher';
+  private armedSpecialPitchColor: string | null = null;
+  public setArmedSpecialPitch(color: string | null): void {
+    this.armedSpecialPitchColor = color;
+  }
   private steadyCamera = false;
   private cameraOverride: CameraPresetId | null = null;
   private cameraPose: CameraPose;
@@ -355,8 +377,9 @@ export class GameSceneController {
     }
     const fieldingSide = half === 'TOP' ? session.home : session.away;
     const battingSide = half === 'TOP' ? session.away : session.home;
-    const fieldingTeam = toTeamColors(fieldingClub);
-    const battingTeam = toTeamColors(battingClub);
+    const { awayTeamColors, homeTeamColors } = resolveMatchupTeamColors(awayClub, homeClub);
+    const fieldingTeam = half === 'TOP' ? homeTeamColors : awayTeamColors;
+    const battingTeam = half === 'TOP' ? awayTeamColors : homeTeamColors;
     this.battingPlayers = battingSide.playersById;
     this.battingColors = battingTeam;
     this.targetRing.visible = false;
@@ -832,6 +855,12 @@ export class GameSceneController {
         runner.updatePose('runner_lead', this.elapsedSec, undefined, this.camera.position);
       }
     }
+    this.vfx.specialPitch.setMoundAura(
+      this.armedSpecialPitchColor && !this.pitch && !this.entrance ? this.armedSpecialPitchColor : null,
+      mound,
+      this.elapsedSec,
+      this.vfx.reducedMotion,
+    );
     return dt;
   }
 

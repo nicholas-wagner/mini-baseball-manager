@@ -5,6 +5,10 @@ import {
   type PlayerRatings,
 } from '../models/player';
 import { evolveSpecialistArchetype } from './specialistsAndPositions';
+import {
+  checkNodeMasteryGate,
+  DISCIPLINE_LABELS,
+} from './skillTreeMastery';
 import { enforceRatingBudget } from './trainingCompromises';
 
 export type SkillBranchId = 'pitcher' | 'batter' | 'fielder';
@@ -678,32 +682,47 @@ function checkBudgetEligibility(player: Player, node: SkillTreeNode): SkillUnloc
   return null;
 }
 
-/** Validates whether a player can unlock a given skill tree node right now. */
-export function canUnlockSkillNode(player: Player, nodeId: string): SkillUnlockEligibility {
-  const node = SKILL_NODES_BY_ID[nodeId];
-  if (!node) return { allowed: false, reason: 'Unknown skill node.' };
+function checkMasteryEligibility(player: Player, node: SkillTreeNode): SkillUnlockEligibility | null {
+  if (!player.skillMastery || node.tier <= 1) return null;
+  const gate = checkNodeMasteryGate(player, node.id);
+  if (gate.met) return null;
+  const label = DISCIPLINE_LABELS[gate.discipline].label;
+  return {
+    allowed: false,
+    reason: `Needs ${label} Mastery ${gate.required} (now ${gate.current}) — play games or practice!`,
+  };
+}
 
-  const eligibleBranches = getAvailableSkillBranches(player);
-  if (!eligibleBranches.includes(node.branch)) {
-    return { allowed: false, reason: `${player.position} players cannot unlock ${node.branch} skills.` };
-  }
-  if (player.unlockedSkillIds.includes(nodeId)) {
-    return { allowed: false, reason: 'Skill already unlocked.' };
-  }
-  const capstoneBlock = checkCapstoneEligibility(player, node);
-  if (capstoneBlock) return capstoneBlock;
-  const budgetBlock = checkBudgetEligibility(player, node);
-  if (budgetBlock) return budgetBlock;
-
+function checkPrereqAndSpEligibility(player: Player, node: SkillTreeNode): SkillUnlockEligibility | null {
   const missingReq = node.prerequisiteIds.find((req) => !player.unlockedSkillIds.includes(req));
   if (missingReq) {
     const reqName = SKILL_NODES_BY_ID[missingReq]?.name ?? missingReq;
     return { allowed: false, reason: `Requires ${reqName} first.` };
   }
+  const masteryBlock = checkMasteryEligibility(player, node);
+  if (masteryBlock) return masteryBlock;
   if (player.skillPoints < node.spCost) {
     return { allowed: false, reason: `Need ${node.spCost} SP (have ${player.skillPoints}).` };
   }
-  return { allowed: true };
+  return null;
+}
+
+/** Validates whether a player can unlock a given skill tree node right now. */
+export function canUnlockSkillNode(player: Player, nodeId: string): SkillUnlockEligibility {
+  const node = SKILL_NODES_BY_ID[nodeId];
+  if (!node) return { allowed: false, reason: 'Unknown skill node.' };
+
+  if (!getAvailableSkillBranches(player).includes(node.branch)) {
+    return { allowed: false, reason: `${player.position} players cannot unlock ${node.branch} skills.` };
+  }
+  if (player.unlockedSkillIds.includes(nodeId)) {
+    return { allowed: false, reason: 'Skill already unlocked.' };
+  }
+  const block =
+    checkCapstoneEligibility(player, node) ??
+    checkBudgetEligibility(player, node) ??
+    checkPrereqAndSpEligibility(player, node);
+  return block ?? { allowed: true };
 }
 
 function applyStatBonusesWithinCaps(

@@ -53,7 +53,7 @@ const ROLE_FATIGUE_MULTIPLIER: Readonly<Record<PitcherRole, number>> = {
 };
 
 function clampRating(value: number): number {
-  return Math.max(20, Math.min(99, Math.round(value)));
+  return Math.max(8, Math.min(99, Math.round(value)));
 }
 
 interface SpecialistRoleHint {

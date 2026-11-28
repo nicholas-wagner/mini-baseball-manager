@@ -157,13 +157,13 @@ export function rollPitcherArsenal(
     const shapeOffset = isTop ? rng.int(9, 14) : isBottom ? -rng.int(10, 16) : rng.int(-3, 5);
     return {
       pitchType,
-      mastery: clampInt(baseMastery + tierShift + shapeOffset, 28, 99),
+      mastery: clampInt(baseMastery + tierShift + shapeOffset, 12, 99),
     };
   });
 
   // Guarantee distinct extremes even if clamping compressed two slots
   if (repertoire[0].mastery <= repertoire[repertoire.length - 1].mastery) {
-    repertoire[repertoire.length - 1].mastery = Math.max(20, repertoire[0].mastery - 6);
+    repertoire[repertoire.length - 1].mastery = Math.max(8, repertoire[0].mastery - 6);
   }
 
   const extremes = deriveArsenalExtremes(repertoire);
@@ -400,8 +400,8 @@ export function evaluatePitchMatchup(
   const recognition = batter.batterPitchProfile.pitchRecognition[pitchType] ?? 0;
   const batterAffinity = classifyBatterAffinity(batter.batterPitchProfile, pitchType, recognition);
 
-  const baseFastballMph = 82 + Math.round((pitcher.ratings.velocity - 40) * 0.34);
-  const mph = clampInt(baseFastballMph + spec.mphOffset, 62, 104);
+  const baseFastballMph = 76 + Math.round((pitcher.ratings.velocity - 20) * 0.34);
+  const mph = clampInt(baseFastballMph + spec.mphOffset, 60, 104);
 
   return {
     pitchType,

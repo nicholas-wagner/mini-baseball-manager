@@ -45,7 +45,7 @@ const SPECIALIST_SHAPES: Readonly<Record<PlayerSpecialistArchetype, Partial<Play
 const MIDDLE_INF_ONLY_LEFT_BLOCKED: ReadonlySet<FieldPosition> = new Set(['2B', '3B', 'SS']);
 
 function clampStatValue(value: number): number {
-  return Math.max(20, Math.min(99, Math.round(value)));
+  return Math.max(8, Math.min(99, Math.round(value)));
 }
 
 /** Rolls a role-appropriate specialist archetype; bargain players often carry 1 sharp tool. */

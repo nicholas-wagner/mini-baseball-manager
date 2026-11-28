@@ -47,6 +47,8 @@ interface LiveGameCanvasProps {
   favoritePlayerIds?: readonly string[];
   hrCelebration?: HrCelebrationId;
   showStretchCue?: boolean;
+  homeCrowdBadge?: string | null;
+  armedSpecialPitchColor?: string | null;
   audioMuted?: boolean;
   onToggleAudio?: () => void;
 }
@@ -57,6 +59,7 @@ type Round4SceneController = GameSceneController & {
   setFavoritePlayerIds?: (ids: readonly string[]) => void;
   setHrCelebration?: (celebration: HrCelebrationId) => void;
   triggerStadiumWave?: () => void;
+  setArmedSpecialPitch?: (color: string | null) => void;
 };
 
 let webglPlayback: boolean | undefined;
@@ -102,6 +105,8 @@ export function LiveGameCanvas({
   favoritePlayerIds = EMPTY_FAVORITES,
   hrCelebration,
   showStretchCue = false,
+  homeCrowdBadge = null,
+  armedSpecialPitchColor = null,
   audioMuted = false,
   onToggleAudio,
 }: LiveGameCanvasProps) {
@@ -187,6 +192,11 @@ export function LiveGameCanvas({
     const ctrl = controllerRef.current as Round4SceneController | null;
     ctrl?.setHrCelebration?.(hrCelebration);
   }, [hrCelebration]);
+
+  useEffect(() => {
+    const ctrl = controllerRef.current as Round4SceneController | null;
+    ctrl?.setArmedSpecialPitch?.(armedSpecialPitchColor);
+  }, [armedSpecialPitchColor]);
 
   useEffect(() => {
     if (playFinished) controllerRef.current?.finishReplay();
@@ -277,6 +287,15 @@ export function LiveGameCanvas({
           className="pointer-events-none absolute top-2 right-14 z-20 px-2 py-0.5 rounded-full border border-[#F2CB75] bg-[#132c36]/90 text-[#FFF7E4] text-[10px] font-extrabold tracking-wide shadow-sm"
         >
           ⚾ From the Stretch
+        </span>
+      ) : null}
+
+      {homeCrowdBadge && !showStretchCue ? (
+        <span
+          data-testid="home-crowd-momentum-pill"
+          className="pointer-events-none absolute top-2 right-14 z-20 px-2 py-0.5 rounded-full border-2 border-[#181B2C] bg-[#FFC300] text-[#181B2C] text-[10px] font-display tracking-wide shadow-[2px_2px_0_#181B2C]"
+        >
+          {homeCrowdBadge}
         </span>
       ) : null}
 

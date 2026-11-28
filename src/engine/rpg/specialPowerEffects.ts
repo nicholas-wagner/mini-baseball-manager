@@ -49,13 +49,36 @@ export interface CapstoneGameplayProfile {
   equippedPowerNames: string[];
 }
 
+export type PowerSweetSpotId = 'two_strikes' | 'risp' | 'empty_bases' | 'late_close' | 'bases_on';
+
+export interface PowerSituationContext {
+  balls: number;
+  strikes: number;
+  runnersOnBase: number;
+  hasRisp: boolean;
+  inning: number;
+  maxInnings?: number;
+  scoreDiff: number; // abs run differential
+}
+
+export interface HeritageTacticalGuide {
+  sweetSpotId: PowerSweetSpotId;
+  bestWhenLabel: string;
+  battingEffectSummary: string;
+  pitchingEffectSummary: string;
+}
+
 export interface ActivatablePowerOption {
   id: string;
   name: string;
-  source: 'heritage' | 'capstone';
+  source: 'heritage' | 'capstone' | 'starter_pitch';
   calloutText: string;
   vfxColor: string;
+  ballStyle?: BallVfxStyle;
   shortEffect: string;
+  statPreview?: string;
+  bestWhenLabel?: string;
+  isSweetSpotNow?: boolean;
 }
 
 export interface ActivePowerSurge {
@@ -65,6 +88,8 @@ export interface ActivePowerSurge {
   vfxColor: string;
   ballStyle: BallVfxStyle;
   soundCue: PlaySoundCue;
+  sweetSpotTriggered?: boolean;
+  impactSummary?: string;
   contactDelta: number;
   powerDelta: number;
   eyeDelta: number;
@@ -553,36 +578,177 @@ export function evaluateCapstoneGameplayProfile(
   return out;
 }
 
-/** Lists every National Heritage & Equipped Individual Capstone Power this player can actively unleash. */
-export function getActivatablePowersForPlayer(
-  player: Pick<Player, 'nationalityId' | 'heritageTierUnlocked' | 'equippedPowerIds' | 'unlockedSkillIds'>,
+const SWEET_SPOT_LABELS: Readonly<Record<PowerSweetSpotId, string>> = {
+  two_strikes: 'Best w/ 2 Strikes or Full Count',
+  risp: 'Best w/ Runners in Scoring Position',
+  empty_bases: 'Best w/ Bases Empty to Spark a Rally',
+  late_close: 'Best Late & Close (Inning 4+ within 2)',
+  bases_on: 'Best w/ Runners on Base',
+};
+
+const CATEGORY_DEFAULT_SWEET_SPOT: Readonly<Record<HeritageAbilitySpec['category'], PowerSweetSpotId>> = {
+  batting: 'risp',
+  pitching: 'two_strikes',
+  fielding: 'bases_on',
+  baserunning: 'empty_bases',
+  luck: 'late_close',
+};
+
+const NATION_SWEET_SPOT_OVERRIDE: Readonly<Partial<Record<NationalityId, PowerSweetSpotId>>> = {
+  USA: 'two_strikes',
+  DOM: 'risp',
+  JPN: 'two_strikes',
+  KOR: 'risp',
+  MEX: 'bases_on',
+  CAN: 'empty_bases',
+  BRA: 'empty_bases',
+  PRI: 'risp',
+  ARG: 'late_close',
+  AUS: 'late_close',
+  IRL: 'late_close',
+};
+
+const CAPSTONE_SWEET_SPOT: Readonly<Record<string, { id: PowerSweetSpotId; preview: string }>> = {
+  blazing_comet: { id: 'two_strikes', preview: '+6 MPH · +14 Stuff · +16% Whiff' },
+  ghost_knuckle: { id: 'two_strikes', preview: 'Vanishing Flutter · +18% Whiff · +14% Chase' },
+  tornado_slider: { id: 'bases_on', preview: 'Corkscrew Break · +16% Whiff · +12% Chase' },
+  ice_veins: { id: 'risp', preview: '+16 CTL · Painted Corner Freeze' },
+  moonshot_bomb: { id: 'risp', preview: '+18 PWR · 1.85× HR Carry' },
+  rally_spark: { id: 'empty_bases', preview: '+16 CON · +16% Hit · Gap Doubles' },
+  laser_eye: { id: 'two_strikes', preview: '+22 EYE · -18% Chase · +12 CON' },
+  ninja_bunt: { id: 'empty_bases', preview: '+28 BUNT · +14 CON · Dead-Stop Chalk' },
+};
+
+/** Checks whether a live pitch situation matches a power's Sweet Spot (+35% bonus!). */
+export function isPowerSweetSpotActive(
+  sweetSpotId: PowerSweetSpotId,
+  situation?: PowerSituationContext,
+): boolean {
+  if (!situation) return false;
+  if (sweetSpotId === 'two_strikes') return situation.strikes >= 2 || (situation.balls === 3 && situation.strikes === 2);
+  if (sweetSpotId === 'risp') return situation.hasRisp;
+  if (sweetSpotId === 'empty_bases') return situation.runnersOnBase === 0;
+  if (sweetSpotId === 'bases_on') return situation.runnersOnBase > 0;
+  const lateCutoff = Math.max(4, (situation.maxInnings ?? 9) - 2);
+  return situation.inning >= lateCutoff && Math.abs(situation.scoreDiff) <= 2;
+}
+
+/** Returns plain-English Batting, Pitching, and Best-When tactical guidance for any nation's Heritage Power. */
+export function getHeritageTacticalGuide(nationalityId: NationalityId): HeritageTacticalGuide {
+  const ability = getNationalityById(nationalityId).heritageAbility;
+  const sweetSpotId =
+    NATION_SWEET_SPOT_OVERRIDE[nationalityId] ?? CATEGORY_DEFAULT_SWEET_SPOT[ability.category];
+  const bat = HERITAGE_BATTER_SURGE[ability.category];
+  const pit = HERITAGE_PITCHER_SURGE[ability.category];
+  const batExtra = ability.category === 'batting' ? ' · 1.55× HR Carry'
+    : ability.category === 'baserunning' ? ' · +50% XBH'
+      : ability.category === 'luck' ? ' · +9% Lucky Bloops' : '';
+  const pitExtra = ability.category === 'pitching' ? ' · +16% Whiff'
+    : ability.category === 'luck' ? ' · +9% Corner Calls' : ' · +11% Whiff';
+  return {
+    sweetSpotId,
+    bestWhenLabel: SWEET_SPOT_LABELS[sweetSpotId],
+    battingEffectSummary: `+${bat.contactDelta} CON · +${bat.powerDelta} PWR · +${bat.eyeDelta} EYE${batExtra}`,
+    pitchingEffectSummary: `+${pit.stuffDelta} Stuff · +${pit.controlDelta} CTL · +${pit.mphBonus} MPH${pitExtra}`,
+  };
+}
+
+/** Resolves a pitcher's natural Starter Signature Special Pitch from their arsenal & archetype so every pitcher throws special pitches from Day 1. */
+export function resolveStarterSignaturePitchId(
+  player: Pick<Player, 'pitchArsenal' | 'specialistArchetype'>,
+): 'blazing_comet' | 'ghost_knuckle' | 'tornado_slider' | 'ice_veins' {
+  const fav = player.pitchArsenal?.favoritePitch;
+  if (fav === 'knuckleball' || fav === 'splitter') return 'ghost_knuckle';
+  if (fav === 'slider' || fav === 'curveball') return 'tornado_slider';
+  if (player.specialistArchetype === 'crafty_tactician' || fav === 'changeup' || fav === 'two_seam' || fav === 'cutter') {
+    return 'ice_veins';
+  }
+  return 'blazing_comet';
+}
+
+function buildCapstoneOption(
+  spec: CapstoneSpec,
+  source: 'capstone' | 'starter_pitch',
+  situation?: PowerSituationContext,
+): ActivatablePowerOption {
+  const meta = CAPSTONE_SWEET_SPOT[spec.id];
+  const sweetSpotId = meta?.id ?? 'two_strikes';
+  const starterLabel = source === 'starter_pitch' ? `${spec.name} (Signature)` : spec.name;
+  return {
+    id: spec.id,
+    name: starterLabel,
+    source,
+    calloutText: spec.calloutText,
+    vfxColor: spec.vfxColor,
+    ballStyle: spec.ballStyle,
+    shortEffect: spec.shortEffect,
+    statPreview: meta?.preview ?? spec.shortEffect,
+    bestWhenLabel: SWEET_SPOT_LABELS[sweetSpotId],
+    isSweetSpotNow: isPowerSweetSpotActive(sweetSpotId, situation),
+  };
+}
+
+function buildHeritageOption(
+  nationalityId: Player['nationalityId'],
   role: 'pitcher' | 'batter',
-): ActivatablePowerOption[] {
-  const options: ActivatablePowerOption[] = [];
-  const nation = getNationalityById(player.nationalityId);
+  situation?: PowerSituationContext,
+): ActivatablePowerOption {
+  const nation = getNationalityById(nationalityId);
   const h = nation.heritageAbility;
-  options.push({
+  const guide = getHeritageTacticalGuide(nationalityId);
+  const summary = role === 'pitcher' ? guide.pitchingEffectSummary : guide.battingEffectSummary;
+  return {
     id: h.id,
     name: `${h.name} (${nation.shortCode})`,
     source: 'heritage',
     calloutText: h.calloutText,
     vfxColor: h.vfxColor,
-    shortEffect: h.shortEffect,
-  });
+    ballStyle: h.ballStyle,
+    shortEffect: summary,
+    statPreview: summary,
+    bestWhenLabel: guide.bestWhenLabel,
+    isSweetSpotNow: isPowerSweetSpotActive(guide.sweetSpotId, situation),
+  };
+}
 
+function collectEquippedCapstoneOptions(
+  player: Pick<Player, 'equippedPowerIds' | 'unlockedSkillIds'>,
+  role: 'pitcher' | 'batter',
+  situation?: PowerSituationContext,
+): ActivatablePowerOption[] {
+  const result: ActivatablePowerOption[] = [];
   for (const powerId of player.equippedPowerIds) {
     const spec = CAPSTONE_SPECS[powerId];
     const reqNode = CAPSTONE_NODE_ID_BY_POWER[powerId];
     if (!spec || spec.branch !== role) continue;
     if (reqNode && !player.unlockedSkillIds.includes(reqNode)) continue;
-    options.push({
-      id: spec.id,
-      name: spec.name,
-      source: 'capstone',
-      calloutText: spec.calloutText,
-      vfxColor: spec.vfxColor,
-      shortEffect: spec.shortEffect,
+    result.push(buildCapstoneOption(spec, 'capstone', situation));
+  }
+  return result;
+}
+
+/** Lists every National Heritage, Equipped Capstone, and Early Signature Special Pitch this player can actively unleash. */
+export function getActivatablePowersForPlayer(
+  player: Pick<
+    Player,
+    'nationalityId' | 'heritageTierUnlocked' | 'equippedPowerIds' | 'unlockedSkillIds'
+  > &
+    Partial<Pick<Player, 'pitchArsenal' | 'specialistArchetype'>>,
+  role: 'pitcher' | 'batter',
+  situation?: PowerSituationContext,
+): ActivatablePowerOption[] {
+  const capstones = collectEquippedCapstoneOptions(player, role, situation);
+  const options: ActivatablePowerOption[] = [
+    buildHeritageOption(player.nationalityId, role, situation),
+    ...capstones,
+  ];
+  if (role === 'pitcher' && capstones.length === 0) {
+    const starterId = resolveStarterSignaturePitchId({
+      pitchArsenal: player.pitchArsenal,
+      specialistArchetype: player.specialistArchetype ?? 'balanced_regular',
     });
+    const starterSpec = CAPSTONE_SPECS[starterId];
+    if (starterSpec) options.unshift(buildCapstoneOption(starterSpec, 'starter_pitch', situation));
   }
   return options;
 }
@@ -606,47 +772,99 @@ const HERITAGE_PITCHER_SURGE: Readonly<Record<HeritageAbilitySpec['category'], A
 function buildHeritageActiveSurge(
   actor: 'pitcher' | 'batter',
   player: Pick<Player, 'nationalityId' | 'heritageTierUnlocked'>,
+  situation?: PowerSituationContext,
 ): ActivePowerSurge {
   const ability = getNationalityById(player.nationalityId).heritageAbility;
-  const tierScale = 1 + player.heritageTierUnlocked * 0.14;
+  const guide = getHeritageTacticalGuide(player.nationalityId);
+  const sweetSpotTriggered = isPowerSweetSpotActive(guide.sweetSpotId, situation);
+  const tierScale = (1 + player.heritageTierUnlocked * 0.14) * (sweetSpotTriggered ? 1.35 : 1);
   const template =
     actor === 'pitcher'
       ? HERITAGE_PITCHER_SURGE[ability.category]
       : HERITAGE_BATTER_SURGE[ability.category];
 
+  const contactDelta = Math.round(template.contactDelta * tierScale);
+  const powerDelta = Math.round(template.powerDelta * tierScale);
+  const eyeDelta = Math.round(template.eyeDelta * tierScale);
+  const stuffDelta = Math.round(template.stuffDelta * tierScale);
+  const controlDelta = Math.round(template.controlDelta * tierScale);
+  const impactSummary =
+    actor === 'pitcher'
+      ? `+${stuffDelta} Stuff, +${controlDelta} CTL${template.mphBonus > 0 ? `, +${template.mphBonus} MPH` : ''}`
+      : `+${contactDelta} CON, +${powerDelta} PWR, +${eyeDelta} EYE`;
+
   return {
     ...template,
     powerId: ability.id,
     actor,
-    calloutText: ability.calloutText,
+    calloutText: sweetSpotTriggered ? `${ability.calloutText} ★ SWEET SPOT!` : ability.calloutText,
     vfxColor: ability.vfxColor,
     ballStyle: ability.ballStyle,
     soundCue: 'heritage_power_surge',
-    contactDelta: Math.round(template.contactDelta * tierScale),
-    powerDelta: Math.round(template.powerDelta * tierScale),
-    eyeDelta: Math.round(template.eyeDelta * tierScale),
-    stuffDelta: Math.round(template.stuffDelta * tierScale),
-    controlDelta: Math.round(template.controlDelta * tierScale),
+    sweetSpotTriggered,
+    impactSummary,
+    contactDelta,
+    powerDelta,
+    eyeDelta,
+    stuffDelta,
+    controlDelta,
   };
 }
 
-/** Computes the active pre-pitch surge for either a National Heritage Power or Individual Capstone Power. */
+function formatCapstoneImpactSummary(
+  actor: 'pitcher' | 'batter',
+  mphBonus: number,
+  stuffDelta: number,
+  controlDelta: number,
+  contactDelta: number,
+  powerDelta: number,
+): string {
+  if (actor === 'pitcher') {
+    const mphPart = mphBonus > 0 ? `+${mphBonus} MPH · ` : '';
+    return `${mphPart}+${stuffDelta} Stuff · +${controlDelta} CTL`;
+  }
+  return `+${contactDelta} CON · +${powerDelta} PWR`;
+}
+
+/** Computes the active pre-pitch surge for either a National Heritage Power, Capstone, or Starter Signature Pitch. */
 export function evaluateActivePowerSurge(
   powerId: string,
   actor: 'pitcher' | 'batter',
-  player: Pick<Player, 'nationalityId' | 'heritageTierUnlocked'>,
+  player: Pick<Player, 'nationalityId' | 'heritageTierUnlocked'> &
+    Partial<Pick<Player, 'unlockedSkillIds'>>,
+  situation?: PowerSituationContext,
 ): ActivePowerSurge {
   const cap = CAPSTONE_SPECS[powerId];
   if (!cap || cap.branch !== actor) {
-    return buildHeritageActiveSurge(actor, player);
+    return buildHeritageActiveSurge(actor, player, situation);
   }
+  const reqNode = CAPSTONE_NODE_ID_BY_POWER[powerId];
+  const isFullCapstone = !reqNode || Boolean(player.unlockedSkillIds?.includes(reqNode));
+  const scale = isFullCapstone ? 1.0 : 0.72;
+  const meta = CAPSTONE_SWEET_SPOT[powerId];
+  const sweetSpotTriggered = Boolean(meta && isPowerSweetSpotActive(meta.id, situation));
+  const finalScale = scale * (sweetSpotTriggered ? 1.2 : 1.0);
+  const mphBonus = Math.round(cap.active.mphBonus * scale);
+  const stuffDelta = Math.round(cap.active.stuffDelta * finalScale);
+  const controlDelta = Math.round(cap.active.controlDelta * finalScale);
+  const contactDelta = Math.round(cap.active.contactDelta * finalScale);
+  const powerDelta = Math.round(cap.active.powerDelta * finalScale);
+
   return {
     ...cap.active,
     powerId: cap.id,
     actor,
-    calloutText: `${cap.calloutText} (${cap.name})`,
+    calloutText: sweetSpotTriggered ? `${cap.calloutText} ★ PRIME!` : `${cap.calloutText} (${cap.name})`,
     vfxColor: cap.vfxColor,
     ballStyle: cap.ballStyle,
     soundCue: cap.soundCue,
+    sweetSpotTriggered,
+    impactSummary: formatCapstoneImpactSummary(actor, mphBonus, stuffDelta, controlDelta, contactDelta, powerDelta),
+    stuffDelta,
+    controlDelta,
+    mphBonus,
+    contactDelta,
+    powerDelta,
+    eyeDelta: Math.round(cap.active.eyeDelta * finalScale),
   };
 }

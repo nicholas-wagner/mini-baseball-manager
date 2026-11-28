@@ -7,6 +7,7 @@ import type {
   PressureResponseProfile,
 } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
+import { computeEffectiveLuck, luckMicroDelta, luckScaleMultiplier } from './luckFactor';
 
 export interface SituationLeverageInput {
   inning: number;
@@ -167,19 +168,20 @@ function computePressureDelta(
 
 /** Evaluates high-leverage pressure swings and subtle universal luck modifiers. */
 export function evaluatePressureAndLuckModifiers(
-  player: Pick<Player, 'pressureProfile' | 'ratings'>,
+  player: Pick<Player, 'pressureProfile' | 'ratings'> & { equippedRelicIds?: readonly string[] },
   leverageIndex: number,
+  relicLuckBonus?: number,
 ): PressureAndLuckModifiers {
-  const luckCentered = (player.ratings.luck - 50) / 50; // -0.98 .. +0.98
+  const effectiveLuck = computeEffectiveLuck(player, relicLuckBonus);
   return {
     pressureRatingDelta: computePressureDelta(
       player.pressureProfile,
       player.ratings.clutch,
       leverageIndex,
     ),
-    luckHitProbDelta: Number((luckCentered * 0.024).toFixed(4)),
-    luckZoneProbDelta: Number((luckCentered * 0.016).toFixed(4)),
-    luckErrorMultiplier: Number((1 - luckCentered * 0.08).toFixed(3)),
+    luckHitProbDelta: luckMicroDelta(effectiveLuck, 0.024),
+    luckZoneProbDelta: luckMicroDelta(effectiveLuck, 0.016),
+    luckErrorMultiplier: Number(luckScaleMultiplier(effectiveLuck, -0.08).toFixed(3)),
   };
 }
 

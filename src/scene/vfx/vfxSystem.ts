@@ -6,6 +6,7 @@ import { createPaintedBat } from '../characters/paintedBat';
 import * as THREE from 'three';
 import { createBallFlightVisual } from './ballFlightVisual';
 import { BALL_TRAJECTORY_PRESETS, type BallTrajectorySpec, type BallVfxStyle } from './ballTrajectory';
+import { createSpecialPitchVfx } from './specialPitchVfx';
 import type { Vec3 } from '../camera/cameraRig';
 
 interface ActiveCallout {
@@ -29,6 +30,7 @@ export interface BallparkVfxSystem {
   setCalloutsVisible: (visible: boolean) => void;
   launchBall: (style: BallVfxStyle, callout?: { text: string; color?: string }) => { cameraShake: number };
   ball: ReturnType<typeof createBallFlightVisual>;
+  specialPitch: ReturnType<typeof createSpecialPitchVfx>;
   kickChalk: (position: Vec3) => void;
   impact: (position: Vec3, color: string) => void;
   clear: () => void;
@@ -126,8 +128,9 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     arc.scale.x = side === 'R' ? 1 : -1;
   };
   const ball = createBallFlightVisual();
+  const specialPitch = createSpecialPitchVfx();
   const umpire=createBaseUmpire();
-  group.add(umpire.sprite);
+  group.add(umpire.sprite, specialPitch.group);
   const bat = createPaintedBat();
   bat.barrel.visible = false;
   group.add(bat.barrel);
@@ -281,6 +284,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
 
   const clear = () => {
     celebration.clear();
+    specialPitch.clear();
     if (splinters) splinters.group.visible = false;
     immediate = null;
     arc.visible = false;
@@ -301,6 +305,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     arc.geometry.dispose();
     arc.material.dispose();
     celebration.dispose();
+    specialPitch.dispose();
     splinters?.dispose();
     ball.dispose();
     bat.dispose();
@@ -331,5 +336,5 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
       }
       splinters.start(at, batSide);
     },
-    umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, kickChalk, clear, spawnComicCallout, update, dispose };
+    umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, specialPitch, launchBall, impact, kickChalk, clear, spawnComicCallout, update, dispose };
 }

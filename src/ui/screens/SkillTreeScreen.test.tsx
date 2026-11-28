@@ -23,6 +23,8 @@ describe('SkillTreeScreen — Capped Build-Identity Trees, Session Undo & Offsea
     const firstHitterIdx = club.roster.findIndex((p) => p.position !== 'SP' && p.position !== 'RP');
     const buffedRoster = club.roster.map((p, idx) => ({
       ...p,
+      age: idx === firstHitterIdx ? 24 : p.age,
+      contract: idx === firstHitterIdx ? { ...p.contract, yearsRemaining: 3 } : p.contract,
       skillPoints: idx === firstHitterIdx ? 12 : 0,
       marketTier: idx === firstHitterIdx ? ('average' as const) : p.marketTier,
       level: idx === firstHitterIdx ? 5 : p.level,
@@ -115,5 +117,25 @@ describe('SkillTreeScreen — Capped Build-Identity Trees, Session Undo & Offsea
     expect(screen.getByTestId('manager-capstone-locked-mogul_dynasty_aura')).toHaveTextContent(
       /Capstone Locked/i,
     );
+  });
+
+  it('renders Skyrim-inspired Constellation map, Discipline Mastery ribbon, Heritage tactical guide, and 3-mode Skill Assistant', async () => {
+    const user = userEvent.setup();
+    render(<SkillTreeScreen />);
+
+    expect(screen.getByTestId('skill-tree-constellation')).toBeInTheDocument();
+    expect(screen.getByTestId('discipline-mastery-ribbon')).toBeInTheDocument();
+    expect(screen.getByTestId('heritage-crest-card')).toHaveTextContent(/Batting:/i);
+    expect(screen.getByTestId('heritage-crest-card')).toHaveTextContent(/Best When/i);
+    expect(screen.getByTestId('skill-tree-assist-bar')).toBeInTheDocument();
+
+    // 1-tap Coach's Picks unlocks skills immediately for the player
+    const applyBtn = screen.getByTestId('apply-coach-picks-player-btn');
+    await user.click(applyBtn);
+    expect(screen.getByTestId('skill-tree-feedback')).toHaveTextContent(/Coach Pops awakened/i);
+
+    // Switch to Manual mode hides Coach's Pick highlights cleanly
+    await user.click(screen.getByTestId('skill-assist-mode-manual'));
+    expect(screen.getByTestId('skill-assist-mode-manual')).toHaveAttribute('aria-pressed', 'true');
   });
 });

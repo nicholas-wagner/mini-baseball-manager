@@ -10,6 +10,7 @@ import {
   type Player,
 } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
+import { computeContestLuckDelta, computeEffectiveLuck } from '../rpg/luckFactor';
 import type { PitchTargetIntent } from './pitchMindGames';
 import type { DefensiveShiftId } from './winProbability';
 
@@ -168,6 +169,11 @@ function computeInPlayBuntSuccessProbs(
       input.charger.ratings.range +
       input.charger.ratings.arm) /
     3;
+  const buntLuck = computeContestLuckDelta(
+    computeEffectiveLuck(input.batter),
+    computeEffectiveLuck(input.charger),
+    0.018,
+  );
   const speedDelta = input.batter.ratings.speed - 60;
   const fastBurst = Math.max(0, input.batter.ratings.speed - 65) * 0.006;
   const rawSingle = clampNumber(
@@ -176,7 +182,8 @@ function computeInPlayBuntSuccessProbs(
       fastBurst +
       buntDelta * 0.0032 +
       input.firstBaseBonus * 0.022 -
-      (defenderComposite - 60) * 0.0042,
+      (defenderComposite - 60) * 0.0042 +
+      buntLuck,
     0.02,
     0.64,
   );
@@ -229,10 +236,15 @@ export function evaluateBuntOdds(input: BuntOddsInput): BuntOddsBreakdown {
   const batterPopUpEdge = buntDelta * 0.00105 + contactDelta * 0.00045;
   const batterFoulEdge = buntDelta * 0.002 + contactDelta * 0.0006;
 
+  const pitchLuck = computeContestLuckDelta(
+    computeEffectiveLuck(input.batter),
+    computeEffectiveLuck(input.pitcher),
+    0.004,
+  );
   // Neutral baseline: 2% whiff, 20% foul, 5% infield pop-up, 73% in play
-  const whiffProb = clampNumber(0.02 - batterWhiffEdge + whiffPressure, 0.005, 0.1);
-  const foulProb = clampNumber(0.2 - batterFoulEdge + foulPressure, 0.08, 0.34);
-  const popUpProb = clampNumber(0.05 - batterPopUpEdge + popUpPressure, 0.01, 0.16);
+  const whiffProb = clampNumber(0.02 - batterWhiffEdge + whiffPressure - pitchLuck * 0.5, 0.005, 0.1);
+  const foulProb = clampNumber(0.2 - batterFoulEdge + foulPressure - pitchLuck, 0.08, 0.34);
+  const popUpProb = clampNumber(0.05 - batterPopUpEdge + popUpPressure - pitchLuck, 0.01, 0.16);
 
   const whiffPct = Math.round(whiffProb * 100);
   const foulPct = Math.round(foulProb * 100);

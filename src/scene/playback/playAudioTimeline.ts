@@ -20,6 +20,31 @@ function superPitchCue(cue: SoundCue | null | undefined): SuperPitchCue | undefi
   return SUPER_PITCH_CUES.find((item) => item === cue);
 }
 
+function pitcherPowerAudioCue(
+  play: DiamondPlay,
+  event: PlayEvent | null | undefined,
+): SoundCue | undefined {
+  const power =
+    event?.specialPowerTriggered?.actor === 'pitcher'
+      ? event.specialPowerTriggered
+      : play.power?.actor === 'pitcher'
+        ? play.power
+        : undefined;
+  if (!power) return undefined;
+  switch (power.powerId) {
+    case 'blazing_comet':
+      return 'comet_pitch';
+    case 'ghost_knuckle':
+      return 'knuckle_warble';
+    case 'tornado_slider':
+      return 'tornado_whoosh';
+    case 'ice_veins':
+      return 'clutch_stinger';
+    default:
+      return 'heritage_power_surge';
+  }
+}
+
 function add(out: ScheduledAudioCue[], at: number, cue: SoundCue) {
   out.push({ at, cue });
 }
@@ -49,12 +74,20 @@ function addRelease(
   event: PlayEvent | null | undefined,
   fallback?: SoundCue | null,
 ) {
-  const special = superPitchCue(event?.soundCue) ?? superPitchCue(fallback);
-  const pitcherPower = event?.specialPowerTriggered?.actor === 'pitcher' || play.power?.actor === 'pitcher';
-  if (special) {
-    add(out, pitch.start, special);
+  const explicitSuper = superPitchCue(event?.soundCue) ?? superPitchCue(fallback);
+  if (explicitSuper) {
+    add(out, pitch.start, explicitSuper);
     return;
   }
+  const powerCue = pitcherPowerAudioCue(play, event);
+  if (powerCue && superPitchCue(powerCue)) {
+    add(out, pitch.start, powerCue);
+    return;
+  }
+  if (powerCue === 'clutch_stinger') {
+    add(out, pitch.start, 'clutch_stinger');
+  }
+  const pitcherPower = event?.specialPowerTriggered?.actor === 'pitcher' || play.power?.actor === 'pitcher';
   if (pitcherPower) add(out, pitch.start, 'heritage_power_surge');
   add(out, pitch.start, 'pitch_whoosh');
 }

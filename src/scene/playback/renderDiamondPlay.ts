@@ -11,6 +11,13 @@ import { Vector3, type PerspectiveCamera } from 'three';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
 import type { PaintedPlayerRig } from '../characters/paintedPlayer';
 import { BALL_TRAJECTORY_PRESETS } from '../vfx/ballTrajectory';
+import {
+  computeSpecialPitchBallOpacity,
+  formatSpecialPitchCallout,
+  getSpecialPitchTrailVisual,
+  resolveSpecialPitchStyle,
+  type SpecialPitchStyle,
+} from '../vfx/specialPitchVfx';
 import { inSwingArcWindow, type BallparkVfxSystem } from '../vfx/vfxSystem';
 import { actorAt, buntFollowBase, diamondCamera, forceAtFirst, sampleLeg, sparkleContact, type Actor, type DiamondPlay } from './diamondPlay';
 import { collectPlayAudioCues, type PlayAudioFrame } from './playAudioTimeline';
@@ -58,9 +65,20 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     rig.logicalYaw = state.yaw;
     return rig.contactAt(state.clip, state.local, state.pos, camera.position);
   }
+  const pitch = play.legs[0];
   const flying = play.legs.find(leg => t >= leg.start && t < leg.end);
   const power = play.power;
+  const pitcherSpecialStyle: SpecialPitchStyle | null =
+    power?.actor === 'pitcher'
+      ? (pitch.specialPitch ?? resolveSpecialPitchStyle(power.powerId, power.ballStyle))
+      : null;
   vfx.ball.group.visible = false;
+  vfx.specialPitch.hideFlight();
+  if (power?.actor === 'pitcher' && t < pitch.start) {
+    vfx.specialPitch.setMoundAura(power.vfxColor, actorAt(play, 'P', t, side).pos, t, vfx.reducedMotion);
+  } else {
+    vfx.specialPitch.setMoundAura(null, BASE_PATH_VERTICES[0], t, vfx.reducedMotion);
+  }
   if (flying) {
     const a = flying.startPoint ?? contact(flying.from, flying.start);
     const b = flying.endPoint ?? contact(flying.to, flying.end);
@@ -70,20 +88,49 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const spec = { ...BALL_TRAJECTORY_PRESETS[style], start: a, end: b, durationSec,
       secondaryColor: homer ? '#FF9056' : flying.kind === 'ground' || flying.kind === 'bounce' ? '#CE8852' : '#7DB5CD' };
     const progress = (t - flying.start) / durationSec;
-    const scale = flying.kind === 'pitch' ? pitchFlightScale(progress, .55) : flying.kind==='handoff' ? pitchFlightScale(0,.55) : .55;
+    const specialStyle = flying.kind === 'pitch' ? pitcherSpecialStyle : null;
+    const specialTrail = specialStyle
+      ? getSpecialPitchTrailVisual(specialStyle, power?.vfxColor, vfx.reducedMotion)
+      : null;
+    const baseScale = flying.kind === 'pitch' ? pitchFlightScale(progress, .55) : flying.kind==='handoff' ? pitchFlightScale(0,.55) : .55;
+    const scale = specialTrail ? baseScale * specialTrail.ballScaleMultiplier : baseScale;
     const powerFlight = power && (power.actor === 'pitcher' ? flying.kind === 'pitch' : flying === play.legs[1]);
-    const trail = powerFlight ? power.vfxColor
+    const trail = specialTrail
+      ? specialTrail
+      : powerFlight ? power.vfxColor
       : flying.kind === 'pitch' && flying.pitch ? getPitchTrailVisual(flying.pitch.pitchType, vfx.reducedMotion)
       : homer ? '#FFD166' : '#FFF1C9';
-    vfx.ball.draw(spec, progress, trail, scale,
-      (_, u) => sampleLeg(flying, a, b, u, throws), play.close && flying.from === 'C' && flying.to === 'P' ? .23 : 1);
+    const ballOpacity = specialStyle
+      ? computeSpecialPitchBallOpacity(specialStyle, progress, vfx.reducedMotion)
+      : 1;
+    const trailWidthScale = specialTrail ? specialTrail.trailWidthScale : 1;
+    const trailLengthScale = typeof trail === 'string' ? 1 : trail.trailLengthScale;
+    vfx.ball.draw(
+      spec,
+      progress,
+      trail,
+      scale,
+      (_, u) => sampleLeg(flying, a, b, u, throws, specialStyle),
+      play.close && flying.from === 'C' && flying.to === 'P' ? .23 : 1,
+      trailLengthScale,
+      ballOpacity,
+      trailWidthScale,
+    );
     vfx.ball.sizeForCamera(camera, heightPx);
+    if (specialStyle) {
+      vfx.specialPitch.updateFlight(
+        specialStyle,
+        vfx.ball.position,
+        progress,
+        power?.vfxColor ?? specialTrail?.primaryColor ?? '#FFC300',
+        vfx.reducedMotion,
+      );
+    }
     const statAt = flying.start + Math.min(.55, durationSec / 2);
     if (homer && previous < statAt && t >= statAt) {
       vfx.spawnComicCallout(moonshotCall(play.hrStatcast), vfx.ball.position, '#FFC300', 'flight');
     }
   }
-  const pitch = play.legs[0];
   const sincePlate = t-pitch.end;
   let barrel = null;
   if (!vfx.reducedMotion && pitch.kind === 'pitch' && inSwingArcWindow(sincePlate)) {
@@ -95,7 +142,17 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const actor = power.actor === 'fielder' ? play.pickup : power.actor === 'pitcher' ? 'P' : 'BAT';
     const unleashAt = actor === 'P' ? pitch.start : actor === 'BAT' ? pitch.end : play.pickupAt;
     if (previous < unleashAt && seconds >= unleashAt) {
-      vfx.celebration.unleash(contact(actor,unleashAt),power.vfxColor);
+      const origin = contact(actor, unleashAt);
+      vfx.celebration.unleash(origin, power.vfxColor);
+      if (actor === 'P' && pitcherSpecialStyle) {
+        const callout = formatSpecialPitchCallout(
+          pitcherSpecialStyle,
+          power.calloutText,
+          pitch.pitch?.mph,
+          power.vfxColor,
+        );
+        vfx.spawnComicCallout(callout.text, origin, callout.color, 'contact');
+      }
     }
   }
   const force = forceAtFirst(play);

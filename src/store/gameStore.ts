@@ -90,6 +90,11 @@ import {
   undoSessionSkillNode,
   unlockSkillNode,
 } from '../engine/rpg/skillTrees';
+import {
+  applyAutoSkillTreeForClub,
+  applyCoachSkillPicksForPlayer,
+} from '../engine/rpg/skillTreeAssist';
+import { useUserPreferencesStore } from './userPreferences';
 import { crossTrainPosition } from '../engine/rpg/specialistsAndPositions';
 import {
   applyTrainingDrill,
@@ -246,6 +251,8 @@ export interface GameStoreState {
     request: TrainingDrillRequest,
   ) => { trained: boolean; reason?: string; summary: string };
   unlockPlayerSkill: (playerId: string, nodeId: string) => { unlocked: boolean; reason?: string };
+  applyCoachSkillsForPlayer: (playerId: string) => { unlockedCount: number; unlockedNodeNames: string[] };
+  applyCoachSkillsForRoster: () => { appliedSummary: string[] };
   undoPlayerSkillUnlock: (
     playerId: string,
     nodeId: string,
@@ -1059,6 +1066,60 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       return { unlocked: true };
     },
 
+    applyCoachSkillsForPlayer: (playerId) => {
+      const state = get();
+      const club = state.activeOffseason
+        ? findClubAcrossLeagues(state.activeOffseason.leagues, state.humanClubId) ?? state.getHumanClub()
+        : state.getHumanClub();
+      if (!club) return { unlockedCount: 0, unlockedNodeNames: [] };
+      const target = club.roster.find((p) => p.id === playerId);
+      if (!target || target.skillPoints <= 0) return { unlockedCount: 0, unlockedNodeNames: [] };
+
+      const res = applyCoachSkillPicksForPlayer(target);
+      if (res.unlockedNodeNames.length === 0) return { unlockedCount: 0, unlockedNodeNames: [] };
+
+      const nextClub: Club = {
+        ...club,
+        roster: club.roster.map((p) => (p.id === playerId ? res.player : p)),
+      };
+      set((s) => ({
+        leagues: updateHumanClubInLeagues(s.leagues, nextClub),
+        ...(s.activeOffseason
+          ? {
+              activeOffseason: {
+                ...s.activeOffseason,
+                leagues: updateHumanClubInLeagues(s.activeOffseason.leagues, nextClub),
+              },
+            }
+          : {}),
+      }));
+      return { unlockedCount: res.unlockedNodeNames.length, unlockedNodeNames: res.unlockedNodeNames };
+    },
+
+    applyCoachSkillsForRoster: () => {
+      const state = get();
+      const club = state.activeOffseason
+        ? findClubAcrossLeagues(state.activeOffseason.leagues, state.humanClubId) ?? state.getHumanClub()
+        : state.getHumanClub();
+      if (!club) return { appliedSummary: [] };
+
+      const res = applyAutoSkillTreeForClub(club);
+      if (res.appliedSummary.length === 0) return { appliedSummary: [] };
+
+      set((s) => ({
+        leagues: updateHumanClubInLeagues(s.leagues, res.club),
+        ...(s.activeOffseason
+          ? {
+              activeOffseason: {
+                ...s.activeOffseason,
+                leagues: updateHumanClubInLeagues(s.activeOffseason.leagues, res.club),
+              },
+            }
+          : {}),
+      }));
+      return { appliedSummary: res.appliedSummary };
+    },
+
     undoPlayerSkillUnlock: (playerId, nodeId) => {
       const state = get();
       const club = state.activeOffseason
@@ -1345,7 +1406,7 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
           events: result.events,
         },
       );
-      const settledHumanClub: Club = {
+      const baseSettledHumanClub: Club = {
         ...bossSettlement.club,
         franchiseRecords: recordUpdate.records,
         ...(latestPolaroid
@@ -1357,6 +1418,10 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
             }
           : {}),
       };
+      const settledHumanClub: Club =
+        useUserPreferencesStore.getState().skillTreeMode === 'auto'
+          ? applyAutoSkillTreeForClub(baseSettledHumanClub).club
+          : baseSettledHumanClub;
       const updatedOpponent = applyGameStatDeltasToClub(
         opponentClub,
         result.playerStatDeltas,

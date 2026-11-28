@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { attachComicOutline } from '../core/toonMaterials';
+import { COMIC_INK_HEX } from '../core/toonMaterials';
 import type { PitchTrailVisual } from '../playback/pitchFlight';
 import { sampleBallTrajectory, type BallTrajectorySpec } from './ballTrajectory';
 
@@ -54,7 +54,16 @@ export function createBallFlightVisual() {
   // From the mound the tail sits between the lens and the baseball. Paint
   // the leather over the translucent streak while still testing field depth.
   ball.renderOrder = 2;
-  attachComicOutline(ball, 1.14);
+  const ballOutlineMaterial = new THREE.MeshBasicMaterial({
+    color: COMIC_INK_HEX,
+    side: THREE.BackSide,
+    transparent: true,
+    opacity: 1,
+  });
+  const ballOutline = new THREE.Mesh(ball.geometry, ballOutlineMaterial);
+  ballOutline.scale.setScalar(1.14);
+  ballOutline.renderOrder = -1;
+  ball.add(ballOutline);
   const rings = 12;
   const sides = 6;
   const positions = new THREE.Float32BufferAttribute(new Float32Array(rings * sides * 3), 3);
@@ -87,13 +96,21 @@ export function createBallFlightVisual() {
 
   function draw(spec: BallTrajectorySpec, progress: number, color: string | PitchTrailVisual = spec.trailColor,
     scale = 1, sample = sampleBallTrajectory, trailStrength = 1,
-    trailLengthScale = typeof color === 'string' ? 1 : color.trailLengthScale) {
+    trailLengthScale = typeof color === 'string' ? 1 : color.trailLengthScale,
+    ballOpacity = 1,
+    trailWidthScale = 1) {
     const visual = typeof color === 'string' ? undefined : color;
     const primary = typeof color === 'string' ? color : color.primaryColor;
     const secondary = visual?.secondaryColor ?? spec.secondaryColor;
     const strength = trailStrength * (visual?.trailStrength ?? 1);
+    const clampedOpacity = THREE.MathUtils.clamp(ballOpacity, 0, 1);
     ballScale = scale;
     ball.scale.setScalar(scale);
+    ball.material.opacity = clampedOpacity;
+    ball.material.depthWrite = clampedOpacity >= 0.99;
+    ballOutlineMaterial.opacity = clampedOpacity * clampedOpacity;
+    ballOutlineMaterial.depthWrite = clampedOpacity >= 0.99;
+    ballOutline.visible = clampedOpacity > 0.08;
     group.visible = true;
     const head = sample(spec, progress);
     ball.position.set(head.x, head.y, head.z);
@@ -109,13 +126,13 @@ export function createBallFlightVisual() {
     const repaint = lastPrimary !== primary || lastAccent !== secondary;
     const main = repaint ? new THREE.Color(primary) : null;
     const accent = repaint ? new THREE.Color(secondary) : null;
-    trail.material.opacity = .86 * strength;
+    trail.material.opacity = Math.min(1, .86 * strength);
     const tailWindow = trailLengthScale * Math.min(0.22, 0.095 / spec.durationSec);
     const trailLength = strength * Math.min(progress, tailWindow);
     for (let r = 0; r < rings; r++) {
       const u = r / (rings - 1);
       const point = sample(spec, progress - u * trailLength);
-      const radius = 0.14 * scale * (1 - u);
+      const radius = 0.14 * scale * trailWidthScale * (1 - u);
       for (let side = 0; side < sides; side++) {
         const angle = (side / sides) * Math.PI * 2;
         const idx = r * sides + side;
@@ -142,6 +159,7 @@ export function createBallFlightVisual() {
   function dispose() {
     ball.geometry.dispose();
     ball.material.dispose();
+    ballOutlineMaterial.dispose();
     groundShadow.geometry.dispose();
     groundShadow.material.dispose();
     texture.dispose();

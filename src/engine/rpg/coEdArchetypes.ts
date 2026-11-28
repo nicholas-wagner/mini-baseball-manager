@@ -55,7 +55,7 @@ const BREAKING_OR_OFFSPEED_PITCHES = new Set<PitchType>([
 ]);
 
 function clampRating(value: number, maxCap: number): number {
-  return Math.max(25, Math.min(maxCap, Math.round(value)));
+  return Math.max(8, Math.min(maxCap, Math.round(value)));
 }
 
 function resolvePresentation(player: Pick<Player, 'traits'>): AthletePresentation {

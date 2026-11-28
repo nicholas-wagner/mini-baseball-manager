@@ -124,6 +124,8 @@ interface LiveActionBarProps {
   humanHype?: number;
   hypeCost?: number;
   readyPowerLabel?: string | null;
+  readyPowerEffect?: string | null;
+  readyPowerSweetSpot?: boolean;
   powerArmed?: boolean;
   onArmReadyPower?: () => void;
   speed?: 1 | 2 | 4;
@@ -235,6 +237,8 @@ export function LiveActionBar({
   humanHype = 25,
   hypeCost = 60,
   readyPowerLabel = null,
+  readyPowerEffect = null,
+  readyPowerSweetSpot = false,
   powerArmed = false,
   onArmReadyPower,
   speed = 1,
@@ -375,7 +379,16 @@ export function LiveActionBar({
       : onePitchMode
         ? 'Swing · 1-Pitch'
         : 'Swing';
-  const pitchAction = isBatting ? battingAction : onePitchMode ? 'Throw · 1-Pitch' : 'Throw Pitch';
+  const shortReadyPower = readyPowerLabel
+    ? readyPowerLabel.replace(/\s*\([^)]*\)\s*$/, '')
+    : null;
+  const pitchAction = powerArmed && shortReadyPower
+    ? `🔥 UNLEASH ${shortReadyPower}!`
+    : isBatting
+      ? battingAction
+      : onePitchMode
+        ? 'Throw · 1-Pitch'
+        : 'Throw Pitch';
   const primaryLabel = gameCompleted || !isBatting ? cue.primaryButtonLabel : battingAction + ' (Next Pitch)';
   const controlsLocked = gameCompleted || locked;
   const toggleStealOption = (opt: (typeof resolvedStealOptions)[number]) => {
@@ -494,9 +507,12 @@ export function LiveActionBar({
                 data-testid="arcade-unleash-power-btn"
                 aria-pressed={powerArmed}
                 disabled={gameCompleted}
+                title={readyPowerEffect ?? readyPowerLabel}
                 onClick={onArmReadyPower}
               >
-                {powerArmed ? 'ARMED!' : readyPowerLabel}
+                {powerArmed
+                  ? '🔥 ARMED!'
+                  : `${readyPowerSweetSpot ? '★ PRIME: ' : '⚡ '}${shortReadyPower ?? readyPowerLabel}`}
               </button>
             ) : null}
           </div>

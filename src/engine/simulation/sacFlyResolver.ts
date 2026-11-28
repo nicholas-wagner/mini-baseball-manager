@@ -2,6 +2,7 @@ import type { FieldPosition } from '../handedness/types';
 import type { AtBatOutcome, PlayEvent, PlaySoundCue } from '../models/playEvent';
 import type { BattedBallType, Player } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
+import { computeContestLuckDelta, computeEffectiveLuck } from '../rpg/luckFactor';
 import type { BaseState } from './gameState';
 
 export type FlyBallDepth = 'shallow' | 'medium' | 'deep';
@@ -12,6 +13,8 @@ export interface SacFlyTagUpInput {
   outfielderArm: number;
   catcherFielding?: number;
   targetBase?: 'home' | 'third';
+  runnerLuck?: number;
+  outfielderLuck?: number;
 }
 
 export interface SacFlyTagUpOdds {
@@ -83,12 +86,17 @@ export function evaluateSacFlyTagUp(input: SacFlyTagUpInput): SacFlyTagUpOdds {
 
   const catcherHandling = ((input.catcherFielding ?? 60) - 60) * 0.0015;
   const thirdBonus = input.targetBase === 'third' ? 0.06 : 0;
+  const tagLuckShift =
+    input.runnerLuck != null || input.outfielderLuck != null
+      ? computeContestLuckDelta(input.runnerLuck ?? 50, input.outfielderLuck ?? 50, 0.02)
+      : 0;
   const safeProb = clampNumber(
     DEPTH_SAFE_BASE[input.depth] +
       thirdBonus +
       speedDelta * 0.0065 -
       armDelta * 0.0072 -
-      catcherHandling,
+      catcherHandling +
+      tagLuckShift,
     0.08,
     0.97,
   );
@@ -145,6 +153,8 @@ function resolveThirdBaseTagUp(
     outfielderArm: input.effectiveArm,
     catcherFielding: input.catcher?.ratings.fielding,
     targetBase: 'home',
+    runnerLuck: computeEffectiveLuck(runner),
+    outfielderLuck: computeEffectiveLuck(input.outfielder),
   });
   const spec = DEPTH_FLIGHT_SPEC[depth];
   const ballFlight = buildFlightForDepth(input.outfieldSpot.x, depth);

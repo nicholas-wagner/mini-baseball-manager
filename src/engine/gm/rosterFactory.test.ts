@@ -256,11 +256,30 @@ describe('TASK-013 — Canonical Domain Models & Seeded Club/Roster Factory', ()
     };
 
     const rookieAvg = averageTierOvr('rookie');
+    const lowAAvg = averageTierOvr('low_a');
+    const highAAvg = averageTierOvr('high_a');
     const aaAvg = averageTierOvr('aa');
+    const aaaAvg = averageTierOvr('aaa');
     const majorsAvg = averageTierOvr('majors');
 
-    expect(rookieAvg).toBeLessThan(aaAvg);
-    expect(aaAvg).toBeLessThan(majorsAvg);
+    expect(rookieAvg).toBeGreaterThanOrEqual(24);
+    expect(rookieAvg).toBeLessThanOrEqual(36);
+    expect(lowAAvg).toBeGreaterThanOrEqual(34);
+    expect(lowAAvg).toBeLessThanOrEqual(46);
+    expect(highAAvg).toBeGreaterThanOrEqual(44);
+    expect(highAAvg).toBeLessThanOrEqual(56);
+    expect(aaAvg).toBeGreaterThanOrEqual(54);
+    expect(aaAvg).toBeLessThanOrEqual(66);
+    expect(aaaAvg).toBeGreaterThanOrEqual(64);
+    expect(aaaAvg).toBeLessThanOrEqual(76);
+    expect(majorsAvg).toBeGreaterThanOrEqual(74);
+    expect(majorsAvg).toBeLessThanOrEqual(86);
+
+    expect(rookieAvg).toBeLessThan(lowAAvg);
+    expect(lowAAvg).toBeLessThan(highAAvg);
+    expect(highAAvg).toBeLessThan(aaAvg);
+    expect(aaAvg).toBeLessThan(aaaAvg);
+    expect(aaaAvg).toBeLessThan(majorsAvg);
 
     const eliteSpOvr = computePlayerOverall({
       position: 'SP',

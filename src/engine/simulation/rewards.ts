@@ -10,6 +10,7 @@ import { computeRosterPopularityAttendanceMultiplier } from '../rpg/coEdArchetyp
 import { updatePlayerFormAfterGame } from '../rpg/formTracker';
 import { evaluateClubhouseMentalAura } from '../rpg/mentalAndLeverage';
 import { computePostGamePitcherRecovery } from '../rpg/pitcherEndurance';
+import { awardDisciplineMasteryFromStatDelta } from '../rpg/skillTreeMastery';
 import { evolveSpecialistArchetype } from '../rpg/specialistsAndPositions';
 import { enforceRatingBudget } from '../rpg/trainingCompromises';
 import { createSeededRng, type SeededRng } from '../rng/seededRng';
@@ -322,7 +323,8 @@ export function applyPostGameProgression(
   const updatedRoster = clubWithStats.roster.map((player) => {
     const delta = statDeltas[player.id];
     const withXp = applyPlayerXpAndLevelUps(player, rewards.playerXpById[player.id] ?? 0);
-    const withForm = updatePlayerFormAfterGame(withXp, delta);
+    const withMastery = awardDisciplineMasteryFromStatDelta(withXp, delta);
+    const withForm = updatePlayerFormAfterGame(withMastery, delta);
     const pitched = Boolean(delta && (delta.pitchesThrown > 0 || delta.inningsPitchedOuts > 0));
     const nextFatigue = isPitcherPosition(player.position)
       ? computePostGamePitcherRecovery(

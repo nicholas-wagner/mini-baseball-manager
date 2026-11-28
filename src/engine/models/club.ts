@@ -93,13 +93,28 @@ export type CrestEmblemId =
   | 'comet_star'
   | 'crown_shield'
   | 'crossed_bats'
-  | 'rocket_paw';
+  | 'rocket_paw'
+  | 'flaming_baseball'
+  | 'winged_cleat'
+  | 'anchor_bay'
+  | 'sakura_blossom'
+  | 'thunder_bird'
+  | 'rocket_ship'
+  | 'desert_cactus'
+  | 'mountain_peak'
+  | 'shamrock_clover'
+  | 'dragon_crest'
+  | 'vintage_mitt'
+  | 'sunburst_wave';
 
 export interface ClubColors {
   primary: string;
   secondary: string;
   accent: string;
   monogram: string;
+  roadPrimary?: string;
+  roadSecondary?: string;
+  roadAccent?: string;
   jerseyPattern?: JerseyPatternId;
   stirrupStyle?: StirrupStyleId;
   capStyle?: CapStyleId;

@@ -351,6 +351,8 @@ export interface Player {
   equippedRelicIds: string[];
   heritageTierUnlocked: 0 | 1 | 2 | 3;
   careerRetrainsUsed?: number;
+  /** Skyrim-inspired use-based Baseball Discipline Mastery (0..100 per discipline). */
+  skillMastery?: Partial<Record<'power' | 'contact' | 'speed' | 'fielding' | 'heat' | 'spin' | 'command', number>>;
 
   // Live Status & Form
   marketTier: PlayerMarketTier;

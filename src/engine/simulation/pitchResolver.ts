@@ -34,7 +34,12 @@ import {
   type CoEdClubhouseSynergy,
 } from '../rpg/coEdArchetypes';
 import { getFormStatModifiers } from '../rpg/formTracker';
+import { computeEffectiveLuck, luckMicroDelta } from '../rpg/luckFactor';
 import { evaluatePressureAndLuckModifiers } from '../rpg/mentalAndLeverage';
+import {
+  adjustAwayPitcherCrowdPenalty,
+  type HomeFieldEffect,
+} from './homeFieldAdvantage';
 import {
   evaluatePitchMatchup,
   selectPitchForCount,
@@ -354,24 +359,33 @@ function resolveHitType(
   rng: SeededRng,
   batter: Player,
   effPower: number,
+  effStuff: number,
   defender: Player,
   battedBallType: BattedBallType,
   parkHrMult: number,
   parkXbhMult: number,
   effSpeed: number,
   effGapPower: number,
+  batterLuck: number,
 ): PitchResolution {
   const hrMult = battedBallType === 'fly_ball' ? 1.55 : battedBallType === 'line_drive' ? 0.9 : 0.08;
-  const gapBonus = (effGapPower - 60) * 0.0024;
-  const hrChance = clampProb((0.11 + (effPower - 60) * 0.0038) * hrMult * parkHrMult, 0.01, 0.56);
+  const matchupPowerEdge = effPower - effStuff;
+  const gapBonus = (effGapPower - effStuff) * 0.002 + (effGapPower - 50) * 0.0006;
+  const luckCarry = luckMicroDelta(batterLuck, 0.018);
+  const hrChance = clampProb(
+    (0.105 + matchupPowerEdge * 0.0036 + (effPower - 50) * 0.0008) * hrMult * parkHrMult + luckCarry,
+    0.015,
+    0.56,
+  );
   const tripleChance = clampProb(
-    (0.045 + (effSpeed - 65) * 0.0022 + gapBonus * 0.4) * parkXbhMult,
+    (0.045 + (effSpeed - 50) * 0.0018 + gapBonus * 0.4) * parkXbhMult + luckCarry * 0.4,
     0.015,
     0.16,
   );
   const doubleChance = clampProb(
-    (0.22 + (effPower - 60) * 0.0018 + gapBonus + (battedBallType === 'line_drive' ? 0.08 : 0)) *
-      parkXbhMult,
+    (0.22 + matchupPowerEdge * 0.0014 + gapBonus + (battedBallType === 'line_drive' ? 0.08 : 0)) *
+      parkXbhMult +
+      luckCarry * 0.6,
     0.12,
     0.44,
   );
@@ -696,6 +710,8 @@ export interface PitchResolverContext {
   pickoffHoldModifier?: number;
   hitAndRun?: boolean;
   relieverWarmupControlBonus?: number;
+  homeBatting?: boolean;
+  homeFieldEffect?: HomeFieldEffect;
 }
 
 const ZERO_STAFF: ClubStaffBonuses = {
@@ -801,11 +817,17 @@ function maybeRobHomeRunWithLeap(
 ): PitchResolution {
   if (hit.outcome !== 'home_run') return hit;
   if (defenderCaps.hrRobberyChance > 0) {
-    if (!rng.chance(defenderCaps.hrRobberyChance)) return hit;
+    const capProb = clampProb(
+      defenderCaps.hrRobberyChance + luckMicroDelta(computeEffectiveLuck(defender), 0.014),
+      0.01,
+      0.45,
+    );
+    if (!rng.chance(capProb)) return hit;
     return buildWallRobberyOut(defender, rng.pick(OUTFIELD_SPOTS), true);
   }
   const { fielder, spot } = resolveWallOutfielder(hit, defender, outfielders);
-  if (!isEliteWallOutfielder(fielder) || !rng.chance(0.03)) return hit;
+  const organicProb = clampProb(0.03 + luckMicroDelta(computeEffectiveLuck(fielder), 0.01), 0.01, 0.08);
+  if (!isEliteWallOutfielder(fielder) || !rng.chance(organicProb)) return hit;
   return buildWallRobberyOut(fielder, spot, false);
 }
 
@@ -978,16 +1000,19 @@ function resolveContactResult(
       shiftXbhScale *
       powers.batterHeritage.xbhStretchMultiplier *
       bSurge.xbhStretchMultiplier;
+    const batterEffLuck = computeEffectiveLuck(ctx.batter, powers.batterRelics.luck);
     const rawHit = resolveHitType(
       ctx.rng,
       ctx.batter,
       effPower,
+      effStuff,
       ctx.defender,
       battedBallType,
       hrMult,
       xbhMult,
       effSpeed,
       effGapPower,
+      batterEffLuck,
     );
     const hit = maybeRobHomeRunWithLeap(
       ctx.rng,
@@ -1178,18 +1203,26 @@ function resolveRequestedPowerSurges(ctx: PitchResolverContext): {
   if (!ctx.requestedPowerId) {
     return { batterSurge: null, pitcherSurge: null };
   }
-  const batOpts = getActivatablePowersForPlayer(ctx.batter, 'batter');
+  const situation = {
+    balls: ctx.balls,
+    strikes: ctx.strikes,
+    runnersOnBase: ctx.bases.filter(Boolean).length,
+    hasRisp: Boolean(ctx.bases[1] || ctx.bases[2]),
+    inning: ctx.inning,
+    scoreDiff: Math.abs(ctx.pitchingLead),
+  };
+  const batOpts = getActivatablePowersForPlayer(ctx.batter, 'batter', situation);
   if (ctx.canBatterTriggerSpecial && batOpts.some((p) => p.id === ctx.requestedPowerId)) {
     return {
-      batterSurge: evaluateActivePowerSurge(ctx.requestedPowerId, 'batter', ctx.batter),
+      batterSurge: evaluateActivePowerSurge(ctx.requestedPowerId, 'batter', ctx.batter, situation),
       pitcherSurge: null,
     };
   }
-  const pitOpts = getActivatablePowersForPlayer(ctx.pitcher, 'pitcher');
+  const pitOpts = getActivatablePowersForPlayer(ctx.pitcher, 'pitcher', situation);
   if (ctx.canPitcherTriggerSpecial && pitOpts.some((p) => p.id === ctx.requestedPowerId)) {
     return {
       batterSurge: null,
-      pitcherSurge: evaluateActivePowerSurge(ctx.requestedPowerId, 'pitcher', ctx.pitcher),
+      pitcherSurge: evaluateActivePowerSurge(ctx.requestedPowerId, 'pitcher', ctx.pitcher, situation),
     };
   }
   return { batterSurge: null, pitcherSurge: null };
@@ -1245,9 +1278,10 @@ function decorateActivePowerOutcome(
 ): PitchResolution {
   const surge = powers.batterSurge ?? powers.pitcherSurge;
   if (!surge || res.specialPowerTriggered) return res;
+  const impactNote = surge.impactSummary ? ` (${surge.impactSummary})` : '';
   return {
     ...res,
-    commentary: `⚡ ${surge.calloutText} — ${res.commentary}`,
+    commentary: `⚡ ${surge.calloutText}${impactNote} — ${res.commentary}`,
     soundCue: surge.soundCue,
     ballFlight: res.ballFlight ? { ...res.ballFlight, style: surge.ballStyle } : res.ballFlight,
     specialPowerTriggered: {
@@ -1256,6 +1290,40 @@ function decorateActivePowerOutcome(
       calloutText: surge.calloutText,
       vfxColor: surge.vfxColor,
     },
+  };
+}
+
+function computeHomeFieldDeltas(ctx: PitchResolverContext): {
+  batterContact: number;
+  batterPower: number;
+  batterEye: number;
+  pitcherStuff: number;
+  pitcherControl: number;
+} {
+  const fx = ctx.homeFieldEffect;
+  if (!fx || ctx.homeBatting == null) {
+    return { batterContact: 0, batterPower: 0, batterEye: 0, pitcherStuff: 0, pitcherControl: 0 };
+  }
+  if (ctx.homeBatting) {
+    const awayControlPen = adjustAwayPitcherCrowdPenalty(
+      fx.awayPitcherControlPenalty,
+      ctx.pitcher.pressureProfile,
+      ctx.pitcher.careerService.experienceTier,
+    );
+    return {
+      batterContact: fx.homeBatterClutchDelta,
+      batterPower: Math.floor(fx.homeBatterClutchDelta * 0.5),
+      batterEye: fx.homeBatterEyeDelta,
+      pitcherStuff: 0,
+      pitcherControl: awayControlPen,
+    };
+  }
+  return {
+    batterContact: 0,
+    batterPower: 0,
+    batterEye: 0,
+    pitcherStuff: Math.floor(fx.homePitcherComposureDelta * 0.6),
+    pitcherControl: fx.homePitcherComposureDelta,
   };
 }
 
@@ -1272,9 +1340,10 @@ function computeEffectiveMatchupNumbers(
   const mod = TACTICAL_CONFIG[ctx.tacticalCall];
   const batterForm = getFormStatModifiers(ctx.batter.formState);
   const pitcherForm = getFormStatModifiers(ctx.pitcher.formState);
-  const batterMental = evaluatePressureAndLuckModifiers(ctx.batter, ctx.leverageIndex);
-  const pitcherMental = evaluatePressureAndLuckModifiers(ctx.pitcher, ctx.leverageIndex);
-  const defenderMental = evaluatePressureAndLuckModifiers(ctx.defender, ctx.leverageIndex);
+  const batterMental = evaluatePressureAndLuckModifiers(ctx.batter, ctx.leverageIndex, powers.batterRelics.luck);
+  const pitcherMental = evaluatePressureAndLuckModifiers(ctx.pitcher, ctx.leverageIndex, powers.pitcherRelics.luck);
+  const defenderMental = evaluatePressureAndLuckModifiers(ctx.defender, ctx.leverageIndex, powers.defenderRelics.luck);
+  const homeField = computeHomeFieldDeltas(ctx);
   const batterSavvy = evaluateVeteranSavvyEdge(ctx.batter.careerService.experienceTier, ctx.leverageIndex);
   const pitcherSavvy = evaluateVeteranSavvyEdge(ctx.pitcher.careerService.experienceTier, ctx.leverageIndex);
   const coEd = computeCoEdPitchDeltas(ctx, pitchType);
@@ -1305,7 +1374,8 @@ function computeEffectiveMatchupNumbers(
     powers.battingChem.contact +
     powers.mindGames.contactDelta +
     bSurge.contactDelta +
-    coEd.contactDelta;
+    coEd.contactDelta +
+    homeField.batterContact;
   const effPower =
     ctx.batter.ratings.power +
     batterHealth.power +
@@ -1321,7 +1391,8 @@ function computeEffectiveMatchupNumbers(
     powers.battingChem.power +
     powers.mindGames.powerDelta +
     bSurge.powerDelta +
-    coEd.powerDelta;
+    coEd.powerDelta +
+    homeField.batterPower;
   const effEye =
     ctx.batter.ratings.eye +
     batterHealth.eye +
@@ -1331,7 +1402,8 @@ function computeEffectiveMatchupNumbers(
     powers.batterRelics.eye +
     powers.battingStaff.battingEyeBonus +
     bSurge.eyeDelta +
-    coEd.eyeDelta;
+    coEd.eyeDelta +
+    homeField.batterEye;
   const effStuff =
     (ctx.pitcher.ratings.velocity +
       pitcherHealth.velocity +
@@ -1353,6 +1425,7 @@ function computeEffectiveMatchupNumbers(
     powers.mindGames.stuffDelta +
     pSurge.stuffDelta +
     coEd.stuffDelta +
+    homeField.pitcherStuff +
     Math.round(enduranceFx.breakDrop * coEd.breakingHangScale) +
     enduranceFx.mphDrop;
   const effControl =
@@ -1373,6 +1446,7 @@ function computeEffectiveMatchupNumbers(
     powers.mindGames.controlDelta +
     pSurge.controlDelta +
     coEd.controlDelta +
+    homeField.pitcherControl +
     enduranceFx.controlDrop +
     (ctx.relieverWarmupControlBonus ?? 0);
 
@@ -1530,7 +1604,8 @@ function computeSwingProbability(
     return clampProb(0.67 + stats.swingMod + boost + fullPowers.mindGames.inZoneSwingDelta, 0.36, 0.92);
   }
   const boost = isHitAndRun ? 0.08 : 0;
-  return clampProb(0.26 - (stats.effEye - 65) * 0.002 + stats.chaseShift + boost, 0.08, 0.62);
+  const eyeEdge = (stats.effEye - stats.effControl) * 0.0022 + (stats.effEye - 50) * 0.0006;
+  return clampProb(0.26 - eyeEdge + stats.chaseShift + boost, 0.08, 0.62);
 }
 
 function resolvePitchOutcome(

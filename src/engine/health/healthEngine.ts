@@ -1,5 +1,6 @@
 import type { Player, PlayerRatings } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
+import { computeEffectiveLuck, luckScaleMultiplier } from '../rpg/luckFactor';
 import {
   getAllHealthConditions,
   getHealthConditionById,
@@ -119,7 +120,8 @@ function tryRollConditionKind(
   const candidate = pickConditionForKind(rng, player, kind, catalog);
   if (!candidate) return null;
   const med = evaluateMedicalStaffEffects(candidate.category, medicalStaff);
-  if (!rng.chance(baseRate * med.preventionMultiplier)) return null;
+  const luckRiskScale = luckScaleMultiplier(computeEffectiveLuck(player), -0.045);
+  if (!rng.chance(baseRate * med.preventionMultiplier * luckRiskScale)) return null;
   return applyHealthConditionToPlayer(rng, player, candidate, medicalStaff).activeHealthStatus ?? null;
 }
 
@@ -233,7 +235,8 @@ export function advancePlayerHealthRecovery(
 
   const med = evaluateMedicalStaffEffects(status.category, medicalStaff);
   const restRate = restedThisGame ? 1.0 : 0.45;
-  const healProgress = Math.max(0.4, restRate * med.healingSpeedMultiplier);
+  const luckHealScale = luckScaleMultiplier(computeEffectiveLuck(player), 0.04);
+  const healProgress = Math.max(0.4, restRate * med.healingSpeedMultiplier * luckHealScale);
   const nextRemaining = Number(Math.max(0, status.gamesRemaining - healProgress).toFixed(2));
 
   if (nextRemaining <= 0) {

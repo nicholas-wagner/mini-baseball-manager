@@ -54,6 +54,7 @@ import {
 import { resolvePickoffAttempt, shouldAiAttemptSteal } from './baserunning';
 import { computeHomeRunStatcast, detectBrokenBatBloop } from './arcadeJuice';
 import { resolveSinglePitch, type PitchResolution } from './pitchResolver';
+import { evaluateHomeFieldAdvantage } from './homeFieldAdvantage';
 
 export type { StepPitchOptions } from './aiManager';
 
@@ -1316,6 +1317,17 @@ function buildPitchStepResolution(
   const readiness = getSpecialReadinessForStep(next, batter, pitcher);
   const defenderPos = rng.pick(['SS', '2B', 'CF', 'LF', 'RF'] as const);
   const firstBaseRunner = next.bases[0] ? batting.playersById[next.bases[0]] : null;
+  const homeBatting = next.half === 'BOT';
+  const homeFieldEffect = evaluateHomeFieldAdvantage({
+    inning: next.inning,
+    maxInnings: next.regulationInnings,
+    homeScore: next.home.score,
+    awayScore: next.away.score,
+    runnersOnBase: next.bases.filter(Boolean).length,
+    outs: next.outs,
+    homeTeamHype: next.home.hypeGauge,
+    isPlayoffs: next.gamePressureLevel !== 'regular',
+  });
   return resolveSinglePitch({
     rng,
     batter,
@@ -1367,6 +1379,8 @@ function buildPitchStepResolution(
     pickoffHoldModifier: next.pickoffHoldModifier ?? 0,
     hitAndRun: Boolean(safeOpts.hitAndRun),
     relieverWarmupControlBonus: safeOpts.relieverWarmupControlBonus,
+    homeBatting,
+    homeFieldEffect,
   });
 }
 

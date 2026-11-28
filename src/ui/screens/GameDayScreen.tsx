@@ -112,7 +112,9 @@ import {
   evaluateCapstoneGameplayProfile,
   evaluateHeritageGameplayProfile,
   getActivatablePowersForPlayer,
+  type PowerSituationContext,
 } from '../../engine/rpg/specialPowerEffects';
+import { evaluateHomeFieldAdvantage } from '../../engine/simulation/homeFieldAdvantage';
 import {
   buildPlayerStatDeltas,
   createGameSession,
@@ -2573,8 +2575,27 @@ export function GameDayScreen({
   const humanHypeNow = liveSession[humanSideKey].hypeGauge;
   const humanActorNow = humanIsBatting ? currentBatter : currentPitcher;
   const humanAvailNow = humanIsBatting ? batterSpecial : pitcherSpecial;
-  const humanPowersNow = getActivatablePowersForPlayer(humanActorNow, humanIsBatting ? 'batter' : 'pitcher');
-  const readyPowerOption = humanAvailNow.allowed ? (humanPowersNow[0] ?? null) : null;
+  const livePowerSituation: PowerSituationContext = {
+    balls: liveSession.balls,
+    strikes: liveSession.strikes,
+    runnersOnBase: liveSession.bases.filter(Boolean).length,
+    hasRisp: Boolean(liveSession.bases[1] || liveSession.bases[2]),
+    inning: liveSession.inning,
+    maxInnings: liveSession.regulationInnings,
+    scoreDiff: Math.abs(liveSession.home.score - liveSession.away.score),
+  };
+  const humanPowersNow = getActivatablePowersForPlayer(
+    humanActorNow,
+    humanIsBatting ? 'batter' : 'pitcher',
+    livePowerSituation,
+  );
+  const readyPowerOption = humanAvailNow.allowed
+    ? (humanPowersNow.find((p) => p.isSweetSpotNow) ?? humanPowersNow[0] ?? null)
+    : null;
+  const armedSpecialPitchColor =
+    !humanIsBatting && armedPowerId
+      ? (humanPowersNow.find((p) => p.id === armedPowerId)?.vfxColor ?? '#FF5722')
+      : null;
   const firstPitchTip = buildFirstPitchCoachTip({
     isOpeningDay: humanClub.wins + humanClub.losses === 0,
     isBatting: humanIsBatting,
@@ -2644,6 +2665,19 @@ export function GameDayScreen({
     : null;
   const liveAwayClub = humanSideKey === 'home' ? activeOpponent : humanClub;
   const liveHomeClub = humanSideKey === 'home' ? humanClub : activeOpponent;
+  const liveHomeField = evaluateHomeFieldAdvantage({
+    inning: liveSession.inning,
+    maxInnings: liveSession.regulationInnings,
+    homeScore: liveSession.home.score,
+    awayScore: liveSession.away.score,
+    runnersOnBase: liveSession.bases.filter(Boolean).length,
+    outs: liveSession.outs,
+    homeTeamHype: liveSession.home.hypeGauge,
+    stadiumWaveBoost: stadiumWaveSignal > 0 ? 12 : 0,
+    isPlayoffs:
+      liveSession.gamePressureLevel === 'playoff_game' ||
+      liveSession.gamePressureLevel === 'elimination_championship',
+  });
   const rankedBullpenCandidates = rankBullpenCandidates(liveSession, humanSideKey);
   const liveCue = computeLiveActionCue({
     session: liveSession,
@@ -3221,6 +3255,8 @@ export function GameDayScreen({
               shakeOffSignal={shakeOffTrigger}
               stadiumWaveSignal={stadiumWaveSignal}
               showStretchCue={showStretchCue}
+              homeCrowdBadge={liveHomeField.badgeLabel}
+              armedSpecialPitchColor={armedSpecialPitchColor}
               audioMuted={audioMuted}
               onToggleAudio={handleToggleLiveAudio}
               awayClub={liveAwayClub}
@@ -3435,6 +3471,8 @@ export function GameDayScreen({
                 }} /> : guiding && <FirstAtBat session={shown} batting={guidedBatting} target={pitchTarget} call={tacticalCall}
               locked={playLocked} expanded={showMore} powerArmed={Boolean(armedPowerId)}
               readyPowerName={readyPowerOption?.name ?? null}
+              readyPowerEffect={readyPowerOption?.statPreview ?? null}
+              readyPowerSweetSpot={Boolean(readyPowerOption?.isSweetSpotNow)}
               arcadeTimingEnabled={arcadeTimingEnabled}
               onePitchMode={onePitchMode}
               onToggleOnePitchMode={() => {
@@ -3598,6 +3636,8 @@ export function GameDayScreen({
               humanHype={humanHypeNow}
               hypeCost={SPECIAL_ABILITY_HYPE_COST}
               readyPowerLabel={readyPowerOption?.name ?? null}
+              readyPowerEffect={readyPowerOption?.statPreview ?? null}
+              readyPowerSweetSpot={Boolean(readyPowerOption?.isSweetSpotNow)}
               powerArmed={Boolean(armedPowerId)}
               speed={speed}
               onCycleSpeed={() => {
@@ -3780,6 +3820,8 @@ export function GameDayScreen({
               humanHype={humanHypeNow}
               hypeCost={SPECIAL_ABILITY_HYPE_COST}
               readyPowerLabel={readyPowerOption?.name ?? null}
+              readyPowerEffect={readyPowerOption?.statPreview ?? null}
+              readyPowerSweetSpot={Boolean(readyPowerOption?.isSweetSpotNow)}
               powerArmed={Boolean(armedPowerId)}
               speed={speed}
               onCycleSpeed={() => {
@@ -4082,7 +4124,11 @@ export function GameDayScreen({
                   const humanActor = humanRole === 'batter' ? currentBatter : currentPitcher;
                   const humanAvail = humanRole === 'batter' ? batterSpecial : pitcherSpecial;
                   const humanHypeNow = liveSession[humanSideKey].hypeGauge;
-                  const activatable = getActivatablePowersForPlayer(humanActor, humanRole);
+                  const activatable = getActivatablePowersForPlayer(
+                    humanActor,
+                    humanRole,
+                    livePowerSituation,
+                  );
 
                   return (
                     <div className="space-y-2">
@@ -4117,7 +4163,7 @@ export function GameDayScreen({
                         <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-extrabold uppercase text-[#4C1D95]">
                           <span className="flex items-center gap-1">
                             <Sparkles className="w-3.5 h-3.5" />
-                            {humanActor.name} — National &amp; Individual Powers ({humanRole})
+                            {humanActor.name} — National &amp; Special Powers ({humanRole})
                           </span>
                           <span>
                             {humanAvail.allowed
@@ -4125,25 +4171,56 @@ export function GameDayScreen({
                               : `Charging Hype ${humanHypeNow}/${SPECIAL_ABILITY_HYPE_COST} (${humanAvail.reason ?? 'Locked'})`}
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                           {activatable.map((pwr) => {
                             const armed = armedPowerId === pwr.id;
                             return (
-                              <ComicButton
+                              <div
                                 key={pwr.id}
-                                size="sm"
-                                variant={
-                                  armed ? 'coral' : pwr.source === 'capstone' ? 'gold' : 'violet'
-                                }
-                                active={armed}
-                                disabled={!humanAvail.allowed || liveSession.status === 'completed'}
-                                onClick={() => {
-                                  setArmedPowerId((prev) => (prev === pwr.id ? null : pwr.id));
-                                  soundEngine.play('clutch_stinger');
-                                }}
+                                className={`p-1.5 rounded-lg border border-[#181B2C] flex flex-col justify-between gap-1 ${
+                                  armed
+                                    ? 'bg-[#FFE5EC]'
+                                    : pwr.isSweetSpotNow
+                                      ? 'bg-[#FFF3BF]'
+                                      : 'bg-white'
+                                }`}
                               >
-                                {armed ? `🔥 ARMED: ${pwr.name}` : `⚡ ${pwr.name}`}
-                              </ComicButton>
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="font-display text-[10.5px] text-[#181B2C]">
+                                      {pwr.name}
+                                    </span>
+                                    {pwr.isSweetSpotNow ? (
+                                      <span
+                                        data-testid={`power-sweet-spot-${pwr.id}`}
+                                        className="px-1.5 py-0.5 rounded bg-[#FFC300] border border-[#181B2C] text-[9px] font-display text-[#181B2C] shrink-0"
+                                      >
+                                        ★ PRIME SPOT!
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="text-[10px] font-extrabold text-[#1B4332]">
+                                    {pwr.statPreview}
+                                  </div>
+                                  <div className="text-[9.5px] font-bold text-[#4A5068]">
+                                    🎯 Best when: {pwr.bestWhenLabel}
+                                  </div>
+                                </div>
+                                <ComicButton
+                                  size="sm"
+                                  variant={
+                                    armed ? 'coral' : pwr.source === 'capstone' || pwr.source === 'starter_pitch' ? 'gold' : 'violet'
+                                  }
+                                  active={armed}
+                                  disabled={!humanAvail.allowed || liveSession.status === 'completed'}
+                                  onClick={() => {
+                                    setArmedPowerId((prev) => (prev === pwr.id ? null : pwr.id));
+                                    soundEngine.play('clutch_stinger');
+                                  }}
+                                >
+                                  {armed ? `🔥 ARMED: ${pwr.name}` : `⚡ Arm ${pwr.name}`}
+                                </ComicButton>
+                              </div>
                             );
                           })}
                         </div>

@@ -17,6 +17,11 @@ import {
   canUnlockNextHeritageTier,
   getHeritageBranch,
 } from '../../engine/rpg/heritageTrees';
+import { getHeritageTacticalGuide } from '../../engine/rpg/specialPowerEffects';
+import {
+  pickCoachRecommendedSkillNode,
+  type SkillTreeAssistMode,
+} from '../../engine/rpg/skillTreeAssist';
 import {
   canRetrainPlayerSkills,
   canUnlockSkillNode,
@@ -32,7 +37,9 @@ import {
 } from '../../engine/rpg/skillTrees';
 import { unlockHumanManagerNode } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
+import { useUserPreferencesStore } from '../../store/userPreferences';
 import { PlayerPortraitBadge } from '../components/PlayerPortraitBadge';
+import { SkillTreeConstellation } from '../components/SkillTreeConstellation';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
 
@@ -76,14 +83,19 @@ export function SkillTreeScreen() {
   const activeOffseason = useGameStore((s) => s.activeOffseason);
   const favoritePlayerIds = useGameStore((s) => s.favoritePlayerIds);
   const unlockPlayerSkill = useGameStore((s) => s.unlockPlayerSkill);
+  const applyCoachSkillsForPlayer = useGameStore((s) => s.applyCoachSkillsForPlayer);
+  const applyCoachSkillsForRoster = useGameStore((s) => s.applyCoachSkillsForRoster);
   const undoPlayerSkillUnlock = useGameStore((s) => s.undoPlayerSkillUnlock);
   const unlockPlayerHeritageTier = useGameStore((s) => s.unlockPlayerHeritageTier);
   const togglePlayerSpecialPower = useGameStore((s) => s.togglePlayerSpecialPower);
   const retrainPlayerSkills = useGameStore((s) => s.retrainPlayerSkills);
+  const skillTreeMode = useUserPreferencesStore((s) => s.skillTreeMode);
+  const setSkillTreeMode = useUserPreferencesStore((s) => s.setSkillTreeMode);
 
   const [treeMode, setTreeMode] = useState<'players' | 'manager'>('players');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
   const [activeBranch, setActiveBranch] = useState<SkillBranchId | null>(null);
+  const [selectedStarId, setSelectedStarId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [sessionUnlockedByPlayer, setSessionUnlockedByPlayer] = useState<Record<string, string[]>>({});
 
@@ -107,6 +119,9 @@ export function SkillTreeScreen() {
 
   const branchNodes = getNodesForBranch(currentBranch);
   const heritageBranch = getHeritageBranch(player.nationalityId);
+  const heritageGuide = getHeritageTacticalGuide(player.nationalityId);
+  const coachRecommendation =
+    skillTreeMode !== 'manual' ? pickCoachRecommendedSkillNode(player) : null;
   const nextHeritage = canUnlockNextHeritageTier(player);
   const maxPowerSlots = getMaxEquippedPowerSlots(player.level);
   const buildIdentity = getPlayerBuildIdentity(player);
@@ -188,6 +203,43 @@ export function SkillTreeScreen() {
       );
     } else {
       setFeedback(res.reason ?? 'Unable to retrain right now.');
+    }
+  };
+
+  const handleApplyCoachPicksPlayer = () => {
+    const res = applyCoachSkillsForPlayer(player.id);
+    if (res.unlockedCount > 0) {
+      soundEngine.play('level_up');
+      setFeedback(`Coach Pops awakened for ${player.name}: ${res.unlockedNodeNames.join(', ')}!`);
+    } else {
+      setFeedback(`${player.name} has no unlockable Coach's Picks right now.`);
+    }
+  };
+
+  const handleApplyCoachPicksRoster = () => {
+    const res = applyCoachSkillsForRoster();
+    if (res.appliedSummary.length > 0) {
+      soundEngine.play('level_up');
+      setFeedback(`Auto-spent SP across ${res.appliedSummary.length} player(s): ${res.appliedSummary.slice(0, 3).join(' • ')}`);
+    } else {
+      setFeedback('No players currently have unlockable Coach Picks.');
+    }
+  };
+
+  const handleSelectSkillTreeMode = (mode: SkillTreeAssistMode) => {
+    setSkillTreeMode(mode);
+    soundEngine.play('ui_pop');
+    if (mode === 'auto') {
+      const res = applyCoachSkillsForRoster();
+      setFeedback(
+        res.appliedSummary.length > 0
+          ? `Skill Assistant set to Auto — applied ${res.appliedSummary.length} upgrade(s)!`
+          : 'Skill Assistant set to Auto — Coaching Staff will automatically spend earned SP after games.',
+      );
+    } else if (mode === 'semi_auto') {
+      setFeedback("Skill Assistant set to Ask Me — Coach's Picks glow in the constellation for 1-tap approval.");
+    } else {
+      setFeedback('Skill Assistant set to Manual — full hands-on control over every constellation star.');
     }
   };
 
@@ -494,8 +546,67 @@ export function SkillTreeScreen() {
             </div>
           </div>
 
-          {/* 3-Tier Cultural Heritage Branch (TASK-020) */}
-          <div className="p-2 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#F6EEFF] space-y-1.5">
+          {/* 3-Mode Skill Assistant Bar (Auto / Ask Me / Manual) + 1-Tap Coach Picks */}
+          <div
+            data-testid="skill-tree-assist-bar"
+            className="p-2 rounded-xl border-2 border-[#181B2C] bg-[#E0FBFC] flex flex-wrap items-center justify-between gap-2"
+          >
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-display text-[10.5px] uppercase text-[#1D3557]">
+                Skill Assistant:
+              </span>
+              {(
+                [
+                  { id: 'auto', label: '🤖 Auto' },
+                  { id: 'semi_auto', label: '💡 Ask Me' },
+                  { id: 'manual', label: '🛠️ Manual' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  data-testid={`skill-assist-mode-${opt.id}`}
+                  aria-pressed={skillTreeMode === opt.id}
+                  onClick={() => handleSelectSkillTreeMode(opt.id)}
+                  className={`px-2.5 py-1 min-h-[36px] rounded-lg border-2 border-[#181B2C] font-display text-[10.5px] cursor-pointer transition ${
+                    skillTreeMode === opt.id
+                      ? 'bg-[#1D3557] text-[#FFD166] shadow-[2px_2px_0_#181B2C]'
+                      : 'bg-[#FFFDF7] text-[#181B2C] hover:bg-[#FFF3BF]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {player.skillPoints > 0 && coachRecommendation ? (
+                <ComicButton
+                  size="sm"
+                  data-testid="apply-coach-picks-player-btn"
+                  variant="gold"
+                  onClick={handleApplyCoachPicksPlayer}
+                >
+                  ⚡ Apply Coach&apos;s Picks ({player.name.split(' ')[0]})
+                </ComicButton>
+              ) : null}
+              {totalPlayerSp > 0 ? (
+                <ComicButton
+                  size="sm"
+                  data-testid="apply-coach-picks-roster-btn"
+                  variant="turf"
+                  onClick={handleApplyCoachPicksRoster}
+                >
+                  ⚡ Auto-Spend Club SP ({totalPlayerSp})
+                </ComicButton>
+              ) : null}
+            </div>
+          </div>
+
+          {/* 3-Tier Cultural Heritage Branch (TASK-020, TASK-134) */}
+          <div
+            data-testid="heritage-crest-card"
+            className="p-2 sm:p-3 rounded-xl border-2 border-[#181B2C] bg-[#F6EEFF] space-y-1.5"
+          >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 font-display text-[11px] sm:text-xs text-[#4A148C] min-w-0">
                 <Star className="w-4 h-4 fill-[#FFC300] text-[#181B2C] shrink-0" />
@@ -529,6 +640,17 @@ export function SkillTreeScreen() {
                 )}
               </ComicButton>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10.5px] font-bold">
+              <div className="px-2 py-1 rounded-lg border border-[#181B2C]/30 bg-white text-[#181B2C]">
+                <span className="font-display text-[#9D0208]">🏏 Batting:</span> {heritageGuide.battingEffectSummary}
+              </div>
+              <div className="px-2 py-1 rounded-lg border border-[#181B2C]/30 bg-white text-[#181B2C]">
+                <span className="font-display text-[#1D3557]">⚾ Pitching:</span> {heritageGuide.pitchingEffectSummary}
+              </div>
+              <div className="px-2 py-1 rounded-lg border border-[#181B2C]/30 bg-[#FFF3BF] text-[#181B2C]">
+                <span className="font-display text-[#7A4F01]">🎯 Best When (+35%):</span> {heritageGuide.bestWhenLabel}
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               {heritageBranch.tiers.map((tierNode) => {
                 const owned = player.heritageTierUnlocked >= tierNode.tier;
@@ -560,12 +682,26 @@ export function SkillTreeScreen() {
                 size="sm"
                 variant={currentBranch === branch ? 'gold' : 'cream'}
                 active={currentBranch === branch}
-                onClick={() => setActiveBranch(branch)}
+                onClick={() => {
+                  setActiveBranch(branch);
+                  setSelectedStarId(null);
+                }}
               >
                 {BRANCH_LABELS[branch]}
               </ComicButton>
             ))}
           </div>
+
+          {/* Skyrim-Inspired Ballpark Night-Sky Constellation Map */}
+          <SkillTreeConstellation
+            player={player}
+            branch={currentBranch}
+            selectedNodeId={selectedStarId}
+            coachRecommendation={coachRecommendation}
+            onSelectNode={(nodeId) => setSelectedStarId(nodeId)}
+            onUnlockNode={handleUnlockNode}
+            onTogglePower={handleTogglePower}
+          />
 
           {/* Branching Tier 1 -> Tier 2 -> Tier 3 Capstone Grid */}
           <div className="space-y-3">

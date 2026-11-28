@@ -88,15 +88,15 @@ export interface LineupValidationResult {
   errors: string[];
 }
 
-const TIER_RATING_BANDS: Readonly<
-  Record<LeagueTierId, { min: number; max: number; salaryBase: number }>
+export const TIER_OVR_PROFILES: Readonly<
+  Record<LeagueTierId, { mean: number; stdDev: number; salaryBase: number }>
 > = {
-  rookie: { min: 42, max: 66, salaryBase: 600 },
-  low_a: { min: 49, max: 72, salaryBase: 1100 },
-  high_a: { min: 56, max: 78, salaryBase: 1800 },
-  aa: { min: 62, max: 84, salaryBase: 3200 },
-  aaa: { min: 68, max: 90, salaryBase: 6000 },
-  majors: { min: 74, max: 96, salaryBase: 12000 },
+  rookie: { mean: 30, stdDev: 10, salaryBase: 600 },
+  low_a: { mean: 40, stdDev: 10, salaryBase: 1100 },
+  high_a: { mean: 50, stdDev: 10, salaryBase: 1800 },
+  aa: { mean: 60, stdDev: 10, salaryBase: 3200 },
+  aaa: { mean: 70, stdDev: 10, salaryBase: 6000 },
+  majors: { mean: 80, stdDev: 10, salaryBase: 12000 },
 };
 
 const CORE_FIELD_POSITIONS: readonly Exclude<FieldPosition, 'SP' | 'RP'>[] = [
@@ -238,39 +238,52 @@ const POSITION_BIASES: Readonly<Record<FieldPosition, PositionBias>> = {
 };
 
 function clampStat(value: number): number {
-  return Math.max(20, Math.min(99, Math.round(value)));
+  return Math.max(8, Math.min(99, Math.round(value)));
+}
+
+/** Deterministic Irwin-Hall bell-curve sample (exact zero mean, unit variance before scaling). */
+function rollBellCurve(rng: SeededRng, mean: number, stdDev: number): number {
+  const sum =
+    rng.next() + rng.next() + rng.next() + rng.next() + rng.next() + rng.next();
+  const z = (sum - 3) * Math.SQRT2;
+  return mean + z * stdDev;
 }
 
 function rollRatingsForRole(
   rng: SeededRng,
   position: FieldPosition,
-  min: number,
-  max: number,
+  playerBase: number,
+  marketTier: PlayerMarketTier,
 ): PlayerRatings {
   const bias = POSITION_BIASES[position];
   const isPitcher = isPitcherPosition(position);
-  const offRoleMax = Math.max(28, min - 6);
-  const roll = (offset: number): number => clampStat(rng.int(min, max) + offset);
-  const rollOff = (): number => clampStat(rng.int(22, offRoleMax));
+  const spread = 5;
+  const offRoleMax = Math.max(18, Math.round(playerBase - 10));
+  const roll = (offset: number): number =>
+    clampStat(playerBase + rng.int(-spread, spread) + Math.round(offset * 0.6));
+  const rollOff = (): number => clampStat(rng.int(10, offRoleMax));
+  const potentialFloor = marketTier === 'rookie' ? Math.max(58, playerBase + 22) : playerBase + 6;
 
   return {
     contact: isPitcher ? rollOff() : roll(bias.contact),
     power: isPitcher ? rollOff() : roll(bias.power),
     gapPower: isPitcher ? rollOff() : roll(Math.round((bias.power + bias.contact) * 0.5)),
     eye: isPitcher ? rollOff() : roll(bias.eye),
-    bunt: clampStat(rng.int(Math.max(30, min - 10), max)),
+    bunt: clampStat(playerBase + rng.int(-8, 6)),
     velocity: isPitcher ? roll(bias.velocity) : rollOff(),
     movement: isPitcher ? roll(bias.movement) : rollOff(),
     control: isPitcher ? roll(bias.control) : rollOff(),
     stamina: isPitcher ? roll(bias.stamina) : rollOff(),
-    speed: clampStat(rng.int(min, max) + bias.speed),
-    fielding: clampStat(rng.int(min, max) + bias.fielding),
-    range: clampStat(rng.int(min, max) + Math.round((bias.fielding + bias.speed) * 0.5)),
-    arm: clampStat(rng.int(min, max) + bias.arm),
-    clutch: clampStat(rng.int(min, max)),
-    luck: clampStat(rng.int(25, 85)),
-    popularity: clampStat(rng.int(min, Math.min(99, max + 6))),
-    potential: clampStat(rng.int(min + 4, Math.min(99, max + 10))),
+    speed: clampStat(playerBase + rng.int(-spread, spread) + Math.round(bias.speed * 0.6)),
+    fielding: clampStat(playerBase + rng.int(-spread, spread) + Math.round(bias.fielding * 0.6)),
+    range: clampStat(
+      playerBase + rng.int(-spread, spread) + Math.round((bias.fielding + bias.speed) * 0.3),
+    ),
+    arm: clampStat(playerBase + rng.int(-spread, spread) + Math.round(bias.arm * 0.6)),
+    clutch: clampStat(playerBase + rng.int(-spread, spread)),
+    luck: clampStat(rng.int(20, 88)),
+    popularity: clampStat(playerBase + rng.int(-4, 12)),
+    potential: clampStat(rng.int(Math.min(95, Math.round(potentialFloor)), 99)),
   };
 }
 
@@ -362,7 +375,7 @@ function playerId(rng: SeededRng, options: CreatePlayerOptions): string {
 
 /** Generates a single deterministic player calibrated to position, league tier, market tier, and specialist role. */
 export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Player {
-  const band = TIER_RATING_BANDS[options.tier];
+  const band = TIER_OVR_PROFILES[options.tier];
   const lockedAge = options.marketTier != null && options.ageMode !== 'league';
   const marketTier = options.marketTier ?? rollClubStarterMarketTier(rng, options.tier);
   const marketSpec = MARKET_TIER_SPECS[marketTier];
@@ -372,9 +385,13 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
   const { birthplace, bats, throws, traits, personality, mental, eligibility } =
     playerProfile(rng, options, marketTier, specialistArchetype);
 
-  const shiftedMin = clampStat(band.min + marketSpec.ovrOffset);
-  const shiftedMax = clampStat(band.max + marketSpec.ovrOffset);
-  const baseRatings = rollRatingsForRole(rng, options.position, shiftedMin, shiftedMax);
+  // Bell-curve centered at tier mean (30/40/50/60/70/80) with combined player OVR SD ~ 10.
+  // Offset positive positional/role shaping so actual computePlayerOverall mean centers squarely on 30..80.
+  const tierCenterOffset = options.tier === 'majors' ? -1.5 : -4.5;
+  const playerBase = clampStat(
+    rollBellCurve(rng, band.mean + tierCenterOffset + marketSpec.ovrOffset, band.stdDev * 0.85),
+  );
+  const baseRatings = rollRatingsForRole(rng, options.position, playerBase, marketTier);
   const specialistRatings = applySpecialistRatingShape(baseRatings, specialistArchetype, options.position);
   const { ratings: roleRatings, pitcherRole, pitchArsenal } = buildPitcherOnlyProfile(
     rng,

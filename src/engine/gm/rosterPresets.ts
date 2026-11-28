@@ -33,7 +33,7 @@ export interface StartingRosterPresetSpec {
 }
 
 /** Fair Rookie Sandlot parity target average OVR shared across all 6 presets (matches Rookie AI clubs). */
-export const ROOKIE_PARITY_TARGET_OVR = 58;
+export const ROOKIE_PARITY_TARGET_OVR = 30;
 
 export const STARTING_ROSTER_PRESETS: readonly StartingRosterPresetSpec[] = [
   {
@@ -81,7 +81,7 @@ export const STARTING_ROSTER_PRESETS: readonly StartingRosterPresetSpec[] = [
 ];
 
 function clampRating(value: number, cap = 99): number {
-  return Math.max(28, Math.min(cap, Math.round(value)));
+  return Math.max(8, Math.min(cap, Math.round(value)));
 }
 
 function shiftRatings(

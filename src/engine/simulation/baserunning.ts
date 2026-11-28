@@ -5,6 +5,7 @@ import type { PlayEvent, PlaySoundCue, TacticalCall } from '../models/playEvent'
 import type { Player } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
 import { getFormStatModifiers } from '../rpg/formTracker';
+import { computeContestLuckDelta, computeEffectiveLuck } from '../rpg/luckFactor';
 import { evaluatePlayerRelicBonuses } from '../rpg/relics';
 import {
   evaluateCapstoneGameplayProfile,
@@ -93,20 +94,15 @@ export function computeEffectiveStealSpeed(runner: Player): number {
     Math.round(form.contactDelta * 0.4) +
     specialistJump -
     fatiguePenalty;
-  return Math.max(20, Math.min(108, raw));
+  return Math.max(8, Math.min(108, raw));
 }
 
 /**
  * Computes base-stealing success probability driven primarily by runner Speed
- * against catcher Arm/Fielding, Bullpen Coach pop-time, LHP runner-hold, and target base.
+ * against catcher Arm/Fielding, Bullpen Coach pop-time, LHP runner-hold, target base, and subtle Luck.
  */
 export function computeStealSuccessProbability(ctx: StealMatchupContext): number {
   const effSpeed = computeEffectiveStealSpeed(ctx.runner);
-  const speedCurve =
-    effSpeed >= 60
-      ? (effSpeed - 60) * 0.0078
-      : (effSpeed - 60) * 0.0115;
-
   const catcherHeritage = evaluateHeritageGameplayProfile(ctx.catcher, 1.0);
   const catcherCapstones = evaluateCapstoneGameplayProfile(ctx.catcher, 1.0);
   const catcherArm =
@@ -119,26 +115,31 @@ export function computeStealSuccessProbability(ctx: StealMatchupContext): number
     catcherArm * 0.72 +
     catcherFld * 0.28 +
     (ctx.catcherPopTimeBonus ?? 0) * 2.5;
-  const catcherEdge = (catcherThrowSkill - 60) * 0.0055;
+  const matchupEdge = (effSpeed - catcherThrowSkill) * 0.0068 + (effSpeed - 50) * 0.0012;
 
   const holdBonus =
     getPositionalHandednessBonus(ctx.pitcher.position, ctx.pitcher.throws).pickoffHoldBonus *
     HOLD_SCALE_BY_PLAY[ctx.playType];
   const fatigueJump = Math.min(0.06, (ctx.pitcherFatigue ?? 0) * 0.0007);
-  const veloPenalty = (ctx.pitcher.ratings.velocity - 65) * 0.0014;
+  const veloPenalty = (ctx.pitcher.ratings.velocity - 55) * 0.0012;
   const defenseMod = DEFENSE_CALL_PENALTY[ctx.defenseCall ?? 'normal'];
   const pickoffHoldPenalty = Math.max(0, Math.min(0.12, ctx.pickoffHoldModifier ?? 0));
+  const luckShift = computeContestLuckDelta(
+    computeEffectiveLuck(ctx.runner),
+    computeEffectiveLuck(ctx.catcher),
+    0.018,
+  );
 
   const raw =
-    0.62 +
-    speedCurve -
-    catcherEdge -
+    0.58 +
+    matchupEdge -
     holdBonus * 0.014 +
     fatigueJump -
     veloPenalty +
     BASE_STEAL_DIFFICULTY[ctx.playType] +
     defenseMod -
-    pickoffHoldPenalty;
+    pickoffHoldPenalty +
+    luckShift;
 
   const minFloor = ctx.playType === 'steal_home' ? 0.06 : 0.14;
   const maxCeil = ctx.playType === 'steal_home' ? 0.48 : 0.91;
@@ -539,21 +540,26 @@ export function computePickoffOutProbability(
   const holdBonus = getPositionalHandednessBonus(pitcher.position, pitcher.throws).pickoffHoldBonus;
   const pitcherMove = pitcher.ratings.control * 0.65 + pitcher.ratings.fielding * 0.35;
   const runnerRead = runner.ratings.speed * 0.65 + runner.ratings.eye * 0.35;
+  const luckShift = computeContestLuckDelta(
+    computeEffectiveLuck(pitcher),
+    computeEffectiveLuck(runner),
+    0.012,
+  );
 
   if (base === 1) {
     const raw =
       0.082 +
       holdBonus * 0.0045 +
-      (pitcherMove - 65) * 0.0007 -
-      (runnerRead - 65) * 0.0006;
+      (pitcherMove - runnerRead) * 0.0007 +
+      luckShift;
     return Number(clampProb(raw, 0.06, 0.14).toFixed(3));
   }
 
   const raw =
     0.062 +
     holdBonus * 0.0018 +
-    (pitcherMove - 65) * 0.0006 -
-    (runnerRead - 65) * 0.0005;
+    (pitcherMove - runnerRead) * 0.0006 +
+    luckShift;
   return Number(clampProb(raw, 0.04, 0.1).toFixed(3));
 }
 

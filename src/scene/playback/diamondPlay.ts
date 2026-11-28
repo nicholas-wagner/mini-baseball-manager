@@ -9,14 +9,17 @@ import { BASE_PATH_VERTICES, OUTFIELD_STARTS, batterBox, headingToward } from '.
 import { buildOutfieldPlay, isOutfieldKind, outfieldDefenderAt, runBases, type OutfieldKind } from './outfieldPlay';
 import type { AtBatOutcome, PlayEvent } from '../../engine/models/playEvent';
 import type { BattedBallType } from '../../engine/models/player';
+import type { BallVfxStyle } from '../../engine/vfx/types';
 import { getCameraPresetPose, type CameraPose, type Vec3 } from '../camera/cameraRig';
 import { CLIP_DURATIONS, deliveryClip, PITCH_RELEASE_PHASE, type CharacterAnimClip } from '../characters/animationState';
+import { applySpecialPitchTrajectoryOffset, resolveSpecialPitchStyle, type SpecialPitchStyle } from '../vfx/specialPitchVfx';
 import type { EffectiveBatSide, FieldPosition, ThrowsHand } from '../../engine/handedness/types';
 
 type InfieldKind = 'ground_out' | 'double_play' | 'pop_up' | 'bunt_out' | 'bunt_single' | 'fielding_error' | 'infield_liner';
 export type DiamondPlayKind = InfieldKind | OutfieldKind | CloseKind | 'cover_first' | 'bullpen';
 export type Actor = 'LF' | 'CF' | 'RF' | 'P' | 'BAT' | 'SS' | '2B' | '1B' | '3B' | 'RUN' | 'C';
-export type Leg = { from: Actor; to: Actor; start: number; end: number; kind: 'pitch' | 'ground' | 'pop' | 'throw' | 'flight' | 'bounce' | 'handoff'; startPoint?: Vec3; endPoint?: Vec3; apex?: number; pitch?: PitchFlight };
+export type Leg = { from: Actor; to: Actor; start: number; end: number; kind: 'pitch' | 'ground' | 'pop' | 'throw' | 'flight' | 'bounce' | 'handoff'; startPoint?: Vec3; endPoint?: Vec3; apex?: number; pitch?: PitchFlight; specialPitch?: SpecialPitchStyle };
+export type DiamondPlayPower = NonNullable<PlayEvent['specialPowerTriggered']> & { ballStyle?: BallVfxStyle };
 const [home, first, second] = BASE_PATH_VERTICES;
 export type ActorPose = { pos: Vec3; yaw: number; local: number; clip: CharacterAnimClip };
 
@@ -68,7 +71,7 @@ export interface DiamondPlay {
   batterView?: boolean;
   pitchTarget?: PitchTargetIntent;
   reliefStrikeout?: boolean;
-  power?: PlayEvent['specialPowerTriggered'];
+  power?: DiamondPlayPower;
   mascotCannon?: boolean;
   splashHit?: boolean;
   plateDecision?: 'out' | 'safe' | 'held';
@@ -113,18 +116,49 @@ export function sparkleContact(play: DiamondPlay): Leg | undefined {
   }
 }
 
+function powerIdToBallStyle(powerId?: string): BallVfxStyle | undefined {
+  if (powerId === 'blazing_comet' || powerId === 'ghost_knuckle' || powerId === 'tornado_slider') {
+    return powerId;
+  }
+  if (powerId === 'ice_veins') return 'blazing_comet';
+  return undefined;
+}
+
+function resolveEventPower(event?: ReplayEvent): DiamondPlayPower | undefined {
+  if (!event?.specialPowerTriggered) return undefined;
+  const ballStyle = event.ballFlight?.style ?? powerIdToBallStyle(event.specialPowerTriggered.powerId);
+  return ballStyle
+    ? { ...event.specialPowerTriggered, ballStyle }
+    : { ...event.specialPowerTriggered };
+}
+
 export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, event?: ReplayEvent, stealBase?: 1 | 2 | 3, pitchInfo: PitchFlight | undefined = event?.pitchThrown, fromStretch = kind === 'steal_safe' || kind === 'steal_out'): DiamondPlay {
   if (kind === 'bullpen') return bullpenPlay();
   const release = CLIP_DURATIONS[deliveryClip(fromStretch)] * PITCH_RELEASE_PHASE;
   const plate = release + (pitchInfo ? pitchSeconds(pitchInfo.mph) : .56);
-  const pitch: Leg = {from:'P', to:'BAT', start:release, end:plate, kind:'pitch', pitch:pitchInfo};
+  const power = resolveEventPower(event);
+  const specialPitchStyle =
+    power?.actor === 'pitcher'
+      ? resolveSpecialPitchStyle(power.powerId, power.ballStyle)
+      : event?.type === 'pitch_thrown'
+        ? resolveSpecialPitchStyle(undefined, event.ballFlight?.style)
+        : null;
+  const pitch: Leg = {
+    from: 'P',
+    to: 'BAT',
+    start: release,
+    end: plate,
+    kind: 'pitch',
+    pitch: pitchInfo,
+    ...(specialPitchStyle ? { specialPitch: specialPitchStyle } : {}),
+  };
   const buntAttempt = kind === 'bunt_out' || kind === 'bunt_single' || isBuntEvent(event);
   if (isCloseKind(kind)) {
     const close = buildClosePlay(kind, pitch, event?.pickoffBase ?? stealBase, buntAttempt,
       event?.outcome, event?.fieldingHighlight?.fielderPos ?? highlight);
-    return { ...close, ...eventHighlights(event), fromStretch: isPickoffKind(kind) || fromStretch };
+    return { ...close, ...eventHighlights(event), ...(power ? { power } : {}), fromStretch: isPickoffKind(kind) || fromStretch };
   }
-  if (isOutfieldKind(kind)) return { ...buildOutfieldPlay(kind, pitch, event), ...eventHighlights(event), fromStretch };
+  if (isOutfieldKind(kind)) return { ...buildOutfieldPlay(kind, pitch, event), ...eventHighlights(event), ...(power ? { power } : {}), fromStretch };
   const pop = kind === 'pop_up';
   const bunt = kind === 'bunt_out' || kind === 'bunt_single';
   const liner = kind === 'infield_liner';
@@ -162,7 +196,7 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
     legs.push({ from:pickup,to:pickup,start:pickupAt,end:pickupAt+.44,kind:'bounce',endPoint:loose },
       { from:pickup,to:pickup,start:pickupAt+.44,end:finish,kind:'ground',startPoint:loose });
   }
-  return { kind, fromStretch, ...eventHighlights(event), webGem: (liner || kind === 'ground_out' || kind === 'cover_first') && isDivingWebGem(event?.fieldingHighlight), legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
+  return { kind, fromStretch, ...eventHighlights(event), ...(power ? { power } : {}), webGem: (liner || kind === 'ground_out' || kind === 'cover_first') && isDivingWebGem(event?.fieldingHighlight), legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
     buntAttempt: buntAttempt || undefined,
     duration: finish + (error ? 1.75 : 1.05),
     batterArrival: kind === 'bunt_single' ? finish-.34 : finish + 0.37, leadArrival: receiveAt + 0.28 };
@@ -173,13 +207,16 @@ function between(a: Vec3, b: Vec3, u: number): Vec3 {
   return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
 }
 
-export function sampleLeg(leg: Leg, a: Vec3, b: Vec3, progress01: number, throws: ThrowsHand = 'R'): Vec3 {
+export function sampleLeg(leg: Leg, a: Vec3, b: Vec3, progress01: number, throws: ThrowsHand = 'R', specialPitch?: SpecialPitchStyle | null): Vec3 {
   const t = clamp(progress01);
   if (t === 0) return a;
   if (t === 1) return b;
   const v = between(a, b, t);
-  if (leg.kind === 'pitch' && leg.pitch) {
-    shapePitch(v,leg.pitch,t,throws);
+  const activeSpecial = specialPitch ?? leg.specialPitch;
+  if (leg.kind === 'pitch' && (leg.pitch || activeSpecial)) {
+    if (leg.pitch) shapePitch(v, leg.pitch, t, throws);
+    else v.y += 4 * t * (1 - t) * 0.10;
+    if (activeSpecial) applySpecialPitchTrajectoryOffset(v, activeSpecial, t, throws);
   } else if (leg.kind === 'flight') {
     v.y += 4*t*(1-t)*Math.max(0,(leg.apex ?? 3) - (a.y+b.y)/2);
   } else if (leg.kind === 'bounce') {

@@ -48,6 +48,8 @@ export function FirstAtBat({
   expanded,
   powerArmed,
   readyPowerName = null,
+  readyPowerEffect = null,
+  readyPowerSweetSpot = false,
   arcadeTimingEnabled = false,
   onePitchMode = false,
   pitchingMode = "simple",
@@ -93,6 +95,8 @@ export function FirstAtBat({
   locked: boolean;
   powerArmed: boolean;
   readyPowerName?: string | null;
+  readyPowerEffect?: string | null;
+  readyPowerSweetSpot?: boolean;
   arcadeTimingEnabled?: boolean;
   onePitchMode?: boolean;
   pitchingMode?: PitchingMode;
@@ -170,7 +174,12 @@ export function FirstAtBat({
       : pitchingMode === "simple"
         ? "Throw Pitch"
         : activePitch.actionLabel;
-  const tradeoffText = batting
+  const shortPowerName = readyPowerName
+    ? readyPowerName.replace(/\s*\([^)]*\)\s*$/, "")
+    : null;
+  const tradeoffText = powerArmed && shortPowerName
+    ? `🔥 ${shortPowerName} ARMED! ${readyPowerEffect ?? "Massive pitch/swing surge!"}${readyPowerSweetSpot ? " (★ PRIME SPOT +35%!)" : ""}`
+    : batting
     ? armedStealPlay
       ? twoStrikeSteal
         ? "2 strikes — runner goes AND batter swings to protect!"
@@ -230,11 +239,17 @@ export function FirstAtBat({
               disabled={locked}
               aria-pressed={powerArmed}
               onClick={onArmPower}
-              title={`Tap to ${powerArmed ? "disarm" : "arm"} ${readyPowerName}`}
+              title={
+                readyPowerEffect
+                  ? `${readyPowerName}: ${readyPowerEffect}${readyPowerSweetSpot ? " — ★ PRIME SPOT!" : ""}`
+                  : `Tap to ${powerArmed ? "disarm" : "arm"} ${readyPowerName}`
+              }
             >
               <Zap className="w-3 h-3 shrink-0 fill-current" aria-hidden="true" />
               <span className="truncate">
-                {powerArmed ? "ARMED!" : readyPowerName.replace(/\s*\([^)]*\)\s*$/, "")}
+                {powerArmed
+                  ? "🔥 ARMED!"
+                  : `${readyPowerSweetSpot ? "★ " : ""}${shortPowerName ?? readyPowerName}`}
               </span>
             </button>
           )}
@@ -566,8 +581,7 @@ export function FirstAtBat({
               data-play-locked={locked ? "true" : undefined}
               onClick={() => onPitch()}
             >
-              {powerArmed ? "⚡ " : ""}
-              {action}
+              {powerArmed && shortPowerName ? `🔥 UNLEASH ${shortPowerName.toUpperCase()}!` : action}
             </button>
           )}
         </>

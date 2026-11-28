@@ -7,6 +7,8 @@ import {
 } from '../models/player';
 import type { SeededRng } from '../rng/seededRng';
 import { deriveFormState } from './formTracker';
+import { computeEffectiveLuck, luckMicroDelta } from './luckFactor';
+import { awardDisciplineMasteryFromPractice } from './skillTreeMastery';
 import {
   applyTrainingDrill,
   enforceRatingBudget,
@@ -128,7 +130,10 @@ function runFieldingFungos(
       summary: 'Only position players run Fielding Fungos.',
     };
   }
-  const gain = rng.int(2, 3) + extraBonus;
+  const luckSpark = rng.chance(Math.max(0, 0.06 + luckMicroDelta(computeEffectiveLuck(player), 0.05)))
+    ? 1
+    : 0;
+  const gain = rng.int(2, 3) + extraBonus + luckSpark;
   const updated = enforceRatingBudget(
     {
       ...player.ratings,
@@ -235,26 +240,28 @@ export function runPracticeComplexActivity(
   }
 
   const ctx = resolvePracticeBonuses(options);
+  let res: PracticeComplexResult;
   if (request.activityId === 'fielding_fungos') {
-    return runFieldingFungos(rng, player, ctx.drillBonus, ctx.fatigueScale);
+    res = runFieldingFungos(rng, player, ctx.drillBonus, ctx.fatigueScale);
+  } else if (request.activityId === 'slump_buster_film') {
+    res = runSlumpBusterFilm(rng, player, ctx.slumpExtra, ctx.fatigueScale);
+  } else if (request.activityId === 'fan_meet_and_greet') {
+    res = runFanMeetAndGreet(rng, player, ctx.fatigueScale);
+  } else {
+    const base = applyTrainingDrill(rng, player, {
+      drillId: request.activityId,
+      targetPitch: request.targetPitch,
+      replacePitchType: request.replacePitchType,
+    });
+    res = {
+      trained: base.trained,
+      reason: base.reason,
+      player: base.player,
+      clubHypeDelta: 0,
+      summary: base.summary,
+    };
   }
-  if (request.activityId === 'slump_buster_film') {
-    return runSlumpBusterFilm(rng, player, ctx.slumpExtra, ctx.fatigueScale);
-  }
-  if (request.activityId === 'fan_meet_and_greet') {
-    return runFanMeetAndGreet(rng, player, ctx.fatigueScale);
-  }
-
-  const base = applyTrainingDrill(rng, player, {
-    drillId: request.activityId,
-    targetPitch: request.targetPitch,
-    replacePitchType: request.replacePitchType,
-  });
-  return {
-    trained: base.trained,
-    reason: base.reason,
-    player: base.player,
-    clubHypeDelta: 0,
-    summary: base.summary,
-  };
+  return res.trained
+    ? { ...res, player: awardDisciplineMasteryFromPractice(res.player, request.activityId) }
+    : res;
 }
