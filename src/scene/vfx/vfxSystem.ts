@@ -1,4 +1,5 @@
 import type { EffectiveBatSide } from '../../engine/handedness/types';
+import { createBrokenBat } from './brokenBat';
 import { createStadiumCelebration } from './stadiumCelebration';
 import { createBaseUmpire } from './baseUmpire';
 import { createPaintedBat } from '../characters/paintedBat';
@@ -13,7 +14,7 @@ interface ActiveCallout {
   elapsed: number;
   duration: number;
   anchor: THREE.Vector3;
-  inCorner: boolean | 'contact';
+  inCorner: boolean | 'contact' | 'flight';
 }
 
 export interface BallparkVfxSystem {
@@ -22,6 +23,7 @@ export interface BallparkVfxSystem {
   reducedMotion: boolean;
   setReducedMotion: (reduced: boolean) => void;
   droppedBat: THREE.Mesh;
+  triggerBrokenBat: (origin: Vec3, batSide: EffectiveBatSide) => void;
   drawSwingArc: (barrel: Vec3 | null, side: EffectiveBatSide, sincePlate: number) => void;
   umpire: ReturnType<typeof createBaseUmpire>;
   setCalloutsVisible: (visible: boolean) => void;
@@ -30,7 +32,7 @@ export interface BallparkVfxSystem {
   kickChalk: (position: Vec3) => void;
   impact: (position: Vec3, color: string) => void;
   clear: () => void;
-  spawnComicCallout: (text: string, pos: Vec3, bgColor?: string, inCorner?: boolean | 'contact') => void;
+  spawnComicCallout: (text: string, pos: Vec3, bgColor?: string, inCorner?: boolean | 'contact' | 'flight') => void;
   update: (dtSec: number, camera?: THREE.PerspectiveCamera, heightPx?: number) => void;
   dispose: () => void;
 }
@@ -108,6 +110,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
   const group = new THREE.Group();
 
   const celebration = createStadiumCelebration();
+  let splinters: ReturnType<typeof createBrokenBat> | undefined;
   let reducedMotion = false;
   group.add(celebration.group);
   const arc = createSwingArc();
@@ -171,7 +174,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     text: string,
     pos: { x: number; y: number; z: number },
     bgColor = '#FFC300',
-    inCorner: boolean | 'contact' = false,
+    inCorner: boolean | 'contact' | 'flight' = false,
   ) => {
     if (!captions) return;
     const texture = createComicCalloutTexture(text, bgColor);
@@ -197,6 +200,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
   const projected = new THREE.Vector3();
   const update = (dtSec: number, camera?: THREE.PerspectiveCamera, heightPx = 320) => {
     celebration.update(dtSec, camera);
+    splinters?.update(dtSec);
     if (immediate) {
       immediate.elapsed += dtSec;
       const progress = immediate.elapsed / immediate.spec.durationSec;
@@ -231,7 +235,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
       const c = callouts[i];
       c.elapsed += dtSec;
       const t = c.elapsed / c.duration;
-      if (t >= 1) {
+      if (t >= 1 || (c.inCorner === 'flight' && !ball.group.visible)) {
         group.remove(c.sprite);
         c.sprite.material.dispose();
         c.texture.dispose();
@@ -239,7 +243,8 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
       } else {
         // Elastic comic pop-in + gentle upward drift
         const pop = t < 0.18 ? (t / 0.18) * 1.18 : 1.18 - Math.min(0.18, (t - 0.18) * 0.9);
-        if (c.inCorner === 'contact' && camera) {
+        if ((c.inCorner === 'contact' || c.inCorner === 'flight') && camera) {
+          if (c.inCorner === 'flight') c.anchor.copy(ball.position);
           camera.updateMatrixWorld();
           projected.copy(c.anchor).project(camera);
           const pxHeight = Math.max(1,heightPx);
@@ -276,6 +281,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
 
   const clear = () => {
     celebration.clear();
+    if (splinters) splinters.group.visible = false;
     immediate = null;
     arc.visible = false;
     umpire.sprite.visible=false;
@@ -295,6 +301,7 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     arc.geometry.dispose();
     arc.material.dispose();
     celebration.dispose();
+    splinters?.dispose();
     ball.dispose();
     bat.dispose();
     umpire.dispose();
@@ -308,6 +315,21 @@ export function createBallparkVfxSystem(): BallparkVfxSystem {
     for (const item of callouts) item.sprite.visible = visible;
   };
   return { group, celebration, drawSwingArc, get reducedMotion() { return reducedMotion; },
-    setReducedMotion(value) { reducedMotion=value; if (value) arc.visible=false; celebration.setReducedMotion(value); },
+    setReducedMotion(value) {
+      reducedMotion = value;
+      if (value) {
+        arc.visible = false;
+        if (splinters) splinters.group.visible = false;
+      }
+      celebration.setReducedMotion(value);
+    },
+    triggerBrokenBat(at, batSide) {
+      if (reducedMotion) return;
+      if (!splinters) {
+        splinters = createBrokenBat();
+        group.add(splinters.group);
+      }
+      splinters.start(at, batSide);
+    },
     umpire, droppedBat: bat.barrel, setCalloutsVisible, ball, launchBall, impact, kickChalk, clear, spawnComicCallout, update, dispose };
 }

@@ -381,3 +381,12 @@ it.each(['fly_out', 'infield_liner', 'ground_out'] as const)('sounds one dive an
   expect(one(cues, 'dirt_slide').at).toBe(play.pickupAt);
   expect(times(cues, 'glove_pop').filter(item => item.at === play.pickupAt)).toHaveLength(1);
 });
+
+it('replaces the contact crack with a single splinter sound on a flagged bloop', () => {
+  const play = diamondPlay('single', undefined, { ...event(), brokenBat: true });
+  expect(play.brokenBat).toBe(true);
+  const cues = buildPlayAudioSchedule(play);
+  expect(cues.filter(item => item.at === play.legs[0].end)).toEqual([{ at: play.legs[0].end, cue: 'broken_bat' }]);
+  expect(times(cues, 'bat_crack')).toHaveLength(0);
+  expect(diamondPlay('ground_out', 'SS', event({ soundCue: 'broken_bat' })).brokenBat).toBe(true);
+});

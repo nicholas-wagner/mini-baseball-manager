@@ -1,4 +1,10 @@
 import { PerspectiveCamera } from 'three';
+import { createClub } from '../../engine/gm/rosterFactory';
+import { createSeededRng } from '../../engine/rng/seededRng';
+import { createGameSession } from '../../engine/simulation/baseballEngine';
+import { useGameStore } from '../../store/gameStore';
+import { GameSceneController } from './gameSceneController';
+import * as replayRenderer from './renderDiamondPlay';
 import { createPortraitTraits } from '../../art/portraits/generatePortrait';
 import { createPaintedPlayerRig } from '../characters/paintedPlayer';
 import { createBallparkVfxSystem } from '../vfx/vfxSystem';
@@ -8,6 +14,17 @@ import { actorAt, diamondPlay, diamondCamera, selectDiamondPlay, sampleLeg } fro
 import type { PlayEvent } from '../../engine/models/playEvent';
 import { BASE_PATH_VERTICES } from './diamondLayout';
 import { choreographPlayEvent } from './eventChoreographer';
+
+vi.mock('three', async importOriginal => ({
+  ...await importOriginal<typeof import('three')>(),
+  WebGLRenderer: class {
+    domElement = document.createElement('canvas');
+    setPixelRatio() {}
+    setSize() {}
+    render() {}
+    dispose() {}
+  },
+}));
 
 describe('infield playback', () => {
   it('fields a chopper before throwing the batter out at first', () => {
@@ -196,12 +213,14 @@ it.each(['robbery', 'dive', 'pickoff_out', 'pickoff_safe'] as const)('renders th
   const camera = new PerspectiveCamera(40, 1.5, .2, 180);
   const vfx = createBallparkVfxSystem();
   const caption = vi.spyOn(vfx, 'spawnComicCallout');
+  const sparkle = vi.spyOn(vfx.celebration, 'starSparkle');
   const chalk = vi.spyOn(vfx, 'kickChalk');
   const impact = vi.spyOn(vfx, 'impact');
   const signal = vi.spyOn(vfx.umpire, 'signal');
   try {
     const when = pickoff ? play.finish : play.pickupAt;
     renderDiamondPlay(play, cast, 'R', when, when - .01, camera, 240, vfx);
+    expect(sparkle).toHaveBeenCalledTimes(pickoff ? 0 : 1);
     if (pickoff) {
       expect(vfx.umpire.sprite.visible).toBe(true);
       expect(signal).toHaveBeenCalledWith(kind === 'pickoff_safe', 0);
@@ -226,5 +245,57 @@ it.each(['robbery', 'dive', 'pickoff_out', 'pickoff_safe'] as const)('renders th
   } finally {
     Object.values(cast).forEach(rig => rig.dispose());
     vfx.dispose();
+  }
+});
+
+it('plays a starred batter’s walkoff from the live clock, with matching audio and reduced-motion timing', () => {
+  let tick!: FrameRequestCallback;
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { tick = cb; return 1; });
+  vi.stubGlobal('cancelAnimationFrame', () => {});
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.spyOn(performance, 'now').mockReturnValue(0);
+  const draw = vi.spyOn(replayRenderer, 'renderDiamondPlay');
+  const makeClub = (id: string, seed: number) => createClub(createSeededRng(seed), {
+    id, city: 'Bay', name: id, mascot: 'Gull', leagueTier: 'rookie', isHuman: false,
+    colors: { primary: '#123456', secondary: '#eeeeee', accent: '#ffdd55', monogram: 'B' },
+  });
+  const away = makeClub('away', 7), home = makeClub('home', 8);
+  const session = createGameSession(away, home, 123);
+  const batterId = session.home.lineup[0].playerId;
+  const event: PlayEvent = { seq: 1, type: 'ball_in_play', outcome: 'single', inning: 9, half: 'BOT',
+    outsBefore: 1, outsAfter: 1, balls: 0, strikes: 0, homeScore: 1, awayScore: 0, batterId,
+    basesAfter: [batterId, null, null], isClutchMoment: true, commentary: '' };
+  const step = choreographPlayEvent(event, 1, [null, null, 'winning-runner'], { walkoff: true });
+  step.durationMs = step.play!.duration * 1000;
+  const contact = step.play!.legs[0].end;
+  const saved = useGameStore.getState().favoritePlayerIds;
+  const controller = new GameSceneController(document.createElement('div'));
+  const cue = vi.fn();
+  controller.setOnAudioCue(cue);
+  try {
+    useGameStore.setState({ favoritePlayerIds: [batterId] });
+    const broken = { ...event, brokenBat: true };
+    let start = 0;
+    for (const reduced of [false, true]) {
+      controller.setCameraOverride(null, reduced);
+      controller.syncMatchup(away, home, session, step, broken);
+      tick((start + contact - .01) * 1000);
+      const fx = draw.mock.lastCall![7];
+      const update = vi.spyOn(fx, 'update');
+      tick((start + contact + .01) * 1000);
+      const [play, , , time] = draw.mock.lastCall!;
+      expect(play).toMatchObject({ favoriteSparkle: true, brokenBat: true });
+      expect(time - contact).toBeCloseTo(.01 * (reduced ? 1 : .38), 6);
+      expect(update.mock.lastCall![0]).toBeCloseTo(.02 * (reduced ? 1 : .38), 6);
+      expect(cue.mock.calls.filter(([name]) => name === 'broken_bat')).toHaveLength(1);
+      expect(fx.group.getObjectByName('favorite stars')!.visible).toBe(!reduced);
+      cue.mockClear();
+      start += contact + .01;
+    }
+  } finally {
+    controller.dispose();
+    useGameStore.setState({ favoritePlayerIds: saved });
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   }
 });

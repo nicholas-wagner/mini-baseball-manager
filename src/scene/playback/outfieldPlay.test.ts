@@ -1,3 +1,4 @@
+import { moonshotCall, stageSplashHit } from './outfieldPlay';
 import { describe, expect, it } from 'vitest';
 import { actorAt, diamondCamera, diamondPlay, sampleLeg } from './diamondPlay';
 import { getShiftDefenderCoords } from './defensiveShiftCoords';
@@ -140,4 +141,17 @@ it('starts a routine fly from the live alignment and adjusts under the ball on t
   const midway = actorAt(play, 'LF', (play.legs[0].end + play.pickupAt) / 2, 'L').pos;
   expect(Math.hypot(midway.x - start.x, midway.z - start.z)).toBeGreaterThan(.25);
   expect(actorAt(play, 'LF', play.pickupAt, 'L').pos).toEqual(play.fieldAt);
+});
+
+it('carries recorded homer measurements and favorite status through to the Bayfront landing', () => {
+  const hrStatcast = { distanceFt: 442, exitVeloMph: 111, landmarkCall: 'SPLASH HIT INTO THE COVE!' };
+  const event = { ...fly, outcome: 'home_run' as const, favoriteSparkle: true, hrStatcast,
+    ballFlight: { ...fly.ballFlight!, landingX: 12 } };
+  const play = stageSplashHit(choreographPlayEvent(event, 1).play!, true);
+  expect(play).toMatchObject({ hrStatcast, favoriteSparkle: true, splashHit: true });
+  expect(moonshotCall(play.hrStatcast)).toBe('442 FT · 111 MPH!');
+});
+
+it('celebrates a legacy home run without inventing a distance or exit velocity', () => {
+  expect(moonshotCall(diamondPlay('home_run').hrStatcast)).toBe('MOONSHOT!');
 });

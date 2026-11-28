@@ -21,6 +21,11 @@ export function isOutfieldKind(kind: string): kind is OutfieldKind {
   return Object.hasOwn(presets, kind);
 }
 
+export function moonshotCall(stats?: DiamondPlay['hrStatcast']) {
+  if (!stats || !Number.isFinite(stats.distanceFt) || !Number.isFinite(stats.exitVeloMph)) return 'MOONSHOT!';
+  return `${stats.distanceFt} FT · ${stats.exitVeloMph} MPH!`;
+}
+
 export function shouldTriggerSplashHit(hasSplashCove: boolean, landingX: number) {
   return hasSplashCove && landingX > SPLASH_COVE.rightCenterX;
 }

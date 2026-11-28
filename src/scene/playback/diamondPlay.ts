@@ -44,6 +44,9 @@ export interface DiamondPlay {
   kind: DiamondPlayKind;
   alignment?: Record<Exclude<Actor, 'BAT' | 'RUN' | 'P' | 'C'>, Vec3>;
   webGem?: boolean;
+  brokenBat?: boolean;
+  hrStatcast?: { distanceFt: number; exitVeloMph: number; landmarkCall?: string };
+  favoriteSparkle?: boolean;
   fromStretch?: boolean;
   battingPreview?: BattingPreviewPose;
   legs: Leg[];
@@ -75,7 +78,28 @@ export interface DiamondPlay {
     call: string; callColor: string; caught: boolean; wall: boolean; robbedHomeRun: boolean;
   };
 }
-export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, event?: PlayEvent, stealBase?: 1 | 2 | 3, pitchInfo: PitchFlight | undefined = event?.pitchThrown, fromStretch = kind === 'steal_safe' || kind === 'steal_out'): DiamondPlay {
+type ReplayHighlights = Pick<DiamondPlay, 'brokenBat' | 'hrStatcast' | 'favoriteSparkle'>;
+export type ReplayEvent = PlayEvent & ReplayHighlights;
+
+export function eventHighlights(event?: ReplayEvent | null): ReplayHighlights {
+  const highlights: ReplayHighlights = {};
+  if (event?.brokenBat || event?.soundCue === 'broken_bat') highlights.brokenBat = true;
+  if (event?.hrStatcast) highlights.hrStatcast = event.hrStatcast;
+  if (event?.favoriteSparkle) highlights.favoriteSparkle = true;
+  return highlights;
+}
+
+export function isBaseHit(play: DiamondPlay) {
+  return Boolean(play.outfield?.bags) || play.kind === 'bunt_single';
+}
+
+/** The ball reaches the favorite batter at contact, or the favorite fielder at the catch. */
+export function sparkleContact(play: DiamondPlay): Leg | undefined {
+  if (isBaseHit(play)) return play.legs[0];
+  if (play.outfield?.caught || play.webGem || play.kind === 'pop_up' || play.kind === 'infield_liner') return play.legs[1];
+}
+
+export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, event?: ReplayEvent, stealBase?: 1 | 2 | 3, pitchInfo: PitchFlight | undefined = event?.pitchThrown, fromStretch = kind === 'steal_safe' || kind === 'steal_out'): DiamondPlay {
   if (kind === 'bullpen') return bullpenPlay();
   const release = CLIP_DURATIONS[deliveryClip(fromStretch)] * PITCH_RELEASE_PHASE;
   const plate = release + (pitchInfo ? pitchSeconds(pitchInfo.mph) : .56);
@@ -84,9 +108,9 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
   if (isCloseKind(kind)) {
     const close = buildClosePlay(kind, pitch, event?.pickoffBase ?? stealBase, buntAttempt,
       event?.outcome, event?.fieldingHighlight?.fielderPos ?? highlight);
-    return { ...close, fromStretch: isPickoffKind(kind) || fromStretch };
+    return { ...close, ...eventHighlights(event), fromStretch: isPickoffKind(kind) || fromStretch };
   }
-  if (isOutfieldKind(kind)) return { ...buildOutfieldPlay(kind, pitch, event), fromStretch };
+  if (isOutfieldKind(kind)) return { ...buildOutfieldPlay(kind, pitch, event), ...eventHighlights(event), fromStretch };
   const pop = kind === 'pop_up';
   const bunt = kind === 'bunt_out' || kind === 'bunt_single';
   const liner = kind === 'infield_liner';
@@ -124,7 +148,7 @@ export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, ev
     legs.push({ from:pickup,to:pickup,start:pickupAt,end:pickupAt+.44,kind:'bounce',endPoint:loose },
       { from:pickup,to:pickup,start:pickupAt+.44,end:finish,kind:'ground',startPoint:loose });
   }
-  return { kind, fromStretch, webGem: (liner || kind === 'ground_out' || kind === 'cover_first') && isDivingWebGem(event?.fieldingHighlight), legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
+  return { kind, fromStretch, ...eventHighlights(event), webGem: (liner || kind === 'ground_out' || kind === 'cover_first') && isDivingWebGem(event?.fieldingHighlight), legs, pickup, pickupAt, receiveAt, finish, fieldAt, unassisted,
     buntAttempt: buntAttempt || undefined,
     duration: finish + (error ? 1.75 : 1.05),
     batterArrival: kind === 'bunt_single' ? finish-.34 : finish + 0.37, leadArrival: receiveAt + 0.28 };

@@ -87,9 +87,56 @@ function createSplashFountain() {
   };
 }
 
+function createSparkleRing() {
+  const shape = new THREE.Shape();
+  for (let i = 0; i < 8; i++) {
+    const radius = i % 2 ? .045 : .155;
+    const angle = i * Math.PI / 4;
+    const x = radius * Math.cos(angle), y = radius * Math.sin(angle);
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  const geometry = new THREE.ShapeGeometry(shape);
+  const material = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  const mesh = new THREE.InstancedMesh(geometry, material, 12);
+  mesh.name = 'favorite stars';
+  mesh.frustumCulled = false;
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const star = new THREE.Object3D();
+  for (let i = 0; i < mesh.count; i++) mesh.setColorAt(i, new THREE.Color(i % 2 ? '#ff94bd' : '#ffd04f'));
+  let age = 0;
+  function update(dt: number, camera?: THREE.PerspectiveCamera) {
+    if (!mesh.visible) return;
+    age += dt;
+    const u = Math.min(1, age / .85);
+    mesh.visible = u < 1;
+    if (!mesh.visible) return;
+    const radius = .20 + .92 * (1 - (1 - u) ** 3);
+    for (let i = 0; i < mesh.count; i++) {
+      const angle = i * Math.PI * 2 / mesh.count;
+      star.position.set(radius * Math.cos(angle), .12 + u * (1 + i % 3 * .16), radius * Math.sin(angle));
+      if (camera) star.quaternion.copy(camera.quaternion);
+      else star.rotation.set(0, 0, 0);
+      star.rotateZ(.28 * Math.sin(angle + u * Math.PI));
+      star.scale.setScalar((i % 2 ? .8 : 1) * (.45 + .8 * Math.sin(Math.PI * u)));
+      star.updateMatrix();
+      mesh.setMatrixAt(i, star.matrix);
+    }
+    material.opacity = 1 - u * u;
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+  return {
+    mesh, update,
+    start(at: Vec3) { mesh.position.copy(at); mesh.visible = true; age = 0; update(0); },
+    dispose() { mesh.dispose(); geometry.dispose(); material.dispose(); },
+  };
+}
+
 export function createStadiumCelebration() {
   const group = new THREE.Group();
   const fireworks = createBurst(false), confetti = createBurst(true);
+  let stars: ReturnType<typeof createSparkleRing> | undefined;
   let fountain: ReturnType<typeof createSplashFountain> | undefined;
   const ring = (name: string, inner: number, outer: number) => {
     const mesh = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 48), new THREE.MeshBasicMaterial({
@@ -128,6 +175,14 @@ export function createStadiumCelebration() {
       fireworks.start();
       if (cannon) confetti.start();
     },
+    starSparkle(at: Vec3) {
+      if (steady) return;
+      if (!stars) {
+        stars = createSparkleRing();
+        group.add(stars.mesh);
+      }
+      stars.start(at);
+    },
     splashDown(at: Vec3) {
       if (steady) return;
       if (!fountain) {
@@ -157,12 +212,14 @@ export function createStadiumCelebration() {
       fireworks.update(dt);
       confetti.update(dt);
       fountain?.update(dt);
+      stars?.update(dt, camera);
     },
     dispose() {
       for (const mesh of [wave, aura]) { mesh.geometry.dispose(); mesh.material.dispose(); }
       fireworks.dispose();
       confetti.dispose();
       fountain?.dispose();
+      stars?.dispose();
       group.clear();
     },
   };

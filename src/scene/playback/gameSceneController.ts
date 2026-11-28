@@ -1,10 +1,11 @@
+import { useGameStore } from '../../store/gameStore';
 import type { DefensiveShiftId } from '../../engine/simulation/winProbability';
 import { isPickoffKind } from './plateAndSteals';
 import { getShiftDefenderCoords } from './defensiveShiftCoords';
 import type { GameDayWeather } from '../../engine/simulation/weather';
 import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
 import { parkLight } from '../ballpark/parkWeather';
-import { barrelReplayTime, crowdReaction, decayExcitement } from './impactTiming';
+import { barrelReplayTime, clutchReplayTime, clutchSlowMoScale, crowdReaction, decayExcitement } from './impactTiming';
 import { FORCE_HOLD_SECONDS, forceReplayTime, isSwingPreview, previewShot, rehearsalPose, targetOffset, type AtBatPreview, type PlayerEntranceCue } from './firstAtBatPresentation';
 import { playReadout } from './playReadout';
 import { WalkoffTeammates } from '../characters/walkoffTeammates';
@@ -12,7 +13,7 @@ import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import { batterBox, headingToward, CATCHER_HOME } from './diamondLayout';
 import { createDelivery, sampleDeliveryFlight, type ShowcaseDelivery } from '../vfx/showcaseDelivery';
 import { runBases, stageSplashHit } from './outfieldPlay';
-import { buntRunnerPose, diamondCamera, diamondPlay, forceAtFirst, heldRunnerLead, type DiamondPlay } from './diamondPlay';
+import { buntRunnerPose, diamondCamera, diamondPlay, eventHighlights, forceAtFirst, heldRunnerLead, isBaseHit, sparkleContact, type DiamondPlay } from './diamondPlay';
 import { renderDiamondPlay, type DiamondCast } from './renderDiamondPlay';
 import { buildPlayAudioSchedule, initialAudioCursor, type ScheduledAudioCue } from './playAudioTimeline';
 import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types';
@@ -461,7 +462,12 @@ export class GameSceneController {
       const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
       const venuePlay = stageSplashHit(play, this.stadiumOverlay?.spec.hasSplashCove ?? false);
       const alignment = getShiftDefenderCoords(this.defensiveShift, choreo.basesBefore ?? session.bases);
-      const filmed = { ...venuePlay, alignment, battingPreview, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon };
+      const accentActor = sparkleContact(play)?.to;
+      const featuredId = accentActor === 'BAT' ? batter.id : accentActor && (event?.fieldingHighlight?.fielderId
+        ?? fieldingSide.lineup.find(slot => slot.defensivePosition === accentActor)?.playerId);
+      const highlights = eventHighlights(event);
+      if (featuredId && useGameStore.getState().favoritePlayerIds.includes(featuredId)) highlights.favoriteSparkle = true;
+      const filmed = { ...venuePlay, ...highlights, alignment, battingPreview, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon };
       const runningBase = play.scorerBase ?? play.runnerToThird ?? (play.close?.steal || play.close?.pickoff
         ? play.close.fromBase : play.kind === 'sac_fly' ? 3 : 1);
       this.replay = { freezeAt:choreo.freezeAt, play: filmed,
@@ -598,26 +604,28 @@ export class GameSceneController {
       this.lastTimestamp = now;
       this.elapsedSec += elapsed;
       this.crowdExcitement = decayExcitement(this.crowdExcitement,elapsed);
-      this.updateScene(dt, elapsed);
+      const effectsDt = this.updateScene(dt, elapsed);
       this.ballpark.update(this.elapsedSec,this.crowdExcitement);
       this.stadiumOverlay?.update?.(this.elapsedSec, this.vfx.reducedMotion);
-      this.vfx.update(dt,this.camera,this.container.clientHeight);
+      this.vfx.update(effectsDt, this.camera, this.container.clientHeight);
       this.renderer.render(this.scene, this.camera);
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
   }
 
-  private updateScene(dt: number, elapsed: number): void {
+  private updateScene(dt: number, elapsed: number): number {
     if (this.replay) {
       const { play, cast, start, rate, runnerDestinations } = this.replay;
       const raw = (this.elapsedSec - start) * rate;
       const limit = this.replay.freezeAt ?? Infinity;
       const clock = Math.min(raw, limit);
       const previous = Math.min(raw - elapsed * rate, limit);
+      const walkoffHit = play.ending?.kind === 'walkoff' && isBaseHit(play);
       const sample = (value: number) => {
         const held = play.holdForceCall ? forceReplayTime(value,play.finish) : value;
-        return this.steadyCamera ? held : barrelReplayTime(play,held,rate);
+        const paced = clutchReplayTime(play, held, this.vfx.reducedMotion);
+        return this.steadyCamera || walkoffHit ? paced : barrelReplayTime(play, paced, rate);
       };
       const t = sample(clock), prior = sample(previous);
       const cheer = this.replay.cheer;
@@ -668,7 +676,7 @@ export class GameSceneController {
         if (destination === 4 && t > arrival + .28) runner.root.visible = false;
       });
       this.targetRing.quaternion.copy(this.camera.quaternion);
-      return;
+      return dt * clutchSlowMoScale(play, clock, this.vfx.reducedMotion);
     }
     const swing = isSwingPreview(this.preview) ? this.preview : null;
     const activePreset = this.cameraOverride ?? this.cameraPreset;
@@ -746,8 +754,7 @@ export class GameSceneController {
         runner.updatePose('runner_lead', this.elapsedSec, undefined, this.camera.position);
       }
     }
-
-
+    return dt;
   }
 
   public dispose(): void {

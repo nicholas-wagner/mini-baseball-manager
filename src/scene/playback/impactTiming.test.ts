@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { barrelReplayTime, crowdReaction, decayExcitement } from './impactTiming';
+import { barrelReplayTime, clutchReplayTime, clutchSlowMoScale, clutchSlowMoWindow, crowdReaction, decayExcitement } from './impactTiming';
 import { actorAt, diamondPlay } from './diamondPlay';
 import { paintedMotion } from '../characters/paintedMotion';
 import { CLIP_DURATIONS } from '../characters/animationState';
@@ -40,3 +40,44 @@ it('finishes a swing on the turned shoulder and lets the starter pump a fist aft
   const k = diamondPlay('swinging_third');
   expect(actorAt(k, 'P', k.finish + .52, 'R').clip).toBe('pitch_fist_pump');
 });
+
+it.each(['walkoff', 'robbery', 'called_third', 'swinging_third', 'relief'] as const)(
+  'slows the ball and players through the decisive frame of a %s', moment => {
+    const play = diamondPlay(moment === 'walkoff' ? 'single' : moment === 'robbery' ? 'fly_out'
+      : moment === 'relief' ? 'swinging_third' : moment);
+    const impact = moment === 'robbery' ? play.pickupAt : play.legs[0].end;
+    if (moment === 'robbery') play.outfield!.robbedHomeRun = true;
+    else if (moment === 'relief') play.reliefStrikeout = true;
+    else play.ending = { kind: moment === 'walkoff' ? 'walkoff' : 'third_out', start: play.finish, scorer: 'BAT' };
+    const lead = moment === 'walkoff' ? .175 : moment === 'robbery' ? .14 : .10;
+    const speed = moment === 'walkoff' || moment === 'robbery' ? .38 : .42;
+    const window = clutchSlowMoWindow(play)!;
+    expect(window.start).toBeCloseTo(impact - lead);
+    expect(window.end - window.start).toBeCloseTo(.35);
+    expect(window.scale).toBe(speed);
+    const scale = (t: number) => clutchSlowMoScale(play, t, false);
+    expect(scale(window.start)).toBe(1);
+    expect(scale(window.start + .025)).toBeLessThan(1);
+    expect(scale(window.start + .025)).toBeGreaterThan(speed);
+    expect(scale(impact)).toBeCloseTo(speed);
+    expect(scale(window.end)).toBe(1);
+    const clock = (t: number) => clutchReplayTime(play, t, false);
+    expect(clock(impact)).toBeCloseTo(impact);
+    expect((clock(impact + .001) - clock(impact - .001)) / .002).toBeCloseTo(speed, 2);
+    let previous = 0;
+    for (let t = 0; t < play.duration; t += .012) {
+      expect(clock(t)).toBeGreaterThanOrEqual(previous);
+      expect(clutchSlowMoScale(play, t, true)).toBe(1);
+      expect(clutchReplayTime(play, t, true)).toBe(t);
+      previous = clock(t);
+    }
+    expect(clock(play.duration)).toBe(play.duration);
+  });
+
+it.each(['single', 'home_run', 'fly_out', 'ground_out', 'called_third', 'swinging_third', 'steal_safe'] as const)(
+  'keeps routine %s playback at normal speed', kind => {
+    const play = diamondPlay(kind);
+    if (kind === 'steal_safe') play.ending = { kind: 'walkoff', start: play.finish, scorer: 'RUN' };
+    expect(clutchSlowMoWindow(play)).toBeNull();
+    expect(clutchSlowMoScale(play, play.pickupAt, false)).toBe(1);
+  });

@@ -1,3 +1,4 @@
+import { moonshotCall } from './outfieldPlay';
 import { ROBBERY_CALL, WEB_GEM_CALL } from './fieldingHighlights';
 import { PICKOFF_CALLS, isPickoffKind } from './plateAndSteals';
 import type { playReadout } from './playReadout';
@@ -11,7 +12,7 @@ import type { EffectiveBatSide, ThrowsHand } from '../../engine/handedness/types
 import type { PaintedPlayerRig } from '../characters/paintedPlayer';
 import { BALL_TRAJECTORY_PRESETS } from '../vfx/ballTrajectory';
 import { inSwingArcWindow, type BallparkVfxSystem } from '../vfx/vfxSystem';
-import { actorAt, buntFollowBase, diamondCamera, forceAtFirst, sampleLeg, type Actor, type DiamondPlay } from './diamondPlay';
+import { actorAt, buntFollowBase, diamondCamera, forceAtFirst, sampleLeg, sparkleContact, type Actor, type DiamondPlay } from './diamondPlay';
 import { collectPlayAudioCues, type PlayAudioFrame } from './playAudioTimeline';
 
 export type DiamondCast = Record<Actor, PaintedPlayerRig>;
@@ -77,6 +78,10 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     vfx.ball.draw(spec, progress, trail, scale,
       (_, u) => sampleLeg(flying, a, b, u, throws), play.close && flying.from === 'C' && flying.to === 'P' ? .23 : 1);
     vfx.ball.sizeForCamera(camera, heightPx);
+    const statAt = flying.start + Math.min(.55, durationSec / 2);
+    if (homer && previous < statAt && t >= statAt) {
+      vfx.spawnComicCallout(moonshotCall(play.hrStatcast), vfx.ball.position, '#FFC300', 'flight');
+    }
   }
   const pitch = play.legs[0];
   const sincePlate = t-pitch.end;
@@ -102,11 +107,19 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     vfx.impact(base, '#A9EDDC');
     if (!play.holdForceCall) vfx.spawnComicCallout('OUT!', base, '#167457', true);
   }
+  const sparkle = play.favoriteSparkle || play.webGem || play.outfield?.robbedHomeRun ? sparkleContact(play) : undefined;
   for (const leg of play.legs) {
     if (previous >= leg.end || seconds < leg.end) continue;
     const at = leg.endPoint ?? contact(leg.to, leg.end);
     if (play.close && leg.from === 'C' && leg.to === 'P') continue;
-    if (leg === pitch && leg.to === 'BAT') vfx.celebration.barrel(at);
+    if (leg === sparkle) vfx.celebration.starSparkle(at);
+    if (leg === pitch && leg.to === 'BAT') {
+      vfx.celebration.barrel(at);
+      if (play.brokenBat) {
+        vfx.triggerBrokenBat(at, side);
+        vfx.spawnComicCallout('SNAP!', at, '#F4A261', 'contact');
+      }
+    }
     if (leg === play.legs[1] && play.kind === 'home_run') vfx.celebration.homer(Boolean(play.mascotCannon));
     if (leg === play.legs[1] && (play.webGem || play.outfield?.robbedHomeRun)) {
       const robbery = play.outfield?.robbedHomeRun;
@@ -155,7 +168,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   }
   const dropAt = play.legs[0].end+(play.kind==='ball_four'?.48:.20);
   vfx.droppedBat.visible=false;
-  if ((!play.close && play.kind!=='bullpen' || play.kind==='ball_four') && t>=dropAt) {
+  if (!play.brokenBat && (!play.close && play.kind!=='bullpen' || play.kind==='ball_four') && t>=dropAt) {
       const state=stateAt('BAT',dropAt-.001);
       const eye = (fixedShot ?? diamondCamera(play,dropAt-.001,side,throws)).position;
       const grip=cast.BAT.batGripAt(state.clip,state.local,state.pos,eye);

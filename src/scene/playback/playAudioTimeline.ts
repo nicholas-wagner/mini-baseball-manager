@@ -33,6 +33,7 @@ function isForceOut(kind: string) {
 }
 
 function contactCue(play: DiamondPlay, event: PlayEvent | null | undefined, fallback?: SoundCue | null): SoundCue | null {
+  if (play.brokenBat) return 'broken_bat';
   if (play.kind === 'home_run') return 'bomb_crack';
   if (play.kind === 'bunt_single' || play.kind === 'bunt_out') return 'bunt_tap';
   if (play.kind === 'foul_back') return 'foul_clank';

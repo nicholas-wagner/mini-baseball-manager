@@ -148,5 +148,5 @@ export function createBallFlightVisual() {
     geometry.dispose();
     trail.material.dispose();
   }
-  return { group, draw, sizeForCamera, dispose };
+  return { group, position: ball.position, draw, sizeForCamera, dispose };
 }
