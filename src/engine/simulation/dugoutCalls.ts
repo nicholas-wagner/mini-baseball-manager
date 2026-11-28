@@ -24,11 +24,10 @@ import type { PitchResolution } from './pitchResolver';
 function thirdBaseResult(
   odds: number,
   outs: number,
-  close: boolean,
   rng: SeededRng,
   call?: 'hold' | 'send',
 ) {
-  const send = close && call ? call === 'send' : odds >= (outs === 2 ? 48 : 65);
+  const send = call ? call === 'send' : odds >= (outs === 2 ? 48 : 65);
   if (!send) return 'held';
   return rng.next() * 100 < odds ? 'safe' : 'out';
 }
@@ -54,7 +53,7 @@ export function readThirdBase(
     ),
   );
   const close = odds >= 35 && odds <= 85;
-  const result = thirdBaseResult(odds, state.outs, close, rng, call);
+  const result = thirdBaseResult(odds, state.outs, rng, call);
   return {
     runnerId: id,
     position,

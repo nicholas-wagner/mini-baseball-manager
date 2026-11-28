@@ -1,4 +1,5 @@
 import { createEmptyFranchiseRecords } from '../league/clubRecords';
+import { STARTER_CLUB_RELIC_IDS } from '../rpg/relicLocker';
 import { DEFAULT_CLUB_RITUALS } from './polaroidKeepsakes';
 import type { CatalogPlayer, DrawCatalogPlayer } from '../catalog/playerCatalog';
 import { rollBatsHand, rollThrowsHand } from '../handedness/handedness';
@@ -9,6 +10,7 @@ import type {
   AiArchetype,
   Club,
   ClubColors,
+  RelicInventoryEntry,
   DefensiveLineupPosition,
 } from '../models/club';
 import {
@@ -401,9 +403,27 @@ export function createPlayer(rng: SeededRng, options: CreatePlayerOptions): Play
     specialistRatings,
     marketTier,
   );
-  const preCaps = rollStatCapsForMarketTier(rng, roleRatings, marketTier, options.position);
   const presentation = traits.playerLook === 'female' ? 'female' : 'male';
-  const ratings = applyCoEdAttributeTilt(roleRatings, preCaps, presentation, options.position);
+  const maxCaps: PlayerRatings = {
+    contact: 99,
+    power: 99,
+    gapPower: 99,
+    eye: 99,
+    bunt: 99,
+    velocity: 99,
+    movement: 99,
+    control: 99,
+    stamina: 99,
+    speed: 99,
+    fielding: 99,
+    range: 99,
+    arm: 99,
+    clutch: 99,
+    luck: 99,
+    popularity: 99,
+    potential: 99,
+  };
+  const ratings = applyCoEdAttributeTilt(roleRatings, maxCaps, presentation, options.position);
   const statCaps = rollStatCapsForMarketTier(rng, ratings, marketTier, options.position);
   const coEdTrait = rollCoEdSpecialTrait(rng, presentation, options.position);
   const batterPitchProfile = rollBatterPitchProfile(rng, specialistArchetype, ratings, marketTier);
@@ -611,6 +631,10 @@ export function createClub(rng: SeededRng, options: CreateClubOptions): Club {
     clubRituals: { ...DEFAULT_CLUB_RITUALS },
     polaroids: [],
     franchiseRecords: createEmptyFranchiseRecords(),
+    relicInventory: STARTER_CLUB_RELIC_IDS.map(
+      (relicId): RelicInventoryEntry => ({ relicId, count: 1, foilTier: 1 }),
+    ),
+    discoveredRelicIds: [...STARTER_CLUB_RELIC_IDS],
     stadium: createInitialStadium(
       options.stadiumName ?? `${options.city} Sandlot Park`,
       options.leagueTier,

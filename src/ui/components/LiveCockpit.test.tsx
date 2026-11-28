@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createClutchMomentSession } from '../../engine/gm/gameDayMoments';
 import { useGameStore } from '../../store/gameStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { GameDayScreen } from '../screens/GameDayScreen';
@@ -138,8 +139,17 @@ describe('TASK-099 live cockpit', () => {
         seed: 2089,
         startingPreset: 'balanced',
       });
-      render(<GameDayScreen />);
-      fireEvent.click(screen.getByRole('button', { name: /Bat with / }));
+      const club = useGameStore.getState().getHumanClub()!;
+      const rival = useGameStore.getState().leagues[club.leagueTier].find((c) => c.id !== club.id)!;
+      const battingMoment = createClutchMomentSession({
+        awayClub: rival,
+        homeClub: club,
+        seed: 2090,
+        regulationInnings: 5,
+        preferHumanBattingFirst: true,
+        chargeOpeningPower: true,
+      });
+      render(<GameDayScreen openingRequest={battingMoment} />);
 
       const swingBtn = screen.getByRole('button', { name: /^Swing/ });
       expect(swingBtn).not.toBeDisabled();

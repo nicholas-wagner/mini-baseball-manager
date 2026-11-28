@@ -225,7 +225,10 @@ const BULLPEN_SITUATION_BONUS: Readonly<
   starter: () => 0,
   short_reliever: () => 4,
   closer: (ctx) => (isSaveInning(ctx) && ctx.lead >= 1 && ctx.lead <= 3 ? 45 : 0),
-  fireman: (ctx) => (ctx.leverageIndex >= 1.8 && ctx.hasRunnersOn ? 42 : 0),
+  fireman: (ctx) =>
+    ctx.hasRunnersOn && (ctx.leverageIndex >= 1.55 || (isFiremanInning(ctx) && Math.abs(ctx.lead) <= 3))
+      ? 48
+      : 0,
   loogy: (ctx) => (ctx.batterEffectiveSide === 'L' && ctx.leverageIndex >= 1.1 ? 36 : 0),
   setup_man: (ctx) => (isSetupInning(ctx) && Math.abs(ctx.lead) <= 3 ? 32 : 0),
   long_reliever: (ctx) => (isEarlyBridgeInning(ctx) || Math.abs(ctx.lead) >= 4 ? 38 : 0),

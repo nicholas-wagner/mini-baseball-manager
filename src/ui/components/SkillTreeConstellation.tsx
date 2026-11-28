@@ -211,14 +211,14 @@ export function SkillTreeConstellation({
           ))}
 
           {/* Tier altitude guide labels */}
-          <text x="12" y="76" fill="#93C5FD" opacity="0.65" fontSize="9.5" fontWeight="800">
-            TIER 3 · CAPSTONE (50)
+          <text x="8" y="76" fill="#93C5FD" opacity="0.65" fontSize="8.5" fontWeight="800">
+            T3 · CAP (50)
           </text>
-          <text x="12" y="172" fill="#93C5FD" opacity="0.55" fontSize="9.5" fontWeight="800">
-            TIER 2 · CRAFT (20)
+          <text x="8" y="172" fill="#93C5FD" opacity="0.55" fontSize="8.5" fontWeight="800">
+            T2 · CRAFT (20)
           </text>
-          <text x="12" y="266" fill="#93C5FD" opacity="0.55" fontSize="9.5" fontWeight="800">
-            TIER 1 · ROOKIE (0)
+          <text x="8" y="266" fill="#93C5FD" opacity="0.55" fontSize="8.5" fontWeight="800">
+            T1 · ROOKIE
           </text>
 
           {/* Lane Constellation Headers */}

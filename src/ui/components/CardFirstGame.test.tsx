@@ -1,5 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
+import { createClutchMomentSession } from '../../engine/gm/gameDayMoments';
+import { stepAtBat } from '../../engine/simulation/baseballEngine';
+import { getCurrentBatter } from '../../engine/simulation/gameState';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
 import { GameDayScreen } from '../screens/GameDayScreen';
@@ -55,22 +58,63 @@ it('replays the same first out and lets the manager hand the rally to the second
     primaryColor: '#E63946', secondaryColor: '#1D3557', accentColor: '#FFC300',
     managerName: 'Coach Skip', seed: 2089, startingPreset: 'balanced',
   });
+  const club = useGameStore.getState().getHumanClub()!;
+  const rival = useGameStore.getState().leagues[club.leagueTier].find((c) => c.id !== club.id)!;
+  const base = createClutchMomentSession({
+    awayClub: rival,
+    homeClub: club,
+    seed: 2090,
+    regulationInnings: 5,
+    preferHumanBattingFirst: true,
+    chargeOpeningPower: true,
+  });
+  const r1 = base.session.home.lineup[7].playerId;
+  const r2 = base.session.home.lineup[8].playerId;
+  const setupSession = {
+    ...base.session,
+    inning: 4,
+    half: 'BOT' as const,
+    outs: 0,
+    balls: 0,
+    strikes: 0,
+    bases: [r1, r2, null] as [string | null, string | null, string | null],
+    away: { ...base.session.away, score: 3 },
+    home: { ...base.session.home, score: 1 },
+  };
+  let groundoutSeed = setupSession.rngSeed;
+  for (let s = 1; s < 500; s += 1) {
+    const probe = stepAtBat({ ...setupSession, rngSeed: s }, 'power');
+    if (
+      probe.events.some((e) => e.outcome === 'ground_out') &&
+      probe.nextSession.outs === 1 &&
+      probe.nextSession.bases[0] === r1 &&
+      probe.nextSession.bases[1] === r2
+    ) {
+      groundoutSeed = s;
+      break;
+    }
+  }
+  const moment = { ...base, session: { ...setupSession, rngSeed: groundoutSeed } };
+  const batter = getCurrentBatter(moment.session);
+  const firstName = batter.name.split(' ')[0];
+  const nextIdx = (moment.session.home.lineupIndex + 1) % moment.session.home.lineup.length;
+  const nextBatter = moment.session.home.playersById[moment.session.home.lineup[nextIdx].playerId];
+
   vi.useFakeTimers();
   try {
-    render(<GameDayScreen />);
-    fireEvent.click(screen.getByRole('button', {name: /Bat with Marcus/}));
+    render(<GameDayScreen openingRequest={moment} />);
     fireEvent.click(screen.getByRole('button', {name: 'Power'}));
     expect(screen.getByText('More power. Easier to miss.')).toBeVisible();
     fireEvent.click(screen.getByRole('button', {name: /^Swing/}));
     act(() => vi.advanceTimersByTime(30000));
     const result = () => within(screen.getByRole('region', {name: 'Play result'}));
-    expect(result().getByRole('heading')).toHaveTextContent('Marcus Baker');
-    expect(result().getByText(/Marcus is out at first. Both runners hold./i)).toBeVisible();
+    expect(result().getByRole('heading')).toHaveTextContent(batter.name);
+    expect(result().getByText(new RegExp(`${firstName} .*Both runners hold\\.`, 'i'))).toBeVisible();
     fireEvent.click(result().getByRole('button', {name: 'Watch again'}));
     act(() => vi.advanceTimersByTime(30000));
-    expect(result().getByRole('heading')).toHaveTextContent('Marcus Baker');
+    expect(result().getByRole('heading')).toHaveTextContent(batter.name);
     fireEvent.click(result().getByRole('button', {name: /Next batter/}));
-    expect(screen.getByRole('group', {name: 'Matchup cards'})).toHaveTextContent('Ethan Torres');
+    expect(screen.getByRole('group', {name: 'Matchup cards'})).toHaveTextContent(nextBatter.name);
     expect(screen.getByRole('region', {name: 'First at-bat'})).toHaveTextContent('One out. A single could score a run.');
     expect(screen.getByRole('button', {name: 'Contact'})).toBeVisible();
     expect(screen.queryByRole('region', {name: 'Play result'})).toBeNull();

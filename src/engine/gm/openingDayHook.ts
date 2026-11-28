@@ -173,7 +173,9 @@ function pickThirdSpotlightPlayer(
         : remaining.filter((p) => p.traits.playerLook === 'female');
     if (femalePool.length > 0) {
       return [...femalePool].sort(
-        (a, b) => b.ratings.speed + computePlayerOverall(b) - (a.ratings.speed + computePlayerOverall(a)),
+        (a, b) =>
+          b.ratings.speed - a.ratings.speed ||
+          computePlayerOverall(b) - computePlayerOverall(a),
       )[0];
     }
   }
@@ -182,10 +184,21 @@ function pickThirdSpotlightPlayer(
   return [...pool].sort((a, b) => b.ratings.speed - a.ratings.speed)[0];
 }
 
-function buildThirdStarTagline(player: Player): string {
+function isClubSpeedster(player: Player, club: Club): boolean {
+  if (player.ratings.speed >= 65) return true;
+  const hitters = club.roster.filter((p) => !isPitcherPosition(p.position));
+  const pool = hitters.length > 0 ? hitters : club.roster;
+  const avgSpeed = pool.reduce((sum, p) => sum + p.ratings.speed, 0) / Math.max(1, pool.length);
+  return player.ratings.speed >= avgSpeed;
+}
+
+function buildThirdStarTagline(player: Player, speedster: boolean): string {
   const ovr = computePlayerOverall(player);
   if (player.ratings.speed >= 65) {
     return `“${player.nickname}” — ${player.ratings.speed} Speed base stealer`;
+  }
+  if (speedster) {
+    return `“${player.nickname}” — ${player.ratings.speed} Speed club sparkplug`;
   }
   if (player.ratings.fielding >= 62) {
     return `“${player.nickname}” — ${player.ratings.fielding} Glove sparkplug`;
@@ -224,11 +237,12 @@ export function selectClubSpotlightTrio(club: Club): SpotlightStarCard[] {
   const alreadyHasFemale = cards.some((c) => c.player.traits.playerLook === 'female');
   const thirdStar = pickThirdSpotlightPlayer(club, usedIds, !alreadyHasFemale);
   if (thirdStar) {
+    const speedster = isClubSpeedster(thirdStar, club);
     cards.push({
       roleId: 'speedster',
-      roleBadge: thirdStar.ratings.speed >= 65 ? '⚡ SPEEDSTER' : '✨ CLUB SPARK',
+      roleBadge: speedster ? '⚡ SPEEDSTER' : '✨ CLUB SPARK',
       player: thirdStar,
-      tagline: buildThirdStarTagline(thirdStar),
+      tagline: buildThirdStarTagline(thirdStar, speedster),
     });
   }
 

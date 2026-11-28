@@ -229,7 +229,7 @@ export function DesignLabAssetBrowser({ tab }: { tab: DesignLabQaTab }) {
                     className="w-20 h-20 rounded-xl border-2 border-[#181B2C] bg-[#FFF8E7] overflow-hidden shrink-0 cursor-pointer relative"
                   >
                     {artUrl ? (
-                      <img src={artUrl} alt={cond.name} loading="lazy" className="w-full h-full object-cover" />
+                      <img src={artUrl} alt={cond.name} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-2xl">🩺</span>
                     )}

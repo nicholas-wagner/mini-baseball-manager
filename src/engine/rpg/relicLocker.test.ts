@@ -103,5 +103,41 @@ describe('Collectible Club Relic Locker, Role-Aware Slots & Foil Fusion (TASK-13
     expect(bought.purchased).toBe(true);
     expect(getRelicOwnershipUsage(bought.club, offers[1].relic.id).owned).toBeGreaterThanOrEqual(1);
     expect(bought.club.economy.cash).toBe(10_000 - offers[1].price);
+
+    // Edge-case guards: unknown relic, broke shop purchase, max ★★★ fusion, 2/2 slots full, recycle equipped
+    expect(purchaseVintageRelic(rich, 'no_such_relic').purchased).toBe(false);
+    const broke = { ...rich, economy: { ...rich.economy, cash: 50 } };
+    expect(purchaseVintageRelic(broke, offers[2].relic.id).purchased).toBe(false);
+
+    expect(recycleSpareRelic(rich, 'no_such_relic').recycled).toBe(false);
+    expect(equipRelicFromClubLocker(rich, 'missing-player', 'pine_tar_holo_rag').equipped).toBe(false);
+
+    const hitter = rich.roster.find((p) => p.position !== 'SP' && p.position !== 'RP')!;
+    let c = addRelicToClubLocker(rich, 'pine_tar_holo_rag', 3);
+    c = addRelicToClubLocker(c, 'turbo_web_gem_laces', 1);
+    c = addRelicToClubLocker(c, 'bubblegum_bucket', 1);
+    const eqA = equipRelicFromClubLocker(c, hitter.id, 'pine_tar_holo_rag');
+    // Already equipped same relic
+    expect(equipRelicFromClubLocker(eqA.club, hitter.id, 'pine_tar_holo_rag').equipped).toBe(false);
+    // Max 2/2 relics per player
+    const eqB = equipRelicFromClubLocker(eqA.club, hitter.id, 'turbo_web_gem_laces');
+    expect(equipRelicFromClubLocker(eqB.club, hitter.id, 'bubblegum_bucket').equipped).toBe(false);
+    // Recycle fails when 0 spare copies left
+    expect(recycleSpareRelic(eqB.club, 'turbo_web_gem_laces').recycled).toBe(false);
+    // Fuse to ★★ then ★★★, then 4th fuse hits max Prismatic Foil cap
+    const f2 = fuseDuplicateRelic(eqB.club, 'pine_tar_holo_rag');
+    expect(f2.newFoilTier).toBe(2);
+    const f3 = fuseDuplicateRelic(f2.club, 'pine_tar_holo_rag');
+    expect(f3.newFoilTier).toBe(3);
+    const fMax = fuseDuplicateRelic(addRelicToClubLocker(f3.club, 'pine_tar_holo_rag', 1), 'pine_tar_holo_rag');
+    expect(fMax.fused).toBe(false);
+    expect(fMax.reason).toMatch(/Prismatic Foil/i);
+
+    // Vintage shop works across all league tiers (including Rookie & Majors)
+    expect(getRotatingVintageRelicShop(1994, 2, 'rookie')).toHaveLength(3);
+    expect(getRotatingVintageRelicShop(1994, 2, 'low_a')).toHaveLength(3);
+    expect(getRotatingVintageRelicShop(1994, 2, 'high_a')).toHaveLength(3);
+    expect(getRotatingVintageRelicShop(1994, 2, 'aaa')).toHaveLength(3);
+    expect(getRotatingVintageRelicShop(1994, 2, 'majors')).toHaveLength(3);
   });
 });

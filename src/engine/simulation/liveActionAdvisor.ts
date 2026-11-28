@@ -90,7 +90,9 @@ function findBestStealOpportunity(
     fieldingSide.pitcherFatigue,
     fieldingSide.catcherPopTimeBonus,
   );
-  const best = plays.find((p) => p.successPct >= 60);
+  const best = plays.find(
+    (p) => p.successPct >= 60 && !(p.playType === 'steal_3b' && session.outs === 2),
+  );
   if (!best) return null;
   return {
     type: 'steal',

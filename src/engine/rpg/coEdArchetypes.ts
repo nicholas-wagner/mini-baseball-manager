@@ -91,9 +91,10 @@ export function applyCoEdAttributeTilt(
           control: -4,
         })
       : applyDeltaPatch(ratings, statCaps, {
-          power: 6,
+          power: 8,
           gapPower: 3,
           arm: 4,
+          speed: 1,
           contact: -4,
           eye: -4,
           fielding: -3,
@@ -103,21 +104,21 @@ export function applyCoEdAttributeTilt(
 
   return pitcher
     ? applyDeltaPatch(ratings, statCaps, {
-        movement: 5,
-        control: 5,
+        movement: 4,
+        control: 4,
         fielding: 3,
         popularity: 6,
-        velocity: -5,
+        velocity: -6,
         stamina: -2,
       })
     : applyDeltaPatch(ratings, statCaps, {
         contact: 5,
         eye: 5,
-        speed: 4,
+        speed: 3,
         fielding: 4,
         range: 4,
         popularity: 6,
-        power: -5,
+        power: -10,
         arm: -3,
       });
 }

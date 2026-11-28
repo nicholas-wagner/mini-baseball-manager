@@ -7,6 +7,7 @@ import {
   awardDisciplineMasteryFromPractice,
   awardDisciplineMasteryFromStatDelta,
   checkNodeMasteryGate,
+  getDisciplinesForPlayer,
   getNodeMasteryDiscipline,
   getNodeMasteryRequirement,
   resolvePlayerSkillMastery,
@@ -106,5 +107,37 @@ describe('Skyrim-Inspired Baseball Discipline Mastery (TASK-133)', () => {
     });
     expect(resolvePlayerSkillMastery(grown).power).toBeGreaterThanOrEqual(20);
     expect(canUnlockSkillNode(grown, 'b_pwr_2').allowed).toBe(true);
+
+    // Pitchers grow heat/spin/command mastery via game pitcher lines & stat deltas + clean innings
+    const pitcher = createPlayer(createSeededRng(1334), { position: 'SP', tier: 'rookie', marketTier: 'rookie' });
+    const lowPitcher = {
+      ...pitcher,
+      skillMastery: { power: 0, contact: 0, speed: 0, fielding: 0, heat: 5, spin: 5, command: 5 },
+    };
+    const afterPitchGame = awardDisciplineMasteryFromGame(lowPitcher, null, {
+      playerId: pitcher.id,
+      outsRecorded: 12,
+      pitchesThrown: 55,
+      strikeouts: 6,
+      walks: 0,
+    });
+    expect(resolvePlayerSkillMastery(afterPitchGame).heat).toBeGreaterThan(15);
+    expect(resolvePlayerSkillMastery(afterPitchGame).command).toBeGreaterThan(15);
+
+    const afterPitchDelta = awardDisciplineMasteryFromStatDelta(lowPitcher, {
+      ...createEmptySeasonStats(),
+      inningsPitchedOuts: 9,
+      pitchesThrown: 42,
+      pitchingStrikeouts: 5,
+      pitchingWalks: 2,
+    });
+    expect(resolvePlayerSkillMastery(afterPitchDelta).spin).toBeGreaterThan(12);
+
+    // Null delta, zero-work line, unknown practice activity, and role discipline lookup
+    expect(awardDisciplineMasteryFromStatDelta(lowPitcher, null).skillMastery).toEqual(lowPitcher.skillMastery);
+    expect(awardDisciplineMasteryFromGame(lowPitcher, { atBats: 0, walks: 0 }, { outsRecorded: 0, pitchesThrown: 0 }).skillMastery).toEqual(lowPitcher.skillMastery);
+    expect(awardDisciplineMasteryFromPractice(lowPitcher, 'unknown_drill')).toBe(lowPitcher);
+    expect(getDisciplinesForPlayer(pitcher)).toEqual(['heat', 'spin', 'command']);
+    expect(getDisciplinesForPlayer(rookie)).toEqual(['power', 'contact', 'speed', 'fielding']);
   });
 });

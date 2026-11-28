@@ -8,6 +8,17 @@ import {
 import type { StaffMember } from '../../engine/models/manager';
 import { ComicButton } from '../design-system/ComicButton';
 
+const STAFF_HIRE_NOUN: Readonly<Record<StaffMember['role'], string>> = {
+  pitching_coach: 'Pitching Coach',
+  hitting_coach: 'Hitting Coach',
+  bench_coach: 'Bench Coach',
+  fielding_coach: 'Fielding Coach',
+  bullpen_coach: 'Bullpen Coach',
+  equipment_manager: 'Equip. Mgr',
+  team_doctor: 'Doctor',
+  athletic_trainer: 'Trainer',
+};
+
 interface StaffCrewCardProps {
   member: StaffMember;
   mode: 'active' | 'market';
@@ -146,8 +157,8 @@ export function StaffCrewCard({
             onClick={onRecruit}
           >
             {replacingMember
-              ? `Replace ${STAFF_ROLE_LABELS[member.role].split(' ')[0]}`
-              : `Hire ${STAFF_ROLE_LABELS[member.role].split(' ')[0]}`}
+              ? `Replace ${STAFF_HIRE_NOUN[member.role]}`
+              : `Hire ${STAFF_HIRE_NOUN[member.role]}`}
           </ComicButton>
         ) : null}
       </div>

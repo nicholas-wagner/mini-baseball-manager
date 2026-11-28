@@ -42,6 +42,32 @@ describe('Home-Field Advantage & Fired-Up Crowd Momentum (TASK-147)', () => {
     expect(roaring.awayPitcherControlPenalty).toBe(-2);
     expect(roaring.homeHypeGainMultiplier).toBeGreaterThan(1.1);
     expect(roaring.bleacherExcitement).toBeGreaterThanOrEqual(0.88);
+
+    const lively = evaluateHomeFieldAdvantage({
+      inning: 4,
+      maxInnings: 9,
+      homeScore: 1,
+      awayScore: 4,
+      runnersOnBase: 1,
+      outs: 1,
+      homeAttendanceRatio: 0.65,
+      homeTeamHype: 55,
+    });
+    expect(lively.tier).toBe('lively');
+
+    const firedUp = evaluateHomeFieldAdvantage({
+      inning: 8,
+      maxInnings: 9,
+      homeScore: 2,
+      awayScore: 3,
+      runnersOnBase: 1,
+      outs: 1,
+      homeAttendanceRatio: 0.65,
+      homeTeamHype: 60,
+      homeRallyStreak: 0,
+    });
+    expect(firedUp.tier).toBe('fired_up');
+    expect(firedUp.badgeLabel).toContain('FIRED UP');
   });
 
   it('softens visiting pitcher crowd pressure for Ice Veins and Cagey Veterans while pressuring Pressure Wilters', () => {

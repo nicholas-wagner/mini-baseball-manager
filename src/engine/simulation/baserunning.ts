@@ -115,7 +115,7 @@ export function computeStealSuccessProbability(ctx: StealMatchupContext): number
     catcherArm * 0.72 +
     catcherFld * 0.28 +
     (ctx.catcherPopTimeBonus ?? 0) * 2.5;
-  const matchupEdge = (effSpeed - catcherThrowSkill) * 0.0068 + (effSpeed - 50) * 0.0012;
+  const matchupEdge = (effSpeed - catcherThrowSkill) * 0.0064 + (effSpeed - 50) * 0.0012;
 
   const holdBonus =
     getPositionalHandednessBonus(ctx.pitcher.position, ctx.pitcher.throws).pickoffHoldBonus *

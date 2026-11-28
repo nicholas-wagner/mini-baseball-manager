@@ -74,4 +74,84 @@ describe('Simple Personality-Driven Contract Extension Negotiations (TASK-144)',
     expect(updated.contract.yearsRemaining).toBe(player.contract.yearsRemaining + demand.preferredYears);
     expect(updated.contract.salaryPerSeason).toBe(demand.askingSalary);
   });
+
+  it('covers prime market earners, cap-blocked offers, short-term year demands, round-3 walkouts, and invalid roster guards', () => {
+    const club = createClub(createSeededRng(1443), {
+      id: 'neg-club-3',
+      city: 'Cap',
+      name: 'Watchers',
+      mascot: 'Ledger',
+      colors: { primary: '#1D3557', secondary: '#E63946', accent: '#FFD166', monogram: 'CW' },
+      leagueTier: 'aa',
+      isHuman: true,
+    });
+
+    const primeStar = {
+      ...club.roster[0],
+      age: 27,
+      morale: 62,
+      personality: 'showboat' as const,
+      mentalTraits: [],
+    };
+    const primeDemand = buildPlayerExtensionDemand(primeStar);
+    expect(primeDemand.archetype).toBe('market_star');
+    expect(primeDemand.preferredYears).toBe(3);
+
+    // Offering fewer years than minAcceptableYears prompts a security counteroffer
+    const shortOffer = evaluateContractOffer(
+      club,
+      primeStar,
+      primeDemand,
+      { years: 1, salaryPerSeason: Math.round(primeDemand.askingSalary * 0.9) },
+      1,
+    );
+    expect(shortOffer.status).toBe('counter');
+    expect(shortOffer.playerReply).toMatch(/at least 2 years/i);
+    expect(shortOffer.counterOffer?.years).toBe(3);
+
+    // Youth bridge premium for longer years & veteran security discount for 4 years
+    const youthDemand = buildPlayerExtensionDemand({ ...primeStar, age: 21 });
+    const youthLong = evaluateContractOffer(
+      club,
+      { ...primeStar, age: 21 },
+      youthDemand,
+      { years: 4, salaryPerSeason: youthDemand.askingSalary },
+      1,
+    );
+    expect(['counter', 'accepted']).toContain(youthLong.status);
+
+    const vetDemand = buildPlayerExtensionDemand({ ...primeStar, age: 34 });
+    const vetLong = evaluateContractOffer(
+      club,
+      { ...primeStar, age: 34 },
+      vetDemand,
+      { years: 4, salaryPerSeason: vetDemand.askingSalary },
+      1,
+    );
+    expect(vetLong.status).toBe('accepted');
+
+    // Round 3 below acceptance walks away
+    const round3Walk = evaluateContractOffer(
+      club,
+      primeStar,
+      primeDemand,
+      { years: 3, salaryPerSeason: Math.round(primeDemand.askingSalary * 0.8) },
+      3,
+    );
+    expect(round3Walk.status).toBe('walked');
+
+    // Over soft cap is blocked cleanly
+    const capBlocked = evaluateContractOffer(
+      club,
+      primeStar,
+      primeDemand,
+      { years: 2, salaryPerSeason: 999_999 },
+      1,
+    );
+    expect(capBlocked.status).toBe('cap_blocked');
+
+    // applyNegotiatedContractExtension guards missing player & over-cap offers
+    expect(applyNegotiatedContractExtension(club, 'missing-id', { years: 2, salaryPerSeason: 1000 }).applied).toBe(false);
+    expect(applyNegotiatedContractExtension(club, club.roster[0].id, { years: 2, salaryPerSeason: 999_999 }).applied).toBe(false);
+  });
 });

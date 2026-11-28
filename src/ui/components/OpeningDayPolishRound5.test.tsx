@@ -175,10 +175,17 @@ describe('Opening Day Polish Round 5 (Clean Badges, Unified Opening Story, 2-Row
     const club = useGameStore.getState().getHumanClub()!;
     const rival = useGameStore.getState().leagues[club.leagueTier].find((c) => c.id !== club.id)!;
     const baseSummary = useGameStore.getState().playInstantExhibition(rival.id, 1994)!;
-    const mvpId = baseSummary.mvp.playerId;
+    const humanStar = club.roster[0];
+    const mvpId = humanStar.id;
     const summaryWithHr = {
       ...baseSummary,
       won: true,
+      mvp: {
+        ...baseSummary.mvp,
+        clubId: club.id,
+        playerId: humanStar.id,
+        playerName: humanStar.name,
+      },
       result: {
         ...baseSummary.result,
         playerStatDeltas: {

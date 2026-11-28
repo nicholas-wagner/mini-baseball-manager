@@ -511,14 +511,14 @@ export function UniformDesignerPanel({ club, onNotice }: UniformDesignerPanelPro
             </div>
             <div
               data-testid="uniform-presets-grid"
-              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 max-h-[216px] overflow-y-auto pr-0.5"
+              className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-[240px] overflow-y-auto pr-0.5"
             >
               {UNIFORM_PRESETS.map((preset) => (
                 <ComicButton
                   key={preset.id}
                   size="sm"
                   variant="cream"
-                  className="w-full px-2 text-[11px] leading-tight justify-start text-left"
+                  className="w-full px-2 py-1.5 text-[10.5px] leading-tight justify-start text-left whitespace-normal"
                   onClick={() => {
                     updateDraft({
                       ...preset.config,

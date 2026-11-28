@@ -4,12 +4,14 @@ import { createStaffMember, hireStaffMember } from '../gm/coaches';
 import { createSeededRng } from '../rng/seededRng';
 import { getRelicOwnershipUsage } from '../rpg/relicLocker';
 import {
+  applyFoilPackRewardsToClub,
   applyHoloUpgradeToPlayer,
   applyStaffClinicPassToClub,
   applyTrainingPassToPlayer,
   depositFoilPackBaseRewards,
   LEGENDARY_PITY_THRESHOLD,
   openFoilBoosterPack,
+  type OpenedFoilPackResult,
 } from './foilPacks';
 
 describe('1994 Foil Pack Overhaul — Agency, 6 Card Types, Pity Timer & Trivia (TASK-137)', () => {
@@ -58,5 +60,40 @@ describe('1994 Foil Pack Overhaul — Agency, 6 Card Types, Pity Timer & Trivia 
     expect(afterHolo.club.roster[2].ratings.popularity).toBeGreaterThanOrEqual(
       Math.min(99, chosenPlayer.ratings.popularity + 8),
     );
+
+    // Edge cases: empty staff clinic cash fallback, missing player guards, and batch auto-assign for all card kinds
+    const noStaffClub = { ...club, coaches: { ...club.coaches, activeStaff: [] } };
+    const fallbackClinic = applyStaffClinicPassToClub(noStaffClub, null, 110);
+    expect(fallbackClinic.club.economy.cash).toBe(noStaffClub.economy.cash + 900);
+    expect(applyHoloUpgradeToPlayer(club, 'missing-id').summary).toMatch(/not found/i);
+    expect(applyTrainingPassToPlayer(club, 'missing-id', 50, 1).summary).toMatch(/not found/i);
+
+    const syntheticPack: OpenedFoilPackResult = {
+      tier: 'rivalry_chrome',
+      tierLabel: 'Synthetic Chrome',
+      gumTrivia: '1994 Gum Fact: test',
+      pityTriggered: false,
+      cards: [
+        { slot: 1, kind: 'cash_windfall', rarity: 'common', title: 'Cash', subtitle: '+$500', cashBonus: 500 },
+        { slot: 2, kind: 'hype_ticket', rarity: 'common', title: 'Hype', subtitle: '+10', hypeBonus: 10 },
+        { slot: 3, kind: 'holo_upgrade', rarity: 'rare', title: 'Holo', subtitle: 'Stamp' },
+      ],
+    };
+    const depSynthetic = depositFoilPackBaseRewards(club, syntheticPack);
+    expect(depSynthetic.club.economy.cash).toBe(club.economy.cash + 500);
+    expect(depSynthetic.summaryLines).toHaveLength(3);
+
+    const clinicPack: OpenedFoilPackResult = {
+      ...syntheticPack,
+      cards: [
+        syntheticPack.cards[0],
+        syntheticPack.cards[1],
+        { slot: 3, kind: 'staff_clinic_pass', rarity: 'rare', title: 'Clinic', subtitle: '+110 XP', staffXpBonus: 110 },
+      ],
+    };
+    const batchSynthetic = applyFoilPackRewardsToClub(club, syntheticPack);
+    expect(batchSynthetic.summaryLines).toHaveLength(3);
+    const batchClinic = applyFoilPackRewardsToClub(club, clinicPack);
+    expect(batchClinic.summaryLines).toHaveLength(3);
   });
 });

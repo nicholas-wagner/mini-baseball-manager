@@ -14,14 +14,16 @@
 }
 .atbat-guide header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
 }
 .atbat-header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 .atbat-guide header .atbat-timing-pill {
@@ -93,7 +95,8 @@
   text-decoration: none;
   box-shadow: 2px 2px 0 #192735;
   white-space: nowrap;
-  max-width: 132px;
+  flex-shrink: 0;
+  max-width: 175px;
   overflow: hidden;
 }
 .atbat-guide header .atbat-power-pill[aria-pressed="true"] {

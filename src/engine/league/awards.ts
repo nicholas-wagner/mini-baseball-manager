@@ -185,7 +185,7 @@ export function evaluateHallOfFameCandidate(
   const service = player.careerService;
   const hofScore = Math.round(
     ovr * 0.42 +
-      service.seasonsPlayed * 5.5 +
+      service.seasonsPlayed * 6.0 +
       service.careerPlayoffGames * 1.4 +
       championshipsWon * 12 +
       majorAwardsCount * 10,
