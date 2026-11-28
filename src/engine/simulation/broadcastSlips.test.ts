@@ -382,4 +382,51 @@ describe('90s TV Broadcast Lower-Third Stat Slips (TASK-120)', () => {
       expect(hitSlip?.badgeText).toContain(totalHits === 1 ? '1ST HIT' : `${totalHits}TH HIT`);
     }
   });
+
+  it('prioritizes 🏆 NEW CLUB RECORD! in gold (#FFC300) over standard HR/K slips when a franchise record falls (TASK-124)', () => {
+    const { awayClub, homeClub, session } = makeFixture();
+    const humanBatterId = session.home.lineup[0].playerId;
+    const humanBatter = session.home.playersById[humanBatterId];
+
+    const recordHrSession = {
+      ...session,
+      half: 'BOT' as const,
+      boxScore: {
+        ...session.boxScore,
+        homeBatters: {
+          ...session.boxScore.homeBatters,
+          [humanBatter.id]: {
+            ...session.boxScore.homeBatters[humanBatter.id],
+            plateAppearances: 2,
+            atBats: 2,
+            hits: 1,
+            homeRuns: 1,
+            rbis: 2,
+          },
+        },
+      },
+    };
+    const recordHrEvent = makeEvent({
+      seq: 99,
+      half: 'BOT',
+      outcome: 'home_run',
+      batterId: humanBatter.id,
+      hrStatcast: { distanceFt: 432, exitVeloMph: 114, landmarkCall: 'NO-DOUBT HOME RUN!' },
+    });
+
+    const slip = buildBroadcastStatSlip({
+      session: recordHrSession,
+      lastEvent: recordHrEvent,
+      awayClub,
+      homeClub,
+      season: 1,
+    });
+
+    expect(slip).not.toBeNull();
+    expect(slip?.kind).toBe('milestone');
+    expect(slip?.kicker).toBe('🏆 NEW CLUB RECORD!');
+    expect(slip?.accentHex).toBe('#FFC300');
+    expect(slip?.title).toContain(humanBatter.name);
+    expect(slip?.statLine).toContain('432 FT MOONSHOT!');
+  });
 });

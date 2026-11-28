@@ -1,3 +1,4 @@
+import type { HrCelebrationId } from '../../engine/gm/polaroidKeepsakes';
 import type { GameDayWeather } from '../../engine/simulation/weather';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { Camera, Volume2, VolumeX } from 'lucide-react';
@@ -43,10 +44,20 @@ interface LiveGameCanvasProps {
   onAudioCue?: (cue: PlaySoundCue) => void;
   shakeOffSignal?: number;
   stadiumWaveSignal?: number;
+  favoritePlayerIds?: readonly string[];
+  hrCelebration?: HrCelebrationId;
   showStretchCue?: boolean;
   audioMuted?: boolean;
   onToggleAudio?: () => void;
 }
+
+const EMPTY_FAVORITES: readonly string[] = [];
+
+type Round4SceneController = GameSceneController & {
+  setFavoritePlayerIds?: (ids: readonly string[]) => void;
+  setHrCelebration?: (celebration: HrCelebrationId) => void;
+  triggerStadiumWave?: () => void;
+};
 
 let webglPlayback: boolean | undefined;
 
@@ -88,6 +99,8 @@ export function LiveGameCanvas({
   onAudioCue,
   shakeOffSignal = 0,
   stadiumWaveSignal = 0,
+  favoritePlayerIds = EMPTY_FAVORITES,
+  hrCelebration,
   showStretchCue = false,
   audioMuted = false,
   onToggleAudio,
@@ -158,13 +171,22 @@ export function LiveGameCanvas({
 
   useEffect(() => {
     if (stadiumWaveSignal > prevWaveRef.current) {
-      const ctrl = controllerRef.current as (GameSceneController & {
-        triggerStadiumWave?: () => void;
-      }) | null;
+      const ctrl = controllerRef.current as Round4SceneController | null;
       ctrl?.triggerStadiumWave?.();
     }
     prevWaveRef.current = stadiumWaveSignal;
   }, [stadiumWaveSignal]);
+
+  useEffect(() => {
+    const ctrl = controllerRef.current as Round4SceneController | null;
+    ctrl?.setFavoritePlayerIds?.(favoritePlayerIds);
+  }, [favoritePlayerIds]);
+
+  useEffect(() => {
+    if (!hrCelebration) return;
+    const ctrl = controllerRef.current as Round4SceneController | null;
+    ctrl?.setHrCelebration?.(hrCelebration);
+  }, [hrCelebration]);
 
   useEffect(() => {
     if (playFinished) controllerRef.current?.finishReplay();
@@ -186,6 +208,8 @@ export function LiveGameCanvas({
         data-testid="live-game-3d-canvas"
         data-preview={preview ?? ''}
         data-defensive-shift={defensiveShift ?? ''}
+        data-favorite-player-count={String(favoritePlayerIds.length)}
+        data-hr-celebration={hrCelebration ?? ''}
         data-shake-off-signal={String(shakeOffSignal)}
         data-stadium-wave-signal={String(stadiumWaveSignal)}
       />

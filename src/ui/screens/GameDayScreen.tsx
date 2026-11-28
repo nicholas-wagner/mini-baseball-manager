@@ -136,6 +136,11 @@ import {
   canArgueLatestCall,
   evaluateRallyChain,
 } from '../../engine/simulation/arcadeJuice';
+import { enhanceBroadcastCommentary } from '../../engine/simulation/announcerBooth';
+import {
+  extractBatterGameMemory,
+  formatBatterGameMemoryLine,
+} from '../../engine/simulation/atBatMemory';
 import {
   computeLiveActionCue,
   type SuggestedQuickAction,
@@ -673,6 +678,11 @@ export function GameDayScreen({
     setArgueToast(null);
     setHalfInningEvents([]);
     setStadiumWaveSignal(0);
+    setPrePlaySession(null);
+    setRevealedPlay(null);
+    setFinishedPlay(null);
+    setThirdDecision(null);
+    setStickerToast(null);
     setLastChoreo(null);
     setDecidingPitchCue(null);
     playLockedRef.current = false;
@@ -749,6 +759,11 @@ export function GameDayScreen({
     setManagerEjected(false);
     setArgueToast(null);
     setStadiumWaveSignal(0);
+    setPrePlaySession(null);
+    setRevealedPlay(null);
+    setFinishedPlay(null);
+    setThirdDecision(null);
+    setStickerToast(null);
     setLastChoreo(null);
     setDecidingPitchCue(null);
     playLockedRef.current = false;
@@ -796,7 +811,11 @@ export function GameDayScreen({
       resumeAt?: number,
       prePlayOverride?: GameSessionState | null,
     ) => {
+      const priorLog = gameLog.current.slice();
       gameLog.current.push(...emitted);
+      if (emitted.some((ev) => ev.type !== 'manager_power_used')) {
+        setArgueToast(null);
+      }
       setClutchRecap(null);
       setEntranceCue(null);
       const effectiveBeforeSession = prePlayOverride ?? liveSession;
@@ -870,21 +889,21 @@ export function GameDayScreen({
           soundEngine.play('organ_seventh_stretch');
         }
         setRecentEvents((prev) => [...emitted.slice().reverse(), ...prev].slice(0, 12));
-        setHalfInningEvents((prev) => {
-          const sameFrame = prev.filter(
-            (ev) => ev.inning === lastEvent.inning && ev.half === lastEvent.half,
-          );
-          const matchingEmitted = emitted.filter(
-            (ev) => ev.inning === lastEvent.inning && ev.half === lastEvent.half,
-          );
-          const nextFrame = [...sameFrame, ...matchingEmitted];
-          const prevRally = evaluateRallyChain(sameFrame, lastEvent.inning, lastEvent.half);
-          const nextRally = evaluateRallyChain(nextFrame, lastEvent.inning, lastEvent.half);
-          if (nextRally.soundCue && nextRally.hitStreak > prevRally.hitStreak) {
-            soundEngine.play(nextRally.soundCue);
-          }
-          return nextFrame;
-        });
+        const prevSameFrame = priorLog.filter(
+          (ev) => ev.inning === lastEvent.inning && ev.half === lastEvent.half,
+        );
+        const nextSameFrame = gameLog.current.filter(
+          (ev) => ev.inning === lastEvent.inning && ev.half === lastEvent.half,
+        );
+        const prevRally = evaluateRallyChain(prevSameFrame, lastEvent.inning, lastEvent.half);
+        const nextRally = evaluateRallyChain(nextSameFrame, lastEvent.inning, lastEvent.half);
+        if (nextRally.soundCue && nextRally.hitStreak > prevRally.hitStreak) {
+          soundEngine.play(nextRally.soundCue);
+        }
+        if (nextRally.hitStreak >= 3 && prevRally.hitStreak < 3) {
+          setStadiumWaveSignal((count) => count + 1);
+        }
+        setHalfInningEvents(nextSameFrame);
         recordNemesisEvents(emitted);
         const pitchEvs = emitted.filter((ev) => Boolean(ev.pitchThrown));
         if (pitchEvs.length > 0) {
@@ -1053,6 +1072,7 @@ export function GameDayScreen({
   const handleSimAtBat = () => {
     setSheetOpen(false);
     if (!liveSession || liveSession.status === 'completed') return;
+    setDecidingPitchCue(null);
     const isolated = resolveLiveStepInputs(liveSession, tacticalCall);
     const { nextSession, events } = stepAtBat(
       liveSession,
@@ -1068,6 +1088,7 @@ export function GameDayScreen({
   const handleSimHalfInning = () => {
     setSheetOpen(false);
     if (!liveSession || liveSession.status === 'completed') return;
+    setDecidingPitchCue(null);
     const battingIsHuman = (liveSession.half === 'BOT') === liveSession.home.isHuman;
     const safeCall: TacticalCall =
       battingIsHuman && isOffensiveTacticalCall(tacticalCall) && tacticalCall !== 'bunt'
@@ -1083,6 +1104,7 @@ export function GameDayScreen({
   const handleClutchSim = () => {
     setSheetOpen(false);
     if (!liveSession || liveSession.status === 'completed') return;
+    setDecidingPitchCue(null);
     const { nextSession, events } = simUntilClutchOrEnd(liveSession);
     applyStepResult(nextSession, events, activeOpponentId);
   };
@@ -1092,6 +1114,9 @@ export function GameDayScreen({
     setPendingRelief(null);
     setLastChoreo(null);
     setDecidingPitchCue(null);
+    setArgueToast(null);
+    setHalfInningEvents([]);
+    setThirdDecision(null);
     playLockedRef.current = false;
     if (liveSession) {
       const full = simRemainingGame(liveSession);
@@ -2880,6 +2905,7 @@ export function GameDayScreen({
       gamble.event.soundCue ?? (gamble.ejected ? 'ump_strike_call' : 'stadium_stomp_clap'),
     );
     setSheetOpen(false);
+    setDecidingPitchCue(null);
     applyStepResult(gamble.nextSession, [gamble.event], activeOpponent.id);
   };
   const rawBullpenRec =
@@ -3026,6 +3052,9 @@ export function GameDayScreen({
       <LiveGameCanvas onAudioCue={playTimelineCue} guided awayClub={liveAwayClub} homeClub={liveHomeClub} session={baseSession}
         weather={gameWeather}
         defensiveShift={defensiveShift}
+        favoritePlayerIds={favoritePlayerIds}
+        hrCelebration={humanClub.clubRituals?.hrCelebration}
+        stadiumWaveSignal={stadiumWaveSignal}
         audioMuted={audioMuted} onToggleAudio={handleToggleLiveAudio}
         choreo={film} lastEvent={event} cameraMode={cameraMode} onChangeCameraMode={changeCamera} />
     </ThirdBaseDecision>;
@@ -3129,15 +3158,50 @@ export function GameDayScreen({
       !activeHrStatcast &&
       !argueToast,
   );
+  const isBossShowdownGame = Boolean(
+    matchBossClubProfile(liveAwayClub) || matchBossClubProfile(liveHomeClub),
+  );
+  const formatBoothCommentary = (ev: PlayEvent): string => {
+    const priorEvents = gameLog.current.filter((item) => item.seq < ev.seq);
+    const upToEvents = gameLog.current.filter((item) => item.seq <= ev.seq);
+    const rallyHitStreak = evaluateRallyChain(upToEvents, ev.inning, ev.half).hitStreak;
+    const priorAtBatSummary =
+      ev.batterId && ev.outcome === 'strikeout'
+        ? formatBatterGameMemoryLine(extractBatterGameMemory(priorEvents, ev.batterId))
+        : null;
+    return enhanceBroadcastCommentary({
+      event: ev,
+      session: liveSession,
+      awayClub: liveAwayClub,
+      homeClub: liveHomeClub,
+      ballparkId: liveSession.ballparkId,
+      rallyHitStreak,
+      priorAtBatSummary,
+      isBossShowdown: isBossShowdownGame,
+    });
+  };
+  const latestBoothCommentary = latestEv ? formatBoothCommentary(latestEv) : null;
+  const batterTodayMemory = formatBatterGameMemoryLine(
+    extractBatterGameMemory(gameLog.current, picturedBatter.id),
+  );
+  const currentBatterTodayMemory = formatBatterGameMemoryLine(
+    extractBatterGameMemory(gameLog.current, currentBatter.id),
+  );
   const broadcastSlipEvent = pendingDecision || showNextMatchup ? null : playbackEvent;
-  const liveBroadcastSlip =
+  const rawBroadcastSlip =
     !entranceCue && !liveDugoutCheer && !leagueBoard
       ? buildBroadcastStatSlip({
           session: liveSession,
           lastEvent: broadcastSlipEvent,
           awayClub: liveAwayClub,
           homeClub: liveHomeClub,
+          season: seasonNumber,
         })
+      : null;
+  const liveBroadcastSlip =
+    rawBroadcastSlip &&
+    !(rawBroadcastSlip.kind === 'batter_card' && (argueToast || activeHrStatcast))
+      ? rawBroadcastSlip
       : null;
   return (
     <div className={`live-game studio-layout${guiding && !showMore ? ' guided-game' : ''}${sheetOpen ? ' tactics-open' : ''}`}>
@@ -3151,6 +3215,8 @@ export function GameDayScreen({
               entranceCue={guiding && !showMore ? entranceCue : null}
               preview={liveIdlePreview}
               defensiveShift={defensiveShift}
+              favoritePlayerIds={favoritePlayerIds}
+              hrCelebration={humanClub.clubRituals?.hrCelebration}
               broadcastSlip={liveBroadcastSlip ? <BroadcastStatSlip slip={liveBroadcastSlip} /> : null}
               shakeOffSignal={shakeOffTrigger}
               stadiumWaveSignal={stadiumWaveSignal}
@@ -3323,6 +3389,7 @@ export function GameDayScreen({
                   batter={picturedBatter}
                   pitcher={picturedPitcher}
                   batterScoutLine={scoutLine.batterLine}
+                  batterTodayMemory={batterTodayMemory}
                   pitcherScoutLine={scoutLine.pitcherLine}
                   pitcherEndurance={pitcherEndurance}
                   pitcherEnduranceTier={enduranceFx.tier}
@@ -3503,6 +3570,7 @@ export function GameDayScreen({
               pitcherStamina={currentPitcher.ratings.stamina}
               pitcherFatigueDropTag={pitcherFatigueDropTag}
               latestEvent={recentEvents[0] ?? null}
+              latestEventCommentary={latestBoothCommentary}
               controlMode={controlMode}
               pitchingMode={pitchingMode}
               onSelectPitchingMode={handleSelectPitchingMode}
@@ -3684,6 +3752,7 @@ export function GameDayScreen({
               pitcherStamina={currentPitcher.ratings.stamina}
               pitcherFatigueDropTag={pitcherFatigueDropTag}
               latestEvent={recentEvents[0] ?? null}
+              latestEventCommentary={latestBoothCommentary}
               controlMode={controlMode}
               pitchingMode={pitchingMode}
               onSelectPitchingMode={handleSelectPitchingMode}
@@ -3924,6 +3993,14 @@ export function GameDayScreen({
               }
             >
               <div className="space-y-3">
+                {currentBatterTodayMemory ? (
+                  <div
+                    data-testid="advanced-batter-today-memory"
+                    className="px-2.5 py-1 rounded-lg border border-[#181B2C] bg-[#FFF8E7] text-[11px] font-extrabold text-[#181B2C] truncate"
+                  >
+                    Today: {currentBatterTodayMemory}
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold">
                   <span className="px-2 py-0.5 rounded bg-[#D8F3DC] border border-[#181B2C] text-[#1B4332]">
                     Batter Crushes:{' '}
@@ -4317,7 +4394,7 @@ export function GameDayScreen({
                       <span className="text-[#1B4332] font-extrabold mr-1">
                         [{ev.half} {ev.inning}]
                       </span>
-                      {ev.commentary}
+                      {formatBoothCommentary(ev)}
                     </div>
                     {showPitchMath && ev.mathBreakdown ? (
                       <div
