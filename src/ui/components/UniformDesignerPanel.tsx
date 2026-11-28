@@ -190,7 +190,7 @@ const CREST_ICON_RENDERERS: Readonly<Record<CrestEmblemId, CrestIconRenderer>> =
   ),
 };
 
-function ClubCrestIcon({
+export function ClubCrestIcon({
   emblem,
   accent,
   primary,

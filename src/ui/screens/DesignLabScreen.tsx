@@ -37,6 +37,10 @@ import type { CharacterAnimClip } from '../../scene/characters/animationState';
 import type { BallVfxStyle } from '../../scene/vfx/ballTrajectory';
 import { BallparkCanvas, type ShowcaseTrigger } from '../components/BallparkCanvas';
 import { BallparkSoundboardCard } from '../components/BallparkSoundboardCard';
+import {
+  DesignLabAssetBrowser,
+  type DesignLabQaTab,
+} from '../components/DesignLabAssetBrowser';
 import { FlipBaseballCard, type BaseballCardPlayer } from '../components/FlipBaseballCard';
 import { ComicButton } from '../design-system/ComicButton';
 import { ComicCard } from '../design-system/ComicCard';
@@ -121,11 +125,24 @@ const ANIMATION_ACTIONS: readonly ActionPreset[] = [
     id: 'tornado_slider',
     label: 'Tornado Slider',
     variant: 'sky',
-    pitcherClip: 'pitch_windup',
+    pitcherClip: 'pitch_super',
     batterClip: 'bat_swing',
     fielderClip: 'field_ready',
     ballStyle: 'tornado_slider',
-    sound: 'pitch_whoosh',
+    sound: 'tornado_whoosh',
+    recommendedCamera: 'over_shoulder_pitcher',
+  },
+  {
+    id: 'ice_veins',
+    label: 'Ice Veins',
+    variant: 'sky',
+    pitcherClip: 'pitch_super',
+    batterClip: 'bat_stance',
+    fielderClip: 'field_ready',
+    ballStyle: 'fastball',
+    sound: 'clutch_stinger',
+    recommendedCamera: 'over_shoulder_pitcher',
+    callout: { text: 'ICE VEINS!', color: '#4CC3FF' },
   },
   {
     id: 'moonshot_hr',
@@ -230,6 +247,7 @@ function catalogShelf(page: number): BaseballCardPlayer[] {
 
 export function DesignLabScreen() {
   const cardCollection = useRef<HTMLDivElement>(null);
+  const [labTab, setLabTab] = useState<'stage' | 'audio' | DesignLabQaTab>('stage');
   const [teamIdx, setTeamIdx] = useState(0);
   const [catalogPage, setCatalogPage] = useState(0);
   const [roster, setRoster] = useState<BaseballCardPlayer[]>([...INITIAL_SHOWCASE_ROSTER]);
@@ -337,6 +355,43 @@ export function DesignLabScreen() {
 
   return (
     <div className="space-y-5">
+      {/* Design Lab Complete QA Inspector Tab Switcher (TASK-145) */}
+      <div
+        data-testid="design-lab-qa-tabs"
+        className="p-2.5 rounded-2xl border-2 border-[#181B2C] bg-[#FFF3BF] shadow-[3px_3px_0_#181B2C] flex flex-wrap items-center gap-1.5"
+      >
+        {(
+          [
+            { id: 'stage', label: '🎬 3D Stage & Cards' },
+            { id: 'audio', label: '🔊 Music & SFX Lab' },
+            { id: 'players_hobbies', label: '🎨 3,000 Players & Hobbies' },
+            { id: 'health_art', label: '🩺 45 Injuries & Illnesses' },
+            { id: 'relics_world', label: '🏺 Relics, Crests & Parks' },
+          ] as const
+        ).map((tab) => (
+          <ComicButton
+            key={tab.id}
+            size="sm"
+            data-testid={`design-lab-tab-${tab.id}`}
+            variant={labTab === tab.id ? 'gold' : 'cream'}
+            active={labTab === tab.id}
+            onClick={() => {
+              setLabTab(tab.id);
+              soundEngine.play('ui_pop');
+            }}
+          >
+            {tab.label}
+          </ComicButton>
+        ))}
+      </div>
+
+      {labTab === 'audio' ? <BallparkSoundboardCard /> : null}
+      {labTab === 'players_hobbies' || labTab === 'health_art' || labTab === 'relics_world' ? (
+        <DesignLabAssetBrowser tab={labTab} />
+      ) : null}
+
+      {labTab === 'stage' ? (
+      <>
       {/* Live Retro Scoreboard Header */}
       <ScoreboardStrip
         awayAbbr={SAMPLE_TEAM_PALETTES[1].monogram}
@@ -655,8 +710,10 @@ export function DesignLabScreen() {
         </div>
       </ComicCard>
 
-      {/* Built-in Procedural 90s Synth & Ballpark Organ Soundboard (all 28 cues) */}
+      {/* Built-in Procedural 90s Synth & Ballpark Organ Soundboard (all cues + 12 stadium themes) */}
       <BallparkSoundboardCard />
+      </>
+      ) : null}
     </div>
   );
 }

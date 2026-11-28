@@ -6,6 +6,7 @@ import {
   FOIL_CASH_SHOP,
   type SalaryCapHealth,
 } from '../../engine/economy/clubLedgerSettlement';
+import { buildClubMoneyFlowSummary } from '../../engine/economy/moneyFlowForecast';
 import { DISTRICT_BUILDINGS_CATALOG, evaluateDistrictBonuses } from '../../engine/economy/districtBuilder';
 import { simulateGameAttendance } from '../../engine/economy/attendance';
 import { computeSeriesLedger, PROMO_NIGHT_CATALOG, type PromoNightId } from '../../engine/economy/ledger';
@@ -108,9 +109,11 @@ function Meter({
 export function ClubTreasuryPanel({ club, seriesIndex, onNotice, onJump }: ClubTreasuryPanelProps) {
   const freeAgents = useGameStore((state) => state.freeAgents);
   const [openReceipt, setOpenReceipt] = useState<string | null>(null);
+  const [flowHorizon, setFlowHorizon] = useState<'series' | 'season'>('series');
   const [selectedPowerUpPlayerId, setSelectedPowerUpPlayerId] = useState<string>(
     () => club.roster[0]?.id ?? '',
   );
+  const moneyFlow = buildClubMoneyFlowSummary(club);
   const selectedPowerUpPlayer =
     club.roster.find((player) => player.id === selectedPowerUpPlayerId) ?? club.roster[0] ?? null;
   const powerUpStats = selectedPowerUpPlayer ? getPowerUpStatOptions(selectedPowerUpPlayer) : [];
@@ -215,6 +218,98 @@ export function ClubTreasuryPanel({ club, seriesIndex, onNotice, onJump }: ClubT
           max={staffBudget}
           tone="#4CC3FF"
         />
+      </div>
+
+      {/* Transparent Money Flow Breakdown (TASK-143) */}
+      <div
+        data-testid="money-flow-breakdown"
+        className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2.5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-display text-xs sm:text-sm text-[#181B2C]">
+              💵 How Your Club Earns &amp; Spends Cash
+            </div>
+            <div className="text-[10.5px] font-bold text-[#4A5068]">
+              Avg crowd ~{moneyFlow.avgHomeAttendance.toLocaleString()} fans • Net{' '}
+              {(flowHorizon === 'series' ? moneyFlow.netPerSeries : moneyFlow.netPerSeason) >= 0 ? '+' : '−'}
+              {money(Math.abs(flowHorizon === 'series' ? moneyFlow.netPerSeries : moneyFlow.netPerSeason))}{' '}
+              / {flowHorizon === 'series' ? '3-Game Series' : '21-Game Season'}
+            </div>
+          </div>
+          <div className="inline-flex rounded-lg border-2 border-[#181B2C] bg-[#FBF4E4] p-0.5 gap-0.5">
+            <button
+              type="button"
+              data-testid="money-flow-horizon-series"
+              aria-pressed={flowHorizon === 'series'}
+              onClick={() => setFlowHorizon('series')}
+              className={`px-2 py-1 rounded text-[10px] font-display cursor-pointer ${
+                flowHorizon === 'series' ? 'bg-[#1D3557] text-[#FFD166]' : 'text-[#181B2C]'
+              }`}
+            >
+              Per Series (3g)
+            </button>
+            <button
+              type="button"
+              data-testid="money-flow-horizon-season"
+              aria-pressed={flowHorizon === 'season'}
+              onClick={() => setFlowHorizon('season')}
+              className={`px-2 py-1 rounded text-[10px] font-display cursor-pointer ${
+                flowHorizon === 'season' ? 'bg-[#1D3557] text-[#FFD166]' : 'text-[#181B2C]'
+              }`}
+            >
+              Full Season (21g)
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          <div className="p-2.5 rounded-xl border border-[#1B4332]/40 bg-[#F2FBF4] space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-display text-[#1B4332]">
+              <span>📈 Cash Earned (Income)</span>
+              <span className="font-mono-tabular">
+                +{money(flowHorizon === 'series' ? moneyFlow.totalIncomePerSeries : moneyFlow.totalIncomePerSeason)}
+              </span>
+            </div>
+            {moneyFlow.incomeLines.map((line) => (
+              <div key={line.id} className="flex items-start justify-between gap-2 text-[10.5px]">
+                <div className="min-w-0">
+                  <div className="font-extrabold text-[#181B2C]">{line.label}</div>
+                  <div className="text-[9.5px] font-bold text-[#4A5068]">{line.detail}</div>
+                </div>
+                <span className="font-mono-tabular font-extrabold text-[#1B4332] shrink-0">
+                  +{money(flowHorizon === 'series' ? line.perSeries : line.perSeason)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="p-2.5 rounded-xl border border-[#9D0208]/35 bg-[#FFF5F7] space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-display text-[#9D0208]">
+              <span>📉 Cash Spent (Expenses)</span>
+              <span className="font-mono-tabular">
+                −{money(flowHorizon === 'series' ? moneyFlow.totalExpensePerSeries : moneyFlow.totalExpensePerSeason)}
+              </span>
+            </div>
+            {moneyFlow.expenseLines.map((line) => (
+              <div key={line.id} className="flex items-start justify-between gap-2 text-[10.5px]">
+                <div className="min-w-0">
+                  <div className="font-extrabold text-[#181B2C]">{line.label}</div>
+                  <div className="text-[9.5px] font-bold text-[#4A5068]">{line.detail}</div>
+                </div>
+                <span className="font-mono-tabular font-extrabold text-[#9D0208] shrink-0">
+                  −{money(flowHorizon === 'series' ? line.perSeries : line.perSeason)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-2 rounded-lg bg-[#FFF3BF] border border-[#181B2C]/30 text-[10.5px] font-extrabold text-[#181B2C] space-y-0.5">
+          {moneyFlow.cfoTips.map((tip) => (
+            <div key={tip}>💡 {tip}</div>
+          ))}
+        </div>
       </div>
 
       <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2.5" data-testid="power-up-camp">

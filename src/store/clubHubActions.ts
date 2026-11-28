@@ -49,6 +49,10 @@ import {
   stashProspectInAcademy,
 } from '../engine/gm/academy';
 import {
+  applyNegotiatedContractExtension,
+  type ContractOfferInput,
+} from '../engine/gm/contractNegotiation';
+import {
   evaluateClubStaffBonuses,
   fireStaffMember,
   hireStaffMember,
@@ -282,6 +286,18 @@ export function extendHumanPlayerContract(playerId: string): { extended: boolean
   if (!res.extended) return { extended: false, reason: res.reason };
   commitHumanClub(res.club);
   return { extended: true };
+}
+
+export function signNegotiatedHumanContractExtension(
+  playerId: string,
+  offer: ContractOfferInput,
+): { applied: boolean; reason?: string } {
+  const club = useGameStore.getState().getHumanClub();
+  if (!club) return { applied: false, reason: 'No active club.' };
+  const res = applyNegotiatedContractExtension(club, playerId, offer);
+  if (!res.applied) return { applied: false, reason: res.reason };
+  commitHumanClub(res.club);
+  return { applied: true };
 }
 
 export function purchaseHumanPowerUp(

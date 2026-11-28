@@ -65,6 +65,7 @@ import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
 import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
 import { RelicLockerPanel } from '../components/RelicLockerPanel';
+import { StadiumLightboxModal } from '../components/StadiumLightboxModal';
 import { StaffCrewCard } from '../components/StaffCrewCard';
 import { UniformDesignerPanel } from '../components/UniformDesignerPanel';
 import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
@@ -120,6 +121,7 @@ export function ClubHubScreen({ initialSubTab = 'stadiums', onOpenRoster }: Club
     'idle' | 'practice_cage' | 'practice_bullpen' | 'field_dive' | 'field_run' | 'celebrate_hr'
   >('idle');
   const [notice, setNotice] = useState<string | null>(null);
+  const [lightboxParkId, setLightboxParkId] = useState<string | null>(null);
 
   const staffMarket = useMemo(() => {
     if (!club) return [];
@@ -333,18 +335,30 @@ export function ClubHubScreen({ initialSubTab = 'stadiums', onOpenRoster }: Club
                   {/* Visual Sandlot -> Majors Home Ballpark Showcase */}
                   <div
                     data-testid="ballpark-visual-banner"
-                    className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3 items-center"
+                    className="grid grid-cols-1 sm:grid-cols-[175px_1fr] gap-3 items-center"
                   >
-                    <div className="relative rounded-xl border-2 border-[#181B2C] overflow-hidden shadow-[3px_3px_0_#181B2C] h-28 sm:h-28 bg-[#63CAFF]">
+                    <button
+                      type="button"
+                      data-testid="stadium-fullsize-btn"
+                      onClick={() => {
+                        setLightboxParkId(activePark.id);
+                        soundEngine.play('ui_pop');
+                      }}
+                      aria-label={`View ${activePark.name} full size`}
+                      className="relative rounded-xl border-2 border-[#181B2C] overflow-hidden shadow-[3px_3px_0_#181B2C] h-32 bg-[#63CAFF] cursor-pointer group text-left"
+                    >
                       <img
                         src={ballparkArt}
                         alt={`${activePark.name} illustration`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
                       />
+                      <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-[#FFC300] border border-[#181B2C] text-[#181B2C] font-display text-[9.5px] shadow-sm">
+                        🔍 Full Size
+                      </span>
                       <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-[#181B2C]/90 text-[#FFD166] font-display text-[10px]">
                         Seating Lv.{club.stadium.seatingTier}
                       </span>
-                    </div>
+                    </button>
                     <div className="space-y-1.5 min-w-0">
                       <div className="font-display text-sm text-[#181B2C] leading-tight">
                         🏟️ {activePark.name} ({tierProfile.label})
@@ -861,6 +875,17 @@ export function ClubHubScreen({ initialSubTab = 'stadiums', onOpenRoster }: Club
           />
         ) : null}
       </ComicCard>
+
+      {lightboxParkId ? (
+        <StadiumLightboxModal
+          open
+          park={getBallparkPreset(lightboxParkId as typeof activePark.id)}
+          imageUrl={ballparkArt}
+          tierLabel={lightboxParkId === activePark.id ? tierProfile.label : undefined}
+          capacity={lightboxParkId === activePark.id ? club.stadium.capacity : undefined}
+          onClose={() => setLightboxParkId(null)}
+        />
+      ) : null}
     </div>
   );
 }

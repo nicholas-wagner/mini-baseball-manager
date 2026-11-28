@@ -51,7 +51,6 @@ import {
   getEligiblePositions,
 } from '../../engine/rpg/specialistsAndPositions';
 import type { TrainingDrillRequest } from '../../engine/rpg/trainingCompromises';
-import { extendHumanPlayerContract } from '../../store/clubHubActions';
 import { useGameStore } from '../../store/gameStore';
 import { RosterPrintGallery } from '../components/GameDayPrints';
 import { FlipBaseballCard } from '../components/FlipBaseballCard';
@@ -62,6 +61,7 @@ import {
 } from '../components/PlayerCardModal';
 import { PlayerPortraitBadge } from '../components/PlayerPortraitBadge';
 import { PlayerDossierModal } from '../components/PlayerDossierModal';
+import { ContractNegotiationModal } from '../components/ContractNegotiationModal';
 import { SaveSlotsModal } from '../components/SaveSlotsModal';
 import { TrainersTablePanel } from '../components/TrainersTablePanel';
 import { ComicButton } from '../design-system/ComicButton';
@@ -129,6 +129,7 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
   const [scoutFreeAgentId, setScoutFreeAgentId] = useState<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [dossierOpen, setDossierOpen] = useState(false);
+  const [negotiatingPlayerId, setNegotiatingPlayerId] = useState<string | null>(null);
   const [rosterMessage, setRosterMessage] = useState<string | null>(null);
   const [lineupOptimized, setLineupOptimized] = useState(false);
 
@@ -353,16 +354,11 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
                 variant="gold"
                 data-testid={`extend-contract-${player.id}`}
                 onClick={() => {
-                  const res = extendHumanPlayerContract(player.id);
-                  setRosterMessage(
-                    res.extended
-                      ? `${player.name} extended +2 years.`
-                      : (res.reason ?? 'Extension unavailable.'),
-                  );
-                  soundEngine.play(res.extended ? 'cash_chime' : 'ui_pop');
+                  setNegotiatingPlayerId(player.id);
+                  soundEngine.play('ui_pop');
                 }}
               >
-                Extend {player.name.split(' ')[0]} (+2 yr)
+                🤝 Negotiate {player.name.split(' ')[0]}
               </ComicButton>
             ))}
           </div>
@@ -1023,6 +1019,19 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
             >
               Download 90s Card (PNG)
             </ComicButton>
+            <ComicButton
+              size="sm"
+              variant="turf"
+              className="w-full"
+              data-testid="negotiate-selected-player-btn"
+              onClick={() => {
+                setNegotiatingPlayerId(inspectedPlayer.id);
+                soundEngine.play('ui_pop');
+              }}
+            >
+              🤝 Negotiate Extension ({inspectedPlayer.contract.yearsRemaining}yr · $
+              {inspectedPlayer.contract.salaryPerSeason.toLocaleString()})
+            </ComicButton>
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">
               {isPitcherPosition(inspectedPlayer.position) && inspectedPlayer.pitchArsenal ? (
                 <>
@@ -1287,6 +1296,17 @@ export function RosterLineupScreen({ onPlayBall, onOpenUniforms }: RosterLineupS
         player={dossierOpen ? inspectedPlayer : null}
         clubName={`${humanClub.city} ${humanClub.name}`}
         onClose={() => setDossierOpen(false)}
+      />
+
+      <ContractNegotiationModal
+        club={humanClub}
+        player={
+          negotiatingPlayerId
+            ? (rosterById.get(negotiatingPlayerId) ?? null)
+            : null
+        }
+        onClose={() => setNegotiatingPlayerId(null)}
+        onSigned={(summary) => setRosterMessage(summary)}
       />
 
       <SaveSlotsModal open={saveModalOpen} onClose={() => setSaveModalOpen(false)} />
