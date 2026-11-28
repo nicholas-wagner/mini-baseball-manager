@@ -9,6 +9,7 @@ import type { Club } from '../../engine/models/club';
 import { setHumanPlayerPlayThrough } from '../../store/clubHubActions';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { ComicButton } from '../design-system/ComicButton';
+import { HealthConditionArt } from './HealthConditionArt';
 
 interface TrainersTablePanelProps {
   club: Club;
@@ -94,13 +95,21 @@ export function TrainersTablePanel({ club, onMessage }: TrainersTablePanelProps)
                 key={player.id}
                 className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] flex flex-wrap items-center justify-between gap-2"
               >
-                <div className="text-xs">
-                  <div className="font-display text-[#9D0208]">
-                    {player.position} {player.name} — {status.name} ({status.gamesRemaining}g left)
-                  </div>
-                  <div className="text-[11px] font-bold text-[#181B2C]">
-                    Status: {status.playingThrough ? 'Playing Through (Stat Dip)' : 'Resting on IL (Faster Healing)'}
-                    {penText ? ` • ${penText}` : ''}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <HealthConditionArt
+                    conditionId={status.conditionId}
+                    conditionName={status.name}
+                    kind={status.kind}
+                    size="md"
+                  />
+                  <div className="text-xs min-w-0">
+                    <div className="font-display text-[#9D0208]">
+                      {player.position} {player.name} — {status.name} ({status.gamesRemaining}g left)
+                    </div>
+                    <div className="text-[11px] font-bold text-[#181B2C]">
+                      Status: {status.playingThrough ? 'Playing Through (Stat Dip)' : 'Resting on IL (Faster Healing)'}
+                      {penText ? ` • ${penText}` : ''}
+                    </div>
                   </div>
                 </div>
                 {status.canPlayThrough ? (

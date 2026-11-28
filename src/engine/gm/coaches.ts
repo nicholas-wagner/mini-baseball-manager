@@ -6,6 +6,7 @@ import type {
 } from '../models/manager';
 import type { SeededRng } from '../rng/seededRng';
 import type { RetiredLegendCoachCandidate } from '../rpg/lifecycle';
+import { advanceStaffRankXp } from './staffProgression';
 
 export type DugoutStaffRole =
   | 'pitching_coach'
@@ -291,6 +292,7 @@ export function createStaffMember(
   role: DugoutStaffRole,
   tier: StaffQualityTier,
   specialtyId?: string,
+  startingLevel: StaffQualityTier = 1,
 ): StaffMember {
   const roleSpecs = STAFF_SPECIALTIES.filter((s) => s.role === role);
   const spec = specialtyId ? findSpecialty(role, specialtyId) : rng.pick(roleSpecs);
@@ -300,7 +302,7 @@ export function createStaffMember(
     name: `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`,
     portraitSeed: rng.int(10000, 99999),
     tier,
-    level: 1,
+    level: startingLevel,
     xp: 0,
     salaryPerSeason: SALARY_BY_TIER[tier],
     yearsRemaining: rng.int(2, 3),
@@ -380,25 +382,12 @@ export function fireStaffMember(club: Club, staffId: string): Club {
   };
 }
 
-/** Awards Staff XP and advances coach level (up to tier cap) so staff grow across seasons. */
+/** Awards Staff XP along the 5-rank Starfleet Command ladder (Rookie -> Legendary [Locked]). */
 export function awardStaffExperience(member: StaffMember, xpGain: number): StaffMember {
-  const maxLevel = Math.min(5, member.tier + 1) as StaffQualityTier;
-  let nextXp = member.xp + Math.max(0, xpGain);
-  let nextLevel = member.level;
-
-  while (nextLevel < maxLevel && nextXp >= nextLevel * 120) {
-    nextXp -= nextLevel * 120;
-    nextLevel = (nextLevel + 1) as StaffQualityTier;
-  }
-
-  return {
-    ...member,
-    level: nextLevel,
-    xp: nextXp,
-  };
+  return advanceStaffRankXp(member, xpGain).member;
 }
 
-/** Sends a staff member to a paid Offseason Coaching Clinic (+1 level, capped per offseason). */
+/** Sends a staff member to a paid Offseason Coaching Clinic (+1 rank up to Legendary [Locked]). */
 export function runOffseasonCoachingClinic(
   club: Club,
   staffId: string,
@@ -416,9 +405,8 @@ export function runOffseasonCoachingClinic(
   if (!target) {
     return { upgraded: false, reason: 'Staff member not found.', club };
   }
-  const maxLevel = Math.min(5, target.tier + 1);
-  if (target.level >= maxLevel) {
-    return { upgraded: false, reason: `${target.name} has reached their Tier ${target.tier} ceiling (Lv.${maxLevel}).`, club };
+  if (target.level >= 5) {
+    return { upgraded: false, reason: `${target.name} has already reached Legendary Rank (Locked).`, club };
   }
 
   const cost = target.level * 1_200;
@@ -448,7 +436,43 @@ export function runOffseasonCoachingClinic(
   };
 }
 
-/** Aggregates live gameplay bonuses and trade-offs from all hired dugout & clubhouse staff. */
+const RANK_MILESTONE_APPLIERS: Readonly<
+  Partial<Record<StaffRole, (level: StaffQualityTier, out: ClubStaffBonuses) => void>>
+> = {
+  pitching_coach: (level, out) => {
+    out.pitchingControlBonus += level >= 5 ? 2 : 1;
+    if (level >= 4) out.pitcherEnduranceDrainScale = Math.max(0.82, out.pitcherEnduranceDrainScale - 0.06);
+  },
+  hitting_coach: (level, out) => {
+    out.battingEyeBonus += 1;
+    if (level >= 4) out.battingContactBonus += level >= 5 ? 2 : 1;
+  },
+  bench_coach: (level, out) => {
+    out.moraleAura += 2;
+    if (level >= 4) out.highLiComposureBonus += 2;
+    if (level >= 5) out.managerPowerCooldownBonus += 1;
+  },
+  fielding_coach: (level, out) => {
+    out.fieldingGloveBonus += level >= 5 ? 3 : 1;
+    out.crossTrainRustReduction = Math.min(0.5, out.crossTrainRustReduction + (level >= 4 ? 0.12 : 0.06));
+  },
+  bullpen_coach: (level, out) => {
+    out.catcherPopTimeBonus += 2;
+    if (level >= 4) out.catcherFramingZoneBonus += 0.01;
+    if (level >= 5) out.relieverFatigueReduction = Math.min(0.38, out.relieverFatigueReduction + 0.08);
+  },
+  equipment_manager: (level, out) => {
+    out.relicBonusMultiplier = Number((out.relicBonusMultiplier + (level >= 5 ? 0.1 : 0.05)).toFixed(3));
+    if (level >= 4) out.vintageRelicFindChance = Math.min(0.24, out.vintageRelicFindChance + 0.04);
+  },
+};
+
+function applyRankMilestoneBonus(member: StaffMember, out: ClubStaffBonuses): void {
+  if (member.level < 2) return;
+  RANK_MILESTONE_APPLIERS[member.role]?.(member.level, out);
+}
+
+/** Aggregates live gameplay bonuses, rank milestone abilities, and trade-offs from all hired staff. */
 export function evaluateClubStaffBonuses(staff: readonly StaffMember[]): ClubStaffBonuses {
   const bonuses: ClubStaffBonuses = {
     pitchingVeloBonus: 0,
@@ -476,13 +500,14 @@ export function evaluateClubStaffBonuses(staff: readonly StaffMember[]): ClubSta
   for (const member of staff) {
     const spec = STAFF_SPECIALTIES.find((s) => s.id === member.specialtyId);
     if (!spec) continue;
-    const potency = member.tier * 0.65 + member.level * 0.55;
+    const potency = member.tier * 0.45 + member.level * 0.75;
     spec.apply(potency, bonuses);
+    applyRankMilestoneBonus(member, bonuses);
   }
   return bonuses;
 }
 
-/** Generates a hireable staff pool across all 6 roles plus any newly retired club legends. */
+/** Generates a hireable staff pool across all 6 roles (scaled by league tier) plus any newly retired club legends. */
 export function generateStaffHiringPool(
   rng: SeededRng,
   tier: LeagueTierId,
@@ -498,9 +523,10 @@ export function generateStaffHiringPool(
     'equipment_manager',
   ];
 
-  const generated = roles.map((role) =>
-    createStaffMember(rng, role, rng.int(1, maxQ) as StaffQualityTier),
-  );
+  const generated = roles.map((role) => {
+    const rolledTier = rng.int(1, maxQ) as StaffQualityTier;
+    return createStaffMember(rng, role, rolledTier, undefined, rolledTier);
+  });
 
   const legendHires: StaffMember[] = retiredLegends.map((legend) => {
     const spec = findSpecialty(legend.recommendedRole, legend.specialtyId);

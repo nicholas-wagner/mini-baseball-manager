@@ -27,9 +27,11 @@ describe('ClubHubScreen — Ballparks, Coaches, Practice Complex & Manager RPG',
     expect(screen.getByText(/high-altitude mesa park/i)).toBeInTheDocument();
     expect(screen.getByText(/neon metro dome/i)).toBeInTheDocument();
 
-    // 2. Staff & Front Office room shows Rookie 0 / 2 cap and hires a candidate
+    // 2. Staff & Front Office room shows Rookie 0 / 2 cap, ALL 6 MDs (including Women's Sports Medicine & Oncology), and hires a candidate
     await user.click(screen.getByRole('button', { name: /staff & front office/i }));
     expect(screen.getByText(/active staff slots: 0 \/ 2/i)).toBeInTheDocument();
+    expect(screen.getByTestId('medical-staff-market')).toHaveTextContent(/Women's Sports Medicine MD/i);
+    expect(screen.getByTestId('medical-staff-market')).toHaveTextContent(/Oncology & Complex Recovery MD/i);
     const hireButtons = screen.getAllByRole('button', { name: /^hire /i });
     await user.click(hireButtons[0]);
     expect(screen.getByText(/active staff slots: 1 \/ 2/i)).toBeInTheDocument();

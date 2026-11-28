@@ -25,6 +25,7 @@ import {
   computePitchingSabermetrics,
   formatRate3,
 } from '../../engine/simulation/sabermetrics';
+import { HealthConditionArt } from './HealthConditionArt';
 
 interface PlayerDossierModalProps {
   player: Player | null;
@@ -119,6 +120,31 @@ export function PlayerDossierModal({ player, clubName, onClose }: PlayerDossierM
 
         {/* Scrollable Content */}
         <div className="p-3 sm:p-4 space-y-3.5 min-h-0 flex-1 overflow-y-auto">
+          {player.activeHealthStatus ? (
+            <div
+              data-testid="dossier-active-health-card"
+              className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFE5EC] flex items-center gap-3"
+            >
+              <HealthConditionArt
+                conditionId={player.activeHealthStatus.conditionId}
+                conditionName={player.activeHealthStatus.name}
+                kind={player.activeHealthStatus.kind}
+                size="md"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-xs text-[#9D0208]">
+                  Active {player.activeHealthStatus.kind === 'injury' ? 'Injury' : 'Illness'}:{' '}
+                  {player.activeHealthStatus.name} ({player.activeHealthStatus.gamesRemaining}g left)
+                </div>
+                <div className="text-[11px] font-bold text-[#181B2C]">
+                  {player.activeHealthStatus.playingThrough
+                    ? 'Playing Through (Reduced ratings until healed)'
+                    : 'Resting on Injured List (Accelerated recovery)'}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Identity, National Heritage & Career Service */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1.5">

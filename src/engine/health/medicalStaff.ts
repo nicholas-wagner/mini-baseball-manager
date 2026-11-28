@@ -25,6 +25,8 @@ export interface TeamDoctor {
   name: string;
   portraitSeed: number;
   tier: MedicalQualityTier;
+  level?: MedicalQualityTier;
+  xp?: number;
   specialty: TeamDoctorSpecialty;
   salaryPerSeason: number;
   summary: string;
@@ -35,6 +37,8 @@ export interface AthleticTrainer {
   name: string;
   portraitSeed: number;
   tier: MedicalQualityTier;
+  level?: MedicalQualityTier;
+  xp?: number;
   specialty: AthleticTrainerSpecialty;
   salaryPerSeason: number;
   summary: string;
@@ -143,25 +147,44 @@ export function createAthleticTrainer(
   };
 }
 
+const DOCTOR_HEAL_RANK_BONUS: Readonly<Record<MedicalQualityTier, number>> = {
+  1: 0,
+  2: 0.1,
+  3: 0.1,
+  4: 0.1,
+  5: 0.18,
+};
+
 function evaluateDoctorContribution(doc: TeamDoctor | null, category: ConditionCategory) {
   if (!doc) return { prevention: 0, healing: 0, careerRisk: 0 };
-  const matches = DOCTOR_SPECIALTY_CATEGORIES[doc.specialty].includes(category);
+  const rank = doc.level ?? doc.tier;
+  const matchWeight = DOCTOR_SPECIALTY_CATEGORIES[doc.specialty].includes(category) ? 1 : 0;
   return {
-    prevention: doc.tier * 0.025 + (matches ? doc.tier * 0.045 : 0),
-    healing: doc.tier * 0.06 + (matches ? doc.tier * 0.12 : 0),
-    careerRisk: doc.tier * 0.04 + (matches ? doc.tier * 0.05 : 0),
+    prevention: rank * (0.025 + matchWeight * 0.045) + (rank >= 4 ? matchWeight * 0.08 : 0),
+    healing: rank * (0.06 + matchWeight * 0.12) + DOCTOR_HEAL_RANK_BONUS[rank],
+    careerRisk: rank * (0.04 + matchWeight * 0.05) + (rank >= 5 ? 0.12 : 0),
   };
 }
 
+const TRAINER_PENALTY_RANK_BONUS: Readonly<Record<MedicalQualityTier, number>> = {
+  1: 0, 2: 0, 3: 0, 4: 0.08, 5: 0.08,
+};
+const TRAINER_AGING_RANK_BONUS: Readonly<Record<MedicalQualityTier, number>> = {
+  1: 0, 2: 0, 3: 0, 4: 0, 5: 0.1,
+};
+
 function evaluateTrainerContribution(trainer: AthleticTrainer | null, category: ConditionCategory) {
   if (!trainer) return { prevention: 0, healing: 0, penalty: 0, aging: 0 };
+  const rank = trainer.level ?? trainer.tier;
   const matches = TRAINER_SPECIALTY_CATEGORIES[trainer.specialty].includes(category);
-  const isDurability = trainer.specialty === 'strength_durability';
+  const matchWeight = matches ? 1 : 0;
+  const durability = trainer.specialty === 'strength_durability' ? 1 : 0;
+  const warmupHit = rank >= 2 && (matches || category === 'legs_soft_tissue') ? 0.06 : 0;
   return {
-    prevention: trainer.tier * 0.04 + (matches ? trainer.tier * 0.07 : 0),
-    healing: trainer.specialty === 'rehab_conditioning' ? trainer.tier * 0.08 : 0,
-    penalty: trainer.tier * (isDurability ? 0.08 : 0.03),
-    aging: trainer.tier * (isDurability ? 0.085 : 0.025),
+    prevention: rank * (0.04 + matchWeight * 0.07) + warmupHit,
+    healing: trainer.specialty === 'rehab_conditioning' ? rank * 0.08 : 0,
+    penalty: rank * (0.03 + durability * 0.05) + TRAINER_PENALTY_RANK_BONUS[rank],
+    aging: rank * (0.025 + durability * 0.06) + TRAINER_AGING_RANK_BONUS[rank],
   };
 }
 
@@ -217,14 +240,15 @@ export function generateMedicalStaffMarket(
 
 /** Adapts a specialty Team Doctor into a unified hireable StaffMember for the club dugout roster. */
 export function teamDoctorToStaffMember(doc: TeamDoctor): StaffMember {
+  const rank = (doc.level ?? doc.tier) as StaffQualityTier;
   return {
     id: doc.id,
     role: 'team_doctor',
     name: doc.name,
     portraitSeed: doc.portraitSeed,
     tier: doc.tier as StaffQualityTier,
-    level: doc.tier as StaffQualityTier,
-    xp: 0,
+    level: rank,
+    xp: doc.xp ?? 0,
     salaryPerSeason: doc.salaryPerSeason,
     yearsRemaining: 2,
     specialtyId: doc.specialty,
@@ -236,14 +260,15 @@ export function teamDoctorToStaffMember(doc: TeamDoctor): StaffMember {
 
 /** Adapts a Head Athletic Trainer into a unified hireable StaffMember for the club dugout roster. */
 export function athleticTrainerToStaffMember(trainer: AthleticTrainer): StaffMember {
+  const rank = (trainer.level ?? trainer.tier) as StaffQualityTier;
   return {
     id: trainer.id,
     role: 'athletic_trainer',
     name: trainer.name,
     portraitSeed: trainer.portraitSeed,
     tier: trainer.tier as StaffQualityTier,
-    level: trainer.tier as StaffQualityTier,
-    xp: 0,
+    level: rank,
+    xp: trainer.xp ?? 0,
     salaryPerSeason: trainer.salaryPerSeason,
     yearsRemaining: 2,
     specialtyId: trainer.specialty,
@@ -253,7 +278,7 @@ export function athleticTrainerToStaffMember(trainer: AthleticTrainer): StaffMem
   };
 }
 
-/** Extracts active Team Doctor & Athletic Trainer records from a club's unified activeStaff list. */
+/** Extracts active Team Doctor & Athletic Trainer records (including current Rank/XP) from activeStaff. */
 export function extractClubMedicalStaff(staff: readonly StaffMember[]): ClubMedicalStaff {
   const docMember = staff.find((s) => s.role === 'team_doctor');
   const trnMember = staff.find((s) => s.role === 'athletic_trainer');
@@ -264,9 +289,11 @@ export function extractClubMedicalStaff(staff: readonly StaffMember[]): ClubMedi
         name: docMember.name,
         portraitSeed: docMember.portraitSeed,
         tier: docMember.tier as MedicalQualityTier,
+        level: docMember.level as MedicalQualityTier,
+        xp: docMember.xp,
         specialty: docMember.specialtyId as TeamDoctorSpecialty,
         salaryPerSeason: docMember.salaryPerSeason,
-        summary: `Tier ${docMember.tier} ${docMember.specialtyLabel}`,
+        summary: `Rank ${docMember.level} ${docMember.specialtyLabel}`,
       }
     : null;
 
@@ -276,9 +303,11 @@ export function extractClubMedicalStaff(staff: readonly StaffMember[]): ClubMedi
         name: trnMember.name,
         portraitSeed: trnMember.portraitSeed,
         tier: trnMember.tier as MedicalQualityTier,
+        level: trnMember.level as MedicalQualityTier,
+        xp: trnMember.xp,
         specialty: trnMember.specialtyId as AthleticTrainerSpecialty,
         salaryPerSeason: trnMember.salaryPerSeason,
-        summary: `Tier ${trnMember.tier} ${trnMember.specialtyLabel}`,
+        summary: `Rank ${trnMember.level} ${trnMember.specialtyLabel}`,
       }
     : null;
 

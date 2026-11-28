@@ -9,6 +9,7 @@ import {
 import { computeRosterPopularityAttendanceMultiplier } from '../rpg/coEdArchetypes';
 import { updatePlayerFormAfterGame } from '../rpg/formTracker';
 import { evaluateClubhouseMentalAura } from '../rpg/mentalAndLeverage';
+import { awardClubStaffPostGameXp } from '../gm/staffProgression';
 import { computePostGamePitcherRecovery } from '../rpg/pitcherEndurance';
 import { awardDisciplineMasteryFromStatDelta } from '../rpg/skillTreeMastery';
 import { evolveSpecialistArchetype } from '../rpg/specialistsAndPositions';
@@ -340,23 +341,27 @@ export function applyPostGameProgression(
     };
   });
 
-  return {
-    club: {
-      ...clubWithStats,
-      roster: updatedRoster,
-      economy: {
-        ...clubWithStats.economy,
-        cash: Math.max(0, clubWithStats.economy.cash + rewards.cashDelta),
-        fanBase: Math.max(100, clubWithStats.economy.fanBase + rewards.fanDelta),
-        teamHype: Math.max(0, Math.min(100, clubWithStats.economy.teamHype + rewards.hypeDelta)),
-        ...(rewards.economyStamp
-          ? {
-              recentLedgerEntries: rewards.economyStamp.recentLedgerEntries,
-              scheduledPromoId: rewards.economyStamp.scheduledPromoId,
-            }
-          : {}),
-      },
+  const activeHealthCases = updatedRoster.filter((p) => Boolean(p.activeHealthStatus)).length;
+  const clubWithRoster: Club = {
+    ...clubWithStats,
+    roster: updatedRoster,
+    economy: {
+      ...clubWithStats.economy,
+      cash: Math.max(0, clubWithStats.economy.cash + rewards.cashDelta),
+      fanBase: Math.max(100, clubWithStats.economy.fanBase + rewards.fanDelta),
+      teamHype: Math.max(0, Math.min(100, clubWithStats.economy.teamHype + rewards.hypeDelta)),
+      ...(rewards.economyStamp
+        ? {
+            recentLedgerEntries: rewards.economyStamp.recentLedgerEntries,
+            scheduledPromoId: rewards.economyStamp.scheduledPromoId,
+          }
+        : {}),
     },
+  };
+  const staffProg = awardClubStaffPostGameXp(clubWithRoster, won, { activeHealthCases });
+
+  return {
+    club: staffProg.club,
     manager: applyManagerXpAndLevelUp(manager, rewards.managerXp, won),
   };
 }

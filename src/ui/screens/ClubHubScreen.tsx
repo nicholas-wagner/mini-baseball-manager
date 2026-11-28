@@ -29,8 +29,10 @@ import {
   STAFF_SLOT_LIMITS_BY_TIER,
 } from '../../engine/gm/coaches';
 import {
+  athleticTrainerToStaffMember,
   DOCTOR_SPECIALTY_LABELS,
   generateMedicalStaffMarket,
+  teamDoctorToStaffMember,
   TRAINER_SPECIALTY_LABELS,
 } from '../../engine/health/medicalStaff';
 import { isPitcherPosition } from '../../engine/models/player';
@@ -65,6 +67,7 @@ import { ClubTreasuryPanel, type TreasuryJumpTarget } from '../components/ClubTr
 import { FrontOfficeGazettePanel } from '../components/FrontOfficeGazettePanel';
 import { FrontOfficeModeBar } from '../components/FrontOfficeModeBar';
 import { PaintedUniformPreview } from '../components/PaintedUniformPreview';
+import { StaffCrewCard } from '../components/StaffCrewCard';
 import { UniformDesignerPanel } from '../components/UniformDesignerPanel';
 import { WorldSpectaclesPanel } from '../components/WorldSpectaclesPanel';
 import { ComicButton } from '../design-system/ComicButton';
@@ -614,167 +617,114 @@ export function ClubHubScreen({ initialSubTab = 'stadiums', onOpenRoster }: Club
             </div>
 
             {activeStaff.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {activeStaff.map((member) => (
-                  <div
+                  <StaffCrewCard
                     key={member.id}
-                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#D8F3DC] space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <div className="font-display text-xs text-[#181B2C]">
-                          {member.name} • Lv.{member.level} (Tier {member.tier})
-                        </div>
-                        <div className="text-[11px] font-extrabold text-[#1B4332]">
-                          {STAFF_ROLE_LABELS[member.role]} — {member.specialtyLabel}
-                        </div>
-                      </div>
-                      <span className="font-mono-tabular text-xs font-extrabold">
-                        ${member.salaryPerSeason.toLocaleString()}/yr
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-bold text-[#181B2C]">+ {member.perkSummary}</div>
-                    <div className="text-[10px] font-bold text-[#9D0208]">− {member.tradeOffSummary}</div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <ComicButton
-                        size="sm"
-                        variant="gold"
-                        onClick={() => {
-                          const res = runHumanStaffClinic(member.id);
-                          setNotice(res.upgraded ? `${member.name} leveled up at Coaching Clinic!` : (res.reason ?? 'Clinic unavailable.'));
-                          soundEngine.play(res.upgraded ? 'level_up' : 'ui_pop');
-                        }}
-                      >
-                        Clinic Upgrade (${(member.level * 1200).toLocaleString()})
-                      </ComicButton>
-                      <ComicButton
-                        size="sm"
-                        variant="coral"
-                        onClick={() => {
-                          fireHumanClubStaff(member.id);
-                          setNotice(`Released ${member.name} to open a staff slot.`);
-                          soundEngine.play('ui_pop');
-                        }}
-                      >
-                        Release
-                      </ComicButton>
-                    </div>
-                  </div>
+                    member={member}
+                    mode="active"
+                    onClinic={() => {
+                      const res = runHumanStaffClinic(member.id);
+                      setNotice(
+                        res.upgraded
+                          ? `${member.name} promoted at Coaching Clinic!`
+                          : (res.reason ?? 'Clinic unavailable.'),
+                      );
+                      soundEngine.play(res.upgraded ? 'level_up' : 'ui_pop');
+                    }}
+                    onLetGo={() => {
+                      fireHumanClubStaff(member.id);
+                      setNotice(`Let go ${member.name} to open a staff slot.`);
+                      soundEngine.play('ui_pop');
+                    }}
+                  />
                 ))}
               </div>
             ) : (
               <p className="text-xs font-bold text-[#4A5068]">
-                No dugout coaches, Equipment Manager, or medical staff hired yet — pick your favorite trade-off below!
+                No dugout coaches, Equipment Manager, or medical staff hired yet — recruit crew below and level them from Rookie to Legendary!
               </p>
             )}
 
             <div className="space-y-2">
               <div className="font-display text-xs uppercase text-[#181B2C]">
-                Available Coaching &amp; Equipment Manager Candidates
+                Available Coaching &amp; Equipment Manager Candidates (Rank Scales by League Tier)
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {staffMarket.map((candidate) => (
-                  <div
-                    key={candidate.id}
-                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-1"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-display text-xs text-[#181B2C]">
-                        {candidate.name} (Tier {candidate.tier})
-                      </span>
-                      <span className="font-mono-tabular text-[11px] font-extrabold text-[#1B4332]">
-                        ${candidate.salaryPerSeason.toLocaleString()}/yr
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-extrabold text-[#1D3557]">
-                      {STAFF_ROLE_LABELS[candidate.role]} • {candidate.specialtyLabel}
-                    </div>
-                    <div className="text-[10px] font-bold text-[#1B4332]">+ {candidate.perkSummary}</div>
-                    <div className="text-[10px] font-bold text-[#9D0208]">− {candidate.tradeOffSummary}</div>
-                    <ComicButton
-                      size="sm"
-                      variant="turf"
-                      onClick={() => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {staffMarket.map((candidate) => {
+                  const replacing = activeStaff.find((s) => s.role === candidate.role) ?? null;
+                  return (
+                    <StaffCrewCard
+                      key={candidate.id}
+                      member={candidate}
+                      mode="market"
+                      replacingMember={replacing}
+                      onRecruit={() => {
                         const res = hireHumanClubStaff(candidate);
-                        setNotice(res.hired ? `Hired ${candidate.name} as ${STAFF_ROLE_LABELS[candidate.role]}!` : (res.reason ?? 'Could not hire.'));
+                        setNotice(
+                          res.hired
+                            ? `Recruited ${candidate.name} as ${STAFF_ROLE_LABELS[candidate.role]}!`
+                            : (res.reason ?? 'Could not hire.'),
+                        );
                         soundEngine.play(res.hired ? 'cash_chime' : 'ui_pop');
                       }}
-                    >
-                      Hire {STAFF_ROLE_LABELS[candidate.role].split(' ')[0]}
-                    </ComicButton>
-                  </div>
-                ))}
+                    />
+                  );
+                })}
               </div>
             </div>
 
-            {/* Interactive Specialty Team Doctors & Head Athletic Trainers */}
-            <div className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-3">
+            {/* ALL 6 Specialty Team Doctors & ALL 5 Head Athletic Trainers (TASK-129, TASK-130) */}
+            <div
+              data-testid="medical-staff-market"
+              className="p-3 rounded-xl border-2 border-[#181B2C] bg-[#FBF4E4] space-y-3"
+            >
               <div className="font-display text-xs uppercase text-[#181B2C]">
-                🩺 Specialty Team Doctors &amp; Head Athletic Trainers ({medicalMarket.doctors.length} MDs • {medicalMarket.trainers.length} Trainers)
+                🩺 All {medicalMarket.doctors.length} Specialty Team Doctors &amp; {medicalMarket.trainers.length} Head Athletic Trainers
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {medicalMarket.doctors.slice(0, 4).map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-white flex flex-col justify-between gap-1.5"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-display text-xs text-[#181B2C]">
-                          {doc.name} (Tier {doc.tier})
-                        </span>
-                        <span className="font-mono-tabular text-[11px] font-extrabold text-[#1B4332]">
-                          ${doc.salaryPerSeason.toLocaleString()}/yr
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-extrabold text-[#1D3557]">
-                        {DOCTOR_SPECIALTY_LABELS[doc.specialty]}
-                      </div>
-                    </div>
-                    <ComicButton
-                      size="sm"
-                      variant="sky"
-                      onClick={() => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {medicalMarket.doctors.map((doc) => {
+                  const asStaff = teamDoctorToStaffMember(doc);
+                  const replacing = activeStaff.find((s) => s.role === 'team_doctor') ?? null;
+                  return (
+                    <StaffCrewCard
+                      key={doc.id}
+                      member={asStaff}
+                      mode="market"
+                      replacingMember={replacing}
+                      onRecruit={() => {
                         const res = hireHumanTeamDoctor(doc);
-                        setNotice(res.hired ? `Hired ${doc.name} as Team Doctor!` : (res.reason ?? 'Could not hire.'));
+                        setNotice(
+                          res.hired
+                            ? `Recruited ${doc.name} (${DOCTOR_SPECIALTY_LABELS[doc.specialty]})!`
+                            : (res.reason ?? 'Could not hire.'),
+                        );
                         soundEngine.play(res.hired ? 'cash_chime' : 'ui_pop');
                       }}
-                    >
-                      Hire Doctor
-                    </ComicButton>
-                  </div>
-                ))}
-                {medicalMarket.trainers.slice(0, 4).map((trn) => (
-                  <div
-                    key={trn.id}
-                    className="p-2.5 rounded-xl border-2 border-[#181B2C] bg-white flex flex-col justify-between gap-1.5"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-display text-xs text-[#181B2C]">
-                          {trn.name} (Tier {trn.tier})
-                        </span>
-                        <span className="font-mono-tabular text-[11px] font-extrabold text-[#1B4332]">
-                          ${trn.salaryPerSeason.toLocaleString()}/yr
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-extrabold text-[#1D3557]">
-                        {TRAINER_SPECIALTY_LABELS[trn.specialty]}
-                      </div>
-                    </div>
-                    <ComicButton
-                      size="sm"
-                      variant="turf"
-                      onClick={() => {
+                    />
+                  );
+                })}
+                {medicalMarket.trainers.map((trn) => {
+                  const asStaff = athleticTrainerToStaffMember(trn);
+                  const replacing = activeStaff.find((s) => s.role === 'athletic_trainer') ?? null;
+                  return (
+                    <StaffCrewCard
+                      key={trn.id}
+                      member={asStaff}
+                      mode="market"
+                      replacingMember={replacing}
+                      onRecruit={() => {
                         const res = hireHumanAthleticTrainer(trn);
-                        setNotice(res.hired ? `Hired ${trn.name} as Head Athletic Trainer!` : (res.reason ?? 'Could not hire.'));
+                        setNotice(
+                          res.hired
+                            ? `Recruited ${trn.name} (${TRAINER_SPECIALTY_LABELS[trn.specialty]})!`
+                            : (res.reason ?? 'Could not hire.'),
+                        );
                         soundEngine.play(res.hired ? 'cash_chime' : 'ui_pop');
                       }}
-                    >
-                      Hire Trainer
-                    </ComicButton>
-                  </div>
-                ))}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
