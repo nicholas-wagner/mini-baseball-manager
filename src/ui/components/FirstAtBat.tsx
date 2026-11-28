@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Zap } from "lucide-react";
 import { soundEngine } from "../../audio/soundEngine";
-import { buildMascotCheerQuip, PITCH_CALL_GUIDE } from "../../engine/gm/openingDayHook";
+import { buildMascotTapCheer, PITCH_CALL_GUIDE } from "../../engine/gm/openingDayHook";
+import type { ClubRitualProfile } from "../../engine/gm/polaroidKeepsakes";
 import { ClubMascotBuddy } from "./ClubMascotBuddy";
 import type { PitchType } from "../../engine/models/player";
 import type { TacticalCall } from "../../engine/models/playEvent";
@@ -80,6 +81,10 @@ export function FirstAtBat({
   mascotName = null,
   mascotColors = null,
   mascotMood = "happy",
+  clubRituals,
+  onMascotTap,
+  canArgueCall = false,
+  onArgueCall,
 }: {
   session: GameSessionState;
   batting: boolean;
@@ -122,6 +127,10 @@ export function FirstAtBat({
   mascotName?: string | null;
   mascotColors?: { primary: string; secondary: string; accent: string } | null;
   mascotMood?: "happy" | "cheering" | "rally" | "determined";
+  clubRituals?: ClubRitualProfile;
+  onMascotTap?: () => void;
+  canArgueCall?: boolean;
+  onArgueCall?: () => void;
 }) {
   const [mascotTapCount, setMascotTapCount] = useState(0);
   const [mascotCheerText, setMascotCheerText] = useState<string | null>(null);
@@ -307,8 +316,10 @@ export function FirstAtBat({
               onClick={() => {
                 const nextTap = mascotTapCount + 1;
                 setMascotTapCount(nextTap);
-                setMascotCheerText(buildMascotCheerQuip(mascotName, mascotMood, nextTap));
-                soundEngine.play(mascotMood === "cheering" ? "crowd_cheer" : "ui_pop");
+                const cheer = buildMascotTapCheer(mascotName, nextTap - 1, clubRituals);
+                setMascotCheerText(cheer.text);
+                soundEngine.play(cheer.soundCue);
+                onMascotTap?.();
               }}
             >
               <ClubMascotBuddy
@@ -375,6 +386,20 @@ export function FirstAtBat({
           <h3>
             {score} {objective}
           </h3>
+          {canArgueCall && onArgueCall ? (
+            <div className="atbat-steal-strip" role="group" aria-label="Manager drama">
+              <button
+                type="button"
+                data-testid="argue-call-chip"
+                className="atbat-steal-chip"
+                disabled={locked}
+                onClick={onArgueCall}
+                style={{ backgroundColor: "#FFE5EC", color: "#9D0208" }}
+              >
+                🗣️ Argue Call!
+              </button>
+            </div>
+          ) : null}
           {batting ? (
             <>
               {stealOptions.length > 0 && onToggleStealPlay ? (

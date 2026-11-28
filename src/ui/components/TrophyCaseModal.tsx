@@ -10,6 +10,7 @@ import { ComicCard } from '../design-system/ComicCard';
 import { ClubMascotBuddy } from './ClubMascotBuddy';
 import { HobbyAlbum } from './OffTheClock';
 import { PlayerPortraitBadge } from './PlayerPortraitBadge';
+import { PolaroidKeepsakeCard } from './PolaroidKeepsakeCard';
 import { ScorebookPrint } from './ScorebookPrint';
 
 export interface TrophyCaseModalProps {
@@ -79,6 +80,7 @@ export function TrophyCaseModal({
   const totalStickersUnlocked = progress.unlockedCount + liveStickers.unlockedCount;
   const totalStickersCount = progress.badges.length + liveStickers.totalCount;
   const favoritePlayers = club.roster.filter((p) => favoritePlayerIds.includes(p.id));
+  const victoryPolaroids = club.polaroids ?? [];
 
   return (
     <div
@@ -106,6 +108,37 @@ export function TrophyCaseModal({
           <div className="space-y-4">
             <ScorebookPrint moments={club.keepsakes ?? []} />
             <HobbyAlbum club={club} />
+
+            {/* 📸 Victory Polaroids Shelf */}
+            <div
+              data-testid="trophy-polaroids-shelf"
+              className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF8E7] space-y-2.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-display text-xs text-[#1D3557]">
+                  📸 VICTORY POLAROIDS ({victoryPolaroids.length})
+                </div>
+                <span className="text-[10px] font-extrabold text-[#4A5068]">
+                  Walk-offs, Shutouts, Boss Wins &amp; Titles
+                </span>
+              </div>
+              {victoryPolaroids.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {victoryPolaroids.slice(0, 6).map((shot) => (
+                    <PolaroidKeepsakeCard
+                      key={shot.id}
+                      polaroid={shot}
+                      club={club}
+                      compact
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs font-bold text-[#4A5068]">
+                  Win Opening Day, pull off a Walk-Off, toss a Shutout, or topple a Boss Club to snap your first Victory Polaroid!
+                </div>
+              )}
+            </div>
             {/* Mascot Header & Counters */}
             <div className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFF8E7] flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">

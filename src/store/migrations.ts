@@ -1,4 +1,5 @@
 import type { Club, LeagueTierId } from '../engine/models/club';
+import { sanitizeClubRituals } from '../engine/gm/polaroidKeepsakes';
 import type { ManagerProfile } from '../engine/models/manager';
 import { createEmptySeasonStats, isPitcherPosition, type Player, type PlayerSeasonStats } from '../engine/models/player';
 import { createSeededRng } from '../engine/rng/seededRng';
@@ -123,6 +124,8 @@ function hydratePlayerDefaults(player: Player): Player {
 function hydrateClubDefaults(club: Club): Club {
   return {
     ...club,
+    clubRituals: sanitizeClubRituals(club.clubRituals),
+    polaroids: Array.isArray(club.polaroids) ? club.polaroids : [],
     economy: migrateClubEconomy(club.economy),
     stadium: {
       ...club.stadium,

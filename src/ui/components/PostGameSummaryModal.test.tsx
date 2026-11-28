@@ -113,4 +113,40 @@ describe('PostGameSummaryModal (TASK-017 & TASK-100 3-Tab Celebration)', () => {
     expect(within(boxPanel).getByText(/line score/i)).toBeInTheDocument();
     expect(within(boxPanel).getByTestId('postgame-top-performers')).toBeInTheDocument();
   });
+
+  it('displays newly snapped Victory Polaroid inside the Highlights tab when present (TASK-122)', () => {
+    const { club, opponent, summary } = setupCareerAndSummary(1994);
+    const withPolaroid = {
+      ...summary,
+      won: true,
+      latestPolaroid: {
+        id: 'polaroid-s1-g1-walk_off',
+        season: 1,
+        occasion: 'walk_off' as const,
+        badgeLabel: 'WALK-OFF WIN!',
+        headline: 'Walk-Off Magic!',
+        caption: 'Strawberry milkshakes on the skipper with Rocket Dog after a 5-4 walk-off!',
+        scoreLine: '5-4 vs Rivals',
+        stadiumName: club.stadium.name,
+        playerIds: [club.roster[0].id, club.roster[1].id],
+        playerNames: [club.roster[0].name, club.roster[1].name],
+        createdAtGameNumber: 1,
+      },
+    };
+
+    render(
+      <PostGameSummaryModal
+        summary={withPolaroid}
+        humanClub={club}
+        opponentClub={opponent}
+        managerLevel={1}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const polaroid = screen.getByTestId('postgame-victory-polaroid');
+    expect(polaroid).toBeInTheDocument();
+    expect(within(polaroid).getByTestId('polaroid-occasion-ribbon')).toHaveTextContent('WALK-OFF WIN!');
+    expect(within(polaroid).getByText(/strawberry milkshakes on the skipper/i)).toBeInTheDocument();
+  });
 });

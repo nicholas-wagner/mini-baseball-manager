@@ -42,6 +42,7 @@ interface LiveGameCanvasProps {
   onEntranceEnd?: () => void;
   onAudioCue?: (cue: PlaySoundCue) => void;
   shakeOffSignal?: number;
+  stadiumWaveSignal?: number;
   showStretchCue?: boolean;
   audioMuted?: boolean;
   onToggleAudio?: () => void;
@@ -86,6 +87,7 @@ export function LiveGameCanvas({
   onEntranceEnd,
   onAudioCue,
   shakeOffSignal = 0,
+  stadiumWaveSignal = 0,
   showStretchCue = false,
   audioMuted = false,
   onToggleAudio,
@@ -96,6 +98,7 @@ export function LiveGameCanvas({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<GameSceneController | null>(null);
   const prevShakeOffRef = useRef(shakeOffSignal);
+  const prevWaveRef = useRef(stadiumWaveSignal);
   const onAudioCueRef = useRef(onAudioCue);
   onAudioCueRef.current = onAudioCue;
   const [webglUnavailable, setWebglUnavailable] = useState(false);
@@ -154,6 +157,16 @@ export function LiveGameCanvas({
   }, [shakeOffSignal]);
 
   useEffect(() => {
+    if (stadiumWaveSignal > prevWaveRef.current) {
+      const ctrl = controllerRef.current as (GameSceneController & {
+        triggerStadiumWave?: () => void;
+      }) | null;
+      ctrl?.triggerStadiumWave?.();
+    }
+    prevWaveRef.current = stadiumWaveSignal;
+  }, [stadiumWaveSignal]);
+
+  useEffect(() => {
     if (playFinished) controllerRef.current?.finishReplay();
   }, [playFinished, awayClub, homeClub, session, choreo, lastEvent]);
 
@@ -174,6 +187,7 @@ export function LiveGameCanvas({
         data-preview={preview ?? ''}
         data-defensive-shift={defensiveShift ?? ''}
         data-shake-off-signal={String(shakeOffSignal)}
+        data-stadium-wave-signal={String(stadiumWaveSignal)}
       />
 
       {celebrateConfetti ? (
