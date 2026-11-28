@@ -99,6 +99,7 @@ interface LiveActionBarProps {
   pitcherStamina?: number;
   pitcherFatigueDropTag?: string | null;
   latestEvent: PlayEvent | null;
+  latestEventCommentary?: string | null;
   controlMode: GameDayControlMode;
   pitchingMode?: PitchingMode;
   onSelectPitchingMode?: (mode: PitchingMode) => void;
@@ -209,6 +210,7 @@ export function LiveActionBar({
   pitcherStamina,
   pitcherFatigueDropTag = null,
   latestEvent,
+  latestEventCommentary = null,
   controlMode,
   pitchingMode = 'simple',
   onSelectPitchingMode,
@@ -1427,7 +1429,7 @@ export function LiveActionBar({
               <span className="font-extrabold text-[#1B4332] mr-1">
                 [{latestEvent.half} {latestEvent.inning}]
               </span>
-              {latestEvent.commentary}
+              {latestEventCommentary ?? latestEvent.commentary}
             </>
           ) : (
             <span className="text-[#4A5068]">

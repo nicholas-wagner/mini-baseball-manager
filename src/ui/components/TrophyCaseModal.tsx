@@ -4,6 +4,10 @@ import { getStickerArtworkUrl, type StickerArtworkMap } from '../../art/stickers
 import { soundEngine } from '../../audio/soundEngine';
 import { buildStickerAlbumShelf } from '../../engine/gm/celebrationStickers';
 import { evaluateTrophyCaseProgress } from '../../engine/gm/openingDayHook';
+import {
+  hydrateFranchiseRecords,
+  type ClubRecordEntry,
+} from '../../engine/league/clubRecords';
 import { useFoilPackStore } from '../../store/foilPackStore';
 import { useGameStore } from '../../store/gameStore';
 import { ComicCard } from '../design-system/ComicCard';
@@ -81,6 +85,21 @@ export function TrophyCaseModal({
   const totalStickersCount = progress.badges.length + liveStickers.totalCount;
   const favoritePlayers = club.roster.filter((p) => favoritePlayerIds.includes(p.id));
   const victoryPolaroids = club.polaroids ?? [];
+  const records = hydrateFranchiseRecords(club.franchiseRecords);
+  const recordRows: readonly {
+    id: string;
+    emoji: string;
+    label: string;
+    unit: string;
+    entry: ClubRecordEntry | null;
+  }[] = [
+    { id: 'hr-dist', emoji: '💣', label: 'Longest HR', unit: 'FT', entry: records.longestHomeRunFt },
+    { id: 'game-k', emoji: '🔥', label: 'Game Strikeouts', unit: 'K', entry: records.mostSingleGameStrikeouts },
+    { id: 'game-h', emoji: '🏏', label: 'Game Hits', unit: 'H', entry: records.mostSingleGameHits },
+    { id: 'win-streak', emoji: '⚡', label: 'Win Streak', unit: 'W', entry: records.longestWinStreak },
+    { id: 'season-hr', emoji: '👑', label: 'Season HRs', unit: 'HR', entry: records.mostSeasonHomeRuns },
+    { id: 'season-sb', emoji: '💨', label: 'Season Steals', unit: 'SB', entry: records.mostSeasonStolenBases },
+  ];
 
   return (
     <div
@@ -108,6 +127,48 @@ export function TrophyCaseModal({
           <div className="space-y-4">
             <ScorebookPrint moments={club.keepsakes ?? []} />
             <HobbyAlbum club={club} />
+
+            {/* 🏅 Franchise Records Shelf */}
+            <div
+              data-testid="trophy-franchise-records-shelf"
+              className="p-3 rounded-2xl border-2 border-[#181B2C] bg-[#FFFDF7] space-y-2"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <div className="font-display text-xs text-[#1D3557]">
+                  🏅 FRANCHISE RECORDS
+                </div>
+                <span className="text-[10px] font-extrabold text-[#4A5068]">
+                  {records.currentWinStreak >= 2
+                    ? `🔥 Active Streak: ${records.currentWinStreak} W`
+                    : 'All-time club marks'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {recordRows.map((row) => (
+                  <div
+                    key={row.id}
+                    className={`min-w-0 p-2 rounded-xl border-2 border-[#181B2C] ${
+                      row.entry ? 'bg-[#FFF3BF] shadow-[2px_2px_0_#181B2C]' : 'bg-[#F1E4C8]/55'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold text-[#4A5068]">
+                      <span className="truncate">
+                        {row.emoji} {row.label}
+                      </span>
+                      {row.entry ? (
+                        <span className="shrink-0 text-[#1D3557]">S{row.entry.season}</span>
+                      ) : null}
+                    </div>
+                    <div className="font-display text-sm text-[#181B2C] leading-tight mt-0.5">
+                      {row.entry ? `${row.entry.value} ${row.unit}` : '—'}
+                    </div>
+                    <div className="text-[10px] font-bold text-[#4A5068] truncate">
+                      {row.entry ? row.entry.holderName : 'Unclaimed'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* 📸 Victory Polaroids Shelf */}
             <div

@@ -8,6 +8,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useUserPreferencesStore } from '../../store/userPreferences';
 import { GameDayScreen } from '../screens/GameDayScreen';
 import { BroadcastStatSlip } from './BroadcastStatSlip';
+import { MatchupPrints } from './GameDayPrints';
 import { LiveGameCanvas } from './LiveGameCanvas';
 import { PostGameSummaryModal } from './PostGameSummaryModal';
 
@@ -131,6 +132,8 @@ describe('BroadcastStatSlip — 90s TV Broadcast Lower-Third UI (TASK-120)', () 
     const summary = useGameStore.getState().commitCompletedGame(bossClub.id, winningResult, true)!;
     const updatedHuman = useGameStore.getState().getHumanClub()!;
 
+    expect(updatedHuman.franchiseRecords?.currentWinStreak).toBe(1);
+    expect(updatedHuman.franchiseRecords?.longestWinStreak?.value).toBe(1);
     expect(summary.bossShowdown?.bossTitle).toBe('Sandlot Legends');
     expect(summary.bossShowdown?.bountyAwarded).toBe(1_000);
     expect(updatedHuman.economy.recentLedgerEntries?.[0]?.gameLabel).toBe(
@@ -176,12 +179,27 @@ describe('BroadcastStatSlip — 90s TV Broadcast Lower-Third UI (TASK-120)', () 
         homeClub={human}
         session={session}
         defensiveShift="infield_in"
+        favoritePlayerIds={[human.roster[0].id, human.roster[1].id]}
+        hrCelebration="dugout_dance_line"
+        stadiumWaveSignal={2}
         broadcastSlip={<BroadcastStatSlip slip={SAMPLE_SLIP} />}
       />,
     );
     expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute(
       'data-defensive-shift',
       'infield_in',
+    );
+    expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute(
+      'data-favorite-player-count',
+      '2',
+    );
+    expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute(
+      'data-hr-celebration',
+      'dugout_dance_line',
+    );
+    expect(screen.getByTestId('live-game-3d-canvas')).toHaveAttribute(
+      'data-stadium-wave-signal',
+      '2',
     );
     expect(screen.getByTestId('live-broadcast-slip-slot')).toHaveClass('pointer-events-none');
     expect(screen.getByTestId('broadcast-stat-slip')).toHaveTextContent('#24 Maya Chen · CF');
@@ -219,5 +237,41 @@ describe('BroadcastStatSlip — 90s TV Broadcast Lower-Third UI (TASK-120)', () 
       'standard',
     );
     expect(screen.getByTestId('broadcast-stat-slip')).toHaveTextContent(/BOSS SHOWDOWN/i);
+  });
+
+  it("renders Today's At-Bat Memory inside MatchupPrints scouting card without bloating mobile thumb dock (TASK-124)", () => {
+    vi.useRealTimers();
+    useGameStore.getState().startNewCareer({
+      city: 'Sandlot',
+      clubName: 'Comets',
+      mascot: 'Rocket Dog',
+      monogram: 'SC',
+      primaryColor: '#E63946',
+      secondaryColor: '#1D3557',
+      accentColor: '#FFD166',
+      managerName: 'Coach Skip',
+      seed: 1994,
+    });
+    const human = useGameStore.getState().getHumanClub()!;
+    const batter = human.roster.find((p) => p.position !== 'SP' && p.position !== 'RP')!;
+    const pitcher = human.roster.find((p) => p.position === 'SP')!;
+
+    render(
+      <MatchupPrints
+        guided
+        batter={batter}
+        pitcher={pitcher}
+        batterTodayMemory="1st K (Slider) · 3rd 2B (4-Seam)"
+        onInspect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('matchup-today-memory')).toHaveTextContent(
+      'Today: 1st K (Slider) · 3rd 2B (4-Seam)',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Matchup' }));
+    expect(screen.getByTestId('scouting-today-memory')).toHaveTextContent(
+      'Today: 1st K (Slider) · 3rd 2B (4-Seam)',
+    );
   });
 });

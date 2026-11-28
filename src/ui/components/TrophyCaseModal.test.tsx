@@ -63,4 +63,87 @@ describe('TrophyCaseModal — 📸 Victory Polaroids Shelf (TASK-122)', () => {
     expect(within(shelf).getByTestId('polaroid-occasion-ribbon')).toHaveTextContent('BOSS DEFEATED!');
     expect(within(shelf).getByText(/rally nachos/i)).toBeInTheDocument();
   });
+
+  it('renders the compact Franchise Records shelf cleanly for empty and populated club records (TASK-124)', () => {
+    const { rerender } = render(<TrophyCaseModal open onClose={vi.fn()} />);
+
+    const emptyRecordsShelf = screen.getByTestId('trophy-franchise-records-shelf');
+    expect(emptyRecordsShelf).toHaveTextContent(/franchise records/i);
+    expect(emptyRecordsShelf).toHaveTextContent(/longest hr/i);
+
+    const state = useGameStore.getState();
+    const club = state.getHumanClub()!;
+    const slugger = club.roster[0];
+    const ace = club.roster.find((p) => p.position === 'SP') ?? club.roster[1];
+    const updatedClub = {
+      ...club,
+      franchiseRecords: {
+        longestHomeRunFt: {
+          value: 441,
+          holderName: slugger.name,
+          holderId: slugger.id,
+          season: 1,
+          detail: '441 FT (114 MPH)',
+        },
+        mostSingleGameStrikeouts: {
+          value: 11,
+          holderName: ace.name,
+          holderId: ace.id,
+          season: 1,
+          detail: '11 Ks in 1 game',
+        },
+        mostSingleGameHits: {
+          value: 4,
+          holderName: slugger.name,
+          holderId: slugger.id,
+          season: 1,
+          detail: '4-for-4 game',
+        },
+        longestWinStreak: {
+          value: 5,
+          holderName: `${club.city} ${club.name}`,
+          holderId: club.id,
+          season: 1,
+          detail: '5-Game Win Streak',
+        },
+        currentWinStreak: 3,
+        mostSeasonHomeRuns: {
+          value: 14,
+          holderName: slugger.name,
+          holderId: slugger.id,
+          season: 1,
+          detail: '14 HR (S1)',
+        },
+        mostSeasonStolenBases: {
+          value: 18,
+          holderName: slugger.name,
+          holderId: slugger.id,
+          season: 1,
+          detail: '18 SB (S1)',
+        },
+      },
+    };
+    act(() => {
+      useGameStore.setState({
+        leagues: {
+          ...state.leagues,
+          [club.leagueTier]: state.leagues[club.leagueTier].map((c) =>
+            c.id === club.id ? updatedClub : c,
+          ),
+        },
+      });
+    });
+
+    rerender(<TrophyCaseModal open onClose={vi.fn()} />);
+
+    const recordsShelf = screen.getByTestId('trophy-franchise-records-shelf');
+    expect(recordsShelf).toHaveTextContent('441 FT');
+    expect(recordsShelf).toHaveTextContent('11 K');
+    expect(recordsShelf).toHaveTextContent('4 H');
+    expect(recordsShelf).toHaveTextContent('5 W');
+    expect(recordsShelf).toHaveTextContent('14 HR');
+    expect(recordsShelf).toHaveTextContent('18 SB');
+    expect(recordsShelf).toHaveTextContent(slugger.name);
+    expect(recordsShelf).toHaveTextContent(ace.name);
+  });
 });

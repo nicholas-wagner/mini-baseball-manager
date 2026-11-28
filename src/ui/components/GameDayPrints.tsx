@@ -191,6 +191,7 @@ export function MatchupPrints({
   pitcher,
   memories = [],
   batterScoutLine,
+  batterTodayMemory,
   pitcherScoutLine,
   pitcherEndurance,
   pitcherEnduranceTier,
@@ -210,6 +211,7 @@ export function MatchupPrints({
   pitcher: Player;
   memories?: readonly ScorebookMoment[];
   batterScoutLine?: string;
+  batterTodayMemory?: string | null;
   pitcherScoutLine?: string;
   pitcherEndurance?: number;
   pitcherEnduranceTier?: PitcherEnduranceTier;
@@ -286,6 +288,11 @@ export function MatchupPrints({
                   {scoutLine}
                 </em>
               ) : null}
+              {role !== 'On the mound' && batterTodayMemory ? (
+                <em className="matchup-today-line" data-testid="matchup-today-memory">
+                  Today: {batterTodayMemory}
+                </em>
+              ) : null}
               {role === 'On the mound' && typeof pitcherEndurance === 'number' ? (
                 <span
                   className="matchup-endurance-wrap"
@@ -323,6 +330,11 @@ export function MatchupPrints({
       {expanded && <section aria-label="Matchup scouting" className="matchup-scouting">
         <h3>{batter.name}</h3>
         <p>{batter.bats === 'S' ? 'Switch hitter' : batter.bats === 'L' ? 'Bats left' : 'Bats right'} · Contact {batter.ratings.contact} · Power {batter.ratings.power} · Speed {batter.ratings.speed}</p>
+        {batterTodayMemory ? (
+          <p data-testid="scouting-today-memory">
+            <strong>Today:</strong> {batterTodayMemory}
+          </p>
+        ) : null}
         <h3>{pitcher.name}</h3>
         <p>Throws {pitcher.throws === 'L' ? 'left' : 'right'}{pitcher.pitchArsenal && ' · Favorite pitch: ' + PITCH_TYPE_LABELS[pitcher.pitchArsenal.favoritePitch]}</p>
         <p>Endurance {pitcherEndurance}%{pitcherFatigueDropTag && ' · ' + pitcherFatigueDropTag}</p>

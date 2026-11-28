@@ -386,48 +386,47 @@ export function FirstAtBat({
           <h3>
             {score} {objective}
           </h3>
-          {canArgueCall && onArgueCall ? (
-            <div className="atbat-steal-strip" role="group" aria-label="Manager drama">
-              <button
-                type="button"
-                data-testid="argue-call-chip"
-                className="atbat-steal-chip"
-                disabled={locked}
-                onClick={onArgueCall}
-                style={{ backgroundColor: "#FFE5EC", color: "#9D0208" }}
-              >
-                🗣️ Argue Call!
-              </button>
-            </div>
-          ) : null}
           {batting ? (
             <>
-              {stealOptions.length > 0 && onToggleStealPlay ? (
+              {(stealOptions.length > 0 && onToggleStealPlay) || (canArgueCall && onArgueCall) ? (
                 <div
                   className="atbat-steal-strip"
                   role="group"
-                  aria-label="Base steal options"
+                  aria-label="Base steal and manager options"
                 >
-                  {stealOptions.map((opt, idx) => {
-                    const isArmed = armedStealPlay === opt.playType;
-                    const chipLabel =
-                      isArmed && session.strikes === 2
-                        ? "💨 Steal + Swing (2K)"
-                        : `💨 ${opt.label} (${opt.successPct}%)`;
-                    return (
-                      <button
-                        key={opt.playType}
-                        type="button"
-                        data-testid={idx === 0 ? "guided-steal-btn" : `guided-steal-option-${opt.playType}`}
-                        className="atbat-steal-chip"
-                        aria-pressed={isArmed}
-                        disabled={locked}
-                        onClick={() => onToggleStealPlay(isArmed ? null : opt.playType)}
-                      >
-                        {chipLabel}
-                      </button>
-                    );
-                  })}
+                  {canArgueCall && onArgueCall ? (
+                    <button
+                      type="button"
+                      data-testid="argue-call-chip"
+                      className="atbat-steal-chip"
+                      disabled={locked}
+                      onClick={onArgueCall}
+                      style={{ backgroundColor: "#FFE5EC", color: "#9D0208" }}
+                    >
+                      🗣️ Argue Call!
+                    </button>
+                  ) : null}
+                  {onToggleStealPlay &&
+                    stealOptions.map((opt, idx) => {
+                      const isArmed = armedStealPlay === opt.playType;
+                      const chipLabel =
+                        isArmed && session.strikes === 2
+                          ? "💨 Steal + Swing (2K)"
+                          : `💨 ${opt.label} (${opt.successPct}%)`;
+                      return (
+                        <button
+                          key={opt.playType}
+                          type="button"
+                          data-testid={idx === 0 ? "guided-steal-btn" : `guided-steal-option-${opt.playType}`}
+                          className="atbat-steal-chip"
+                          aria-pressed={isArmed}
+                          disabled={locked}
+                          onClick={() => onToggleStealPlay(isArmed ? null : opt.playType)}
+                        >
+                          {chipLabel}
+                        </button>
+                      );
+                    })}
                 </div>
               ) : null}
               <div className="atbat-choices" role="group" aria-label="Swing approach">
@@ -445,17 +444,31 @@ export function FirstAtBat({
             </>
           ) : (
             <>
-              {pickoffOption && onPickoff ? (
-                <div className="atbat-steal-strip" role="group" aria-label="Pickoff throw">
-                  <button
-                    type="button"
-                    data-testid="guided-pickoff-btn"
-                    className="atbat-steal-chip"
-                    disabled={locked}
-                    onClick={() => onPickoff(pickoffOption.base)}
-                  >
-                    👀 {pickoffOption.label}
-                  </button>
+              {(pickoffOption && onPickoff) || (canArgueCall && onArgueCall) ? (
+                <div className="atbat-steal-strip" role="group" aria-label="Pickoff and manager options">
+                  {canArgueCall && onArgueCall ? (
+                    <button
+                      type="button"
+                      data-testid="argue-call-chip"
+                      className="atbat-steal-chip"
+                      disabled={locked}
+                      onClick={onArgueCall}
+                      style={{ backgroundColor: "#FFE5EC", color: "#9D0208" }}
+                    >
+                      🗣️ Argue Call!
+                    </button>
+                  ) : null}
+                  {pickoffOption && onPickoff ? (
+                    <button
+                      type="button"
+                      data-testid="guided-pickoff-btn"
+                      className="atbat-steal-chip"
+                      disabled={locked}
+                      onClick={() => onPickoff(pickoffOption.base)}
+                    >
+                      👀 {pickoffOption.label}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
               {pitchingMode === "simple" ? (

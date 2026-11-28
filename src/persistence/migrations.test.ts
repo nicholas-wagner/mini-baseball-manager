@@ -80,6 +80,15 @@ describe('TASK-108 economy & TASK-114 skill-tree migrations', () => {
       luckySnack: 'strawberry_milkshakes',
     });
     expect(loaded.leagues.low_a[0].polaroids).toEqual([]);
+    expect(loaded.leagues.low_a[0].franchiseRecords).toEqual({
+      longestHomeRunFt: null,
+      mostSingleGameStrikeouts: null,
+      mostSingleGameHits: null,
+      longestWinStreak: null,
+      currentWinStreak: 0,
+      mostSeasonHomeRuns: null,
+      mostSeasonStolenBases: null,
+    });
     expect(loaded.leagues.low_a[0].roster[0].careerRetrainsUsed).toBe(0);
     expect(loaded.leagues.low_a[0].roster[1].careerRetrainsUsed).toBe(1);
   });

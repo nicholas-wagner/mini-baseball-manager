@@ -3,6 +3,7 @@ import type { ClubRitualProfile, PolaroidKeepsake } from '../gm/polaroidKeepsake
 import type { ScorebookMoment } from '../gm/scorebookMoments';
 import type { BallparkPresetId } from '../ballparks/stadiumCatalog';
 import type { FieldPosition } from '../handedness/types';
+import type { ClubFranchiseRecords } from '../league/clubRecords';
 import type { CoachStaffState } from './manager';
 import type { Player } from './player';
 
@@ -167,6 +168,7 @@ export interface Club {
   earnedStickerIds?: string[];
   clubRituals?: ClubRitualProfile;
   polaroids?: PolaroidKeepsake[];
+  franchiseRecords?: ClubFranchiseRecords;
   id: string;
   isHuman: boolean;
   city: string;

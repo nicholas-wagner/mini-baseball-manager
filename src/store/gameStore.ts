@@ -57,6 +57,7 @@ import {
 import type { StartingRosterPreset } from '../engine/gm/rosterPresets';
 import type { FieldPosition } from '../engine/handedness/types';
 import { applyBossBountyLedgerEntry } from '../engine/league/bossClubs';
+import { updateClubFranchiseRecordsAfterGame } from '../engine/league/clubRecords';
 import {
   advanceOffseasonWorld,
   generateSixTierWorld,
@@ -136,6 +137,7 @@ export interface StartNewCareerInput {
 export interface PostGameSummary {
   moments?: ScorebookMoment[];
   latestPolaroid?: PolaroidKeepsake | null;
+  recordBrokenHeadlines?: string[];
   opponentClubId: string;
   opponentName: string;
   isHomeGame: boolean;
@@ -1333,12 +1335,28 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
         season: state.seasonNumber,
         gameNumber: humanClub.wins + humanClub.losses + 1,
       });
-      const settledHumanClub: Club = latestPolaroid
-        ? {
-            ...bossSettlement.club,
-            polaroids: appendPolaroidKeepsake(bossSettlement.club.polaroids ?? [], latestPolaroid),
-          }
-        : bossSettlement.club;
+      const recordUpdate = updateClubFranchiseRecordsAfterGame(
+        bossSettlement.club.franchiseRecords,
+        {
+          club: bossSettlement.club,
+          session: result.finalState,
+          humanWon: won,
+          season: state.seasonNumber,
+          events: result.events,
+        },
+      );
+      const settledHumanClub: Club = {
+        ...bossSettlement.club,
+        franchiseRecords: recordUpdate.records,
+        ...(latestPolaroid
+          ? {
+              polaroids: appendPolaroidKeepsake(
+                bossSettlement.club.polaroids ?? [],
+                latestPolaroid,
+              ),
+            }
+          : {}),
+      };
       const updatedOpponent = applyGameStatDeltasToClub(
         opponentClub,
         result.playerStatDeltas,
@@ -1429,6 +1447,9 @@ export function createGameStore(repository: SaveRepository = createSaveRepositor
       const summary: PostGameSummary = {
         moments: selectScorebookMoments(result.events, side.playersById, isHomeGame, opponentClub.name, gameId, guidedEvents),
         latestPolaroid,
+        ...(recordUpdate.brokenHeadlines.length > 0
+          ? { recordBrokenHeadlines: recordUpdate.brokenHeadlines }
+          : {}),
         opponentClubId: opponentClub.id,
         opponentName: `${opponentClub.city} ${opponentClub.name}`,
         isHomeGame,

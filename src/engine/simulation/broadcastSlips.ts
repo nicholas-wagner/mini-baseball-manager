@@ -1,4 +1,5 @@
 import { matchBossClubProfile } from '../league/bossClubs';
+import { detectLiveRecordBreaker } from '../league/clubRecords';
 import type { Club } from '../models/club';
 import { isScoringOrHitOutcome, type PlayEvent } from '../models/playEvent';
 import { createEmptySeasonStats, type Player, type PlayerSeasonStats } from '../models/player';
@@ -28,6 +29,7 @@ export interface BroadcastStatSlipParams {
   lastEvent: PlayEvent | null;
   awayClub: Club;
   homeClub: Club;
+  season?: number;
 }
 
 const STRIKEOUT_MILESTONES: ReadonlySet<number> = new Set([5, 7, 10]);
@@ -227,12 +229,58 @@ function tryCareerHitMilestoneSlip(
   };
 }
 
+function resolveHumanClub(awayClub: Club, homeClub: Club): Club | null {
+  if (homeClub.isHuman) return homeClub;
+  return awayClub.isHuman ? awayClub : null;
+}
+
+function resolveRecordActor(
+  params: BroadcastStatSlipParams,
+  event: PlayEvent,
+  humanClub: Club,
+): Player | null {
+  const { battingSide, fieldingSide, battingClub, fieldingClub } = resolveEventSides(params, event);
+  return battingClub.id === humanClub.id
+    ? lookupPlayer(battingSide, battingClub, event.batterId)
+    : lookupPlayer(fieldingSide, fieldingClub, event.pitcherId ?? fieldingSide.activePitcherId);
+}
+
+function tryFranchiseRecordSlip(
+  params: BroadcastStatSlipParams,
+  event: PlayEvent,
+): BroadcastStatSlipData | null {
+  const humanClub = resolveHumanClub(params.awayClub, params.homeClub);
+  if (!humanClub) return null;
+  if (humanClub.franchiseRecords === undefined && params.season === undefined) return null;
+
+  const alert = detectLiveRecordBreaker(
+    humanClub.franchiseRecords,
+    event,
+    params.session,
+    humanClub,
+    params.season ?? 1,
+  );
+  if (!alert) return null;
+
+  const actor = resolveRecordActor(params, event, humanClub);
+  return {
+    id: `milestone-record-${event.seq}-${alert.value}`,
+    kind: 'milestone',
+    kicker: '🏆 NEW CLUB RECORD!',
+    title: actor ? formatPlayerTitle(actor) : `${humanClub.city} ${humanClub.name}`,
+    statLine: alert.headline,
+    accentHex: '#FFC300',
+    badgeText: `🏅 ${alert.label.toUpperCase()}`,
+  };
+}
+
 function buildPriorityMilestoneSlip(
   params: BroadcastStatSlipParams,
 ): BroadcastStatSlipData | null {
   const event = params.lastEvent;
   if (!event) return null;
   return (
+    tryFranchiseRecordSlip(params, event) ??
     tryHomeRunSlip(params, event) ??
     tryRobberyOrWebGemSlip(params, event) ??
     tryPickoffSlip(params, event) ??

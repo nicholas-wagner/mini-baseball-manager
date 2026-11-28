@@ -61,6 +61,15 @@ const MANAGER_TONE_CLASSES: Record<'skipper' | 'coach' | 'mogul' | 'balanced', s
   balanced: 'bg-[#E0FBFC] text-[#1D3557]',
 };
 
+function formatBuildIdentityPill(identity: { shortTag: string; label: string }): string {
+  const [icon = '', ...rest] = identity.shortTag.trim().split(/\s+/);
+  const tagWord = rest.join(' ').trim();
+  if (!tagWord || identity.label.toLowerCase().includes(tagWord.toLowerCase())) {
+    return icon ? `${icon} ${identity.label}` : identity.label;
+  }
+  return `${identity.shortTag} · ${identity.label}`;
+}
+
 export function SkillTreeScreen() {
   const humanClub = useGameStore((s) => s.getHumanClub());
   const manager = useGameStore((s) => s.manager);
@@ -417,7 +426,7 @@ export function SkillTreeScreen() {
                       data-testid="player-build-identity"
                       className={`px-2 py-0.5 rounded-md border border-[#181B2C] font-display text-[10px] ${BUILD_TONE_CLASSES[buildIdentity.tone]}`}
                     >
-                      {buildIdentity.shortTag} · {buildIdentity.label}
+                      {formatBuildIdentityPill(buildIdentity)}
                     </span>
                   </div>
                   <div className="text-[10.5px] font-bold text-[#4A5068]">

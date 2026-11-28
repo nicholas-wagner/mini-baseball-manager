@@ -48,7 +48,8 @@ describe('SkillTreeScreen — Capped Build-Identity Trees, Session Undo & Offsea
     expect(screen.getByText(/player skill trees & heritage mastery/i)).toBeInTheDocument();
     expect(screen.getByText(/12 SP Available/i)).toBeInTheDocument();
     expect(screen.getByTestId('career-talent-budget')).toHaveTextContent(/Career Talent: 0 \/ 12 SP/i);
-    expect(screen.getByTestId('player-build-identity')).toHaveTextContent(/Developing Prospect/i);
+    expect(screen.getByTestId('player-build-identity')).toHaveTextContent('🌱 Developing Prospect');
+    expect(screen.getByTestId('player-build-identity').textContent).not.toMatch(/prospect.*prospect/i);
 
     // Unlock Tier 1 Cultural Heritage (1 SP -> 11 SP left)
     await user.click(screen.getByRole('button', { name: /unlock tier 1 \(1 sp\)/i }));
@@ -72,7 +73,8 @@ describe('SkillTreeScreen — Capped Build-Identity Trees, Session Undo & Offsea
     await user.click(screen.getByRole('button', { name: /^unlock \(3 sp\)$/i }));
 
     expect(screen.getByTestId('career-talent-budget')).toHaveTextContent(/Career Talent: 6 \/ 12 SP/i);
-    expect(screen.getByTestId('player-build-identity')).toHaveTextContent(/Power Specialist/i);
+    expect(screen.getByTestId('player-build-identity')).toHaveTextContent('💣 Power Specialist');
+    expect(screen.getByTestId('player-build-identity').textContent).not.toMatch(/power.*power/i);
     // Rival Tier-3 batter capstones show "🔒 Specialized" pill!
     expect(screen.getByTestId('capstone-locked-pill-cap_rally_spark')).toHaveTextContent(/Specialized/i);
 
