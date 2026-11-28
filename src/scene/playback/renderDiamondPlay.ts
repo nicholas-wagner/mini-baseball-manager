@@ -3,7 +3,7 @@ import { ROBBERY_CALL, WEB_GEM_CALL } from './fieldingHighlights';
 import { PICKOFF_CALLS, isPickoffKind } from './plateAndSteals';
 import type { playReadout } from './playReadout';
 import { BASE_PATH_VERTICES } from './diamondLayout';
-import { railReaction, welcomePose } from './teamReactions';
+import { railReaction, selectLiveActorMood, toPortraitMood, welcomePose } from './teamReactions';
 import { fitFieldOfView, type CameraPose } from '../camera/cameraRig';
 import { pitchFlightScale } from '../vfx/ballFlightVisual';
 import { getPitchTrailVisual } from './pitchFlight';
@@ -120,7 +120,9 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
         vfx.spawnComicCallout('SNAP!', at, '#F4A261', 'contact');
       }
     }
-    if (leg === play.legs[1] && play.kind === 'home_run') vfx.celebration.homer(Boolean(play.mascotCannon));
+    if (leg === play.legs[1] && play.kind === 'home_run') {
+      vfx.celebration.homer(Boolean(play.mascotCannon) || play.hrCelebration === 'mascot_confetti');
+    }
     if (leg === play.legs[1] && (play.webGem || play.outfield?.robbedHomeRun)) {
       const robbery = play.outfield?.robbedHomeRun;
       const call = robbery ? ROBBERY_CALL : WEB_GEM_CALL;
@@ -165,6 +167,16 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   }
   if (readout?.base && previous < play.batterArrival && seconds >= play.batterArrival) {
     vfx.impact(BASE_PATH_VERTICES[readout.base], '#FFCE54');
+  }
+  if (play.kind === 'home_run' && previous < play.batterArrival && seconds >= play.batterArrival) {
+    if (play.hrCelebration === 'helmet_high_five') {
+      vfx.celebration.starSparkle({ x: BASE_PATH_VERTICES[0].x, y: 1.15, z: BASE_PATH_VERTICES[0].z });
+    } else if (play.hrCelebration === 'mascot_confetti') {
+      vfx.celebration.confettiBurst();
+    }
+  }
+  if (play.favoriteSparkle && play.kind === 'steal_safe' && previous < play.leadArrival && seconds >= play.leadArrival) {
+    vfx.celebration.starSparkle(contact('RUN', play.leadArrival));
   }
   const dropAt = play.legs[0].end+(play.kind==='ball_four'?.48:.20);
   vfx.droppedBat.visible=false;
@@ -215,12 +227,16 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
   teammates.forEach((member,index)=>{
     const ending=play.ending;
     const pose = ending?.kind === 'walkoff' && t >= ending.start
-      ? welcomePose(index,t-ending.start) : index === 0 ? railReaction(play,t) : undefined;
+      ? welcomePose(index,t-ending.start) : railReaction(play,t,index);
     member.root.visible = Boolean(pose);
     if (!pose) return;
     member.root.position.copy(pose.pos);
     member.logicalYaw=pose.yaw;
-    member.updatePose(pose.clip,pose.local,undefined,camera.position);
+    const mateMood =
+      ending?.kind === 'walkoff' || (play.kind === 'home_run' && play.hrCelebration === 'dugout_dance_line')
+        ? 'happy'
+        : undefined;
+    member.updatePose(pose.clip,pose.local,mateMood,camera.position);
   });
   const received = play.legs.filter(l => t >= l.end).at(-1);
   for (const actor of actors) {
@@ -231,7 +247,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const state = stateAt(actor, t);
     rig.logicalYaw = state.yaw;
     rig.root.position.copy(state.pos);
-    const grin = play.kind === 'double_play' && actor === '1B' && t > play.finish + .20;
+    const mood = toPortraitMood(selectLiveActorMood({ actor, play, time: t }));
     // On a foul into the stands the catcher sends a fresh ball back to the mound.
     const freshBall = actor === 'C' && play.kind === 'foul_back' && state.clip === 'catch_throw';
     const ready = state.clip === 'bat_stance' || state.clip === 'pitch_set' || state.clip === 'pitch_stretch_set' || state.clip === 'catch_target';
@@ -239,7 +255,7 @@ export function renderDiamondPlay(play: DiamondPlay, cast: DiamondCast, side: Ef
     const loadingPickoff = play.close?.pickoff && actor === 'P' && t < pitch.start;
     const holdsBall = !flying && (loadingPickoff || freshBall || (!received?.endPoint && received?.to === actor)
       || (!received && play.kind === 'bullpen' && actor === 'C'));
-    rig.updatePose(state.clip, local, grin ? 'happy' : undefined, camera.position, holdsBall,
+    rig.updatePose(state.clip, local, mood, camera.position, holdsBall,
       actor === 'RUN' && play.close?.pickoff && state.clip === 'runner_slide');
   }
 }

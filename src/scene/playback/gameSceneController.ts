@@ -1,4 +1,5 @@
 import { useGameStore } from '../../store/gameStore';
+import type { HrCelebrationId } from '../../engine/gm/polaroidKeepsakes';
 import type { DefensiveShiftId } from '../../engine/simulation/winProbability';
 import { isPickoffKind } from './plateAndSteals';
 import { getShiftDefenderCoords } from './defensiveShiftCoords';
@@ -102,6 +103,10 @@ export class GameSceneController {
   private ambient = new THREE.HemisphereLight();
   private sun = new THREE.DirectionalLight();
   private crowdExcitement = .2;
+  private favoritePlayerIds: readonly string[] | null = null;
+  private hrCelebration: HrCelebrationId = 'helmet_high_five';
+  private hrCelebrationExplicit = false;
+  private isHighLeverage = false;
   private queuedTarget: PitchTargetIntent | null = null;
   private calledTarget: PitchTargetIntent | null = null;
   private targetPlaced = false;
@@ -122,6 +127,20 @@ export class GameSceneController {
 
   public triggerPitcherShakeOff() {
     this.shakeOffStart = this.elapsedSec;
+  }
+
+  public triggerStadiumWave(): void {
+    this.ballpark.triggerWave(this.elapsedSec);
+    this.crowdExcitement = Math.max(this.crowdExcitement, 0.85);
+  }
+
+  public setFavoritePlayerIds(ids: readonly string[]): void {
+    this.favoritePlayerIds = [...ids];
+  }
+
+  public setHrCelebration(style: HrCelebrationId): void {
+    this.hrCelebration = style;
+    this.hrCelebrationExplicit = true;
   }
   private entrance: PlayerEntranceCue | null = null;
   private entranceTime = 0;
@@ -441,12 +460,33 @@ export class GameSceneController {
       ? diamondPlay(fallbackKind, choreo.highlightFielderPos, event ?? undefined, event?.pickoffBase,
         event?.pitchThrown, (choreo.basesBefore ?? session.bases).some(Boolean))
       : undefined);
+    this.isHighLeverage = Boolean(
+      event?.isClutchMoment ||
+        (event?.leverageIndex ?? 0) >= 1.5 ||
+        (session.inning >= Math.max(1, session.regulationInnings - 1) &&
+          Math.abs(session.home.score - session.away.score) <= 2),
+    );
     if (choreo) this.shakeOffStart = -Infinity;
     if (play && choreo) {
       const calledTarget = this.calledTarget ?? play.pitchTarget;
       if (play.close?.steal || play.close?.pickoff || play.kind === 'bullpen') this.calledTarget = null;
       else this.calledTarget = calledTarget ?? (play.close ? 'attack_zone' : null);
-      if (play.outfield && (play.scorerBase || play.runnerToThird) && play.ending?.kind !== 'walkoff') {
+      const hrCelebration =
+        play.kind === 'home_run'
+          ? (this.hrCelebrationExplicit
+              ? this.hrCelebration
+              : (battingClub.clubRituals?.hrCelebration ?? this.hrCelebration))
+          : undefined;
+      if (play.kind === 'home_run' && hrCelebration === 'dugout_dance_line' && play.ending?.kind !== 'walkoff') {
+        const candidates = battingClub.roster.filter(p => p.id !== batter.id && !bases.includes(p.id));
+        const dancers = [
+          ...candidates.filter(p => p.personality === 'showboat' || p.personality === 'prankster'),
+          ...candidates.filter(p => p.personality !== 'showboat' && p.personality !== 'prankster'),
+        ].slice(0, 3);
+        if (dancers.length) {
+          this.welcome.set(dancers.map(p => ({ traits: p.traits, jerseyNumber: p.jerseyNumber, throwsHand: p.throws, team: battingTeam, role: 'fielder' })));
+        }
+      } else if (play.outfield && (play.scorerBase || play.runnerToThird) && play.ending?.kind !== 'walkoff') {
         const candidates = battingClub.roster.filter(p => p.id !== batter.id && !bases.includes(p.id));
         const buddy = candidates.find(p => p.personality === 'showboat' || p.personality === 'prankster') ?? candidates[0];
         if (buddy) this.welcome.set([{traits:buddy.traits,jerseyNumber:buddy.jerseyNumber,throwsHand:buddy.throws,team:battingTeam,role:'fielder'}]);
@@ -462,12 +502,47 @@ export class GameSceneController {
       const rate = (play.duration + (play.holdForceCall ? FORCE_HOLD_SECONDS : 0) - (choreo.startAt ?? 0)) * 1000 / choreo.durationMs;
       const venuePlay = stageSplashHit(play, this.stadiumOverlay?.spec.hasSplashCove ?? false);
       const alignment = getShiftDefenderCoords(this.defensiveShift, choreo.basesBefore ?? session.bases);
-      const accentActor = sparkleContact(play)?.to;
-      const featuredId = accentActor === 'BAT' ? batter.id : accentActor && (event?.fieldingHighlight?.fielderId
-        ?? fieldingSide.lineup.find(slot => slot.defensivePosition === accentActor)?.playerId);
+      const favoriteIds = this.favoritePlayerIds ?? useGameStore.getState().favoritePlayerIds;
       const highlights = eventHighlights(event);
-      if (featuredId && useGameStore.getState().favoritePlayerIds.includes(featuredId)) highlights.favoriteSparkle = true;
-      const filmed = { ...venuePlay, ...highlights, alignment, battingPreview, batterView: play.batterView ?? battingSide.isHuman, pitchTarget: calledTarget ?? play.pitchTarget, reliefStrikeout, mascotCannon: homeClub.stadium.hasMascotCannon };
+      const isOffenseHighlight = isBaseHit(play) || play.kind === 'steal_safe';
+      const isDefenseOutHighlight =
+        Boolean(play.outfield?.caught || play.webGem) ||
+        play.kind === 'pop_up' ||
+        play.kind === 'infield_liner' ||
+        play.kind === 'ground_out' ||
+        play.kind === 'double_play' ||
+        play.kind === 'bunt_out' ||
+        play.kind === 'cover_first' ||
+        play.kind === 'steal_out' ||
+        play.kind === 'pickoff_out';
+      if (isOffenseHighlight) {
+        const stealerId = play.kind === 'steal_safe' ? bases[(play.close?.fromBase ?? 1) - 1] : null;
+        if (favoriteIds.includes(batter.id) || (stealerId && favoriteIds.includes(stealerId))) {
+          highlights.favoriteSparkle = true;
+        }
+      } else if (isDefenseOutHighlight) {
+        const accentActor = sparkleContact(play)?.to ?? choreo.highlightFielderPos ?? play.pickup;
+        const defenderId =
+          event?.fieldingHighlight?.fielderId ??
+          (accentActor === 'P' || accentActor === 'SP' || accentActor === 'RP'
+            ? pitcher.id
+            : fieldingSide.lineup.find(slot => slot.defensivePosition === accentActor)?.playerId);
+        if (defenderId && favoriteIds.includes(defenderId)) {
+          highlights.favoriteSparkle = true;
+        }
+      }
+      const filmed = {
+        ...venuePlay,
+        ...highlights,
+        hrCelebration,
+        highLeverage: this.isHighLeverage,
+        alignment,
+        battingPreview,
+        batterView: play.batterView ?? battingSide.isHuman,
+        pitchTarget: calledTarget ?? play.pitchTarget,
+        reliefStrikeout,
+        mascotCannon: homeClub.stadium.hasMascotCannon,
+      };
       const runningBase = play.scorerBase ?? play.runnerToThird ?? (play.close?.steal || play.close?.pickoff
         ? play.close.fromBase : play.kind === 'sac_fly' ? 3 : 1);
       this.replay = { freezeAt:choreo.freezeAt, play: filmed,
@@ -572,7 +647,8 @@ export class GameSceneController {
     const catchTime = receive + .3 * CLIP_DURATIONS.catch_receive;
     play.pitch.end = catcher.contactAt('catch_receive', .3 * CLIP_DURATIONS.catch_receive, catcher.root.position, this.camera.position);
     const stillPitching = time < CLIP_DURATIONS[play.pitcherClip];
-    pitcher.updatePose(stillPitching ? play.pitcherClip : 'idle', stillPitching ? time : 0, undefined, this.camera.position);
+    const prePlateMood = this.isHighLeverage && receive < 0 ? 'determined' : undefined;
+    pitcher.updatePose(stillPitching ? play.pitcherClip : 'idle', stillPitching ? time : 0, prePlateMood, this.camera.position);
     catcher.updatePose(catchTime >= 0 && catchTime < .42 ? 'catch_receive' : 'field_ready',
       Math.max(0, catchTime), undefined, this.camera.position, receive >= 0 && receive < .33);
     const swing = time - play.swingAt;
@@ -581,7 +657,7 @@ export class GameSceneController {
     const barrel = fullSwing && !this.vfx.reducedMotion && inSwingArcWindow(receive)
       ? this.batterRig.contactAt(this.batterClip,play.plateAt-play.swingAt,this.batterRig.root.position,this.camera.position) : null;
     this.vfx.drawSwingArc(barrel,this.bats,receive);
-    this.batterRig.updatePose(active ? this.batterClip : 'bat_stance', active ? swing : 0, undefined, this.camera.position);
+    this.batterRig.updatePose(active ? this.batterClip : 'bat_stance', active ? swing : 0, prePlateMood, this.camera.position);
     const flight = sampleDeliveryFlight(play, time, this.vfx.reducedMotion);
     if (flight && receive < 0) {
       this.vfx.ball.draw(flight.spec, flight.progress, flight.visual, pitchFlightScale(flight.progress, .46));
@@ -672,7 +748,8 @@ export class GameSceneController {
         const state = advancing ? buntRunnerPose(play, i + 1, t) : runBases(BASE_PATH_VERTICES[i + 1], i + 1, destination, t, go, arrival);
         runner.root.position.copy(state.pos);
         runner.logicalYaw = state.yaw;
-        runner.updatePose(state.clip, state.local, undefined, this.camera.position);
+        const runnerMood = play.kind === 'home_run' && t >= play.legs[0].end ? 'happy' : undefined;
+        runner.updatePose(state.clip, state.local, runnerMood, this.camera.position);
         if (destination === 4 && t > arrival + .28) runner.root.visible = false;
       });
       this.targetRing.quaternion.copy(this.camera.quaternion);
@@ -717,6 +794,7 @@ export class GameSceneController {
     );
 
     this.targetRing.visible = Boolean(this.preview && !swing && !this.entrance && !this.pitch);
+    const clutchIdleMood = this.isHighLeverage ? 'determined' : undefined;
     for (const [pos, rig] of this.defenders.entries()) {
       if (pos !== 'P' && pos !== 'C') this.alignFielder(pos, rig, dt);
       if (this.pitch && (pos === 'P' || pos === 'C')) continue;
@@ -737,18 +815,18 @@ export class GameSceneController {
           this.targetRing.quaternion.copy(this.camera.quaternion);
         } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
       } else if (pos === 'P' && this.elapsedSec-this.shakeOffStart < CLIP_DURATIONS.pitch_shake_off) {
-        rig.updatePose('pitch_shake_off',this.elapsedSec-this.shakeOffStart,undefined,this.camera.position);
+        rig.updatePose('pitch_shake_off',this.elapsedSec-this.shakeOffStart,clutchIdleMood,this.camera.position);
       } else if (pos === 'P' && this.entrance?.role === 'pitcher') {
         rig.updatePose(this.pitcherRitual, entranceTime, undefined, this.camera.position);
-      } else rig.updatePose(clip, this.elapsedSec, undefined, this.camera.position);
+      } else rig.updatePose(clip, this.elapsedSec, pos === 'P' ? clutchIdleMood : undefined, this.camera.position);
     }
     if (this.pitch) this.drawPitch(this.pitch);
     else if (tap) this.showGloveTap(entranceTime);
     else if (this.entrance?.role === 'batter') this.batterRig.updatePose(this.batterRitual, entranceTime, undefined, this.camera.position);
     else if (swing) {
       const pose = rehearsalPose(swing,this.elapsedSec-this.previewStart,this.steadyCamera);
-      this.batterRig.updatePose(pose.clip,pose.time,undefined,this.camera.position);
-    } else this.batterRig.updatePose(this.batterClip, this.elapsedSec, undefined, this.camera.position);
+      this.batterRig.updatePose(pose.clip,pose.time,clutchIdleMood,this.camera.position);
+    } else this.batterRig.updatePose(this.batterClip, this.elapsedSec, clutchIdleMood, this.camera.position);
     for (const runner of this.runnerRigs) {
       if (runner.root.visible) {
         runner.updatePose('runner_lead', this.elapsedSec, undefined, this.camera.position);

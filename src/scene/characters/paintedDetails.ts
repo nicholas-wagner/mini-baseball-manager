@@ -114,6 +114,16 @@ export function createFaceDetails() {
       const smile = `M${left} ${leftY}Q${mouthX} ${lip+5} ${right} ${rightY}Q${mouthX+2} ${lip+21} ${left} ${leftY}Z`;
       fill(smile,'#fff4da'); line(smile,ink,2.5);
     }
+    if (mood===4) {
+      const eyeAngle = Math.atan2(ry - ly, rx - lx);
+      const eyeSpan = Math.hypot(rx - lx, ry - ly);
+      c.save();
+      c.translate(lx, ly);
+      c.rotate(eyeAngle);
+      line(`M${-eyeSpan * 0.28} -15L${eyeSpan * 0.22} -10`, ink, 3.2);
+      line(`M${eyeSpan * 0.78} -10L${eyeSpan * 1.2} -15`, ink, 3.2);
+      c.restore();
+    }
     const lipAngle = Math.atan2(rightY - leftY, right - left);
     const [jawL, jawY, lowL, lowLY, chin, bottom, lowR, lowRY, jawR, farY] = face.jaw;
     if (groom === 'shortBeard' || groom === 'longBeard' || groom === 'stubble') {

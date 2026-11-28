@@ -479,7 +479,15 @@ export function createPaintedPlayerRig(
     head.position.set(0, 72 * headUnit, 0);
     const showDetails = !rear || headSheet === 'helmet-quarter';
     headMat.uniforms.showDetails.value = Number(showDetails);
-    if (showDetails) detail.paint(a, headSheet, faceCell, clip==='slide_safe' || (opt.quietInfielder && caught && mood==='happy') ? 3 : emotion, opt.team.accent);
+    const detailMood =
+      clip === 'slide_safe' ||
+      (opt.quietInfielder && caught && mood === 'happy') ||
+      (!style.expressions && mood === 'happy')
+        ? 3
+        : !style.expressions && mood === 'determined'
+          ? 4
+          : emotion;
+    if (showDetails) detail.paint(a, headSheet, faceCell, detailMood, opt.team.accent);
     const setMitt = role === 'catcher' && ['catch_target','catch_receive','catch_frame'].includes(clip);
     const returnCatch = role === 'pitcher' && clip === 'field_receive';
     const tuck = returnCatch ? -.14 * THREE.MathUtils.smoothstep(time,.18,.46) : 0;

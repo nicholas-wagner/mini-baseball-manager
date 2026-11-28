@@ -1,6 +1,6 @@
 import type { GameDayWeather } from '../../engine/simulation/weather';
 import { createDrizzle, parkLight } from './parkWeather';
-import { DUGOUT_RAIL } from '../playback/teamReactions';
+import { computeStadiumWaveLift, DUGOUT_RAIL } from '../playback/teamReactions';
 import * as THREE from 'three';
 import { BATTERS_BOX, INFIELD_DIRT, OUTFIELD_WALL, batterBox } from '../playback/diamondLayout';
 import { createClayTexture, createFloodlights, createHorizon } from './parkScenery';
@@ -13,6 +13,7 @@ export interface BallparkEnvironment {
   setWeather: (weather: GameDayWeather | null, reducedMotion: boolean) => void;
   setVenueMarquee: (name: string, architecture: string, wallColor: string) => void;
   cheerBehindHome: (timeSec: number) => void;
+  triggerWave: (timeSec: number) => void;
   updateScoreboard: (snapshot: LiveStadiumScoreboardSnapshot) => void;
   dispose: () => void;
 }
@@ -301,6 +302,7 @@ export function createMiniBallpark(): BallparkEnvironment {
   let weather: GameDayWeather | null = null;
   let steady = false;
   let standAt = -Infinity;
+  let waveStartSec = -Infinity;
   function setWeather(next: GameDayWeather | null, reducedMotion: boolean) {
     weather = next;
     steady = reducedMotion;
@@ -731,7 +733,8 @@ export function createMiniBallpark(): BallparkEnvironment {
       const beat = timeSec - standAt - Math.max(0, s.x + 7) * .012;
       const stand = s.z >= 9 && !steady
         ? THREE.MathUtils.smoothstep(beat,0,.14) * (1 - THREE.MathUtils.smoothstep(beat,.60,1.12)) : 0;
-      const hop = steady ? 0 : Math.abs(Math.sin(timeSec * bounceSpeed + s.phase)) * bounceAmp + stand * .58;
+      const waveLift = computeStadiumWaveLift(s.x, timeSec - waveStartSec, steady);
+      const hop = steady ? 0 : Math.abs(Math.sin(timeSec * bounceSpeed + s.phase)) * bounceAmp + stand * .58 + waveLift;
       const y = s.y + hop - 0.23;
       dummy.position.set(s.x, y, s.z);
       dummy.scale.set(0.34, 0.36, 0.25);
@@ -793,6 +796,7 @@ export function createMiniBallpark(): BallparkEnvironment {
       sign.material.map = createBillboardTexture(name, architecture.toUpperCase(), wallColor, '#ffd166');
     },
     cheerBehindHome(timeSec) { standAt = timeSec; },
+    triggerWave(timeSec) { waveStartSec = timeSec; },
     updateScoreboard: scoreboardDisplay.updateScoreboard,
     dispose,
   };

@@ -175,6 +175,10 @@ export function createStadiumCelebration() {
       fireworks.start();
       if (cannon) confetti.start();
     },
+    confettiBurst() {
+      if (steady) return;
+      confetti.start();
+    },
     starSparkle(at: Vec3) {
       if (steady) return;
       if (!stars) {

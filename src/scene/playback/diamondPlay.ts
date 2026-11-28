@@ -1,5 +1,6 @@
 import { divingCatchPose, isDivingWebGem } from './fieldingHighlights';
 import { plateBatterPose, type BattingPreviewPose } from './firstAtBatPresentation';
+import type { HrCelebrationId } from '../../engine/gm/polaroidKeepsakes';
 import type { PitchTargetIntent } from '../../engine/simulation/pitchMindGames';
 import { pitchSeconds, shapePitch, type PitchFlight } from './pitchFlight';
 import { reactionCamera, reactionPose, bullpenPlay } from './teamReactions';
@@ -46,6 +47,8 @@ export interface DiamondPlay {
   webGem?: boolean;
   brokenBat?: boolean;
   hrStatcast?: { distanceFt: number; exitVeloMph: number; landmarkCall?: string };
+  hrCelebration?: HrCelebrationId;
+  highLeverage?: boolean;
   favoriteSparkle?: boolean;
   fromStretch?: boolean;
   battingPreview?: BattingPreviewPose;
@@ -93,10 +96,21 @@ export function isBaseHit(play: DiamondPlay) {
   return Boolean(play.outfield?.bags) || play.kind === 'bunt_single';
 }
 
-/** The ball reaches the favorite batter at contact, or the favorite fielder at the catch. */
+/** The ball reaches the favorite batter at contact, or the favorite fielder at the catch/out. */
 export function sparkleContact(play: DiamondPlay): Leg | undefined {
   if (isBaseHit(play)) return play.legs[0];
   if (play.outfield?.caught || play.webGem || play.kind === 'pop_up' || play.kind === 'infield_liner') return play.legs[1];
+  if (
+    play.favoriteSparkle &&
+    (play.kind === 'ground_out' ||
+      play.kind === 'double_play' ||
+      play.kind === 'bunt_out' ||
+      play.kind === 'cover_first' ||
+      play.kind === 'steal_out' ||
+      play.kind === 'pickoff_out')
+  ) {
+    return play.legs.at(-1);
+  }
 }
 
 export function diamondPlay(kind: DiamondPlayKind, highlight?: FieldPosition, event?: ReplayEvent, stealBase?: 1 | 2 | 3, pitchInfo: PitchFlight | undefined = event?.pitchThrown, fromStretch = kind === 'steal_safe' || kind === 'steal_out'): DiamondPlay {
